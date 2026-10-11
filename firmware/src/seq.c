@@ -808,7 +808,7 @@ static __attribute__((noinline)) void audition_tick(uint32_t n)
 /* -------------------------------------------------------- sequencer --- */
 static void seq_start(void)
 {
-    static uint8_t tess_inited = 0; if (!tess_inited) { tessera_init(); tess_inited = 1; }
+    tessera_ensure_init();
     uint32_t i;
     seq_erase_request = 0;
     seq_erase_transport++;
@@ -991,7 +991,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             if (tr_idx < TESSERA_TRACKS && tessera.mode[tr_idx] != TESS_ENG_OFF) {
                 tessera_clock_step(t);
             } else {
-                seq_step(t, s, period, skip);
+                seq_step(t, s, step_gate(s) ? step_samples(t, period, t->seq_idx) : period, skip);
             }
         }
     }

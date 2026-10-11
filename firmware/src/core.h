@@ -90,7 +90,6 @@ enum {                          /* per-track parameters */
     P_FM2_ATK, P_FM2_DEC, P_FM2_SUS, P_FM2_REL, P_FM2_LEVEL,
     P_FM3_ATK, P_FM3_DEC, P_FM3_SUS, P_FM3_REL, P_FM3_LEVEL,
     P_FM4_ATK, P_FM4_DEC, P_FM4_SUS, P_FM4_REL, P_FM4_LEVEL,
-    P_TESS_PROB, P_TESS_LEN, P_TESS_SPAN, P_TESS_DENS, P_TESS_MPH,
     P_CHRD, P_VOIC,                            /* chord keys (chord.c): one key plays a chord; its voicing */
     P_MPCDEG,                                  /* QNT MPC: the scale degree MPC pad H02 plays, 1 = the root */
     P_LN0, P_LN1, P_LN2, P_LN3, P_LN4, P_LN5, P_LN6, P_LN7, /* DRUM lane levels, 127 = original gain */

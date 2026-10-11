@@ -792,6 +792,7 @@ static void pv_picture(void)
             pp = (int32_t)(TSEL->seq_idx % (uint32_t)clamp(TSEL->p[P_SLEN], 1, NSTEP));
         }
     }
+    if (pic == 6u) sig ^= tessera_sig(trk_index(TSEL)) * 2654435761u;
     sig ^= pic == 0u ? (ui.frame >> 1) * 2654435761u : 0u;   /* (the scope: every other frame) */
     if (pic >= 5u) {                                    /* ARP, PATTERN, SLICER: the keys, steps, the SLICER's step */
         sig ^= steps_hash(TSEL) + (song.playing ? 1u + sl[song.sel].idx * 257u : 0u) * 2246822519u;

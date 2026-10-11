@@ -118,7 +118,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
 
             if (i < len) {
                 /* Calculate relative pitch height based on historical bit shift */
-                uint8_t raw_history = (tur->reg >> (len - 1u - i)) & 0xFFu;
+                uint8_t raw_history = ((tur->reg & (len >= 16u ? 0xFFFFu : ((1u << len) - 1u))) >> (len - 1u - i)) & 0xFFu;
                 uint8_t span = tur->oct_span ? tur->oct_span : 1;
                 uint32_t step_val = ((raw_history / 7) % span) * 7 + (raw_history % 7);
                 uint32_t max_val = (span * 7) - 1;
@@ -158,9 +158,8 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             }
 
             if (i < len) {
-                uint32_t rot_safe = euc->rot % len;
-                uint32_t active = (((i + len - rot_safe) * euc->pulses) % len) < euc->pulses;
-                int is_head = (song.playing && i == euc->step_idx);
+                uint32_t active = (uint32_t)tessera_euclid_hit((uint8_t)i, (uint8_t)len, euc->pulses, euc->rot);
+                int is_head = (song.playing && i == (euc->step_idx + len - 1u) % len);
 
                 if (active) {
                     cv_rrect(sx, y_base, step_w, h, 1, is_head ? c : T_TEXT, bg);

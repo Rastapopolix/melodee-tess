@@ -203,11 +203,6 @@ static const param_desc_t TP[P_COUNT] = {
                 [P_FM##k##_LEVEL] = PD("LVL", F_PCT, 0, 127, 127)
     FMOP(1), FMOP(2), FMOP(3), FMOP(4),
 #undef FMOP
-    [P_TESS_PROB] = PD("T-PROB", F_PCT, 0, 100, 50),
-    [P_TESS_LEN] = PD("T-LEN", F_INT, 1, 64, 16),
-    [P_TESS_SPAN] = PD("T-SPAN", F_INT, 1, 5, 2),
-    [P_TESS_DENS] = PD("T-DENS", F_PCT, 0, 100, 100),
-    [P_TESS_MPH] = PD("T-MRPH", F_PCT, 0, 100, 50),
     [P_CHRD] = PE("CHRD", N_CHRD, 0),
     [P_VOIC] = PE("VOIC", N_VOIC, 0),
     [P_MPCDEG] = PD("DEG", F_INT, 1, 12, 1),         /* its max: the scale's notes (track_desc) */
@@ -534,8 +529,6 @@ static const page_t PAGES[] = {
     {"VOICE", FAM_EDIT, SC_TRACK, GR_NONE, {P_VOICE, P_GLIDE, P_GLMODE, P_PRIO}},
     {"VOICE 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_ALLOC, P_DETUNE, P_PAN, P_MUTE}},
     {"VOICE 3", FAM_EDIT, SC_TRACK, GR_NONE, {P_SPRD, 0xFF, 0xFF, 0xFF}},
-    {"TESSERA", FAM_EDIT, SC_TRACK, GR_NONE, {P_TESS_PROB, P_TESS_LEN, P_TESS_SPAN, P_TESS_DENS}},
-    {"TESS 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_TESS_MPH, 0xFF, 0xFF, 0xFF}},
     {"GLOBAL", FAM_GLO, SC_GLOBAL, GR_NONE, {G_A4, 0xFF, G_CLOCK, G_TUNE}},      /* A4 device reference; CLK/TUNE kept (GLO_KEPT) */
     {"SYSTEM", FAM_GLO, SC_GLOBAL, GR_NONE, {G_MIDI, G_DRUMCH, G_ROUTE, G_INFO}},
     {"PRESETS", FAM_SAVE, SC_GLOBAL, GR_BROWSE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* browser: KNOB 1 LIST, 2 / PRESETS the sounds */

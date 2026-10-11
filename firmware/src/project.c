@@ -1203,7 +1203,9 @@ typedef struct {
     drum_patch_t drum[NTRK];
     uint32_t size, magic;                         /* last: the record's end */
 } tmpl_t;
-
+_Static_assert(sizeof(tmpl_t) == 2u * G_COUNT + 2u + NTRK * (2u + 2u * P_COUNT) + NTRK * (FM6_PACKED + FM6_NFN) + PROJ_CZ_BYTES + PROJ_P5_BYTES + NTRK*sizeof(drum_patch_t) + 8u &&
+               sizeof(tmpl_t) == TMPL_SIZE_E + NTRK*sizeof(drum_patch_t),
+               "template layout (P_COUNT, G_COUNT, FM6_PACKED: a conversion)");
 static tmpl_t tmpl; /* balance the new recording state across RAM and POOL */
 static struct { persist_t p; tmpl_t t; } set_rec __attribute__((section(".pool")));   /* the settings record */
 _Static_assert(sizeof set_rec == sizeof(persist_t) + sizeof(tmpl_t), "the template follows the settings");
@@ -1221,8 +1223,7 @@ static int tmpl_blob_valid(const uint8_t *b, uint32_t len)
     if (size != len) return 0;
     if ((len == TMPL_SIZE5 && magic == TMPL_MAGIC5) || (len == TMPL_SIZE6 && magic == TMPL_MAGIC6)) return 1;
     off = TMPL_SIZE6 - 8u;
-    if (len == sizeof tmpl && magic == TMPL_MAGIC) { n = CZ_BYTES; off += 176u; }
-    else if (len==TMPL_SIZE_E && magic==TMPL_MAGIC_E) { n = CZ_BYTES; off += 96u; }
+    if ((len == sizeof tmpl && magic == TMPL_MAGIC) || (len==TMPL_SIZE_E && magic==TMPL_MAGIC_E)) { n = CZ_BYTES; off += 96u; }
     else if (len == TMPL_SIZE_D && magic == TMPL_MAGIC_D) { n = CZ_BYTES; off += 64u; }
     else if (len == TMPL_SIZE_C && magic == TMPL_MAGIC_C) n = CZ_BYTES;
     else if (len == TMPL_SIZE_B && magic == TMPL_MAGIC_B) n=CZ_BYTES;
@@ -1235,14 +1236,14 @@ static int tmpl_blob_valid(const uint8_t *b, uint32_t len)
         if (n == CZ_BYTES ? !cz_patch_valid(p) : !cz_legacy_tone(tone, p, n)) return 0;
     }
     if(len==sizeof tmpl || len==TMPL_SIZE_E || len==TMPL_SIZE_D || len==TMPL_SIZE_C)for(uint32_t k=0;k<NTRK;k++){p5_patch_t p;memcpy(&p,b+off+PROJ_CZ_BYTES+k*sizeof p,sizeof p);if(!p5_patch_valid(&p))return 0;}
-    if(len==sizeof tmpl)for(uint32_t k=0;k<NTRK;k++)if(!drum_patch_valid((const drum_patch_t *)(b+TMPL_SIZE_E+72u+k*sizeof(drum_patch_t))))return 0;
+    if(len==sizeof tmpl)for(uint32_t k=0;k<NTRK;k++)if(!drum_patch_valid((const drum_patch_t *)(b+TMPL_SIZE_E-8u+k*sizeof(drum_patch_t))))return 0;
     return 1;
 }
 static int tmpl_take(const uint8_t *b, uint32_t len)
 {
     memset(&tmpl, 0, sizeof tmpl);
     if (!tmpl_blob_valid(b, len)) return 0;
-    uint32_t np = (len == sizeof tmpl) ? P_COUNT : (len==TMPL_SIZE_E) ? (P_COUNT - 5u) : len==TMPL_SIZE_D ? 100u : 92u, pos = 2u * G_COUNT + 2u;
+    uint32_t np = (len == sizeof tmpl || len==TMPL_SIZE_E) ? P_COUNT : len==TMPL_SIZE_D ? 100u : 92u, pos = 2u * G_COUNT + 2u;
     memcpy(tmpl.g, b, sizeof tmpl.g); tmpl.sel = b[2u * G_COUNT];
     for (uint32_t k = 0; k < NTRK; k++) {
         int16_t values[P_COUNT], def[P_COUNT];
@@ -1274,8 +1275,8 @@ static int tmpl_take(const uint8_t *b, uint32_t len)
             }
         }
     }
-    for(uint32_t k=0;k<NTRK;k++){if(len==sizeof tmpl || len==TMPL_SIZE_E || len==TMPL_SIZE_D || len==TMPL_SIZE_C)memcpy(&tmpl.p5[k],b+TMPL_SIZE_A-8u+((len==sizeof tmpl)?176u:(len==TMPL_SIZE_E)?96u:len==TMPL_SIZE_D?64u:0u)+k*sizeof(p5_patch_t),sizeof(p5_patch_t));else p5_patch_init(&tmpl.p5[k]);}
-    if(len==sizeof tmpl){memcpy(tmpl.drum,b+TMPL_SIZE_E+72u,sizeof tmpl.drum);for(uint32_t k=0;k<NTRK;k++)if(!drum_patch_valid(&tmpl.drum[k]))return 0;}
+    for(uint32_t k=0;k<NTRK;k++){if(len==sizeof tmpl || len==TMPL_SIZE_E || len==TMPL_SIZE_D || len==TMPL_SIZE_C)memcpy(&tmpl.p5[k],b+TMPL_SIZE_A-8u+((len==sizeof tmpl || len==TMPL_SIZE_E)?96u:len==TMPL_SIZE_D?64u:0u)+k*sizeof(p5_patch_t),sizeof(p5_patch_t));else p5_patch_init(&tmpl.p5[k]);}
+    if(len==sizeof tmpl){memcpy(tmpl.drum,b+TMPL_SIZE_E-8u,sizeof tmpl.drum);for(uint32_t k=0;k<NTRK;k++)if(!drum_patch_valid(&tmpl.drum[k]))return 0;}
     tmpl.magic = TMPL_MAGIC; tmpl.size = sizeof tmpl;
     return 1;
 }

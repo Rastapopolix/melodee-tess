@@ -156,11 +156,13 @@ void tessera_clock_step(track_t *t)
         tur->reg = ((tur->reg << 1) | bit0) & 0xFFFFu;
 
         uint8_t span = tur->oct_span ? tur->oct_span : 1;
-        uint8_t raw = tur->reg & 0xFFu;
+        uint16_t tmask = (len >= 16) ? 0xFFFFu : (uint16_t)((1u << len) - 1u);
+        uint16_t mreg = tur->reg & tmask;
+        uint8_t raw = mreg & 0xFFu;
         uint8_t idx = raw % 7;
         uint8_t oct = (raw / 7) % span;
         note = 36 + (oct * 12) + TESS_SCALE_MIN[idx];
-        vel = 90 + ((tur->reg >> 8) & 0x1Fu);
+        vel = 90 + ((mreg >> 8) & 0x1Fu);
         if (tur->reg & 1u) {
             should_trigger = 1;
         }
@@ -252,6 +254,7 @@ void tessera_clock_step(track_t *t)
 
 void tessera_knob(uint32_t k, int32_t s)
 {
+    tessera_ensure_init();
     uint32_t tr = song.sel;
     if (tr >= TESSERA_TRACKS || !s) return;
 
@@ -351,4 +354,27 @@ void tessera_knob(uint32_t k, int32_t s)
             m->snap_b = MORPH_PRESETS[pb];
         }
     }
+}
+
+void tessera_ensure_init(void)
+{
+    static uint8_t done;
+    if (!done) { done = 1; tessera_init(); }
+}
+
+uint32_t tessera_sig(uint32_t tr)
+{
+    if (tr >= TESSERA_TRACKS || tessera.mode[tr] == TESS_ENG_OFF) return 0;
+    uint32_t h = tessera.mode[tr] * 1009u + tessera.last_note[tr] * 53u + tessera.active_gate[tr];
+    switch (tessera.mode[tr]) {
+    case TESS_ENG_TURING: { const tessera_turing_t *a = &tessera.turing[tr];
+        h ^= a->reg * 31u + a->len * 7u + a->oct_span * 131u; break; }
+    case TESS_ENG_EUCLID: { const tessera_euclid_t *a = &tessera.euclid[tr];
+        h ^= a->steps * 31u + a->pulses * 7u + a->rot * 131u + a->step_idx * 17u; break; }
+    case TESS_ENG_MARKOV: { const tessera_markov_t *a = &tessera.markov[tr];
+        h ^= a->cur_state * 31u + a->tension * 7u + a->density * 131u; break; }
+    case TESS_ENG_MORPH:  { const tessera_morph_t *a = &tessera.morph[tr];
+        h ^= a->snap_a * 31u + a->snap_b * 7u + a->morph_pos * 131u + a->step_idx * 17u; break; }
+    }
+    return h;
 }
