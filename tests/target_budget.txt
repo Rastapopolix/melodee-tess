@@ -1,0 +1,71 @@
+# MELODEE target cost budget (tests/target_budget.py): instructions in the loops of each
+# function in build/melodee.dis, x4 per nesting level, divides x9. The check allows +10 %.
+# Rewritten by BUDGET_UPDATE=1.
+# Natural-loop metric normalized against unchanged serial 27806bb disassembly; existing relative headroom retained.
+# Optional recording paths are checked separately from the audio interrupt.
+midi_parameter 47
+audition_tick 129
+click_render 30
+analog_render 393
+phase_render 127
+sid_render 1204
+formant_render 314
+trio_render 341
+trio_pass 175
+wheel_render 267
+wheel_block 102
+phys_render 61
+drum_render 72
+noise_render 247
+# Native fp32 serial FM6, decoded r3/fprev1 and counted with natural loops.
+# Includes extracted operator/output helpers; dual-core profile measures 3439.
+fm6_render 3385
+px_modal_block 111
+px_modal_run 192
+px_memb_block 106
+px_string_excite 171
+px_string_run 264
+px_symp_run 252
+dr_bd 127
+dr_sd 137
+dr_tom 105
+dr_rs 148
+dr_cl 70
+dr_cp 59
+dr_ma 49
+dr_metal 121
+dr_cb 68
+dr_cy 114
+dr_hat 37
+dr8_run 20
+slicer_track 632
+fm1_alnk0_irq 18778
+# Standalone voice-loop baseline from 83cdcdc's track_render, compiled
+# noinline with the same target flags. Existing ISR/engine limits unchanged.
+track_render_audio 821
+mod_begin 158
+mod_voice 30
+mod_end 7
+perf_begin 28
+perf_mute 21
+perf_pre 27
+perf_block 507
+perf_master 31
+rev_room 218
+rev_spring 126
+cz_native_render 529
+cz_native_wave 0
+drum_source 10
+drum_limit 22
+drum_color 19
+dr_metal_tune 7
+d9_render_bd 224
+d9_render_sd 280
+d9_render_tom 3064
+d9_render_rim 4383
+d9_render_clap 1047
+d9_render_smp 1444
+
+# Native fp32 Prophet kernels, r3 + fprev1 disassembly.
+p5_samples 1075
+p5_mod_samples 105

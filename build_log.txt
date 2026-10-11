@@ -1,0 +1,28 @@
+gen_909_tables: tanh and EXP pots -> /home/theo/src/tessera/build/gen/x0x_drum_tables.h
+In file included from firmware/src/melodee.c:87:
+In file included from firmware/src/seq.c:224:
+firmware/src/motion.c:18:1: error: static_assert failed "motion: the native ids after the track's"
+_Static_assert(P_COUNT <= MO_NATIVE && MO_NATIVE + MO_NATIVE_N <= 256u, "motion: the native ids after the track's");
+^              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from firmware/src/melodee.c:108:
+firmware/src/project.c:1206:1: error: static_assert failed "template layout (P_COUNT, G_COUNT, FM6_PACKED: a conversion)"
+_Static_assert(sizeof(tmpl_t) == 2u * G_COUNT + 2u + NTRK * (2u + 2u * P_COUNT) + NTRK * (FM6_PACKED + FM6_NFN) + PROJ_CZ_BYTES + PROJ_P5_BYTES + NTRK*sizeof(drum_patch_t) + 8u &&
+^              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 errors generated.
+loader: image 8396 B at 0x1c0a800, bss end 0x1c0f4a0
+loader: ota.bin 7094 B
+face X: Rubik[wght].ttf@500 9px h12 base9  105 glyphs x 4  data 6572 B + table 3360 B + kern 4650 B (1550 pairs) = 14592 B   digit adv 6.00px
+face S: Rubik[wght].ttf@400 11px h14 base11  105 glyphs x 4  data 8597 B + table 3360 B + kern 4545 B (1515 pairs) = 16512 B   digit adv 7.00px
+face M: Rubik[wght].ttf@500 15px h19 base15  105 glyphs x 4  data 13013 B + table 3360 B + kern 4836 B (1612 pairs) = 21219 B   digit adv 10.00px
+face L: Rubik[wght].ttf@500 30px h37 base29  69 glyphs x 2  data 10103 B + table 1104 B + kern 2538 B (846 pairs) = 13813 B   digit adv 19.00px
+fonts total 66136 B  -> /home/theo/src/tessera/build/gen/ui_fonts.h
+icons 12px: 71 cells, 5257 B
+icons 16px: 36 cells, 4753 B
+icons 24px: 14 cells, 4177 B
+icons total 14187 B -> /home/theo/src/tessera/build/gen/ui_icons.h   (71 drawings)
+keycaps: 26 pills, data 4516 B + table 208 B; knob arcs 1478 B = 6202 B -> /home/theo/src/tessera/build/gen/ui_keycaps.h
+tables: /home/theo/src/tessera/build/gen/melodee_tables.h
+fm6 patches: 8 -> /home/theo/src/tessera/build/gen/melodee_fm6.h
+cz1 factory: 64 tones -> /home/theo/src/tessera/build/gen/melodee_cz1.h
+Prophet factory: 200 exact native programs -> /home/theo/src/tessera/build/gen/melodee_prophet_factory.h
+build: pi32v2/bin/clang failed
