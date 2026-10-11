@@ -714,6 +714,40 @@ static void draw_columns(void)
         return;
     }
 #endif
+    if (cur_page()->graph == GR_FORM) {
+        uint32_t tr = song.sel;
+        const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
+        char f2[16];
+        fmt_int(f2, ev->contrast);
+        draw_column(0, "FORM", tessera_form_name(ev->form), "", VAL(0u), (int32_t)ev->form * 1000 / 6, ICON_AUTO);
+        draw_column(1, "CONTRAST", f2, "%", VAL(1u), (int32_t)ev->contrast * 10, ICON_AUTO);
+        draw_column(2, "CLEAR", "TURN", "", VAL(2u), -1, ICON_AUTO);
+        {
+            char w3[16];
+            int32_t fl = ev->flourish;
+            if (!fl) str_cpy(w3, "OFF", sizeof w3);
+            else { w3[0] = fl < 0 ? '-' : '+'; fmt_int(w3 + 1, (uint32_t)(fl < 0 ? -fl : fl)); }
+            draw_column(3, "FLOURISH", w3, fl ? "st" : "", VAL(3u), (fl + 12) * 1000 / 24, ICON_AUTO);
+        }
+        return;
+    }
+    if (cur_page()->graph == GR_TWEAK) {
+        uint32_t tr = song.sel;
+        const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
+        char w0[16], w1[16], w2[16], w3[8];
+        int32_t sh = ev->shift;
+        w0[0] = sh < 0 ? '-' : '+';
+        fmt_int(w0 + 1, (uint32_t)(sh < 0 ? -sh : sh));
+        fmt_int(w1, ev->drop);
+        fmt_int(w2, ev->human);
+        if (ev->follow) { w3[0] = 'T'; w3[1] = (char)('0' + ev->follow); w3[2] = 0; }
+        else str_cpy(w3, "OFF", sizeof w3);
+        draw_column(0, "SHIFT", w0, "st", VAL(0u), (sh + 24) * 1000 / 48, ICON_AUTO);
+        draw_column(1, "DROP", w1, "%", VAL(1u), (int32_t)ev->drop * 10, ICON_AUTO);
+        draw_column(2, "HUMAN", w2, "%", VAL(2u), (int32_t)ev->human * 10, ICON_AUTO);
+        draw_column(3, "FOLLOW", w3, "", VAL(3u), (int32_t)ev->follow * 1000 / 4, ICON_AUTO);
+        return;
+    }
     if (cur_page()->graph == GR_EVOLVE) {
         uint32_t tr = song.sel;
         const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];

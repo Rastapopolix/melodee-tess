@@ -775,6 +775,16 @@ static void edit_param(uint32_t slot, int32_t steps)
         ui.force = 1;
         return;
     }
+    if (pg->graph == GR_TWEAK) {
+        tessera_tweak_knob(slot, steps);
+        ui.force = 1;
+        return;
+    }
+    if (pg->graph == GR_FORM) {
+        tessera_form_knob(slot, steps);
+        ui.force = 1;
+        return;
+    }
     if (pg->graph == GR_STEPS) {
         uint32_t sel_tr = song.sel;
         if (sel_tr < TESSERA_TRACKS) {
@@ -1999,7 +2009,7 @@ static void ui_input(void)
             page_over = 0;
         } else {            edit_param(k, s);
             const page_t *pg = cur_page();
-            int tess_active = (pg->graph == GR_EVOLVE) || (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF));
+            int tess_active = (pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_TWEAK) || (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF));
             if (!tess_active) {
                 pick_touch(k);
             }

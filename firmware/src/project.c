@@ -886,6 +886,72 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
     return 0;
 }
 
+
+/* ---- Tessera: its state is one flash object (OBJ_TESSERA: 4 slots x tag + block), apart from the project record
+ * (no room in it). A slot's block is valid only while its tag equals the project record's hash (proj_saved_hash):
+ * any other write to the slot (an archive, a failed or interrupted save) loads the project with Tessera OFF. */
+#define TESS_OBJ_MAGIC 0x31525354u                    /* "TSR1" */
+#define TESS_SLOT_BYTES (4u + TESSERA_PK_BYTES)
+#define TESS_OBJ_BYTES (4u + 4u * TESS_SLOT_BYTES)
+_Static_assert(TESS_OBJ_BYTES <= ST_SECTOR - 256u - sizeof(st_hdr_t), "Tessera object: one sector");
+static uint8_t tess_blob[TESS_OBJ_BYTES] __attribute__((section(".pool")));
+
+/* the stored object -> tess_blob; 0 = none / damaged (tess_blob then empty, ready to fill) */
+static int tess_obj_read(void)
+{
+    uint32_t m = TESS_OBJ_MAGIC, got;
+    int n = st_load(OBJ_TESSERA, tess_blob, sizeof tess_blob);
+    memcpy(&got, tess_blob, 4);
+    if (n == (int)sizeof tess_blob && got == m) return 1;
+    memset(tess_blob, 0, sizeof tess_blob);
+    memcpy(tess_blob, &m, 4);
+    return 0;
+}
+static uint8_t *tess_slot(uint32_t slot) { return tess_blob + 4u + (slot & 3u) * TESS_SLOT_BYTES; }
+
+/* the live Tessera state -> slot's block, tagged with the record just written: 0 saved */
+static int tessera_store_save(uint32_t slot)
+{
+#if MELODEE_FLASH
+    uint32_t tag = proj_saved_hash[slot & 3u];
+    if (!flash_ok) return 1;
+    tess_obj_read();
+    memcpy(tess_slot(slot), &tag, 4);
+    tessera_pack(tess_slot(slot) + 4u);
+    return st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob) ? 1 : 0;
+#else
+    (void)slot; return 0;
+#endif
+}
+
+/* slot's block -> the live state, if its tag is the record's hash (else: left as it is) */
+static void tessera_store_load(uint32_t slot)
+{
+#if MELODEE_FLASH
+    uint32_t tag, want = proj_saved_hash[slot & 3u];
+    if (!flash_ok || !want || !tess_obj_read()) return;
+    memcpy(&tag, tess_slot(slot), 4);
+    if (tag == want) tessera_unpack(tess_slot(slot) + 4u);
+#else
+    (void)slot;
+#endif
+}
+
+/* the record was rewritten without changing the music (a rename): its block follows the new hash */
+static void tessera_store_retag(uint32_t slot, uint32_t old_tag)
+{
+#if MELODEE_FLASH
+    uint32_t tag, now = proj_saved_hash[slot & 3u];
+    if (!flash_ok || !old_tag || !now || old_tag == now || !tess_obj_read()) return;
+    memcpy(&tag, tess_slot(slot), 4);
+    if (tag != old_tag) return;
+    memcpy(tess_slot(slot), &now, 4);
+    (void)st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob);
+#else
+    (void)slot; (void)old_tag;
+#endif
+}
+
 static void project_capture(project_t *p)
 {
     uint32_t i;
@@ -948,7 +1014,7 @@ static int project_save_as(uint32_t slot, const char *name)
     if (proj_write_slot(slot, proj_wire_u.raw, BANK_STORE_SIZE)) { ui_message("SAVE ERROR"); return 2; }
     proj_name_get(proj_name, (const uint8_t *)p->name);
     proj_cur = (uint8_t)(slot & 3u);
-    ui_message(MELODEE_FLASH ? "SAVED" : "SAVED (RAM)");
+    ui_message(tessera_store_save(slot) ? "SAVED (TSR ERR)" : MELODEE_FLASH ? "SAVED" : "SAVED (RAM)");
     return 0;
 }
 static int project_save(uint32_t slot) { return project_save_as(slot, 0); }
@@ -1017,6 +1083,7 @@ static int project_rename(uint32_t slot, const char *name)
     }
     int n = proj_read_slot(slot);
     if (!n) { ui_message("EMPTY SLOT"); return 1; }
+    uint32_t tess_old_tag = proj_saved_hash[slot & 3u];
     memset(p->name, 0, sizeof p->name);
     memcpy(p->name, name, str_len(name) < PROJ_NAME_LEN ? str_len(name) : PROJ_NAME_LEN);
     p->sum = proj_sum(p);
@@ -1029,6 +1096,7 @@ static int project_rename(uint32_t slot, const char *name)
         if (!bank_pack(proj_wire_u.raw, p, 0)) return 2;
     }
     if (proj_write_slot(slot, proj_wire_u.raw, BANK_STORE_SIZE)) { ui_message("SAVE ERROR"); return 2; }
+    tessera_store_retag(slot, tess_old_tag);
     if (proj_cur == (slot & 3u))
         proj_name_get(proj_name, (const uint8_t *)p->name);
 #if MELODEE_FLASH
@@ -1163,6 +1231,8 @@ static void project_load(uint32_t slot)
     if (!project_restore_runtime(&proj_scratch)) {
         if (n == BANK_STORE_SIZE) bank_restore(proj_wire_u.raw);
         proj_cur = (uint8_t)(slot & 3u);
+        tessera_reset();
+        if (n == BANK_STORE_SIZE) tessera_store_load(slot);
     }
 }
 

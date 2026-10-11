@@ -32,6 +32,7 @@ typedef struct {
     uint8_t  rot;         /* Step rotation offset */
     uint8_t  step_idx;    /* Current step index */
     uint8_t  last_hit;    /* 1 if current step fired */
+    uint8_t  pitch_seed;  /* 0 = the original fixed pitch pattern; 1..255 = a random one (ROLL) */
 } tessera_euclid_t;
 
 /* 3. Markov Pitch State */
@@ -41,8 +42,7 @@ typedef struct {
     uint8_t  tension;     /* 0 = tight/stepwise, 100 = wild leaps */
     uint8_t  density;  /* 0=Minor, 1=Major, 2=Dorian, 3=Penta */
     uint8_t  oct_span;    /* 1..3 octave spread */
-    uint8_t  matrix[8][8];/* Normalized cumulative transition weights (0..100) */
-    uint8_t  notes[8];    /* Pitch degree lookup */
+    /* matrix[8][8] / notes[8] removed: the row is derived from tension (tess_markov_row) */
 } tessera_markov_t;
 
 /* 4. Morph State */
@@ -67,9 +67,26 @@ typedef struct {
     uint8_t  pos_now;     /* position of the step being played */
     uint8_t  rec;         /* 2 = armed, 1 = recording this pass, 0 = replaying (Turing: 2 = capture base) */
     uint16_t base_reg;    /* Turing: the register captured at the start of the phrase */
-    uint8_t  buf_note[32];/* Markov / Morph base phrase: bit 7 = hit, bits 0..6 = note */
-    uint8_t  buf_vel[32];
+    uint8_t  form;        /* 0 = OFF, 1..6 = AB ABAC ABCB AABA ABCA AABC (see TESS_FORMS) */
+    uint8_t  contrast;    /* 0..100: how different a new section is from the one before it */
+    uint8_t  sec;         /* current section: 0 = A, 1 = B, 2 = C */
+    uint8_t  form_pos;    /* position inside the form */
+    uint8_t  visited;     /* bit s: section s exists */
+    uint8_t  valid;       /* bit s: section s's recorded phrase is complete (Markov / Morph) */
+    int8_t   shift;       /* TWEAK: semitones added to the track's notes (or to the followed note) */
+    uint8_t  drop;        /* TWEAK: 0..100 chance a hit is dropped, any engine */
+    uint8_t  human;       /* TWEAK: 0..100 velocity and gate variation */
+    uint8_t  follow;      /* TWEAK: 0 = off, 1..4 = play that track's pitch, shifted, in this track's scale */
+    int8_t   flourish;    /* FORM: semitones added on the last beat of every phrase (EVERY bars), 0 = off */
 } tessera_evolve_t;
+
+/* One remembered section (A, B or C) of a track's form */
+typedef struct {
+    uint16_t reg;         /* Turing: base register; Morph: snapshot A */
+    uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos */
+    uint8_t  note[32];    /* Markov / Morph phrase: bit 7 = hit, bits 0..6 = note */
+    uint8_t  vel[16];     /* 4 bits per step */
+} tessera_sec_t;
 
 /* Master Tessera Engine State */
 typedef struct {
@@ -79,6 +96,7 @@ typedef struct {
     tessera_markov_t markov[TESSERA_TRACKS];
     tessera_morph_t  morph[TESSERA_TRACKS];
     tessera_evolve_t evolve[TESSERA_TRACKS];
+    tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
     uint8_t          active_gate[TESSERA_TRACKS];
 } tessera_state_t;
@@ -101,5 +119,13 @@ uint32_t tessera_every_bars(uint32_t every);
 int  tessera_lock_get(uint32_t tr);            /* 0..100, or -1 when LOCK is not available for the mode */
 void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash); /* of == 0: EVERY is OFF */
 void tessera_stop_all(void);
+void tessera_tweak_knob(uint32_t k, int32_t s);
+void tessera_form_knob(uint32_t k, int32_t s);
+uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
+const char *tessera_form_name(uint32_t form);
+#define TESSERA_PK_BYTES 180u                       /* the saved state (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
+int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
+void tessera_reset(void);                           /* every track OFF, defaults */
 
 #endif

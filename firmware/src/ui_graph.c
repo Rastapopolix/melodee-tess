@@ -182,12 +182,14 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         int col = is_panel ? 25 : 27;
         int32_t x0 = is_panel ? 18 : 14;
         uint32_t cur = mk->cur_state & 7u;
+        uint8_t mrow[8];
+        tess_markov_row(mk->tension, cur, mrow);
 
         for (uint32_t i = 0; i < 8u; i++) {
             int32_t sx = x0 + (int32_t)i * col;
             /* matrix[][] is cumulative: the chance of i is the step up from i-1 */
-            uint32_t cum = mk->matrix[cur][i];
-            uint32_t prev = i ? mk->matrix[cur][i - 1u] : 0u;
+            uint32_t cum = mrow[i];
+            uint32_t prev = i ? mrow[i - 1u] : 0u;
             uint32_t pr = cum > prev ? cum - prev : 0u;
             if (pr > 40u) pr = 40u;
             int bar_h = 3 + (int)(pr * (uint32_t)(h - 3) / 40u);
@@ -229,6 +231,30 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         /* morph position: left = A, right = B */
         cv_rect(x0, y_base + h + 9, sw, 1, dim);
         cv_rect(x0 + ((int32_t)mo->morph_pos * (sw - 4)) / 127, y_base + h + 6, 4, 7, c);
+    }
+}
+
+/* FORM page: one cell per section of the form (tall = A, medium = B, short = C); the playing one is lit
+ * and a line under it fills with the bars elapsed */
+static void graph_form(const track_t *t, uint16_t c)
+{
+    uint32_t tr = trk_index(t), pos = 0, bar = 0, of = 0, i, len, w;
+    uint8_t seq[4];
+    int flash = 0;
+    len = tessera_form_get(tr, seq, &pos);
+    tessera_phrase(tr, &bar, &of, &flash);
+    if (!len) {
+        cv_rect(13, 30, 200, 2, T_RAISE);
+        return;
+    }
+    w = (200u - 4u * (len - 1u)) / len;
+    for (i = 0; i < len; i++) {
+        int32_t x = 13 + (int32_t)(i * (w + 4u)), hh = 18 - 6 * (int32_t)seq[i];
+        uint16_t col = i == pos ? (flash ? T_TEXT : c) : T_RAISE;
+        cv_rrect(x, 36 - hh, (int32_t)w, hh, 1, col, T_SURF);
+        cv_rect(x, 39, (int32_t)w, 1, T_RAISE);
+        if (i == pos && of)
+            cv_rect(x, 39, (int32_t)(w * (bar + 1u) / of), 2, c);
     }
 }
 
@@ -1006,7 +1032,7 @@ static uint32_t graph_sig(int play)
         h ^= (ui.hot_t ? ui.hot_col + 1u : 0u) * 65537u;
     if (pg->scope == SC_ENGINE && t->eng_req % NENGINES == ENGI_FM6)   /* the patch (PAT's algorithm, levels, FB) */
         h ^= (fm6_pgen[(t - trk) % NTRK] + 1u) * 2246822519u + fm6_fn[(t - trk) % NTRK][FN_ENGINE] * 40503u;
-    if (pg->graph == GR_STEPS || pg->graph == GR_EVOLVE || pg->graph == GR_ROLL || pg->graph == GR_DRUMHIT) {
+    if (pg->graph == GR_STEPS || pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_ROLL || pg->graph == GR_DRUMHIT) {
         uint32_t ph = song.playing ? t->seq_idx : 0xFFFFu;
         if (pg->graph != GR_STEPS && (ph / 16u != ui.bank || (!play && pg->graph == GR_ROLL)))
             ph = 0xFFFFu;                            /* the roll shows the cursor's bank only */
@@ -1313,6 +1339,9 @@ static void draw_graph(void)
         switch (pg->graph) {
         case GR_LFO:
             graph_lfo(t, c);
+            break;
+        case GR_FORM:
+            graph_form(t, c);
             break;
         case GR_EVOLVE:
             graph_evolve(t, c);
