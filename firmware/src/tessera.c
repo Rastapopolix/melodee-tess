@@ -89,6 +89,10 @@ void tessera_init(void)
         tessera.morph[i].snap_b = 0xA5A5u;
         tessera.morph[i].step_idx = 0;
         tessera.morph[i].oct_span = 2;
+
+        /* 5. Evolve */
+        tessera.evolve[i].amount = 30;
+        tessera.evolve[i].rec = 2;
     }
 }
 
@@ -112,10 +116,201 @@ void tessera_kill(track_t *t)
     seq_release(t);
 }
 
+static void tess_realign(uint32_t tr);
+
 void tessera_stop_all(void)
 {
     for (uint32_t i = 0; i < TESSERA_TRACKS; i++) {
         tessera_kill(&trk[i]);
+        tessera.evolve[i].bar_cnt = 0;
+        tessera.evolve[i].step_cnt = 0;
+        tessera.evolve[i].flash = 0;
+        tess_realign(i);
+    }
+}
+
+static const uint8_t TESS_EVERY_BARS[6] = {0, 1, 2, 4, 8, 16};
+
+uint32_t tessera_every_bars(uint32_t every)
+{
+    return TESS_EVERY_BARS[every > 5u ? 5u : every];
+}
+
+/* Steps in one 4/4 bar at the track's division, derived from seq_div_samples()
+ * with division 0 = 1/4 (a quarter note), so it follows the sequencer's own DIV table. */
+static uint32_t tess_steps_per_bar(const track_t *t)
+{
+    uint32_t q = seq_div_samples(0u), d = seq_div_samples((uint32_t)t->p[P_SDIV]);
+    uint32_t n = d ? (4u * q + d / 2u) / d : 16u;
+    return n ? n : 1u;
+}
+
+static uint32_t tess_rnd(uint32_t n) { return n ? rng() % n : 0u; }
+
+/* Phrase loop length in steps (<= 32, the buffer size) */
+static uint32_t tess_loop_len(uint32_t tr)
+{
+    uint32_t n = 16u;
+    if (tessera.mode[tr] == TESS_ENG_TURING) n = tessera.turing[tr].len ? tessera.turing[tr].len : 16u;
+    else if (tessera.mode[tr] == TESS_ENG_EUCLID) n = tessera.euclid[tr].steps ? tessera.euclid[tr].steps : 16u;
+    return n > 32u ? 32u : n;
+}
+
+/* Settings changed: record / capture the phrase again from its start */
+static void tess_rearm(uint32_t tr)
+{
+    tessera.evolve[tr].lp_pos = 0;
+    tessera.evolve[tr].rec = 2;
+}
+
+/* A phrase boundary (mutation, ROLL, stop): rearm AND put the engines' own playheads back on step 1 */
+static void tess_realign(uint32_t tr)
+{
+    tess_rearm(tr);
+    tessera.euclid[tr].step_idx = 0;
+    tessera.morph[tr].step_idx = (uint8_t)((tessera.morph[tr].step_idx & 0xF0u) | 0x0Fu);  /* engine pre-increments */
+}
+
+/* One mutation, scaled by the track's AMOUNT. Also what ROLL calls. */
+void tessera_mutate(uint32_t tr)
+{
+    if (tr >= TESSERA_TRACKS) return;
+    uint32_t amt = tessera.evolve[tr].amount;
+    if (amt > 100u) amt = 100u;
+
+    switch (tessera.mode[tr]) {
+    case TESS_ENG_TURING: {
+        tessera_turing_t *a = &tessera.turing[tr];
+        uint32_t len = a->len ? a->len : 16u;
+        uint32_t n = (amt * len + 99u) / 100u;          /* bits to flip: >= 1 when AMOUNT > 0 */
+        while (n--) a->reg ^= (uint16_t)(1u << tess_rnd(len));
+        break; }
+    case TESS_ENG_EUCLID: {
+        tessera_euclid_t *a = &tessera.euclid[tr];
+        uint32_t steps = a->steps ? a->steps : 16u;
+        if (tess_rnd(100u) < amt) {                     /* nudge the rotation by one */
+            if (tess_rnd(2u)) a->rot = (uint8_t)((a->rot + 1u) % steps);
+            else a->rot = (uint8_t)(a->rot ? a->rot - 1u : steps - 1u);
+        }
+        if (tess_rnd(100u) < amt / 2u) {                /* less often, a pulse more or fewer */
+            if (tess_rnd(2u) && a->pulses < steps) a->pulses++;
+            else if (a->pulses) a->pulses--;
+        }
+        break; }
+    case TESS_ENG_MARKOV: {
+        tessera_markov_t *a = &tessera.markov[tr];
+        int32_t j = (int32_t)tess_rnd(amt + 1u) - (int32_t)(amt / 2u);
+        int32_t v = (int32_t)a->tension + j;
+        a->tension = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
+        tessera_markov_recalc(tr);
+        break; }
+    case TESS_ENG_MORPH: {
+        tessera_morph_t *a = &tessera.morph[tr];
+        uint32_t n = 1u + amt / 34u;                    /* 1..3 bits of snapshot A flip */
+        while (n--) a->snap_a ^= (uint16_t)(1u << tess_rnd(16u));
+        int32_t j = (int32_t)tess_rnd(amt + 1u) - (int32_t)(amt / 2u);
+        int32_t v = (int32_t)a->morph_pos + j;
+        a->morph_pos = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
+        break; }
+    }
+    tessera.evolve[tr].flash = 4;
+    tess_realign(tr);
+}
+
+/* Once per sequencer step, before the engine runs: counts bars, mutates on the boundary, and
+ * walks the phrase loop. Turing: at the start of every pass the register goes back to the base
+ * captured at the phrase start (when EVERY is on), so LOCK's variations never accumulate.
+ * Markov / Morph: the first pass after a boundary is recorded, later passes replay it. */
+static void tessera_evolve_tick(const track_t *t, uint32_t tr)
+{
+    tessera_evolve_t *ev = &tessera.evolve[tr];
+    uint32_t L = tess_loop_len(tr), pos;
+    if (ev->flash) ev->flash--;
+    if (ev->step_cnt >= tess_steps_per_bar(t)) {
+        ev->step_cnt = 0;
+        if (ev->every && ++ev->bar_cnt >= tessera_every_bars(ev->every)) {
+            ev->bar_cnt = 0;
+            tessera_mutate(tr);              /* also puts the loop back on step 1 and rearms it */
+        }
+    }
+    ev->step_cnt++;
+    pos = ev->lp_pos;
+    if (pos >= L) pos = 0;
+    if (pos == 0) {
+        if (tessera.mode[tr] == TESS_ENG_TURING) {
+            tessera_turing_t *tu = &tessera.turing[tr];
+            if (ev->rec) { ev->base_reg = tu->reg; ev->rec = 0; }
+            else if (ev->every) tu->reg = ev->base_reg;
+        } else if (ev->rec) {
+            ev->rec--;                       /* 2 -> 1: record this pass; 1 -> 0: replay from now on */
+        }
+    }
+    ev->pos_now = (uint8_t)pos;
+    ev->lp_pos = (uint8_t)(pos + 1u >= L ? 0u : pos + 1u);
+}
+
+/* Markov / Morph: LOCK% of steps replay the base phrase, the rest play fresh (not remembered) */
+static void tessera_phrase_apply(uint32_t tr, uint8_t *note, uint8_t *vel, int *trig)
+{
+    tessera_evolve_t *ev = &tessera.evolve[tr];
+    uint32_t pos = ev->pos_now & 31u;
+    if (!ev->lock) return;                                   /* 0 = fresh every pass (the old behaviour) */
+    if (ev->rec) {
+        ev->buf_note[pos] = (uint8_t)((*trig ? 0x80u : 0u) | (*note & 0x7Fu));
+        ev->buf_vel[pos] = *vel;
+    } else if (tess_rnd(100u) < ev->lock) {
+        uint8_t b = ev->buf_note[pos];
+        *trig = (b >> 7) & 1;
+        *note = b & 0x7Fu;
+        *vel = ev->buf_vel[pos];
+    }
+}
+
+/* LOCK = deja vu: 100 frozen loop, 0 fresh every pass. Turing: exactly 100 - prob. */
+int tessera_lock_get(uint32_t tr)
+{
+    if (tr >= TESSERA_TRACKS) return -1;
+    if (tessera.mode[tr] == TESS_ENG_TURING) return 100 - (int)tessera.turing[tr].prob;
+    if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH) return tessera.evolve[tr].lock;
+    return -1;                                               /* Euclid is already a fixed loop: no LOCK */
+}
+
+void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash)
+{
+    const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
+    *of = tessera_every_bars(ev->every);
+    *bar = ev->bar_cnt;
+    *flash = ev->flash != 0;
+}
+
+/* EVOLVE page encoders: 0 LOCK, 1 EVERY, 2 AMOUNT, 3 ROLL */
+void tessera_evolve_knob(uint32_t k, int32_t s)
+{
+    tessera_ensure_init();
+    uint32_t tr = song.sel;
+    if (tr >= TESSERA_TRACKS || !s) return;
+    tessera_evolve_t *ev = &tessera.evolve[tr];
+
+    if (k == 0u) {
+        if (tessera_lock_get(tr) < 0) return;
+        if (tessera.mode[tr] == TESS_ENG_TURING) {
+            int32_t p = (int32_t)tessera.turing[tr].prob - s * 2;   /* clockwise = more locked */
+            tessera.turing[tr].prob = (uint8_t)(p < 0 ? 0 : p > 100 ? 100 : p);
+        } else {
+            int32_t l = (int32_t)ev->lock + s * 2;
+            uint8_t was = ev->lock;
+            ev->lock = (uint8_t)(l < 0 ? 0 : l > 100 ? 100 : l);
+            if (!was && ev->lock) tess_rearm(tr);                  /* record the phrase that is playing next */
+        }
+    } else if (k == 1u) {
+        int32_t e = (int32_t)ev->every + (s > 0 ? 1 : -1);
+        ev->every = (uint8_t)(e < 0 ? 0 : e > 5 ? 5 : e);
+        ev->bar_cnt = 0;
+    } else if (k == 2u) {
+        int32_t a = (int32_t)ev->amount + s * 2;
+        ev->amount = (uint8_t)(a < 0 ? 0 : a > 100 ? 100 : a);
+    } else if (k == 3u) {
+        if (tessera.mode[tr] != TESS_ENG_OFF) tessera_mutate(tr);   /* any turn rolls once */
     }
 }
 
@@ -123,6 +318,8 @@ void tessera_clock_step(track_t *t)
 {
     uint32_t tr = trk_index(t);
     if (tr >= TESSERA_TRACKS) return;
+
+    tessera_evolve_tick(t, tr);
 
     if (t->p[P_MUTE]) {
         if (tessera.active_gate[tr]) {
@@ -226,6 +423,11 @@ void tessera_clock_step(track_t *t)
     }
     }
 
+    if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH)
+        tessera_phrase_apply(tr, &note, &vel, &should_trigger);
+    if (tessera.mode[tr] == TESS_ENG_MARKOV)
+        tessera.markov[tr].last_hit = (uint8_t)(should_trigger != 0);   /* after LOCK's replay: what really sounds */
+
     if (should_trigger) {
         int32_t final_note = tessera_snap_note(t, (int32_t)note);
 
@@ -262,6 +464,7 @@ void tessera_knob(uint32_t k, int32_t s)
             tessera.active_gate[tr] = 0;
         }
         tessera.mode[tr] = (uint8_t)m;
+        tess_rearm(tr);
         return;
     }
 
@@ -347,6 +550,7 @@ void tessera_knob(uint32_t k, int32_t s)
             m->snap_b = MORPH_PRESETS[pb];
         }
     }
+    tess_rearm(tr);
 }
 
 void tessera_ensure_init(void)
@@ -359,13 +563,14 @@ uint32_t tessera_sig(uint32_t tr)
 {
     if (tr >= TESSERA_TRACKS || tessera.mode[tr] == TESS_ENG_OFF) return 0;
     uint32_t h = tessera.mode[tr] * 1009u + tessera.last_note[tr] * 53u + tessera.active_gate[tr];
+    h ^= tessera.evolve[tr].bar_cnt * 977u + tessera.evolve[tr].flash * 4093u + tessera.evolve[tr].every * 61u + tessera.evolve[tr].amount * 29u + tessera.evolve[tr].lock * 13u;
     switch (tessera.mode[tr]) {
     case TESS_ENG_TURING: { const tessera_turing_t *a = &tessera.turing[tr];
         h ^= a->reg * 31u + a->len * 7u + a->oct_span * 131u; break; }
     case TESS_ENG_EUCLID: { const tessera_euclid_t *a = &tessera.euclid[tr];
         h ^= a->steps * 31u + a->pulses * 7u + a->rot * 131u + a->step_idx * 17u; break; }
     case TESS_ENG_MARKOV: { const tessera_markov_t *a = &tessera.markov[tr];
-        h ^= a->cur_state * 31u + a->tension * 7u + a->density * 131u; break; }
+        h ^= a->cur_state * 31u + a->tension * 7u + a->density * 131u + a->last_hit * 977u; break; }
     case TESS_ENG_MORPH:  { const tessera_morph_t *a = &tessera.morph[tr];
         h ^= a->snap_a * 31u + a->snap_b * 7u + a->morph_pos * 131u + a->step_idx * 17u; break; }
     }

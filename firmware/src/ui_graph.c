@@ -193,8 +193,14 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             int bar_h = 3 + (int)(pr * (uint32_t)(h - 3) / 40u);
             int is_cur = (i == cur);
 
-            cv_rrect(sx, y_base + h - bar_h, step_w, bar_h, 1, is_cur ? c : T_TEXT, bg);
-            cv_rect(sx, y_base + h + 2, step_w, is_cur ? 2 : 1, is_cur ? c : dim);
+            int rest = is_cur && !mk->last_hit;          /* playhead on a rest: hollow bar, thin dim underline */
+            if (rest) {
+                cv_rrect(sx, y_base + h - bar_h, step_w, bar_h, 1, c, bg);
+                cv_rect(sx + 1, y_base + h - bar_h + 1, step_w - 2, bar_h - 2, bg);
+            } else {
+                cv_rrect(sx, y_base + h - bar_h, step_w, bar_h, 1, is_cur ? c : T_TEXT, bg);
+            }
+            cv_rect(sx, y_base + h + 2, step_w, is_cur && !rest ? 2 : 1, is_cur && !rest ? c : dim);
         }
     } else if (mode == TESS_ENG_MORPH) {
         const tessera_morph_t *mo = &tessera.morph[tr];
@@ -223,6 +229,26 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         /* morph position: left = A, right = B */
         cv_rect(x0, y_base + h + 9, sw, 1, dim);
         cv_rect(x0 + ((int32_t)mo->morph_pos * (sw - 4)) / 127, y_base + h + 6, 4, 7, c);
+    }
+}
+
+/* EVOLVE page: phrase progress strip, one cell per bar until the next mutation; all cells flash on a mutation */
+static void graph_evolve(const track_t *t, uint16_t c)
+{
+    uint32_t tr = trk_index(t), bar = 0, of = 0, n, i, w;
+    int flash = 0;
+    tessera_phrase(tr, &bar, &of, &flash);
+    n = of ? of : 1u;
+    w = (200u - 2u * (n - 1u)) / n;
+    for (i = 0; i < n; i++) {
+        int32_t x = 13 + (int32_t)(i * (w + 2u));
+        uint16_t col = T_RAISE;
+        if (of) {
+            if (flash) col = c;
+            else if (i < bar) col = T_TEXT;
+            else if (i == bar && song.playing) col = c;
+        }
+        cv_rrect(x, 20, (int32_t)w, of ? 16 : 4, 1, col, T_SURF);
     }
 }
 
@@ -980,7 +1006,7 @@ static uint32_t graph_sig(int play)
         h ^= (ui.hot_t ? ui.hot_col + 1u : 0u) * 65537u;
     if (pg->scope == SC_ENGINE && t->eng_req % NENGINES == ENGI_FM6)   /* the patch (PAT's algorithm, levels, FB) */
         h ^= (fm6_pgen[(t - trk) % NTRK] + 1u) * 2246822519u + fm6_fn[(t - trk) % NTRK][FN_ENGINE] * 40503u;
-    if (pg->graph == GR_STEPS || pg->graph == GR_ROLL || pg->graph == GR_DRUMHIT) {
+    if (pg->graph == GR_STEPS || pg->graph == GR_EVOLVE || pg->graph == GR_ROLL || pg->graph == GR_DRUMHIT) {
         uint32_t ph = song.playing ? t->seq_idx : 0xFFFFu;
         if (pg->graph != GR_STEPS && (ph / 16u != ui.bank || (!play && pg->graph == GR_ROLL)))
             ph = 0xFFFFu;                            /* the roll shows the cursor's bank only */
@@ -1287,6 +1313,9 @@ static void draw_graph(void)
         switch (pg->graph) {
         case GR_LFO:
             graph_lfo(t, c);
+            break;
+        case GR_EVOLVE:
+            graph_evolve(t, c);
             break;
         case GR_STEPS:
             graph_steps(t, c);

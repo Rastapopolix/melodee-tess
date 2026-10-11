@@ -37,6 +37,7 @@ typedef struct {
 /* 3. Markov Pitch State */
 typedef struct {
     uint8_t  cur_state;   /* 0..7 active scale degree */
+    uint8_t  last_hit;    /* 1 if the current step sounded, 0 if it was a rest */
     uint8_t  tension;     /* 0 = tight/stepwise, 100 = wild leaps */
     uint8_t  density;  /* 0=Minor, 1=Major, 2=Dorian, 3=Penta */
     uint8_t  oct_span;    /* 1..3 octave spread */
@@ -53,6 +54,23 @@ typedef struct {
     uint8_t  oct_span;    /* Octave span */
 } tessera_morph_t;
 
+/* 5. Evolve (per track, engine-independent): phrase-level mutation.
+ * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
+typedef struct {
+    uint8_t  every;       /* 0 = OFF, 1..5 -> 1/2/4/8/16 bars between mutations */
+    uint8_t  amount;      /* 0..100: how much changes at each mutation */
+    uint8_t  bar_cnt;     /* bars elapsed since the last mutation */
+    uint16_t step_cnt;    /* steps elapsed inside the current bar */
+    uint8_t  flash;       /* steps left to show the "just mutated" flash */
+    uint8_t  lock;        /* 0..100 deja vu for Markov / Morph (Turing: 100 - prob; Euclid: n/a) */
+    uint8_t  lp_pos;      /* next position in the phrase loop */
+    uint8_t  pos_now;     /* position of the step being played */
+    uint8_t  rec;         /* 2 = armed, 1 = recording this pass, 0 = replaying (Turing: 2 = capture base) */
+    uint16_t base_reg;    /* Turing: the register captured at the start of the phrase */
+    uint8_t  buf_note[32];/* Markov / Morph base phrase: bit 7 = hit, bits 0..6 = note */
+    uint8_t  buf_vel[32];
+} tessera_evolve_t;
+
 /* Master Tessera Engine State */
 typedef struct {
     uint8_t          mode[TESSERA_TRACKS];
@@ -60,6 +78,7 @@ typedef struct {
     tessera_euclid_t euclid[TESSERA_TRACKS];
     tessera_markov_t markov[TESSERA_TRACKS];
     tessera_morph_t  morph[TESSERA_TRACKS];
+    tessera_evolve_t evolve[TESSERA_TRACKS];
     uint8_t          last_note[TESSERA_TRACKS];
     uint8_t          active_gate[TESSERA_TRACKS];
 } tessera_state_t;
@@ -76,6 +95,11 @@ int32_t tessera_snap_note(const track_t *t, int32_t n);
 uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step);
 uint32_t tessera_sig(uint32_t tr);
 void tessera_kill(track_t *t);
+void tessera_mutate(uint32_t tr);
+void tessera_evolve_knob(uint32_t k, int32_t s);
+uint32_t tessera_every_bars(uint32_t every);
+int  tessera_lock_get(uint32_t tr);            /* 0..100, or -1 when LOCK is not available for the mode */
+void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash); /* of == 0: EVERY is OFF */
 void tessera_stop_all(void);
 
 #endif

@@ -714,6 +714,22 @@ static void draw_columns(void)
         return;
     }
 #endif
+    if (cur_page()->graph == GR_EVOLVE) {
+        uint32_t tr = song.sel;
+        const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
+        char e0[16], e1[16], e2[16], e0u[8] = "", e1u[8] = "", e2u[8] = "%";
+        int lk = tessera_lock_get(tr);
+        if (lk < 0) str_cpy(e0, "--", sizeof e0);
+        else { fmt_int(e0, (uint32_t)lk); str_cpy(e0u, "%", sizeof e0u); }
+        if (!ev->every) str_cpy(e1, "OFF", sizeof e1);
+        else { fmt_int(e1, tessera_every_bars(ev->every)); str_cpy(e1u, "BAR", sizeof e1u); }
+        fmt_int(e2, ev->amount);
+        draw_column(0, "LOCK", e0, e0u, VAL(0u), lk < 0 ? -1 : lk * 10, ICON_AUTO);
+        draw_column(1, "EVERY", e1, e1u, VAL(1u), (int32_t)ev->every * 1000 / 5, ICON_AUTO);
+        draw_column(2, "AMOUNT", e2, e2u, VAL(2u), (int32_t)ev->amount * 10, ICON_AUTO);
+        draw_column(3, "ROLL", "TURN", "", VAL(3u), -1, ICON_AUTO);
+        return;
+    }
     if (cur_page()->graph == GR_STEPS) {
         uint32_t tr = song.sel;
         if (tr < TESSERA_TRACKS) {
