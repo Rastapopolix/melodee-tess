@@ -36,6 +36,9 @@
 #ifndef MELODEE_ID
 #define MELODEE_ID "FM-1_900"    /* package identity (build.py: the .fwsc marker string) */
 #endif
+#ifndef MELODEE_FORK
+#define MELODEE_FORK "(tess)"       /* this fork: melodee(tess); the version below is upstream Melodee's */
+#endif
 #ifndef MELODEE_VERSION
 #define MELODEE_VERSION "v1.1.0" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
 #endif

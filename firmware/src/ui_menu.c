@@ -50,6 +50,11 @@ static void draw_about_qr(int32_t x, int32_t y)
 enum { MC_TEXT, MC_TITLE, MC_URL };
 typedef struct { const char *text; uint8_t kind; } menu_credit_t;
 static const menu_credit_t MENU_CREDITS[] = {
+    {"MELODEE(TESS) / THIS FORK", MC_TITLE},
+    {"Tessera engines and project save: Theo Dainis", MC_TEXT},
+    {"Melodee: Kerem Kilic, Ellic Studio / GPL-3.0", MC_TEXT},
+    {"https://github.com/keremimo/melodee", MC_URL},
+    {"", MC_TEXT},
     {"FELUCCA / UPSTREAM", MC_TITLE},                  /* Melodee is a modified Felucca */
     {"H\xFCgelton Instruments, Leo Kuroshita / GPL-3.0", MC_TEXT},
     {"https://github.com/hugelton/Felucca", MC_URL},
@@ -144,7 +149,7 @@ static int32_t menu_document(int32_t y, int draw)
     if (draw) {
         int32_t x;                                    /* (docs/design: mock/r6_pages About) */
         cv_text(6, y + 4, &AF_L, "Melodee", T_THEME);
-        cv_text(6, y + 40, &AF_S, "Multi-engine synthesizer", T_SEC);
+        cv_text(6, y + 40, &AF_S, "melodee(tess) fork", T_SEC);
         x = cv_text(6, y + 62, &AF_M, MELODEE_VERSION, T_TEXT);
         cv_text(x + 8, y + 67, &AF_X, __DATE__, T_MID);
         draw_about_qr(158, y + 4);
