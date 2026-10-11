@@ -240,7 +240,7 @@ void tessera_clock_step(track_t *t)
         t->seq_notes[0] = (uint8_t)final_note;
         t->seq_n = 1;
 
-        uint32_t period = seq_div_samples((uint32_t)(t->p[P_SDIV] ? t->p[P_SDIV] : 1));
+        uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]);
         t->seq_off = period * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
     }
 }
