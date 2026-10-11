@@ -162,7 +162,9 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 int is_head = (song.playing && i == (euc->step_idx + len - 1u) % len);
 
                 if (active) {
-                    cv_rrect(sx, y_base, step_w, h, 1, is_head ? c : T_TEXT, bg);
+                    uint32_t epit = tessera_euclid_pitch(&trk[tr], i);
+                    int ebar = 4 + (int)((epit * (uint32_t)(h - 4)) / 14u);
+                    cv_rrect(sx, y_base + h - ebar, step_w, ebar, 1, is_head ? c : T_TEXT, bg);
                 } else {
                     cv_rrect(sx, y_base + h - 4, step_w, 4, 1, is_head ? c : dim, bg);
                 }
@@ -173,6 +175,54 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 cv_rect(sx, y_base + h + 2, step_w, 1, dim);
             }
         }
+    } else if (mode == TESS_ENG_MARKOV) {
+        const tessera_markov_t *mk = &tessera.markov[tr];
+        int h = is_panel ? 14 : 18;
+        int step_w = is_panel ? 16 : 18;
+        int col = is_panel ? 25 : 27;
+        int32_t x0 = is_panel ? 18 : 14;
+        uint32_t cur = mk->cur_state & 7u;
+
+        for (uint32_t i = 0; i < 8u; i++) {
+            int32_t sx = x0 + (int32_t)i * col;
+            /* matrix[][] is cumulative: the chance of i is the step up from i-1 */
+            uint32_t cum = mk->matrix[cur][i];
+            uint32_t prev = i ? mk->matrix[cur][i - 1u] : 0u;
+            uint32_t pr = cum > prev ? cum - prev : 0u;
+            if (pr > 40u) pr = 40u;
+            int bar_h = 3 + (int)(pr * (uint32_t)(h - 3) / 40u);
+            int is_cur = (i == cur);
+
+            cv_rrect(sx, y_base + h - bar_h, step_w, bar_h, 1, is_cur ? c : T_TEXT, bg);
+            cv_rect(sx, y_base + h + 2, step_w, is_cur ? 2 : 1, is_cur ? c : dim);
+        }
+    } else if (mode == TESS_ENG_MORPH) {
+        const tessera_morph_t *mo = &tessera.morph[tr];
+        int h = is_panel ? 14 : 18;
+        int step_w = is_panel ? 10 : 11;
+        int lane = (h - 2) / 2;
+        uint32_t cur = mo->step_idx & 0x0Fu;
+        int32_t x0 = is_panel ? 18 : 13;
+        int32_t sw = is_panel ? 202 : 218;
+
+        for (uint32_t i = 0; i < 16u; i++) {
+            int32_t sx = is_panel ? (18 + (int32_t)i * 12 + (int32_t)(i / 4u) * 4)
+                                  : (13 + (int32_t)i * 13 + (int32_t)(i / 4u) * 4);
+            int ha = (mo->snap_a >> i) & 1u;
+            int hb = (mo->snap_b >> i) & 1u;
+            int is_head = (song.playing && i == cur);
+
+            /* top lane = snapshot B, bottom lane = snapshot A */
+            if (hb) cv_rrect(sx, y_base, step_w, lane, 1, T_ACCENT, bg);
+            else cv_rect(sx, y_base + lane - 1, step_w, 1, dim);
+            if (ha) cv_rrect(sx, y_base + lane + 2, step_w, lane, 1, c, bg);
+            else cv_rect(sx, y_base + h - 1, step_w, 1, dim);
+
+            cv_rect(sx, y_base + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
+        }
+        /* morph position: left = A, right = B */
+        cv_rect(x0, y_base + h + 9, sw, 1, dim);
+        cv_rect(x0 + ((int32_t)mo->morph_pos * (sw - 4)) / 127, y_base + h + 6, 4, 7, c);
     }
 }
 

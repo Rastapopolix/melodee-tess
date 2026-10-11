@@ -227,14 +227,7 @@ void tessera_clock_step(track_t *t)
     }
 
     if (should_trigger) {
-        int32_t final_note = (int32_t)note;
-        uint32_t mask = scale_mask(t);
-        uint32_t guard = 12;
-
-        /* Force note down into the nearest active scale degree */
-        while (guard-- && !((mask >> (uint32_t)((final_note - t->p[P_ROOT] + 120) % 12)) & 1u)) {
-            final_note--;
-        }
+        int32_t final_note = tessera_snap_note(t, (int32_t)note);
 
         /* Apply track transpose and clamp to MIDI range */
         final_note += (int32_t)t->p[P_TRANS];
@@ -377,4 +370,23 @@ uint32_t tessera_sig(uint32_t tr)
         h ^= a->snap_a * 31u + a->snap_b * 7u + a->morph_pos * 131u + a->step_idx * 17u; break; }
     }
     return h;
+}
+
+/* Force a note down into the nearest active scale degree of the track */
+int32_t tessera_snap_note(const track_t *t, int32_t n)
+{
+    uint32_t mask = scale_mask(t), guard = 12;
+    while (guard-- && !((mask >> (uint32_t)((n - t->p[P_ROOT] + 120) % 12)) & 1u))
+        n--;
+    return n;
+}
+
+/* The pitch Euclid plays on a step, as 0..14 (mirrors tessera_clock_step: 48 + (step*3)%12, snapped) */
+uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
+{
+    int32_t n = tessera_snap_note(t, 48 + (int32_t)((step * 3u) % 12u));
+    n -= 45;
+    if (n < 0) n = 0;
+    if (n > 14) n = 14;
+    return (uint32_t)n;
 }
