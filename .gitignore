@@ -1,1 +1,6 @@
 build/
+firmware/src/*.preram
+firmware/src/*.presave
+firmware/src/*.preflourish
+firmware/src/*.prerename
+tools/*.prerename

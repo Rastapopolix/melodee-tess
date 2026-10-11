@@ -1459,6 +1459,7 @@ static void template_load(void)
     p->sum = proj_sum(p);
     if (project_restore_runtime(p))
         return;
+    tessera_reset();                                  /* (the restore stopped the sequencer: no note is held) */
     for (k = 0; k < NTRK; k++) {
         track_defaults_steps(&trk[k]);                /* every pattern empty */
         pat_last[k] = 0;
@@ -1485,6 +1486,8 @@ static void project_new_blank(void)
     uint32_t i, k;
     int16_t kept[4];
     momentary_restore();
+    tessera_stop_all();                               /* release what a Tessera track holds, then OFF */
+    tessera_reset();
     for (k = 0; k < 4u; k++)
         kept[k] = song.g[GLO_KEPT[k]];
     fm1_irq_off();
