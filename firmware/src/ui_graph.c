@@ -935,6 +935,7 @@ static uint32_t graph_sig(int play)
         if (pg->graph != GR_STEPS && (ph / 16u != ui.bank || (!play && pg->graph == GR_ROLL)))
             ph = 0xFFFFu;                            /* the roll shows the cursor's bank only */
         h ^= steps_hash(t) + ph * 31u + ui.cursor * 7919u + ui.lane * 104723u + ui.bank * 613u;
+        h ^= tessera_sig(trk_index(t)) * 2654435761u;
     }
     return h;
 }
