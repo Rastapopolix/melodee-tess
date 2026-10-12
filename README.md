@@ -1,6 +1,6 @@
 # Melodee (Tess)
 
-A fork of the M-Vave FM-1 alt-firmware [Melodee](https://github.com/keremimo/melodee) originally developed by **keremino** (Leo Kuroshita / Hügelton Instruments, GPL-3.0-only). **Status: Experimental.**
+A fork of the M-Vave FM-1 alt-firmware [Melodee](https://github.com/keremimo/melodee) developed by **keremino** (itself built upon *Felucca* by **Leo Kuroshita / Hügelton Instruments**). GPL-3.0-only. **Status: Experimental.**
 
 ---
 
