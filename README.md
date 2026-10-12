@@ -4,6 +4,18 @@ A fork of the M-Vave FM-1 alt-firmware [Melodee](https://github.com/keremimo/mel
 
 ---
 
+## Install
+
+Flash it from your browser (Chrome or Edge, FM-1 connected directly by USB):
+
+**[Web installer](https://rastapopolix.github.io/melodee-tess/webapp/installer/)**
+
+After installing, you can edit sounds and sequences from the computer with the [web editor](https://rastapopolix.github.io/melodee-tess/webapp/editor/).
+
+Do not unplug the FM-1 while it is writing. This is experimental firmware and use is at your own risk. The installer page also has a way back to the official V15 firmware, with a backup first.
+
+---
+
 ## What It Is
 
 **Melodee (Tess)** adds algorithmic note generators to the four tracks, plus controls for evolving them over time, building song forms from them, and saving them with the project. Each track can stay a normal step sequencer or be switched to a Tessera engine. 
