@@ -12,52 +12,35 @@ The sound engines, effects, and core infrastructure are unchanged. The build out
 
 ---
 
-## Engines & UI Walkthrough
+## Engines & Workflow
 
-On the **PATTERN** page, the **MODE** knob switches a track between `STEP` (the original sequencer) and one of four generative engines:
+On the **PATTERN** page, the **MODE** knob switches a track between the original step sequencer (`STEP`) inherited from upstream Melodee and one of four new generative engines:
 
-### 1. Standard Step Sequencer (`STEP`)
-![Step Sequencer](assets/01_Pattern_Step.jpg)
-
-### 2. Turing Engine
-A looping shift register in the style of a Turing Machine (`LEN`, `PROB`, `SPAN`).
-![Turing Engine](assets/02_Pattern_Turing.jpg)
-
-### 3. Euclidean Engine
-Euclidean rhythms (`STEPS`, `PULSE`, `ROT`) using track-saved seed pitches.
-![Euclid Engine](assets/03_Pattern_Euclid.jpg)
-
-### 4. Markov Engine
-A random walk over 8 scale degrees (`LEAP`, `DENS`, `SPAN`).
-![Markov Engine](assets/04_Pattern_Markov.jpg)
-
-### 5. Morph Engine
-A rhythm blended between two preset patterns (`POS`, `SNP A`, `SNP B`).
-![Morph Engine](assets/05_Pattern_Morph.jpg)
+* **Turing**: A looping shift register in the style of a Turing Machine (`LEN`, `PROB`, `SPAN`).
+* **Euclid**: Euclidean rhythms (`STEPS`, `PULSE`, `ROT`) using track-saved seed pitches.
+* **Markov**: A random walk over 8 scale degrees (`LEAP`, `DENS`, `SPAN`).
+* **Morph**: A rhythm blended between two preset patterns (`POS`, `SNP A`, `SNP B`).
 
 ---
 
 ## Control Pages
 
-### Evolve Page
-![Evolve Page](assets/06_Evolve.jpg)
-* `LOCK`: Deja vu control determining how much of the phrase repeats.
-* `EVERY`: Mutates the phrase every (`OFF`, `1`, `2`, `4`, `8`, or `16` bars).
-* `AMOUNT`: Degree of change per mutation.
-* `ROLL`: Instantly triggers a mutation.
+* **Evolve Page**: 
+  * `LOCK`: Deja vu control determining how much of the phrase repeats.
+  * `EVERY`: Mutates the phrase every (`OFF`, `1`, `2`, `4`, `8`, or `16` bars).
+  * `AMOUNT`: Degree of change per mutation.
+  * `ROLL`: Instantly triggers a mutation.
 
-### Form Page
-![Form Page](assets/07_Form.jpg)
-* Builds sections from mutated phrases (`AB`, `ABAC`, `ABCB`, `AABA`, `ABCA`, or `AABC`). 
-* `CONTRAST`: Varies new sections relative to previous ones.
-* `CLEAR`: Forgets B and C, resetting the current phrase to A.
+* **Form Page**: 
+  * Builds sections from mutated phrases (`AB`, `ABAC`, `ABCB`, `AABA`, `ABCA`, or `AABC`). 
+  * `CONTRAST`: Varies new sections relative to previous ones.
+  * `CLEAR`: Forgets B and C, resetting the current phrase to A.
 
-### Tweak Page
-![Tweak Page](assets/08_Tweak.jpg)
-* `SHIFT`: Transposes up to 24 semitones.
-* `DROP`: Probability of dropping a hit across any engine.
-* `HUMAN`: Adds velocity and gate variation.
-* `FOLLOW`: Plays another Tessera track's pitch, shifted, in this track's scale.
+* **Tweak Page**: 
+  * `SHIFT`: Transposes up to 24 semitones.
+  * `DROP`: Probability of dropping a hit across any engine.
+  * `HUMAN`: Adds velocity and gate variation.
+  * `FOLLOW`: Plays another Tessera track's pitch, shifted, in this track's scale.
 
 *(Note: The **FLOURISH** knob is located on the FORM page, shifting the last beat of the last bar of each phrase into section transitions).*
 
@@ -69,6 +52,31 @@ Tessera state is saved with the project into its own dedicated flash object (`OB
 
 * **Tagging & Validation**: Each slot's block carries a hash of its parent project record. If hashes mismatch, the project loads with Tessera `OFF` to prevent stale data. Every field is range-checked.
 * **Compatibility**: Projects saved by stock Melodee load normally with Tessera `OFF`, and projects saved by this fork remain readable.
+
+---
+
+## Visual Reference Gallery
+
+### 1. Turing Engine
+![Turing Engine](assets/02_Pattern_Turing.jpg)
+
+### 2. Euclidean Engine
+![Euclid Engine](assets/03_Pattern_Euclid.jpg)
+
+### 3. Markov Engine
+![Markov Engine](assets/04_Pattern_Markov.jpg)
+
+### 4. Morph Engine
+![Morph Engine](assets/05_Pattern_Morph.jpg)
+
+### 5. Evolve Page
+![Evolve Page](assets/06_Evolve.jpg)
+
+### 6. Form Page
+![Form Page](assets/07_Form.jpg)
+
+### 7. Tweak Page
+![Tweak Page](assets/08_Tweak.jpg)
 
 ---
 
