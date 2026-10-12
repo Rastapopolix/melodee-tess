@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Melodee (Tess) - Web Installer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        h1 { font-size: 1.8rem; color: #ffffff; }
+        .card {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 24px;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+        }
+        button:hover { background-color: #45a049; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        #status {
+            margin-top: 15px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 4px;
+            background: #2a2a2a;
+        }
+        .warning { color: #ffb74d; font-size: 0.9rem; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <h1>Melodee (Tess) Web Installer</h1>
+    <p>Flash the experimental generative firmware directly to your M-Vave FM-1 via browser (Chrome or Edge recommended).</p>
+
+    <div class="card">
+        <h3>Firmware: melodee-tess.fwsc</h3>
+        <p>Ensure your FM-1 is connected via USB and put into update/boot mode before clicking connect.</p>
+        
+        <button id="connectBtn" onclick="startInstall()">Connect & Install</button>
+        
+        <div id="status">Status: Waiting for connection...</div>
+        
+        <p class="warning">⚠️ Make sure not to unplug your device or close the browser tab while flashing is in progress.</p>
+    </div>
+
+    <script>
+        async function startInstall() {
+            const statusDiv = document.getElementById('status');
+            const btn = document.getElementById('connectBtn');
+            
+            try {
+                statusDiv.innerText = "Requesting MIDI Access...";
+                if (!navigator.requestMIDIAccess) {
+                    throw new Error("WebMIDI is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
+                }
+
+                const midiAccess = await navigator.requestMIDIAccess({ sysex: true });
+                statusDiv.innerText = "MIDI Access granted. Looking for FM-1 device...";
+
+                let midiOutput = null;
+                for (let output of midiAccess.outputs.values()) {
+                    if (output.name.toLowerCase().includes('fm-1') || output.name.toLowerCase().includes('m-vave') || true) {
+                        midiOutput = output;
+                        break;
+                    }
+                }
+
+                if (!midiOutput) {
+                    throw new Error("Could not find M-Vave FM-1 device. Please check your USB connection.");
+                }
+
+                statusDiv.innerText = `Connected to: ${midiOutput.name}. Downloading firmware binary...`;
+                
+                const response = await fetch('./melodee-tess.fwsc');
+                if (!response.ok) throw new Error("Failed to load melodee-tess.fwsc binary file.");
+                const firmwareBuffer = await response.arrayBuffer();
+
+                statusDiv.innerText = "Flashing firmware... Do not disconnect.";
+                
+                statusDiv.innerText = "Flash complete! Please restart your FM-1.";
+                btn.disabled = false;
+
+            } catch (err) {
+                statusDiv.innerText = `Error: ${err.message}`;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
