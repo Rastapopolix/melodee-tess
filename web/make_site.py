@@ -63,7 +63,7 @@ def main(pkg, single, version, out):
         strip_module((HERE / "fm1ota.js").read_text(encoding="utf-8")) + "\n" + \
         strip_module((HERE / "fm1backup.js").read_text(encoding="utf-8"))
     v = re.sub(r'[^A-Za-z0-9.-]', '-', version)
-    name, name1 = f"melodee-{v}.fwsc", f"melodee-{v}-1core.fwsc"
+    name, name1 = f"melodee-tess-{v}.fwsc", f"melodee-tess-{v}-1core.fwsc"
     meta = json.dumps({"version": version, "product": product,
                        "pkg": {"dual": "../../firmware/" + name, "single": "../../firmware/" + name1}})
     for mark in ("/*LIB*/", "/*META*/"):
