@@ -52,7 +52,9 @@ baseline means the step altered the music: find out why before going on (diff th
 `build/tessera_log/` against a run of the previous commit).
 
 0. **Before starting**
-   - Decide whether to merge upstream v1.3.1 first (see QUESTIONS.md). Recommended: yes. It touches
+   - Done 2026-10-14: v1.3.1 merged (`1b4c9e9`), baseline unchanged, static RAM 5,200 B free. The RAM
+     and flash risks below were written before the merge. Was: decide whether to merge upstream v1.3.1
+     first (see QUESTIONS.md). Recommended: yes. It touches
      the same `seq.c` hooks, and frees RAM (see the risks). If merged, re-run the baseline: it must be
      unchanged, because upstream did not touch the generators (only the code around them).
    - Add the GPL-3.0 SPDX header to `tessera.c` and `tessera.h`.

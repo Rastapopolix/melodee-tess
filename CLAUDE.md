@@ -35,8 +35,8 @@ Generators can be developed and tested on the PC; flash the device only to check
 - JieLi AC79 at 360 MHz. CPU1 is optional and retires itself on units that misread SRAM:
   everything must work single-core.
 - Audio at 44.1 kHz. Modulation runs at control rate (once per audio block).
-- The build requires at least 152 KiB of audio working arena; it reports the free arena and
-  fails below the minimum. Watch RAM and flash headroom.
+- The build checks the audio working arena against its minimum (142,336 B since v1.3.1); it
+  reports the free arena and fails below it. Watch RAM and flash headroom.
 
 ## Rules
 

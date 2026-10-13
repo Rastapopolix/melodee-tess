@@ -301,13 +301,12 @@ tests and on the device, which stays essential.
 ## Upstream sync
 
 - Remote `upstream` = `https://github.com/keremimo/melodee.git` (fetched with tags).
-- **Synced upstream version: `0bc95e8` "chore(release): prepare 1.1.0"** (2026-10-10). The fork's
-  history isn't connected to upstream's; attach it (rebase or `git replace --graft`) before the
-  first merge.
-- Latest upstream reviewed: **v1.3.1** (2026-10-13), 60 commits after the base. Merging it is about
-  10 small textual conflicts plus semantic checks of `seq.c` (transport, recording) and `project.c`
-  (format rewrite) against the generators' hooks. Upstream also retired ANALOG, DIGITAL and all
-  external effects (`perform.c`, `delay.c`, `slicer.c`), and saved RAM and flash.
+- **Synced upstream version: `v1.3.1`** (`757b65b`, 2026-10-13), merged 2026-10-14 in `1b4c9e9`.
+  The fork's history is connected to upstream's by `4621fa4` (a no-change "ours" merge of `0bc95e8`,
+  the fork's real base), so git finds the merge base by itself. Not rebased: `main` is already on GitHub.
+- Upstream retired ANALOG, DIGITAL and all external effects (`perform.c`, `delay.c`, `slicer.c`),
+  and saved RAM and flash. `upstream/next` adds a CPU1 retirement fix (`7025143`): cherry-pick it if
+  CPU1 misbehaves.
 - Process: before each merge, summarise upstream changes into platform/bug fixes to take, changes
   touching code we've modified, and changes to engines we're removing. Merge whole releases while
   feasible; cherry-pick after the hard fork. Update the synced version above after every merge.
@@ -340,8 +339,10 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
       retired legacy project objects, which nothing reads or writes (the 2026-10-13 "bug" was wrong;
       see `docs/analysis/upstream.md`)
 - [ ] Storage test: no two live flash objects share a sector (guards the free pair at upstream merges)
-- [ ] Decide whether to merge upstream v1.3.1 before phase 1 (gains RAM: static RAM has 36 B free,
-      the audio arena 608 B)
+- [x] Merge upstream v1.3.1 before phase 1 (decided 2026-10-14; `1b4c9e9`): both builds pass, the
+      Tessera baseline is unchanged, FORM's labels shortened to CONTR / FLRSH for the new fonts
+- [ ] Check the merged build on the device: play, stop (no hanging notes), GLO mute, MIDI Start/Stop,
+      save and load, and a project saved before the merge (do its Tessera settings come back?)
 - [x] Perform test and regress HEALTH: one bug, `tessera_kill` cleared the note list before releasing
       it, so stopping left step-sequencer notes hanging. Fixed in `279f08c` (branch `overnight-analysis`)
 - [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): two identical renders
@@ -413,9 +414,11 @@ Plan: `docs/analysis/phase1-plan.md`.
 
 ## Constraints
 
-AC79 at 360 MHz, 44.1 kHz audio, at least 152 KiB of audio working arena (see CLAUDE.md).
-Headroom on 2026-10-14: static RAM (`.data + .bss`) 36 B, audio arena 608 B, app flash about 1.7 KB
-(`melodee.bin` 579,832 B of 581,564 B). Every new feature needs room made first.
+AC79 at 360 MHz, 44.1 kHz audio, the audio working arena above the build's minimum (142,336 B since
+v1.3.1; see CLAUDE.md).
+Headroom after the v1.3.1 merge (2026-10-14, dual core): static RAM (`.data + .bss`) 5,200 B free,
+audio arena 5,472 B above the minimum, `melodee.bin` 496,896 B (about 84 KB below the 579,832 B the
+fork had before). Before the merge: 36 B, 608 B, about 1.7 KB.
 
 ## Overnight analysis (2026-10-14)
 
@@ -431,6 +434,12 @@ Branch `overnight-analysis`, not pushed, nothing merged. Reports in `docs/analys
 - `QUESTIONS.md`: decisions for Theo.
 Also: the Tessera baseline test, and the stuck-notes fix (`279f08c`). The suite now fails only the
 CZ-1 knob test (an upstream issue).
+
+Decisions the same day (QUESTIONS.md 1–7, Theo: "go with your recommendations"): tonight's work brought
+into `tessera-dev`; the history connected without rewriting (`main` is already pushed, so no rebase);
+v1.3.1 merged before phase 1 on branch `merge-upstream-1.3.1`; the stuck-notes fix kept; CZ-1 reported
+upstream and left failing; FORM to develop with Gravity in phase 6; Markov's DENSITY default to about 70
+at the next intended baseline change.
 
 ## Open questions
 

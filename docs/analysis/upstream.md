@@ -2,6 +2,10 @@
 
 Written 2026-10-14 on branch `overnight-analysis`. Nothing was merged.
 
+**Update, same day:** v1.3.1 is merged (`1b4c9e9`), the histories connected by `4621fa4`. The
+conflicts were as listed below, plus two found by the tests: upstream's site test expected the
+`melodee-` package name, and the new fonts cut off FORM's CONTRAST / FLOURISH labels.
+
 - Remote: `upstream` = `https://github.com/keremimo/melodee.git`, fetched with tags.
 - **Our base:** upstream `0bc95e8` "chore(release): prepare 1.1.0" (2026-10-10). The fork's first
   commit (`f93496f`) is exactly that tree plus Tessera; the histories are not connected, so git

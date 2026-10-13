@@ -2,6 +2,11 @@
 
 Decisions the overnight run (2026-10-14, branch `overnight-analysis`) could not make alone.
 
+**Answered 2026-10-14: all as recommended**, with one change to 1: `main` was already on GitHub, so
+the history was connected by a no-change "ours" merge of `0bc95e8` (`4621fa4`) instead of a rebase.
+v1.3.1 is merged (`1b4c9e9`, branch `merge-upstream-1.3.1`). Still to do: report the CZ-1 test
+upstream (5); FORM development (6) in phase 6; Markov's default (7) at the next baseline change.
+
 ## Upstream
 
 1. **Attach the fork's history to upstream?** The fork does not share git history with upstream,
