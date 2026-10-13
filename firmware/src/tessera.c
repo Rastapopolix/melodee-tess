@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 Theo Dainis (melodee-tess) */
+/* Tessera: the note generators of tracks 1-4 (Turing, Euclid, Markov, Morph), EVOLVE, FORM and TWEAK, clocked by the
+ * sequencer (seq.c) in place of a track's steps; their state is saved with the project (project.c, OBJ_TESSERA). */
 static const uint16_t MORPH_PRESETS[8] = {
     0x8888u, /* 4-on-floor */
     0x2222u, /* Offbeats */

@@ -57,7 +57,7 @@ baseline means the step altered the music: find out why before going on (diff th
      first (see QUESTIONS.md). Recommended: yes. It touches
      the same `seq.c` hooks, and frees RAM (see the risks). If merged, re-run the baseline: it must be
      unchanged, because upstream did not touch the generators (only the code around them).
-   - Add the GPL-3.0 SPDX header to `tessera.c` and `tessera.h`.
+   - Add the GPL-3.0 SPDX header to `tessera.c` and `tessera.h` (done 2026-10-14).
 
 1. **Widen the baseline first** (tests only; done 2026-10-14 except loading mid-play, which the firmware does not
    do: the sequencer stops for a load): scenarios for swing, external MIDI clock (`G_CLOCK`),
