@@ -29,6 +29,8 @@ application layer. GPL-3.0 and the upstream attribution stay.
 Open question: whether to do phase 4 before phase 5, or the other way round. Decide before
 starting phase 4.
 
+Alongside the phases runs the **web simulator** track (below): the firmware running in a browser.
+
 ## Tasks
 
 ### 1. Foundation
@@ -41,7 +43,7 @@ starting phase 4.
       note-offs (upstream v1.1.0 passes, so the fork causes it)
 - [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): report upstream or skip
 - [ ] `tests/run_tests.sh` passes end to end
-- [x ] Stop tracking `__pycache__/`; add it and the `*.bak*` / `*.pre*` backups to `.gitignore`
+- [x] Stop tracking `__pycache__/`; add it and the `*.bak*` / `*.pre*` backups to `.gitignore`
 - [ ] Delete the backup files in `firmware/src` and `tools/` once nothing in them is needed
 - [ ] Decide what happens to the `master`, `tools-util` and `cleanup-claude-md` branches
 
@@ -76,6 +78,18 @@ starting phase 4.
 - [ ] Voices: VA, 2-op FM, wavefolder, Karplus pluck, noise drums, each through an LPG
 - [ ] FX: clock-synced tape delay with wow, the inherited reverb, bitcrusher, ring mod,
       comb resonator
+
+### Web simulator (runs alongside the phases)
+The firmware's own engine, sequencer, mod and UI code compiled to WebAssembly, so it can be
+played in a browser. It does not validate the hardware CPU budget: check cost with the host
+tests' target budget and on the device.
+
+- [ ] Now: keep all hardware access behind the platform layer (`hal/`), so engines, sequencer,
+      mod and UI code compile for the host. New code must not touch registers outside `hal/`.
+- [ ] Mid-project: Emscripten/WebAssembly build that reuses the host-test stubs; AudioWorklet
+      audio, the display on a canvas, an on-screen panel (keys, knobs, buttons), Web MIDI,
+      browser storage in place of flash
+- [ ] Near release: public demo deployed to GitHub Pages by GitHub Actions
 
 ## Constraints
 
