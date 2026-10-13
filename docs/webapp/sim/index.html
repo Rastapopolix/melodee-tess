@@ -73,10 +73,22 @@ kbd { font: 600 11px ui-monospace, Menlo, monospace; border: 1px solid var(--rul
 footer { margin-top: 12px; font-size: 12px; }
 footer nav a { margin: 0 6px; }
 footer small { font-size: 11px; opacity: .8; }
-.try { margin: 14px 0 0; text-align: center; color: var(--dim); }
-.try button { font: inherit; font-weight: 600; padding: 6px 14px; background: var(--body); color: var(--label); border: 0; border-radius: 6px; cursor: pointer; }
-.try button:disabled { opacity: .45; cursor: default; }
-.try button:focus-visible { outline: 2px solid var(--body); outline-offset: 2px; }
+/* melodee-tess: the guide to the generators, under the device */
+.guide { max-width: 860px; margin: 20px auto 0; color: var(--fg); font-size: 14px; line-height: 1.5; }
+.guide h2 { font-size: 15px; margin: 0 0 6px; }
+.guide h3 { font-size: 13px; margin: 0 0 4px; letter-spacing: .04em; }
+.guide p { margin: 0 0 10px; }
+.guide ol { margin: 0 0 14px; padding-left: 1.4em; display: grid; gap: 4px; }
+.demo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 16px; }
+.demo button { font: inherit; font-weight: 600; padding: 7px 16px; background: var(--body); color: var(--label); border: 0; border-radius: 6px; cursor: pointer; }
+.demo button:disabled { opacity: .45; cursor: default; }
+.demo button:focus-visible { outline: 2px solid var(--body); outline-offset: 2px; }
+.gens { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 0 0 14px; }
+.gens section { min-width: 0; background: #9b9ba0; border-radius: 8px; padding: 10px 12px; }
+.gens dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 13px; }
+.gens dt { font-weight: 700; white-space: nowrap; }
+.gens dd { margin: 0; }
+.gens .what { margin: 0 0 6px; font-size: 13px; }
 </style>
 <main>
 <div class="device" id="device">
@@ -85,9 +97,33 @@ footer small { font-size: 11px; opacity: .8; }
   <div class="start" id="start"><button id="go" type="button">Switch on</button><p id="status" hidden></p></div>
 </div>
 
-<p class="try"><button id="demo" type="button" disabled>Play the demo</button>
-  a Tessera generator on each track (Turing, Morph, Markov, Euclid). SEQ, then SELECT to PATTERN: KNOB 1 picks a track's generator;
-  EVOLVE, FORM and TWEAK follow.</p>
+<div class="guide">
+  <h2>Try the generators</h2>
+  <div class="demo"><button id="demo" type="button" disabled>Play the demo</button>
+    <span>Switch on first. The demo puts a generator on each track (Turing, Morph, Markov, Euclid) and presses PLAY.</span></div>
+  <p>Or set one up yourself, on the selected track (T1 when you switch on):</p>
+  <ol>
+    <li>Press <b>SEQ</b> (<kbd>0</kbd>). The screen shows NOTES.</li>
+    <li>Turn <b>SELECT</b> one click clockwise (<kbd>↑</kbd>) to the <b>PATTERN</b> page.</li>
+    <li>Turn <b>KNOB 1</b> (MODE): STEP, then TURING, EUCLID, MARKOV, MORPH. STEP is the normal step sequencer.</li>
+    <li>Press <b>PLAY</b> (<kbd>-</kbd>), then turn KNOB 2 to 4 while it plays.</li>
+    <li>Turn <b>ALGORITHM</b> (<kbd>←</kbd> <kbd>→</kbd>) to pick another track and give it a generator too. <b>PRESETS</b> changes its sound.</li>
+  </ol>
+  <div class="gens">
+    <section><h3>TURING</h3><p class="what">A looping shift register: a riff that repeats or slowly mutates.</p>
+      <dl><dt>LENGTH</dt><dd>loop length, 2 to 16 steps</dd><dt>PROB</dt><dd>chance of a change each step; at 0 (Lock) it repeats exactly</dd><dt>SPAN</dt><dd>pitch range, 1 to 3 octaves</dd></dl></section>
+    <section><h3>EUCLID</h3><p class="what">Hits spread as evenly as possible over the loop.</p>
+      <dl><dt>STEPS</dt><dd>loop length, 1 to 32</dd><dt>PULSE</dt><dd>number of hits</dd><dt>ROT</dt><dd>shifts the pattern round the loop</dd></dl></section>
+    <section><h3>MARKOV</h3><p class="what">A melody that wanders from note to note.</p>
+      <dl><dt>LEAP</dt><dd>small steps (low) or big jumps (high)</dd><dt>DENS</dt><dd>chance each step plays; try 60 to 70 %</dd><dt>SPAN</dt><dd>pitch range in octaves</dd></dl></section>
+    <section><h3>MORPH</h3><p class="what">Blends two rhythm patterns.</p>
+      <dl><dt>POS</dt><dd>from pattern A (0) to pattern B (127)</dd><dt>SNP A</dt><dd>pattern A, one of 8</dd><dt>SNP B</dt><dd>pattern B, one of 8</dd></dl></section>
+  </div>
+  <p><b>Make it change over time:</b> from PATTERN, turn SELECT on to <b>EVOLVE</b>. EVERY sets how many bars pass between
+    changes, AMOUNT how big they are, and ROLL makes one change now. The next pages are <b>FORM</b>, which builds sections
+    (AB, ABAC and more) and returns to them, and <b>TWEAK</b> (SHIFT, DROP, HUMAN, FOLLOW). Notes snap to the track's scale:
+    press <b>SCL</b> to change it.</p>
+</div>
 
 <p class="keys">
   <span><kbd>Z</kbd>–<kbd>'</kbd> <kbd>Q</kbd>–<kbd>O</kbd> keys</span>
