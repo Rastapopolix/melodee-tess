@@ -36,9 +36,12 @@ starting phase 4.
 - [x] `./build.sh` passes in WSL
 - [x] Host tests compile again (hostsim includes Tessera, package name, flash guard, CZ-1 type)
 - [x] CLAUDE.md
-- [ ] Fix the perform test: FX black key 1 leaves track 1 at peak 318 (limit 200)
+- [ ] Fix the perform test: FX black key 1 leaves track 1 at peak 318 (limit 200; upstream v1.1.0: 63)
+- [ ] Fix regress HEALTH: song/4track_mix and slicer/song_gate_stut keep voices and DC after the
+      note-offs (upstream v1.1.0 passes, so the fork causes it)
+- [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): report upstream or skip
 - [ ] `tests/run_tests.sh` passes end to end
-- [ ] Stop tracking `__pycache__/`; add it and the `*.bak*` / `*.pre*` backups to `.gitignore`
+- [x ] Stop tracking `__pycache__/`; add it and the `*.bak*` / `*.pre*` backups to `.gitignore`
 - [ ] Delete the backup files in `firmware/src` and `tools/` once nothing in them is needed
 - [ ] Decide what happens to the `master`, `tools-util` and `cleanup-claude-md` branches
 
