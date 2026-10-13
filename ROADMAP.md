@@ -237,6 +237,55 @@ Process: draft a page map before the end of phase 2, and review designs with the
 suite renders (`tests/ui_render.c` → `build/ui_new/`, with one contact sheet per palette).
 Visual styling comes later.
 
+## Keys
+
+The FM-1 has 27 keys (F3–G5: 16 white, 11 black) and 14 buttons (FX, SCL, ENV, LFO, EDIT, GLO,
+HOME, SAVE, ARP, SEQ, PLAY, REC, OCT-, OCT+).
+
+### How Melodee uses them today
+
+| Gesture | What it does |
+| --- | --- |
+| Keys alone | Play notes; on STEP, write the cursor step (live at the play head while recording) |
+| FX held + keys | White keys hold performance effects, black keys 1–4 mute tracks 1–4; KNOB 1–4 macros |
+| GLO held + keys | Black keys 1–4 latch mutes, F3–B3 solo while held, C4 unmute all, F4 tap tempo; KNOB 1–4 levels |
+| SCL held + keys | The key pressed sets the root; KNOB 1–4 root, scale, chord, voicing |
+| EDIT held + keys | White keys jump to sound sections, black keys to FM6 operators, Init, Favourite, Undo, Store |
+| SEQ held + keys | Eight white keys (F3–C5) select patterns; hold one and press another to copy |
+| ENV / SCL / EDIT held on STEP | Note gestures: SELECT lengthens or moves the note; EDIT tapped deletes; EDIT + OCT-/+ undo/redo |
+| LFO held + knob | Momentary tweak: the value springs back on release; OCT+ keeps it |
+| Taps / holds | HOME hold: menu. REC hold: Capture. SEQ hold: PATTERNS. SAVE hold: undo. OCT+ hold: the page's sheet |
+| Button pairs | REC + PLAY: record now. SAVE + REC: quick save. GLO + PLAY: restart. SAVE + OCT-/+: undo/redo. OCT- + OCT+: octave reset; held 5 s: update mode; at power-on: panel calibration |
+| Grid pages (drums) | White keys toggle the lane's steps; black keys select lanes and pages |
+
+Free today: **ARP held** (no gesture at all), **ENV held off STEP**, and keys with **ARP, ENV or
+LFO held** (they still play notes). The FX layer's four unassigned white keys are free too, but
+upstream has since removed the performance effects. Melodee's quick layers are the model to keep:
+hold a button, keys and knobs become its shortcuts, the map shows over the page, letting go
+restores.
+
+### Plan
+
+Without a modifier, **keys play music**:
+- Live transpose of the generators.
+- Hold keys to set a quantizer scale.
+- Record a live phrase as a STEP seed.
+- Chord input for chord mode.
+- Set Gravity's home note.
+
+With the **function key** held, **keys select**:
+- Performance mode: quantized mutes and solos.
+- Patching: hold a source key, then press a destination key.
+- Quick jumps to tracks, pages, banks, scenes and seeds.
+- Typing form chains.
+- Step locks and probability.
+
+Rules:
+- One consistent modifier convention across the whole firmware.
+- An on-screen legend while the modifier is held (as Melodee's layer maps do).
+- A visible indicator whenever the keys are in a non-default mode (for example a held-scale or
+  transpose mode), so the player always knows what a key will do.
+
 ## Web simulator
 
 The firmware's own generator, sequencer, mod and UI code compiled to WebAssembly, so it can be
@@ -314,6 +363,7 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [ ] UI page map drafted before the phase ends; review it with the rendered UI PNGs
 - [ ] Help text field in the central parameter table, filled for every parameter
 - [ ] Generate the online parameter reference from the table
+- [ ] Choose the function key and draft the key map alongside the page map
 
 ### 3. Normalled default patch
 - [ ] Default patch that sounds good with no cords; cords override the normals
@@ -353,6 +403,9 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [ ] The remaining mod sources, clock tools, quantizer, Kria-style lanes
 - [ ] Chords as a per-track note-generation option
 - [ ] External MIDI over USB: per-track routing and channel, clock out
+- [ ] Key modes: the play gestures (transpose, scale by held keys, phrase recording, chord input,
+      Gravity home) and the function-key gestures (performance, patching, jumps, form chains,
+      step locks); legend and mode indicator
 
 ## Constraints
 
@@ -364,3 +417,7 @@ AC79 at 360 MHz, 44.1 kHz audio, at least 152 KiB of audio working arena (see CL
 - Performance page: the assignment gesture and the number of banks.
 - Exact voice and FX budget numbers.
 - Gravity and Energy curves.
+- Which physical button is the function key. The FM-1 has none labelled FN. Candidates: ARP (its
+  hold is unused) or FX (its effects layer would then move into performance mode).
+- How the modifier convention fits Melodee's existing layers (FX, GLO, SCL, EDIT, SEQ held):
+  keep them as they are, or fold them into the function key.
