@@ -4,3 +4,4 @@ firmware/src/*.presave
 firmware/src/*.preflourish
 firmware/src/*.prerename
 tools/*.prerename
+__pycache__/
