@@ -207,6 +207,26 @@ Relies on the central parameter IDs.
 - Mutation history using the existing undo levels.
 - Patch sharing via the web editor, and a community library page.
 
+## UI
+
+- **Keep Melodee's interaction model:** knob cards and its navigation. Players coming from
+  Melodee should feel at home.
+- **A visual language of our own:** a tile/mosaic motif (the name), modulation visuals as the
+  signature look, and consistent colours per track or role.
+
+Principles:
+- The same knob grammar on every page (the same knob does the same kind of thing everywhere).
+- Shallow navigation: every page within a press or two.
+- Progressive disclosure: the essentials first, depth on request.
+- Parameters at their off position are shown dimmed.
+- An automation status strip shows which automatic layers (Energy, Entries, Wander, Evolve,
+  Gravity, Piece Length) are active.
+- Musical language in labels (for example "Density", "Home", "Wander"), not engineering terms.
+
+Process: draft a page map before the end of phase 2, and review designs with the PNGs the test
+suite renders (`tests/ui_render.c` → `build/ui_new/`, with one contact sheet per palette).
+Visual styling comes later.
+
 ## Web simulator
 
 The firmware's own generator, sequencer, mod and UI code compiled to WebAssembly, so it can be
@@ -281,6 +301,7 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [ ] Fixed destination table; about 16 cords (source, destination, amount, offset) at control
       rate, extending `mod.c`
 - [ ] Generators and a first set of mod sources (LFO, envelope, S&H) on the bus
+- [ ] UI page map drafted before the phase ends; review it with the rendered UI PNGs
 
 ### 3. Normalled default patch
 - [ ] Default patch that sounds good with no cords; cords override the normals
