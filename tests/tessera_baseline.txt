@@ -23,4 +23,9 @@ transport_stop_start 0x946e7a1b 286
 mute_and_unmute 0xdbaeb96c 65
 knobs_while_playing 0x7d925608 75
 midi_clock_start_stop_continue 0x208b6ef7 159
+swing_track40_global30 0x1829426d 105
+track_len_shorter_than_loop 0xfc24d42e 105
+pattern_switch_while_playing 0x1fcf1117 97
+song_chain_two_banks 0xc0bda8d9 63
+glo_mute_and_unmute 0x7648fed9 57
 saved_block 0xaf90c7b2 180

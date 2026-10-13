@@ -355,7 +355,7 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 Plan: `docs/analysis/phase1-plan.md`.
 - [x] Baseline of what the generators play today: `tests/tessera_test.c`, 22 scenarios and the saved
       block against `tests/tessera_baseline.txt` (`TESSERA_UPDATE=1` rewrites it)
-- [ ] Widen the baseline: swing, MIDI clock, pattern switches, SONG chains, short `P_SLEN`, GLO mute
+- [x] Widen the baseline: swing, MIDI clock, pattern switches, SONG chains, short `P_SLEN`, GLO mute (28 scenarios)
 - [ ] Define `gen_tick(state, input_phrase, clock)` and its output (gate stream + CV)
 - [ ] Move Turing, Euclid, Markov and Morph behind it, out of seq.c / project.c / UI coupling
 - [ ] Host tests per generator: output identical to before, deterministic for a seed, CPU cost

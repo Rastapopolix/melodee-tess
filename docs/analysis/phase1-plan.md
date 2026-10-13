@@ -59,7 +59,8 @@ baseline means the step altered the music: find out why before going on (diff th
      unchanged, because upstream did not touch the generators (only the code around them).
    - Add the GPL-3.0 SPDX header to `tessera.c` and `tessera.h`.
 
-1. **Widen the baseline first** (tests only): scenarios for swing, external MIDI clock (`G_CLOCK`),
+1. **Widen the baseline first** (tests only; done 2026-10-14 except loading mid-play, which the firmware does not
+   do: the sequencer stops for a load): scenarios for swing, external MIDI clock (`G_CLOCK`),
    pattern switches and SONG chains with a generator track, a track's length (`P_SLEN`) shorter than the
    generator's loop, the GLO mute key, and loading a saved block mid-play. These are paths the
    extraction could disturb that tonight's 22 scenarios do not cover.

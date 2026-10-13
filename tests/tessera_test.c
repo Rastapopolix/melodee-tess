@@ -275,6 +275,65 @@ static void k_midi_clock(uint32_t n)                 /* before block n: the cloc
     }
 }
 
+/* swing: the track's own and the global, together */
+static void s_swing(void)
+{
+    gen(0, TESS_ENG_TURING);
+    gen(1, TESS_ENG_EUCLID);
+    trk[0].p[P_SSWING] = 40;
+    song.g[G_SWING] = 30;
+}
+/* the track's LEN shorter than the generator's loop (Turing 16, Euclid 16 steps) */
+static void s_short_len(void)
+{
+    gen(0, TESS_ENG_TURING);
+    gen(1, TESS_ENG_EUCLID);
+    trk[0].p[P_SLEN] = 5;
+    trk[1].p[P_SLEN] = 7;
+}
+/* a pattern bank switch while playing (PATTERNS: the next bank at the loop's end): bank 2 is 8 steps long */
+static void s_pattern_switch(void)
+{
+    gen(0, TESS_ENG_TURING);
+    gen(1, TESS_ENG_MORPH);
+    pattern_at(0, 1)->timing[0] = 8;
+}
+static void b_pattern_switch(uint32_t bar)
+{
+    if (bar == 2u) trk[0].pattern_next = 1;
+    if (bar == 5u) trk[0].pattern_next = 0;
+}
+/* SONG: a chain of bank 1 twice, then bank 2 (8 steps) twice, as project.c chain_prepare arms it; it stops itself */
+static void s_song_chain(void)
+{
+    uint32_t k;
+    gen(0, TESS_ENG_MARKOV);
+    gen(1, TESS_ENG_EUCLID);
+    for (k = 0; k < NTRK; k++) {
+        pattern_at(k, 1)->timing[0] = 8;
+        chain_patterns[0][k] = 0;
+        chain_patterns[1][k] = 1;
+        pattern_commit(&trk[k]);
+        trk[k].pattern_next = 0xff;
+    }
+    chain_config.count = 2;
+    chain_config.row[0] = (chain_row_t){0, 2};
+    chain_config.row[1] = (chain_row_t){1, 2};
+    chain.config = chain_config;
+    chain.armed = 1;
+}
+/* GLO held: KNOB / key mute, as ui_layer.c does it (MUTE, then tessera_kill: the generator's note released) */
+static void s_glo_mute(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    gen(1, TESS_ENG_TURING);
+}
+static void b_glo_mute(uint32_t bar)
+{
+    if (bar == 3u) { trk[1].p[P_MUTE] = 1; tessera_kill(&trk[1]); }
+    if (bar == 5u) trk[1].p[P_MUTE] = 0;
+}
+
 typedef struct {
     const char *name;
     uint32_t bars, seed;
@@ -306,6 +365,11 @@ static const scen_t SCEN[] = {
     {"mute_and_unmute", 6, 0x1015u, s_mute, b_mute},
     {"knobs_while_playing", 8, 0x1016u, s_edit_live, b_edit_live},
     {"midi_clock_start_stop_continue", 7, 0x1017u, s_midi_clock, 0, k_midi_clock},
+    {"swing_track40_global30", 8, 0x1018u, s_swing, 0},
+    {"track_len_shorter_than_loop", 8, 0x1019u, s_short_len, 0},
+    {"pattern_switch_while_playing", 8, 0x101Au, s_pattern_switch, b_pattern_switch},
+    {"song_chain_two_banks", 6, 0x101Bu, s_song_chain, 0},
+    {"glo_mute_and_unmute", 6, 0x101Cu, s_glo_mute, b_glo_mute},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 

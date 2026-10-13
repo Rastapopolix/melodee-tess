@@ -125,6 +125,9 @@ Two hours per setting (the `longform` probe; windows of 4 bars):
 
 - Turing never advances `step_idx`, so the panel picture's playhead for Turing (`ui_pages.c pv_picture`)
   stays on step 0.
+- Turing ignores the track's LEN (`P_SLEN`): with LEN 5 it plays exactly what it plays with 16 (its own LENGTH sets its
+  loop), while Euclid's hits follow the shorter track loop (found widening the baseline; `track_len_shorter_than_loop`).
+  Decide whether a track's LEN should bound every generator.
 - Morph keeps its B preset in the field named `oct_span`, and Morph has no octave span.
 - `tessera.h` documents Markov's `density` as "0 = Minor, 1 = Major, ..." (a leftover).
 - SHIFT is added after the scale snap when not following, so a SHIFT that is not a scale interval plays
