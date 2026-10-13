@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments; Theo Dainis (melodee-tess) */
 /* Web simulator: the firmware (sound, sequencer, Tessera, UI) on tests/ui_test.c's HAL stubs, built to
- * WebAssembly by web/sim/build.sh and run inside an AudioWorklet (web/sim/sim-worklet.js). Audio time drives
- * the clock, as on the device; the UI runs a frame every 16 ms of audio.
- * Not simulated: flash (SAVE / projects are not kept), USB, the CPU budget (check cost with the host tests). */
+ * WebAssembly by web/sim/build.sh. It exports Felucca's browser interface (web/emu/felucca_web.c of
+ * hugelton/Felucca: web_render, web_buttons, web_keys, web_enc, web_master, web_midi, the LEDs, the screen), so
+ * Felucca's page and worklet (web/sim/index.html, worklet.js) drive it unchanged: the same FM-1 drawing as the
+ * other FM-1 browser builds. Audio time drives the clock: each millisecond of the device renders the audio due and
+ * runs main.c's loop (a frame every 15 ms, ui_input between).
+ * Not simulated: flash (saves are lost on reload; web_flash_writes_count stays 0), USB, the CPU budget. */
 #define UI_TEST_NO_MAIN 1
 #include "ui_test.c"
 
@@ -17,23 +20,185 @@ static const int8_t FM1_KEYMAP[6][FM1_NCOL] = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 };
 
-#define SIM_BLOCK 128u                       /* an AudioWorklet render quantum */
-static float sim_out[2u * SIM_BLOCK];
-static uint8_t sim_led[41];                  /* per key id (0..13 buttons by matrix id, 14..40 keys): 0 off, 1 dim, 2 lit */
-static uint64_t sim_frames, sim_sent;
+#undef __attribute__                         /* (tests/hostsim.c defines it away) */
+#define EXPORT __attribute__((used, visibility("default")))
 
-__attribute__((used)) void sim_init(void)
+static uint32_t web_booted, web_last_frame, web_samples_due;
+
+/* power-on (main.c melodee_init via ui_test.c's ui_power_on), in the default palette */
+static void web_power_on(void)
 {
     ui_power_on();
     settings.palette = UI_DEFAULT_INDEX;     /* (ui_power_on: the tests' GRAY) */
     palette_set(settings.palette);
-    song.master_q12 = 2048;                  /* main.c melodee_init; the volume knob on the device */
+    song.master_q12 = 2048;                  /* until the page sends MASTER */
     screen_clear();
     ui.force = 1;
+    web_last_frame = fm1_ms - 15u;
+    web_booted = 1;
 }
 
-/* the demo: a Tessera generator on each track, as KNOB 1 on SEQ > PATTERN sets it, EVOLVE on track 1, then PLAY */
-__attribute__((used)) void sim_demo(void)
+/* one pass of main.c's loop: what the browser has (no USB, editor, UBOOT, flash) */
+static void web_frame(void)
+{
+    ui_input();
+    ui_leds();
+    ui_draw();
+}
+
+/* output ring, stereo float: filled a block of CTL at a time as the device's milliseconds pass, drained by
+ * web_render. The HOME scope is fed as audio.c audio_block feeds it. */
+#define RING 4096u
+static float ring[RING * 2];
+static uint32_t ring_w, ring_r;
+
+static void web_ms(void)
+{
+    fm1_ms++;
+    host_ticks += 1000u;
+    web_samples_due += FS;
+    while (web_samples_due >= 1000u * CTL) {
+        static int32_t o[2u * CTL];
+        uint32_t k;
+        web_samples_due -= 1000u * CTL;
+        mix_block(o, CTL);
+        for (k = 0; k < CTL; k++) {
+            uint32_t i = (ring_w++ % RING) * 2u;
+            if (k & 1u)
+                scope_buf[scope_w++ & (SCOPE_N - 1u)] = (int16_t)o[2u * k];
+            ring[i] = (float)o[2u * k] * (1.0f / 32768.0f);
+            ring[i + 1u] = (float)o[2u * k + 1u] * (1.0f / 32768.0f);
+        }
+    }
+    if (!web_booted)
+        return;
+    if (fm1_ms - web_last_frame >= 15u) {        /* main.c: a frame, then ui_input until 15 ms are over */
+        web_last_frame = fm1_ms;
+        web_frame();
+    } else {
+        ui_input();
+    }
+}
+
+static float out_l[1024], out_r[1024];
+EXPORT float *web_out_l(void) { return out_l; }
+EXPORT float *web_out_r(void) { return out_r; }
+/* n frames (<= 1024) into out_l / out_r: the device runs until they exist */
+EXPORT void web_render(uint32_t n)
+{
+    uint32_t k;
+    if (n > 1024u)
+        n = 1024u;
+    while (ring_w - ring_r < n)
+        web_ms();
+    for (k = 0; k < n; k++) {
+        uint32_t i = (ring_r++ % RING) * 2u;
+        out_l[k] = ring[i];
+        out_r[k] = ring[i + 1u];
+    }
+}
+
+/* no flash here: the page's saved sectors are ignored, nothing is ever written */
+static uint8_t nor[4096];
+EXPORT uint8_t *web_nor(void) { return nor; }
+EXPORT uint32_t web_nor_size(void) { return 0; }
+EXPORT void web_nor_erase(void) { memset(nor, 0xFF, sizeof nor); }
+EXPORT uint32_t web_flash_writes_count(void) { return 0; }
+EXPORT void web_boot(void)
+{
+    if (!web_booted)
+        web_power_on();
+}
+
+/* input, by the printed labels: buttons bit b = B_FX .. B_OCTUP (panel.c), keys bit k = key k (F3 .. G5),
+ * encoders by role (EN_SELECT .. EN_K4), MASTER 0..1023 (main.c: the pot, squared) */
+EXPORT void web_buttons(uint32_t labels)
+{
+    uint32_t m = 0, b;
+    for (b = 0; b < NB; b++)
+        if ((labels >> b) & 1u)
+            m |= 1u << panel.btn[b];
+    host_pressed |= m & ~fm1_in.buttons;
+    fm1_in.buttons = m;
+}
+EXPORT void web_keys(uint32_t mask)
+{
+    mask &= (1u << 27) - 1u;
+    host_notes |= mask & ~fm1_in.notes;
+    fm1_in.notes = mask;
+}
+EXPORT void web_enc(uint32_t role, int32_t n)
+{
+    if (role < NE)
+        host_enc[panel.enc[role] % 7u] += n * panel.dir[role];
+}
+EXPORT void web_master(uint32_t v)
+{
+    uint32_t k10 = v > 1023u ? 1023u : v;
+    song.master_q12 = (int32_t)((k10 * k10) >> 8);
+}
+/* a channel message from Web MIDI, as a USB-MIDI packet arrives: 0 = the queue was full */
+EXPORT uint32_t web_midi(uint32_t status, uint32_t d1, uint32_t d2)
+{
+    if (status < 0x80u || status >= 0xF0u)
+        return 1;
+    if (mi_w - mi_r >= MQ)
+        return 0;
+    midi_in_q[mi_w % MQ] = (status >> 4) | status << 8 | (d1 & 127u) << 16 | (d2 & 127u) << 24;
+    mi_w++;
+    return 1;
+}
+
+/* the LEDs: bit b = the button labelled b, keys bit k. Lit: fm1_led; dim: the idle-key and idle-button planes;
+ * breath: the third plane (ui_input.c ui_leds) */
+static uint32_t led_on(const uint8_t *l, uint32_t id)
+{
+    uint32_t c, r;
+    for (c = 0; c < FM1_NCOL; c++)
+        for (r = 1; r < 5u; r++)
+            if (FM1_KEYMAP[r][c] == (int8_t)id)
+                return (l[c] >> r) & 1u;
+    return 0;
+}
+static uint32_t led_buttons(const uint8_t *l)
+{
+    uint32_t b, m = 0;
+    for (b = 0; b < NB; b++)
+        m |= led_on(l, panel.btn[b]) << b;
+    return m;
+}
+static uint32_t led_keys(const uint8_t *l)
+{
+    uint32_t k, m = 0;
+    for (k = 0; k < 27u; k++)
+        m |= led_on(l, 14u + k) << k;
+    return m;
+}
+static uint8_t led_dim[FM1_NCOL];
+static const uint8_t *web_dim_plane(void)
+{
+    uint32_t c;
+    for (c = 0; c < FM1_NCOL; c++)
+        led_dim[c] = (uint8_t)((fm1_led_dim[0][c] | fm1_led_dim[1][c]) & ~fm1_led[c]);
+    return led_dim;
+}
+EXPORT uint32_t web_lit_buttons(void) { return led_buttons(fm1_led); }
+EXPORT uint32_t web_lit_keys(void) { return led_keys(fm1_led); }
+EXPORT uint32_t web_dim_buttons(void) { return led_buttons(web_dim_plane()); }
+EXPORT uint32_t web_dim_keys(void) { return led_keys(web_dim_plane()); }
+EXPORT uint32_t web_dim_level(void) { return 0; }
+EXPORT uint32_t web_breath_buttons(void) { return led_buttons(fm1_led_dim[2]); }
+EXPORT uint32_t web_breath_keys(void) { return led_keys(fm1_led_dim[2]); }
+
+EXPORT uint16_t *web_screen(void) { return host_screen; }        /* 240 x 240 RGB565, the panel's byte order */
+EXPORT uint32_t web_screen_draws(void) { return (uint32_t)host_sent; }
+EXPORT uint32_t web_now_ms(void) { return fm1_ms; }
+EXPORT uint32_t web_playing(void) { return song.playing; }
+EXPORT uint32_t web_sample_rate(void) { return FS; }
+
+/* melodee-tess: the demo, a Tessera generator on each track (as KNOB 1 on SEQ > PATTERN sets it), EVOLVE on
+ * track 1, then PLAY */
+EXPORT void web_demo(void)
 {
     static const uint8_t GEN[4] = {TESS_ENG_TURING, TESS_ENG_MORPH, TESS_ENG_MARKOV, TESS_ENG_EUCLID};
     uint32_t tr, sel = song.sel;
@@ -50,89 +215,4 @@ __attribute__((used)) void sim_demo(void)
     ui.force = 1;
     if (!song.playing)
         transport_req = 1;
-}
-
-/* n frames (at most SIM_BLOCK, a multiple of CTL) into sim_out, interleaved L R */
-__attribute__((used)) float *sim_render(uint32_t n)
-{
-    static int32_t o[2u * CTL];
-    uint32_t i, j;
-    for (i = 0; i < n; i += CTL) {
-        mix_block(o, CTL);
-        for (j = 0; j < CTL; j++) {
-            if (j & 1u)
-                scope_buf[scope_w++ & (SCOPE_N - 1u)] = (int16_t)o[2u * j];   /* the HOME scope (audio.c audio_block) */
-            sim_out[2u * (i + j)] = (float)o[2u * j] * (1.0f / 32768.0f);
-            sim_out[2u * (i + j) + 1u] = (float)o[2u * j + 1u] * (1.0f / 32768.0f);
-        }
-    }
-    sim_frames += n;
-    fm1_ms = (uint32_t)(sim_frames * 1000u / FS);
-    host_ticks = (uint32_t)(sim_frames * 1000000u / FS);
-    return sim_out;
-}
-
-/* one UI frame (main.c's loop body): 1 if the screen changed */
-__attribute__((used)) int sim_frame(void)
-{
-    uint32_t c, r, id;
-    ui_input();
-    ui_leds();
-    ui_draw();
-    memset(sim_led, 0, sizeof sim_led);
-    for (c = 0; c < FM1_NCOL; c++)
-        for (r = 1; r < 5u; r++)
-            if ((id = (uint32_t)FM1_KEYMAP[r][c]) < 41u) {
-                uint32_t b = 1u << r;
-                sim_led[id] = (fm1_led[c] & b) ? 2 :
-                              ((fm1_led_dim[0][c] | fm1_led_dim[1][c] | fm1_led_dim[2][c]) & b) ? 1 : 0;
-            }
-    if (host_sent == sim_sent)
-        return 0;
-    sim_sent = host_sent;
-    return 1;
-}
-
-__attribute__((used)) uint16_t *sim_screen(void) { return host_screen; }   /* 240 x 240 RGB565, high byte first */
-__attribute__((used)) uint8_t *sim_leds(void) { return sim_led; }
-__attribute__((used)) uint32_t sim_button_id(uint32_t label) { return label < NB ? panel.btn[label] : 255u; }
-
-__attribute__((used)) void sim_button(uint32_t label, int down)   /* label: B_FX .. B_OCTUP */
-{
-    uint32_t b;
-    if (label >= NB)
-        return;
-    b = 1u << panel.btn[label];
-    if (down) {
-        fm1_in.buttons |= b;
-        host_pressed |= b;
-    } else {
-        fm1_in.buttons &= ~b;
-    }
-}
-
-__attribute__((used)) void sim_key(uint32_t k, int down)         /* k: 0..26, F (53) .. G (79) */
-{
-    if (k >= 27u)
-        return;
-    if (down) {
-        fm1_in.notes |= 1u << k;
-        host_notes |= 1u << k;
-    } else {
-        fm1_in.notes &= ~(1u << k);
-    }
-}
-
-__attribute__((used)) void sim_turn(uint32_t role, int32_t steps)   /* role: EN_SELECT .. EN_K4, + = clockwise */
-{
-    if (role < NE)
-        host_enc[panel.enc[role]] += steps * panel.dir[role];
-}
-
-__attribute__((used)) void sim_midi(uint32_t status, uint32_t d1, uint32_t d2)   /* a short message (Web MIDI) */
-{
-    if (status < 0x80u || status >= 0xF0u)
-        return;
-    midi_in_q[mi_w % MQ] = (status >> 4) | status << 8 | (d1 & 127u) << 16 | (d2 & 127u) << 24;
-    mi_w++;
 }

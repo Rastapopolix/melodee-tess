@@ -295,8 +295,10 @@ tests and on the device, which stays essential.
 1. Now: keep the platform layer strict. New code must not touch registers outside `firmware/hal/`.
 2. **First version done 2026-10-14** (branch `web-sim`, the pre-merge firmware): `web/sim/`. The
    firmware on `tests/ui_test.c`'s stubs, built with Emscripten (`web/sim/build.sh` -> `build/sim/`),
-   runs in an AudioWorklet; the screen on a canvas, an on-screen panel (our own drawing), mouse,
-   touch, computer keyboard, Web MIDI, a demo with a generator per track. Tested by
+   runs in an AudioWorklet. The page and worklet are Felucca's (`web/emu` of hugelton/Felucca, after
+   X0X's), so the panel is the same FM-1 drawing as the other FM-1 browser builds (wide and upright
+   layouts); `web/sim/sim.c` exports Felucca's `web_*` interface. Mouse, touch, computer keyboard,
+   Web MIDI, MASTER, a demo with a generator per track. Tested by
    `web/sim/test_sim.mjs` (in `run_tests.sh` when Emscripten is installed). Still to do: browser
    storage in place of flash (saving is lost on reload), rebuild it on the merged firmware.
 3. Near release: a public demo deployed to GitHub Pages by GitHub Actions.
