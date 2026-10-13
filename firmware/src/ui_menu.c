@@ -52,6 +52,7 @@ typedef struct { const char *text; uint8_t kind; } menu_credit_t;
 static const menu_credit_t MENU_CREDITS[] = {
     {"MELODEE(TESS) / THIS FORK", MC_TITLE},
     {"Tessera engines and project save: Theo Dainis", MC_TEXT},
+    {"tess is short for tessera, the small tile of a mosaic: short phrases set side by side into a larger form", MC_TEXT},
     {"Melodee: Kerem Kilic, Ellic Studio / GPL-3.0", MC_TEXT},
     {"https://github.com/keremimo/melodee", MC_URL},
     {"", MC_TEXT},

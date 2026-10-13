@@ -24,6 +24,12 @@ The sound engines, effects, and core infrastructure are unchanged. The build out
 
 ---
 
+## The Name
+
+*Tess* is short for *tessera* (plural *tesserae*), the Latin word for the small tile of stone or glass in a mosaic. Each engine makes a short phrase; EVOLVE and FORM set mutated phrases side by side into sections, so a piece is built from small tiles arranged into a larger pattern. The word also meant a die, which suits the chance-driven engines.
+
+---
+
 ## Engines & Workflow
 
 On the **PATTERN** page, the **MODE** knob switches a track between the original step sequencer (`STEP`) inherited from upstream Melodee and one of four new generative engines:
