@@ -2,6 +2,8 @@
 
 A fork of the M-Vave FM-1 alt-firmware [Melodee](https://github.com/keremimo/melodee) developed by **keremimo** (itself built upon *Felucca* by **Leo Kuroshita / Hügelton Instruments**). GPL-3.0-only. **Status: Experimental.**
 
+**Based on Melodee 1.1.0 (pre-release):** upstream commit [`0bc95e8`](https://github.com/keremimo/melodee/commit/0bc95e8) "prepare 1.1.0" (10 October 2026), one day before the final [v1.1.0](https://github.com/keremimo/melodee/releases/tag/v1.1.0) release. Changes upstream made after that are not included yet.
+
 **[Try it in your browser](https://rastapopolix.github.io/melodee-tess/webapp/sim/)**: the firmware running on an on-screen FM-1, with the same engines, sequencer and Tessera generators. No FM-1 or install needed; press *Play the demo* to hear the generators.
 
 ---
