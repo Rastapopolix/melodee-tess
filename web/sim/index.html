@@ -1,0 +1,352 @@
+<title>Melodee (tess) Simulator</title>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     Web simulator of the melodee-tess firmware: melodee.wasm (web/sim/sim.c) runs in sim-worklet.js.
+     Built into build/sim/ by web/sim/build.sh. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the instrument on a bench. One object centred, the notes on how to play it underneath. */
+:root {
+  --bench: #e6e8eb;           /* page */
+  --ink: #1b1f25;
+  --muted: #59616c;
+  --rule: #c9ced5;
+  --accent: #d9583a;          /* the firmware's own orange (NIGHT palette) */
+  --accent-ink: #ffffff;
+  /* the device keeps one look in both themes */
+  --body: #24282e;
+  --body-edge: #121417;
+  --plate: #2d3239;
+  --silk: #b9c0c9;
+  --silk-dim: #7d8691;
+  --cap: #3a4048;
+  --cap-top: #454c55;
+  --led-off: #4a3a35;
+  --led-dim: #8a4a38;
+  --led-on: #ff7a4f;
+  --white-key: #ecebe7;
+  --white-key-down: #d3d1cb;
+  --black-key: #1a1d21;
+  --black-key-down: #2f343b;
+  --f-display: "Chakra Petch", "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bench: #101215; --ink: #e4e7eb; --muted: #98a1ac; --rule: #2b3037;
+    --accent: #ef6a4a; --accent-ink: #160b07; --body-edge: #000000; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bench: #101215; --ink: #e4e7eb; --muted: #98a1ac; --rule: #2b3037;
+  --accent: #ef6a4a; --accent-ink: #160b07; --body-edge: #000000; color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { background: var(--bench); color: var(--ink); }
+body { font: 16px/1.5 var(--f-body); padding: 24px 16px 48px; }
+.wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 28px; }
+
+header { display: grid; gap: 6px; }
+h1 { font: 700 clamp(26px, 5vw, 36px)/1.1 var(--f-display); letter-spacing: 0.01em; margin: 0; text-wrap: balance; }
+h1 small { font-weight: 500; color: var(--muted); font-size: 0.6em; letter-spacing: 0.06em; text-transform: uppercase; margin-left: 6px; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.cta { font: 600 15px/1 var(--f-display); letter-spacing: 0.06em; text-transform: uppercase; border: 0; border-radius: 6px;
+       padding: 12px 18px; cursor: pointer; background: var(--accent); color: var(--accent-ink); }
+.cta.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--rule); }
+.cta:disabled { opacity: 0.45; cursor: default; }
+.cta:focus-visible, .knob:focus-visible, .btn:focus-visible, .key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.status { font: 13px/1.3 var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.vol { display: inline-flex; align-items: center; gap: 8px; font: 13px var(--f-mono); color: var(--muted); }
+.vol input { width: 110px; accent-color: var(--accent); }
+
+/* ------------------------------------------------------------ the device --- */
+.device { background: var(--body); border-radius: 18px; padding: clamp(12px, 3vw, 22px);
+          box-shadow: 0 1px 0 #ffffff14 inset, 0 18px 40px -18px var(--body-edge), 0 2px 0 var(--body-edge);
+          display: grid; gap: clamp(12px, 2.4vw, 18px); color: var(--silk); user-select: none; -webkit-user-select: none;
+          touch-action: manipulation; }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: clamp(12px, 3vw, 24px); align-items: center; }
+.screen { position: relative; background: #000; border-radius: 6px; padding: 8px; box-shadow: 0 0 0 2px var(--body-edge), 0 0 0 3px #ffffff10; }
+canvas { display: block; width: 100%; max-width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 2px; background: #0d0f12; }
+.screen .off { position: absolute; inset: 8px; display: grid; place-items: center; text-align: center; color: var(--silk-dim);
+               font: 500 13px/1.4 var(--f-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.encs { display: grid; gap: 14px; justify-items: center; }
+.label { font: 600 10.5px/1 var(--f-display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--silk); text-align: center; }
+.knob { --a: 0deg; position: relative; border-radius: 50%; cursor: ns-resize; touch-action: none;
+        background: radial-gradient(circle at 50% 38%, var(--cap-top), var(--cap) 60%, #2a2f35);
+        box-shadow: 0 3px 0 var(--body-edge), 0 0 0 1px #ffffff12 inset; }
+.knob::after { content: ""; position: absolute; left: 50%; top: 9%; width: 3px; height: 26%; margin-left: -1.5px; border-radius: 2px;
+               background: var(--silk); transform-origin: 50% 158%; transform: rotate(var(--a)); }
+.enc { display: grid; gap: 6px; justify-items: center; }
+.enc .knob { width: clamp(46px, 9vw, 62px); height: clamp(46px, 9vw, 62px); }
+.knobs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 4px; }
+.knobs .knob { width: clamp(36px, 7vw, 46px); height: clamp(36px, 7vw, 46px); }
+.knobs .knob::after { transform-origin: 50% 165%; }
+.btns { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: clamp(6px, 1.4vw, 10px); }
+.btn { position: relative; border: 0; border-radius: 7px; padding: 14px 2px 8px; cursor: pointer; color: var(--silk);
+       font: 600 clamp(9px, 1.9vw, 11.5px)/1 var(--f-display); letter-spacing: 0.08em; background: var(--cap);
+       box-shadow: 0 3px 0 var(--body-edge), 0 0 0 1px #ffffff10 inset; touch-action: none; }
+.btn.down { transform: translateY(2px); box-shadow: 0 1px 0 var(--body-edge), 0 0 0 1px #ffffff10 inset; }
+.btn::before { content: ""; position: absolute; top: 5px; left: 50%; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px;
+               background: var(--led-off); }
+.btn[data-led="1"]::before { background: var(--led-dim); }
+.btn[data-led="2"]::before { background: var(--led-on); box-shadow: 0 0 8px var(--led-on); }
+.btn.play { color: var(--led-on); }
+.kbd { position: relative; height: clamp(96px, 20vw, 150px); }
+.whites { display: flex; height: 100%; gap: 2px; }
+.key { touch-action: none; cursor: pointer; }
+.whites .key { flex: 1 1 0; min-width: 0; background: var(--white-key); border-radius: 0 0 5px 5px; position: relative;
+               box-shadow: 0 2px 0 #b9b6ae; }
+.blacks .key { position: absolute; top: 0; height: 60%; width: calc(100% / 16 * 0.62); background: var(--black-key);
+               border-radius: 0 0 4px 4px; box-shadow: 0 2px 0 #000, 0 0 0 1px #000; z-index: 1; }
+.whites .key.down { background: var(--white-key-down); box-shadow: 0 1px 0 #b9b6ae; }
+.blacks .key.down { background: var(--black-key-down); }
+.key::after { content: ""; position: absolute; left: 50%; bottom: 7px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%;
+              background: transparent; }
+.blacks .key::after { bottom: 6px; width: 6px; height: 6px; margin-left: -3px; }
+.key[data-led="1"]::after { background: var(--led-dim); }
+.key[data-led="2"]::after { background: var(--led-on); box-shadow: 0 0 6px var(--led-on); }
+.key .note { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font: 500 9px var(--f-mono); color: #8d8a83; }
+.plate { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.plate .name { font: 700 13px/1 var(--f-display); letter-spacing: 0.22em; color: var(--silk); }
+.plate .load { font: 11px var(--f-mono); color: var(--silk-dim); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------- the notes --- */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px 32px; }
+.notes section { min-width: 0; }
+h2 { font: 600 13px/1.2 var(--f-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+.notes ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+.notes p { margin: 0 0 8px; }
+kbd { font: 500 12px var(--f-mono); padding: 1px 5px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--rule); }
+b.ctl { font: 600 0.82em var(--f-display); letter-spacing: 0.06em; }
+footer { border-top: 1px solid var(--rule); padding-top: 14px; color: var(--muted); font-size: 14px; }
+footer a { color: inherit; }
+@media (max-width: 560px) {
+  .top { grid-template-columns: 1fr; }
+  .encs { grid-template-columns: repeat(3, 1fr); }
+  .btn { padding: 13px 0 7px; letter-spacing: 0.02em; }
+  .key .note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .btn.down { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Melodee (tess) <small>Simulator</small></h1>
+    <p class="lede">The melodee-tess firmware for the M-Vave FM-1, running in your browser: the same synth engines,
+      sequencer and Tessera generators as on the device, compiled from the same source.</p>
+    <div class="bar">
+      <button class="cta" id="power">Power on</button>
+      <button class="cta ghost" id="demo" disabled>Play the demo</button>
+      <button class="cta ghost" id="midi" disabled>Use a MIDI keyboard</button>
+      <label class="vol" for="vol">Volume <input id="vol" type="range" min="0" max="150" value="100"></label>
+      <span class="status" id="status">Off. Sound starts when you power on.</span>
+    </div>
+  </header>
+
+  <div class="device" id="device" aria-label="The simulated instrument">
+    <div class="top">
+      <div class="screen">
+        <canvas id="lcd" width="240" height="240" aria-label="Display"></canvas>
+        <div class="off" id="offmsg">Press Power on</div>
+      </div>
+      <div class="encs" id="encs"></div>
+    </div>
+    <div class="knobs" id="knobs"></div>
+    <div class="btns" id="btns"></div>
+    <div class="kbd" id="kbd"><div class="whites" id="whites"></div><div class="blacks" id="blacks"></div></div>
+    <div class="plate"><span class="name">MELODEE (TESS)</span><span class="load" id="load">CPU –</span></div>
+  </div>
+
+  <div class="notes">
+    <section>
+      <h2>Getting started</h2>
+      <ul>
+        <li><b class="ctl">Play the demo</b> switches on a Tessera generator on each track and starts the sequencer.</li>
+        <li><b class="ctl">PLAY</b> starts and stops. <b class="ctl">ALGORITHM</b> picks the track, <b class="ctl">PRESETS</b> its sound.</li>
+        <li>Press <b class="ctl">SEQ</b>, then turn <b class="ctl">SELECT</b> to the PATTERN page: <b class="ctl">KNOB 1</b> picks the
+          generator (Turing, Euclid, Markov, Morph). EVOLVE, FORM and TWEAK are the next pages.</li>
+        <li>The keys play the selected track. <b class="ctl">OCT-</b> and <b class="ctl">OCT+</b> shift the octave.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Controls</h2>
+      <ul>
+        <li>Knobs: drag up or down, scroll, or focus one and use the arrow keys.</li>
+        <li>Buttons and keys respond to press and release, so holding works as on the device.</li>
+        <li>Computer keyboard: <kbd>A</kbd> to <kbd>'</kbd> play C to F, with <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd>
+          <kbd>U</kbd> <kbd>O</kbd> <kbd>P</kbd> as the black keys. <kbd>Space</kbd> is PLAY.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Not simulated</h2>
+      <p>Saving: projects and presets are lost when you reload. USB and the battery. The CPU limit: your computer is much
+        faster than the FM-1, so something that plays smoothly here can still overload the device.</p>
+    </section>
+  </div>
+
+  <footer>
+    melodee-tess is a fork of <a href="https://github.com/keremimo/melodee" target="_blank" rel="noopener">Melodee</a> by keremimo,
+    built on Felucca by Leo Kuroshita / Hügelton Instruments. Tessera generators by Theo Dainis. GPL-3.0-only; source:
+    <a href="https://github.com/Rastapopolix/melodee-tess" target="_blank" rel="noopener">github.com/Rastapopolix/melodee-tess</a>.
+    Not affiliated with M-Vave.
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const LABELS = ["FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY", "REC", "OCT-", "OCT+"];
+  const BTN_ID = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 1];   // panel.c PANEL_DEFAULT: matrix id per label
+  const ORDER = [6, 9, 8, 0, 1, 2, 3, 4, 5, 7, 10, 11, 12, 13];      // on the panel: HOME SEQ ARP FX SCL ENV LFO / EDIT GLO SAVE PLAY REC OCT- OCT+
+  const NOTE = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+  const $ = (id) => document.getElementById(id);
+  let node = null, ctx = null, gain = null;
+  const send = (m) => { if (node) node.port.postMessage(m); };
+
+  /* ------------------------------------------------------------- knobs */
+  function makeKnob(parent, name, role, cls) {
+    const wrap = document.createElement("div");
+    wrap.className = cls;
+    const k = document.createElement("div");
+    k.className = "knob"; k.tabIndex = 0; k.setAttribute("role", "slider"); k.setAttribute("aria-label", name);
+    const l = document.createElement("div"); l.className = "label"; l.textContent = name;
+    wrap.append(k, l); parent.append(wrap);
+    let angle = 0, y0 = 0, acc = 0, wheel = 0;
+    const turn = (s) => { if (!s) return; angle += s * 15; k.style.setProperty("--a", angle + "deg"); send({ t: "turn", role, steps: s }); };
+    k.addEventListener("pointerdown", (e) => { k.setPointerCapture(e.pointerId); y0 = e.clientY; acc = 0; e.preventDefault(); });
+    k.addEventListener("pointermove", (e) => {
+      if (!k.hasPointerCapture(e.pointerId)) return;
+      acc += y0 - e.clientY; y0 = e.clientY;
+      const s = Math.trunc(acc / 8); acc -= s * 8; turn(s);
+    });
+    k.addEventListener("wheel", (e) => {
+      e.preventDefault(); wheel += e.deltaY;
+      const s = Math.trunc(-wheel / 40); if (s) { wheel = 0; turn(Math.max(-4, Math.min(4, s))); }
+    }, { passive: false });
+    k.addEventListener("keydown", (e) => {
+      const s = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
+      if (s) { e.preventDefault(); turn(s); }
+    });
+  }
+  ["SELECT", "ALGORITHM", "PRESETS"].forEach((n, i) => makeKnob($("encs"), n, i, "enc"));
+  ["KNOB 1", "KNOB 2", "KNOB 3", "KNOB 4"].forEach((n, i) => makeKnob($("knobs"), n, 3 + i, "enc"));
+
+  /* ----------------------------------------------------------- buttons */
+  const btnEl = [];
+  function hold(el, down, up) {
+    let on = false;
+    el.addEventListener("pointerdown", (e) => { el.setPointerCapture(e.pointerId); if (!on) { on = true; el.classList.add("down"); down(); } e.preventDefault(); });
+    const off = () => { if (on) { on = false; el.classList.remove("down"); up(); } };
+    el.addEventListener("pointerup", off); el.addEventListener("pointercancel", off); el.addEventListener("lostpointercapture", off);
+    el.addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); e.stopPropagation(); if (!on) { on = true; el.classList.add("down"); down(); } } });
+    el.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); off(); } });
+    return { press: () => { if (!on) { on = true; el.classList.add("down"); down(); } }, release: off };
+  }
+  const btnCtl = [];
+  ORDER.forEach((label) => {
+    const b = document.createElement("button");
+    b.className = "btn" + (label === 10 ? " play" : ""); b.textContent = LABELS[label]; b.dataset.led = "0";
+    $("btns").append(b); btnEl[label] = b;
+    btnCtl[label] = hold(b, () => send({ t: "btn", label, down: 1 }), () => send({ t: "btn", label, down: 0 }));
+  });
+
+  /* -------------------------------------------------------------- keys */
+  const keyEl = [], keyCtl = [];
+  const black = (k) => (0x54A >> ((k + 5) % 12)) & 1;      // seq.c key_black: the 27 keys from F
+  let whiteIndex = 0;
+  for (let k = 0; k < 27; k++) {
+    const el = document.createElement("div");
+    el.className = "key"; el.dataset.led = "0"; el.setAttribute("aria-label", NOTE[(k + 5) % 12] + (Math.floor((k + 53) / 12) - 1));
+    if (black(k)) {
+      el.style.left = `calc(${(whiteIndex / 16) * 100}% - (100% / 16 * 0.31))`;
+      $("blacks").append(el);
+    } else {
+      const n = (k + 5) % 12;
+      if (n === 0) { const s = document.createElement("span"); s.className = "note"; s.textContent = "C" + (Math.floor((k + 53) / 12) - 1); el.append(s); }
+      $("whites").append(el); whiteIndex++;
+    }
+    keyEl[k] = el;
+    keyCtl[k] = hold(el, () => send({ t: "key", k, down: 1 }), () => send({ t: "key", k, down: 0 }));
+  }
+
+  /* ---------------------------------------------------- computer keyboard */
+  const KB = { a: 7, w: 8, s: 9, e: 10, d: 11, f: 12, t: 13, g: 14, y: 15, h: 16, u: 17, j: 18, k: 19, o: 20, l: 21, p: 22, ";": 23, "'": 24 };
+  const typing = (e) => e.target.closest && e.target.closest("input, textarea, select");
+  document.addEventListener("keydown", (e) => {
+    if (!node || e.repeat || e.metaKey || e.ctrlKey || e.altKey || typing(e)) return;
+    const k = KB[e.key.toLowerCase()];
+    if (k !== undefined) { keyCtl[k].press(); e.preventDefault(); }
+    else if (e.key === " " && !(e.target.closest && e.target.closest("button, .knob, .key"))) { btnCtl[10].press(); e.preventDefault(); }
+  });
+  document.addEventListener("keyup", (e) => {
+    const k = KB[e.key.toLowerCase()];
+    if (k !== undefined) keyCtl[k].release();
+    else if (e.key === " ") btnCtl[10].release();
+  });
+
+  /* ------------------------------------------------------- screen, LEDs */
+  const lcd = $("lcd").getContext("2d"), img = lcd.createImageData(240, 240);
+  function draw(px) {
+    const d = img.data;
+    for (let i = 0, j = 0; i < 57600; i++, j += 4) {
+      const c = (px[2 * i] << 8) | px[2 * i + 1];
+      d[j] = ((c >> 11) * 527 + 23) >> 6; d[j + 1] = (((c >> 5) & 63) * 259 + 33) >> 6; d[j + 2] = ((c & 31) * 527 + 23) >> 6; d[j + 3] = 255;
+    }
+    lcd.putImageData(img, 0, 0);
+  }
+  function leds(v) {
+    for (let label = 0; label < 14; label++) btnEl[label].dataset.led = v[BTN_ID[label]];
+    for (let k = 0; k < 27; k++) keyEl[k].dataset.led = v[14 + k];
+  }
+
+  /* ---------------------------------------------------------- power on */
+  const status = (t) => { $("status").textContent = t; };
+  $("vol").addEventListener("input", () => { if (gain) gain.gain.value = $("vol").value / 100; });
+  $("power").addEventListener("click", async () => {
+    const p = $("power");
+    p.disabled = true; status("Loading the firmware…");
+    try {
+      ctx = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
+      const [wasm] = await Promise.all([
+        fetch("melodee.wasm").then((r) => { if (!r.ok) throw new Error("melodee.wasm: " + r.status); return r.arrayBuffer(); }),
+        ctx.audioWorklet.addModule("sim-worklet.js"),
+      ]);
+      node = new AudioWorkletNode(ctx, "melodee-sim", { numberOfInputs: 0, outputChannelCount: [2], processorOptions: { wasm } });
+      gain = new GainNode(ctx, { gain: $("vol").value / 100 });
+      node.connect(gain).connect(ctx.destination);
+      node.port.onmessage = (e) => {
+        const m = e.data;
+        if (m.t === "screen") draw(m.px);
+        else if (m.t === "leds") leds(m.leds);
+        else if (m.t === "load") $("load").textContent = "CPU " + (m.pct < 1 ? "<1" : m.pct) + "%";
+        else if (m.t === "ready") {
+          $("offmsg").hidden = true; status("Running. Try the demo, or press PLAY.");
+          $("demo").disabled = false; $("midi").disabled = !navigator.requestMIDIAccess;
+          p.textContent = "Powered on";
+        } else if (m.t === "error") status("The firmware did not start: " + m.msg);
+      };
+      await ctx.resume();
+    } catch (err) {
+      status("Could not start: " + err.message + ". Try a current Chrome, Edge, Firefox or Safari.");
+      p.disabled = false;
+    }
+  });
+  $("demo").addEventListener("click", () => { send({ t: "demo" }); status("Demo: Turing, Morph, Markov and Euclid on tracks 1 to 4."); });
+
+  /* --------------------------------------------------------------- MIDI */
+  $("midi").addEventListener("click", async () => {
+    try {
+      const access = await navigator.requestMIDIAccess();
+      const hook = () => { let n = 0; access.inputs.forEach((i) => { n++; i.onmidimessage = (e) => { const d = e.data; if (d[0] >= 0x80 && d[0] < 0xF0) send({ t: "midi", d: [d[0], d[1], d[2]] }); }; }); return n; };
+      const n = hook(); access.onstatechange = hook;
+      status(n ? `MIDI: listening to ${n} input${n > 1 ? "s" : ""} (routing: GLO > SYSTEM, as on the device).` : "MIDI: no inputs found. Connect a keyboard and it will be picked up.");
+      $("midi").disabled = true;
+    } catch (err) {
+      status("MIDI is not available here: the browser or this page's host blocked it.");
+    }
+  });
+})();
+</script>
