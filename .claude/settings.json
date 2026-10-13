@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./build.sh)",
+      "Bash(./build.sh *)",
+      "Bash(tests/run_tests.sh)",
+      "Bash(sh tests/run_tests.sh)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
