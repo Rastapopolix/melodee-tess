@@ -25,9 +25,13 @@ static const uint32_t audio_batch_cost[AP_COUNT] __attribute__((section(".dsp_ta
     [AP_PROPHET]=3100,[AP_FM6]=1250,[AP_CZ]=2100,
     [AP_SID]=2000,[AP_808]=1150,[AP_909]=1900
 };
-#ifdef FM1_IRQ_TARGET
+#if defined(FM1_IRQ_TARGET) && MELODEE_DUAL_CORE
 #define AB_LOAD(p) fm1_aw_load(p)
 #define AB_STORE(p,v) fm1_aw_store(p,v)
+#elif defined(FM1_IRQ_TARGET)
+/* A single-core target consumes descriptors serially; no worker publishes. */
+#define AB_LOAD(p) (*(p))
+#define AB_STORE(p,v) (*(p)=(v))
 #else
 #define AB_LOAD(p) __atomic_load_n(p,__ATOMIC_ACQUIRE)
 #define AB_STORE(p,v) __atomic_store_n(p,v,__ATOMIC_RELEASE)
