@@ -336,21 +336,25 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [x] CLAUDE.md and ROADMAP.md
 - [x] Stop tracking `__pycache__/`; add it and the `*.bak*` / `*.pre*` backups to `.gitignore`
 - [x] Upstream sync review (v1.3.1 against the base, see Upstream sync)
-- [ ] **Bug (flash layout, risky):** `OBJ_TESSERA` at 0x9D000/0x9E000 shares its sectors with
-      project slot 4 (`PROJECT3` A/B), so saving one can corrupt the other. Move it to free
-      sectors and add an overlap check to `storage_test.c`. (Upstream's Prophet banks 3–5 also
-      share sectors with project slots 1–3; ask upstream whether that is intended.)
-- [ ] Decide whether to merge upstream v1.3.1 before phase 1 (it removes `perform_test.c` and
-      gains RAM headroom: only 608 B of arena are free today)
-- [ ] Fix the perform test: FX black key 1 leaves track 1 at peak 318 (limit 200; upstream v1.1.0: 63)
-- [ ] Fix regress HEALTH: song/4track_mix and slicer/song_gate_stut keep voices and DC after the
-      note-offs (upstream v1.1.0 passes, so the fork causes it)
-- [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): report upstream or skip
+- [x] Flash layout checked: `OBJ_TESSERA` (0x9D000/0x9E000) is in a free pair. It overlaps only the
+      retired legacy project objects, which nothing reads or writes (the 2026-10-13 "bug" was wrong;
+      see `docs/analysis/upstream.md`)
+- [ ] Storage test: no two live flash objects share a sector (guards the free pair at upstream merges)
+- [ ] Decide whether to merge upstream v1.3.1 before phase 1 (gains RAM: static RAM has 36 B free,
+      the audio arena 608 B)
+- [x] Perform test and regress HEALTH: one bug, `tessera_kill` cleared the note list before releasing
+      it, so stopping left step-sequencer notes hanging. Fixed in `279f08c` (branch `overnight-analysis`)
+- [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): two identical renders
+      differ from sample 11; report upstream or skip (QUESTIONS.md 5)
 - [ ] `tests/run_tests.sh` passes end to end
 - [ ] Delete the backup files in `firmware/src` and `tools/` once nothing in them is needed
 - [ ] Decide what happens to the `master`, `tools-util` and `cleanup-claude-md` branches
 
 ### 1. Extract the generators
+Plan: `docs/analysis/phase1-plan.md`.
+- [x] Baseline of what the generators play today: `tests/tessera_test.c`, 22 scenarios and the saved
+      block against `tests/tessera_baseline.txt` (`TESSERA_UPDATE=1` rewrites it)
+- [ ] Widen the baseline: swing, MIDI clock, pattern switches, SONG chains, short `P_SLEN`, GLO mute
 - [ ] Define `gen_tick(state, input_phrase, clock)` and its output (gate stream + CV)
 - [ ] Move Turing, Euclid, Markov and Morph behind it, out of seq.c / project.c / UI coupling
 - [ ] Host tests per generator: output identical to before, deterministic for a seed, CPU cost
@@ -410,6 +414,23 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 ## Constraints
 
 AC79 at 360 MHz, 44.1 kHz audio, at least 152 KiB of audio working arena (see CLAUDE.md).
+Headroom on 2026-10-14: static RAM (`.data + .bss`) 36 B, audio arena 608 B, app flash about 1.7 KB
+(`melodee.bin` 579,832 B of 581,564 B). Every new feature needs room made first.
+
+## Overnight analysis (2026-10-14)
+
+Branch `overnight-analysis`, not pushed, nothing merged. Reports in `docs/analysis/`:
+- `upstream.md`: changes from our base to v1.3.1 / next in three groups, merge estimate (small text
+  conflicts, moderate semantic checks), and the correction of the flash "bug".
+- `codebase-map.md`: modules, platform vs application, the generators' hooks (sequencer in the audio
+  interrupt, UI, storage; none into the mod matrix), and what removing Prophet/FM6/CZ/SLICE involves
+  (about 120 KB of flash).
+- `generators.md`: each generator in plain language, two-hour simulations: Euclid goes silent for up to
+  72 bars, FORM replays exactly forever, Markov plays every step; where Gravity and guardrails fit.
+- `phase1-plan.md`: the `gen_tick` interface, the order of work, risks (the order of random draws, RAM).
+- `QUESTIONS.md`: decisions for Theo.
+Also: the Tessera baseline test, and the stuck-notes fix (`279f08c`). The suite now fails only the
+CZ-1 knob test (an upstream issue).
 
 ## Open questions
 

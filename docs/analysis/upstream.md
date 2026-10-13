@@ -83,7 +83,8 @@ Points to check by hand after a merge:
   the fork before the merge would load with Tessera OFF the first time. Re-save once, or retag
   in the boot rewrite.
 - `ui_pages.c`: the merged `pv_picture` no longer references the removed slicer (checked).
-- The upstream `perform_test.c` is gone, so our failing perform test disappears with it.
+- Upstream deleted `perform_test.c` with the effects it tested. (Its failure here was the
+  `tessera_kill` bug, fixed tonight in `279f08c`.)
 
 ### Flash layout: no conflict (correction)
 

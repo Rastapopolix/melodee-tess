@@ -11,8 +11,8 @@ Decisions the overnight run (2026-10-14, branch `overnight-analysis`) could not 
    been pushed yet.
 2. **Merge `v1.3.1` or `next`?** `next` adds a CPU1 retirement fix and recovery tooling on top of
    v1.3.1. Recommendation: the release (v1.3.1), then cherry-pick `7025143` if CPU1 misbehaves.
-3. **Merge before phase 1?** Recommendation: yes. It frees RAM (608 B of arena headroom today) and
-   removes the failing perform test with the code it tests.
+3. **Merge before phase 1?** Recommendation: yes. It frees RAM (static RAM has 36 B free, the audio
+   arena 608 B) and touches the same sequencer hooks the extraction will move.
 
 ## Tests and fixes
 
