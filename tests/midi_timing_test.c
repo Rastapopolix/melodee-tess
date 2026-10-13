@@ -7,7 +7,6 @@ static uint32_t timing_now;
 #define MIDI_TICKS_PER_MS 24000u
 #define MIDI_CONTROL_NO_MAIN 1
 #include "midi_control_test.c"
-#include "frozen_project.h"
 
 static void timing_reset(uint32_t source, uint32_t start)
 {
@@ -117,6 +116,7 @@ static int timeline_test(void)
     }
     bad += check("24 MHz timer wrap preserves the exact six-clock step boundary", trk[0].seq_idx == 1 && trk[0].seq_pos == 0);
     timing_reset(2, 24000000u);
+    timing_packet(24000000u, 0xFA, 0, 0, 2); events_block(0);
     trk[0].seq_pos = 3072;
     trk[0].arp_pos = 2048;
     song.g[G_CLOCK] = 0;
@@ -195,6 +195,8 @@ static int lengths_and_swing_test(void)
     timing_packet(start, 0xFA, 0, 0, 2);
     for (uint32_t pulse = 0; pulse <= 192; pulse++) {
         timing_packet(start + pulse * 500000u, 0xF8, 0, 0, 2); events_block(CTL);
+        /* This fixture measures continuous capture beyond the first pass. */
+        song.rec_pass = 0;
         uint32_t units = pulse * 1024u, pair = units / 12288u, within = units % 12288u;
         /* SWING 100: 6144 + floor(6144*100/250) = 8601, then 3687. */
         uint32_t odd = within >= 8601u;
@@ -215,8 +217,11 @@ static int loop_replay_test(void)
         timing_packet(timing_now, 0xFA, 0, 0, 2);
         timing_packet(timing_now, 0xF8, 0, 0, 2);
         events_block(CTL);
+        /* Exercise the event store's cross-loop releases independently of the
+         * UI's one-pattern punch-out (covered in recording_test.c). */
+        song.rec_pass = 0;
         seq_advance(15u * 6144u + 5000u);
-        t->p[P_RECQ] = 3; /* optional playback 1/16 grid */
+        t->p[P_RECQ] = 3; /* commit a 1/16 grid when this take stops */
         /* Three paths retain the same late last-step original onset. */
         if (source == 0) input_on(t, 60, 111);
         else { timing_packet(timing_now, 0x90, 60, 111, source); events_block(CTL); }
@@ -262,33 +267,8 @@ static int old_formats_and_overdub_test(void)
 {
     int bad = 0;
     timing_reset(2, 24000000u);
-    trk[0].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 96};
-    project_capture(&proj_scratch);
-    int ok = bank_pack(proj_wire_u.raw, &proj_scratch, 1);
-    /* Build the frozen 92-parameter FUN10/FBKD layout, not today's
-     * payload with an old magic. Its banks use n+5*time metadata. */
-    uint8_t legacy[PROJ_STORE_V11]; memset(legacy, 0, sizeof legacy);
-    frozen_project92(legacy,proj_wire_u.raw+8u,PROJ_REC_OFF-PROJ_PARAM_EXTRA);
-    uint32_t magic = PROJ_MAGIC_V10, size = PROJ_STORE_V11, sum;
-    memcpy(legacy, &magic, 4); memcpy(legacy + 4u, &size, 4);
-    sum = proj_hash(legacy, sizeof legacy - 4u); memcpy(legacy + sizeof legacy - 4u, &sum, 4);
-    for (uint32_t i = 0; i < NTRK * (NPAT - 1u) * NSTEP; i++) {
-        uint8_t *bytes = proj_wire_u.raw + BANK_EXTRA_OFF + i * 8u;
-        step_t st; bank_step_unpack(&st, bytes);
-        bytes[3] = (bytes[3] & 15u) | ((st.n + 5u * st.time) << 4);
-    }
-    frozen_bank_tail(proj_wire_u.raw + 8u + PROJ_STORE_V11, proj_wire_u.raw + 8u + PROJ_STORE_SIZE,
-            BANK_SIZE_E - 8u - PROJ_STORE_V11 - 4u);
-    memcpy(proj_wire_u.raw + 8u, legacy, sizeof legacy);
-    magic = BANK_MAGIC_D; size = BANK_SIZE_E;
-    memcpy(proj_wire_u.raw, &magic, 4); memcpy(proj_wire_u.raw + 4u, &size, 4);
-    sum = proj_hash(proj_wire_u.raw, BANK_SIZE_E - 4u); memcpy(proj_wire_u.raw + BANK_SIZE_E - 4u, &sum, 4);
-    ok &= bank_valid(proj_wire_u.raw, BANK_SIZE_E);
-    if (ok) bank_upgrade(proj_wire_u.raw);
-    ok &= bank_valid(proj_wire_u.raw, BANK_STORE_SIZE) && *(uint32_t *)proj_wire_u.raw == BANK_MAGIC &&
-          *(uint32_t *)(proj_wire_u.raw + 8) == PROJ_MAGIC;
-    bad += check("existing FUN10/FBKD projects migrate while retaining legacy GATE behavior", ok && !step_gate(&proj_scratch.t[0].step[0]));
     timing_reset(2, 24000000u);
+    timing_packet(24000000u, 0xFA, 0, 0, 2); events_block(0);
     track_t *t = &trk[0]; seq_start(); seq_advance(0);
     input_on(t, 60, 111); seq_advance(14000); input_off(t, 60);
     seq_stop(); seq_start(); seq_advance(0);

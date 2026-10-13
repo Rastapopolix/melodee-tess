@@ -34,10 +34,12 @@ static void fresh(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     host_tracks_init();
-    for (p = 0; p < NPART; p++) host_preset(&trk[p], 0, 0);
+    for (p = 0; p < NPART; p++) host_preset(&trk[p], HOST_SYNTH, 0);
     memset(&melodee_dbg, 0, sizeof melodee_dbg);
     audio_cpu_rem = audio_halves = audio_max_us = 0;
     shed_req = 0; shed_count = 0; shed_over = 0;
+    memset(shed_part, 0, sizeof shed_part);
+    memset(voice_kills_part, 0, sizeof voice_kills_part);
     host_clock = host_us = host_half_reads = host_dma_advanced = host_acks = host_nest = 0;
     host_pending = FM1_AUDIO_HALF;
     transport_req = panic_req = 0;
@@ -72,6 +74,8 @@ static void overload(void)
     shed_voice();
     check("overload keeps each part's MONO lead and lowest POLY note",
           lead && bass && extra && lead->gate && bass->gate && extra->stage == 4u && shed_count == 1u);
+    check("part diagnostics attribute the cut to its actual track",
+          shed_part[0] == 0u && shed_part[1] == 1u && voice_kills_part[0] == 0u && voice_kills_part[1] == 1u);
     mix_block(out, CTL);
     check("overload frees its victim within one control block", extra && !extra->active && sounding() == 2u);
     shed_voice();

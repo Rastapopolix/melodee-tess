@@ -96,7 +96,7 @@ static int loop_drums_and_playback(void)
                !recording[2].vel&&recording[0].vel&&recording[1].vel&&(t->step[0].hit&(1u<<drum_lane(36)))&&(t->step[0].hit&(1u<<drum_lane(38))));
     hold(B_SAVE);bad+=check("drum deletion undoes without opening the EDIT layer",recording[2].vel==90&&!ui.ly&&cur_page()->graph==GR_ROLL);
 
-    raw_begin();t=&trk[0];seq_advance(600);input_on(t,60,70);seq_advance(100);input_off(t,60);
+    raw_begin();t=&trk[0];t->p[P_RECQ]=3;seq_advance(600);input_on(t,60,70);seq_advance(100);input_off(t,60);
     seq_advance(100);input_on(t,60,90);seq_advance(100);input_off(t,60);seq_stop();song.rec=0;
     go_page(GR_ROLL);cursor_set(0);frame();
     t->p[P_RECQ]=3;raw_replay();
@@ -123,7 +123,7 @@ static int timing_geometry_and_context(void)
                   x==PR_X0+4*PR_CW&&pr_is_bar((uint32_t)x+1u,(uint32_t)y+2u)&&!pr_is_bar((uint32_t)x-2u,(uint32_t)y+2u));
     notes_cycle(1); frame();uint16_t selection=ui.note_pick;
     t->p[P_RECQ]=3;frame();
-    bad+=check("playback quantization leaves the displayed original onset unchanged",
+    bad+=check("changing the next-take quantization leaves a completed take's display unchanged",
                ui.note_pick==selection&&notes_x(recording_raw_on(t,&recording[0],period),a,b)==x);
     t->p[P_RECQ]=0;cursor_set(4);turn(EN_PRESET,-3);notes_window(t,period,&a,&b);
     bad+=check("zoom windows clip safely to the last step of an odd-length loop",notes_base()==0&&b==recording_loop(t,period));
@@ -192,13 +192,13 @@ static int control_clashes(void)
     t=clash_setup();memcpy(saved,recording,sizeof saved);chain.running=1;press(B_EDIT);
     bad+=check("song-chain protection also blocks individual note deletion",!memcmp(saved,recording,sizeof saved)&&msg_is("STOP TO EDIT"));
     chain.running=0;
-    for(uint32_t layer=LAYER_FX;layer<LAYER_SCL;layer++) {
+    for(uint32_t layer=LAYER_GLO;layer<LAYER_SCL;layer++) {
         t=clash_setup();memcpy(saved,recording,sizeof saved);uint8_t zoom=ui.note_zoom;
         uint32_t b=LAYERS[layer].btn;
         fm1_in.buttons|=1u<<panel.btn[b];host_pressed|=1u<<panel.btn[b];frame();turn(EN_K4,1);
         int active=ui.ly==layer&&ui.layer==layer;
         fm1_in.buttons&=~(1u<<panel.btn[b]);frame();
-        bad+=check("FX/GLO layers keep their own knobs inside NOTES",active&&ui.note_zoom==zoom&&!memcmp(saved,recording,sizeof saved));
+        bad+=check("GLO layer keep their own knobs inside NOTES",active&&ui.note_zoom==zoom&&!memcmp(saved,recording,sizeof saved));
     }
     return bad;
 }
@@ -217,10 +217,10 @@ static int property_edits_and_mixed_patterns(void)
     turn(EN_K4,-20);bad+=check("VEL changes the highlighted hit's playback velocity",recording[1].vel==70&&recording[1].note==64&&recording[0].vel==100);
     uint32_t length=(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5));
     turn(EN_K3,1);
-    bad+=check("LENGTH extends one captured note by a step without moving its onset",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==length+RECORD_UNIT&&recording[1].on==original[1].on&&recording[0].duration==original[0].duration);
+    bad+=check("LENGTH snaps one captured note to the next quarter without moving its onset",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==(length/(RECORD_UNIT/4u)+1u)*(RECORD_UNIT/4u)&&recording[1].on==original[1].on&&recording[0].duration==original[0].duration);
     hold(B_SAVE);bad+=check("length undo keeps the preceding velocity edit",recording[1].duration==original[1].duration&&recording[1].vel==70);
     fm1_in.buttons|=1u<<panel.btn[B_ENV];host_pressed|=1u<<panel.btn[B_ENV];frame();turn(EN_K3,1);fm1_in.buttons&=~(1u<<panel.btn[B_ENV]);frame();
-    bad+=check("ENV plus LENGTH gives a fine sixteenth-step duration edit",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==length+RECORD_UNIT/16u&&cur_page()->graph==GR_ROLL);
+    bad+=check("ENV plus LENGTH gives a fine sixteenth-step duration edit",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==(length/(RECORD_UNIT/16u)+1u)*(RECORD_UNIT/16u)&&cur_page()->graph==GR_ROLL);
     hold(B_SAVE);
     fm1_in.buttons|=1u<<panel.btn[B_SCL];host_pressed|=1u<<panel.btn[B_SCL];frame();turn(EN_K1,2);fm1_in.buttons&=~(1u<<panel.btn[B_SCL]);frame();
     bad+=check("MOVE preserves a captured note's fractional onset, duration and neighbours",ui.cursor==2&&notes_selected(t)==1&&(recording[1].step&63u)==2&&recording[1].on==original[1].on&&recording[1].duration==original[1].duration&&recording[0].vel==100&&recording[2].vel==95);
@@ -434,9 +434,89 @@ static int erase_edit_hold_conflicts(void)
     return bad;
 }
 
+static void delete_range(uint32_t first,uint32_t last)
+{
+    cursor_set((int32_t)first);frame();
+    bulk.on=1;bulk.track=song.sel;bulk.generation=TSEL->pattern_gen;
+    bulk.engine=(uint8_t)library_engine();bulk.pattern=TSEL->pattern;
+    bulk.anchor=(uint16_t)first;bulk.end=(uint16_t)last;
+    press(B_EDIT);
+}
+static int bulk_and_pattern_clears(void)
+{
+    raw_begin();track_t *t=TSEL;
+    seq_advance(600);input_on(t,60,80);seq_advance(300);input_off(t,60);
+    seq_advance(3300);input_on(t,64,90);seq_advance(300);input_off(t,64);
+    seq_advance(2244);input_on(t,67,100);seq_advance(300);input_off(t,67);
+    seq_advance(15u*6144u+5004u-7044u);input_on(t,72,110);seq_advance(300);input_off(t,72);
+    seq_stop();song.rec=0;go_page(GR_ROLL);frame();
+    recorded_note_t saved[4];memcpy(saved,recording,sizeof saved);
+    int bad=check("bulk fixture includes late notes rounded outside their onset intervals",
+        recording_view(t,&recording[1])==1&&recording_view(t,&recording[3])==0);
+    delete_range(0,0);
+    bad+=check("EDIT deletes every selected onset, including late notes, and preserves neighbours sharing its overview",
+        !recording[0].vel&&!recording[1].vel&&!memcmp(&recording[2],&saved[2],sizeof saved[2])&&
+        !memcmp(&recording[3],&saved[3],sizeof saved[3])&&t->step[0].note[0]==72&&t->step[1].note[0]==67&&!bulk.on);
+    hold(B_SAVE);
+    bad+=check("bulk delete undo restores all precise events byte-for-byte",!memcmp(saved,recording,sizeof saved));
+    bad+=check("bulk delete redo removes both events again",note_tools_history(1)&&!recording[0].vel&&!recording[1].vel&&recording[2].vel&&recording[3].vel);
+    delete_range(15,15);
+    bad+=check("bulk delete at loop end removes the late event's step-zero overview only",!recording[3].vel&&recording[2].vel&&!step_on(&t->step[0]));
+    hold(B_SAVE);
+    bulk.on=2;bulk.track=song.sel;bulk.generation=recording_generation;
+    bulk.engine=(uint8_t)library_engine();bulk.pattern=TSEL->pattern;
+    memset(bulk.notes,0,sizeof bulk.notes);bulk.notes[0]=1u<<3;
+    cursor_set(1);frame();press(B_EDIT);
+    bad+=check("exact selection after a move deletes selected events rather than the cursor's neighbour",!recording[3].vel&&recording[2].vel);
+
+    raw_begin();t=TSEL;
+    seq_advance(600);input_on(t,60,80);seq_advance(300);input_off(t,60);
+    seq_advance(3600);input_on(t,64,90);seq_advance(300);input_off(t,64);
+    seq_stop();song.rec=0;go_page(GR_ROLL);frame();
+    recorded_note_t other=recording[0];other.owner=(uint8_t)(1u+NPAT);other.note=75;
+    recording_restore_note(&trk[1],2,other);
+    saved[0]=recording[0];saved[1]=recording[1];
+    motion_set_event(t,0,P_LEVEL,80);motion_store_t before;motion_snapshot_track(t,&before);
+    go_title("PATTERN");frame();
+    confirm_open(CF_CLEAR_SEQ,0);press(B_OCTUP);
+    bad+=check("Clear pattern physically erases the bank's precise events and preserves other owners",
+        !recording[0].vel&&!recording[1].vel&&!memcmp(&recording[2],&other,sizeof other)&&seq_is_empty(t)&&!t->rh_n&&!motion.count);
+    hold(B_SAVE);motion_store_t after;motion_snapshot_track(t,&after);
+    bad+=check("pattern clear undo restores exact events and motion together",!memcmp(&recording[0],&saved[0],sizeof saved[0])&&
+        !memcmp(&recording[1],&saved[1],sizeof saved[1])&&!memcmp(&before,&after,sizeof before));
+    undo_step(1);
+    bad+=check("pattern clear redo from the pattern page deletes events and motion again",!recording[0].vel&&!recording[1].vel&&!motion.count);
+    song.rec=1;seq_start();seq_advance(0);seq_advance(600);input_on(t,77,100);
+    seq_advance(3u*6144u);input_off(t,77);seq_stop();song.rec=0;
+    uint32_t count=0;int only=1;
+    for(uint32_t i=recording_head[recording_owner(t)];i<RECORD_MAX;i=recording_next[i]){count++;only&=recording[i].note==77;}
+    bad+=check("a long note recorded after clearing cannot revive old notes",count==1&&only&&!note_tools_history(0));
+    raw_replay();seq_advance(600);int clean=gate_note(t,77)&&!gate_note(t,60)&&!gate_note(t,64);
+    seq_advance(4000);clean&=!gate_note(t,60)&&!gate_note(t,64);
+    seq_advance(3u*6144u-4000u);clean&=!gate_note(t,77);
+    bad+=check("playback after clearing sounds only the newly recorded long note",clean);
+    seq_stop();project_capture(&proj_scratch);int packed=bank_pack(proj_wire_u.raw,&proj_scratch,1);
+    project_restore_runtime(&proj_scratch);if(packed)bank_restore(proj_wire_u.raw);
+    count=0;only=1;for(uint32_t i=recording_head[recording_owner(t)];i<RECORD_MAX;i=recording_next[i]){count++;only&=recording[i].note==77;}
+    bad+=check("cleared events stay deleted through project save/load",packed&&count==1&&only);
+
+    raw_begin();t=TSEL;seq_advance(600);input_on(t,60,80);input_on(t,64,90);
+    seq_advance(300);input_off(t,60);input_off(t,64);seq_stop();song.rec=0;
+    /* Simulate a step replacement that invalidates the rounded recording. */
+    step_clear(&t->step[0]);song.rec=1;seq_start();seq_advance(0);seq_advance(1800);input_on(t,79,100);
+    seq_advance(3u*6144u);input_off(t,79);seq_stop();song.rec=0;
+    count=0;only=1;for(uint32_t i=recording_head[recording_owner(t)];i<RECORD_MAX;i=recording_next[i]){count++;only&=recording[i].note==79;}
+    bad+=check("overwritten dormant events are retired before new recording can reactivate their overview",count==1&&only);
+    raw_begin();t=TSEL;seq_advance(12u*6144u+600u);input_on(t,60,80);seq_advance(300);input_off(t,60);
+    seq_stop();song.rec=0;t->p[P_SLEN]=8;go_title("PATTERN");frame();
+    confirm_open(CF_CLEAR_SEQ,0);press(B_OCTUP);
+    bad+=check("full pattern clear also deletes retained events beyond a shortened LEN",!recording[0].vel&&recording_head[recording_owner(t)]==RECORD_MAX);
+    return bad;
+}
+
 int main(void)
 {
-    int bad=selection_and_delete()+deletion_history()+loop_drums_and_playback()+timing_geometry_and_context()+control_clashes()+property_edits_and_mixed_patterns()+manual_chord_controls()+dense_selection_and_protection()+drum_recording_layout()+live_erase_manual()+live_erase_raw()+live_erase_scope_and_drums()+erase_edit_hold_conflicts();
+    int bad=selection_and_delete()+deletion_history()+loop_drums_and_playback()+timing_geometry_and_context()+control_clashes()+property_edits_and_mixed_patterns()+manual_chord_controls()+dense_selection_and_protection()+drum_recording_layout()+live_erase_manual()+live_erase_raw()+live_erase_scope_and_drums()+erase_edit_hold_conflicts()+bulk_and_pattern_clears();
     printf("Recorded note editing: %s\n",bad?"FAILED":"all passed");
     return !!bad;
 }

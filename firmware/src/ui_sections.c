@@ -31,7 +31,7 @@ static const char *sec_rule(uint32_t i, uint32_t *plen)   /* page i's section na
     uint32_t r;
     for (r = 0; r < NELEM(SEC_RULE); r++) {
         uint32_t n = str_len(SEC_RULE[r].prefix);
-        if (!memcmp(PAGES[i].title, SEC_RULE[r].prefix, n)) {
+        if (str_prefix(PAGES[i].title, SEC_RULE[r].prefix)) {
             if (plen) *plen = n;
             return SEC_RULE[r].name;
         }
@@ -144,7 +144,7 @@ static void sec_chip(uint32_t i, char *b, uint32_t n)
         return;
     }
     for (k = 0; k < NELEM(STRIP); k++)
-        if (!memcmp(t, STRIP[k], str_len(STRIP[k])) && t[str_len(STRIP[k])]) {
+        if (str_prefix(t, STRIP[k]) && t[str_len(STRIP[k])]) {
             t += str_len(STRIP[k]);
             break;
         }
@@ -157,36 +157,41 @@ static void sec_short(uint32_t i, char *b, uint32_t n)   /* .. in words ("Flt en
     menu_words(b, c, n);
 }
 
-/* the tabs under the header: the section shown filled, its neighbours; as many as fit around it */
-static void sec_tabs(void)
+/* tabs under the header: name[cur] filled, its neighbours; as many as fit around it (sig: what they show) */
+static void tabs_draw(const char *const *name, uint32_t n, uint32_t cur, uint32_t sig)
 {
     static uint32_t drawn;
-    uint32_t cur, k, first, sig;
+    uint32_t k, first;
     int32_t x, w;
-    sec_build();
-    cur = sec_of(ui.page);
-    sig = cur * 7u + sec.n * 131u + sec.eng * 1031u + ux.gen * 977u + ux.pal * 31u + song.sel;
     if (!ui.force && sig == drawn)
         return;
     drawn = sig;
     for (first = cur; first > 0u; first--) {           /* from the furthest back that still lets cur fit */
         for (x = 6, k = first - 1u; k <= cur; k++)
-            x += text_w(&AF_X, sec.name[k]) + 15;
+            x += text_w(&AF_X, name[k]) + 15;
         if (x > 236)
             break;
     }
     cv_begin(240, SEC_TAB_H, T_BG);
-    for (x = 6, k = first; k < sec.n; k++) {
+    for (x = 6, k = first; k < n; k++) {
         int on = k == cur, far = (k > cur ? k - cur : cur - k) > 2u;
-        w = text_w(&AF_X, sec.name[k]) + 12;
+        w = text_w(&AF_X, name[k]) + 12;
         if (x + w > 236)
             break;
         if (on)
-            cv_rrect(x, 1, w, 14, 4, T_THEME, T_BG), cv_rrect(x + 1, 2, w - 2, 12, 3, ux_mix(T_BG, T_THEME, 22), T_THEME);
-        cv_text_c(x + w / 2, 3, &AF_X, sec.name[k], on ? T_THEME : far ? T_DIM : T_MID, on ? ux_mix(T_BG, T_THEME, 22) : T_BG);
+            cv_rrect(x, 0, w, 16, 5, T_THEME, T_BG), cv_rrect(x + 1, 1, w - 2, 14, 4, ux_mix(T_BG, T_THEME, 22), T_THEME);
+        cv_text_c(x + w / 2, 3, &AF_X, name[k], on ? T_THEME : far ? T_DIM : T_MID, on ? ux_mix(T_BG, T_THEME, 22) : T_BG);
         x += w + 3;
     }
     cv_blit(0, H_HEAD);
+}
+/* an engine's sections as the tabs */
+static void sec_tabs(void)
+{
+    uint32_t cur;
+    sec_build();
+    cur = sec_of(ui.page);
+    tabs_draw(sec.name, sec.n, cur, cur * 7u + sec.n * 131u + sec.eng * 1031u + ux.gen * 977u + ux.pal * 31u + song.sel);
 }
 
 /* ---------------------------------------------------------- the map --- */

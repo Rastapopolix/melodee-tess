@@ -33,14 +33,15 @@ function device(objs, opt = {}) {
     }
     if (cmd === BACKUP_CMD.PUT) {
       const [op, id] = a;
-      if (op === 0) { d.staged = { id, size: bkR32(a, 2), crc: bkR32(a, 7), bytes: [] }; return [op, id, 0]; }
+      if (op === 0) { const size = bkR32(a, 2), rc = opt.refuse?.(id, size) || 0; if (!rc) d.staged = { id, size, crc: bkR32(a, 7), bytes: [], chunks: 0 }; return [op, id, rc]; }
       if (op === 1) {
+        d.staged.chunks++;
         if (opt.failChunk === id) return [op, id, 2];
         const off = bkR32(a, 2), p = a.slice(7), n = Math.min(256, d.staged.size - off);
         d.staged.bytes.push(...bkUnpack(p, n)); return [op, id, 0];
       }
       if (op === 2) { const s = Uint8Array.from(d.staged.bytes); const rc = bkCrc(s) === d.staged.crc ? 0 : 2; if (!rc) { d.objs.set(id, s); d.log.push(id); } return [op, id, rc]; }
-      if (op === 3) { d.log.push(`abort ${id}`); return [op, id, 0]; }
+      if (op === 3) { if (d.staged?.chunks) d.log.push(`abort ${id}`); return [op, id, 0]; }  /* (a preflight: no chunks) */
     }
     if (cmd === 11 || cmd === 12 || cmd === 13 || cmd === 14) { if (cmd === 13 || cmd === 14) d.log.push(32 + a[0]); return [a[0], 0]; }
     throw new Error(`unexpected ${cmd}`);
@@ -149,8 +150,8 @@ const badNative=JSON.parse(JSON.stringify(nativeFile)),invalidFM=nativeFM.slice(
 badNative.objects[21]={...badNative.objects[21],crc:bkCrc(invalidFM),data:Buffer.from(invalidFM).toString("base64")};
 const nativeProtected=device([],{ids:nativeIds});
 ok(await athrows(()=>restoreBackup(nativeProtected.request,badNative)) && !nativeProtected.log.length,"backup: malformed native voice refused before any restore writes");
-const oldOwnedTarget=device([],{ids:nativeIds});await restoreBackup(oldOwnedTarget.request,ownedFile);
-ok(oldOwnedTarget.log.includes(19) && !oldOwnedTarget.log.includes(21),"backup: old owned-voice archives reach firmware migration without clearing new objects");
+const oldOwnedTarget=device([],{ids:nativeIds,refuse:(id,size)=>id>=19&&id<=22&&size!==2060?1:0});
+ok(await athrows(()=>restoreBackup(oldOwnedTarget.request,ownedFile)) && !oldOwnedTarget.log.length,"backup: an archive the firmware refuses (old owned voices) writes nothing");
 
 console.log(fails ? `BACKUP WEB TESTS FAILED (${fails})` : "backup web tests passed");
 process.exit(fails ? 1 : 0);

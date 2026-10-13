@@ -13,7 +13,11 @@ vibrato, both line levels, key follow and per-envelope velocity sensitivity.
 Editing one rate changes that rate only; unedited native data is not normalized.
 END targets zero during playback as specified by Casio. Rates are speeds rather
 than ADSR segment durations. PHASE is a separate engine with LINK/SPLIT controls and its own presets. Selecting CZ-1 opens a native INIT TONE; importing a
-native tone selects the CZ-1 engine and its native renderer.
+native tone through an editor track command selects the CZ-1 engine and its native renderer.
+Direct USB MIDI tone dumps instead open the CZ-1 USER list for choosing a destination, retaining
+all sixteen name bytes. They do not replace the current track. OCT+ opens **Import here / Cancel import**;
+occupied destinations ask before replacement. Stop playback to save. The USER sheet's **Send** exports
+the selected stored tone; hold OCT+ and scroll to select several tones for bulk sending or erasure.
 
 The parser accepts `F0 44 00 00 7n 30 <data> F7` dumps and receive-request
 `20 <slot>` (128 bytes) / `21 <slot>` (144 bytes) frames. Casio's low nibble

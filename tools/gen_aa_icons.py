@@ -39,15 +39,14 @@ LEGACY = {
     "shape": "waveform_variant_four", "pitch": "waveform_pitch", "tune": "symbol_tuning",
     "detune": "function_phaseout", "transpose": "control_arrow_up_down", "octave": "control_arrow_up",
     "level": "symbol_volume", "pan": "symbol_pan", "mute": "control_speaker_mute",
-    "dist": "function_signal_clip", "drive": "symbol_diode", "fold": "waveform_fold", "bits": "function_mask",
-    "chorus": "symbol_waves", "delay": "symbol_echo", "reverb": "symbol_spring", "feedback": "symbol_feedback",
+    "drive": "symbol_diode", "fold": "waveform_fold", "bits": "function_mask",
     "arp": "control_arrow_loop", "gate": "function_gate_unipolar", "swing": "symbol_swing",
     "tempo": "symbol_tempo", "scale": "control_arow_scale", "quantize": "symbol_grid",
     "glide": "symbol_transition", "slide": "symbol_rise", "voice": "symbol_primitives_o", "mod": "symbol_modular",
     "noise": "waveform_noise_white", "sub": "symbol_bass", "ratio": "function_multiply",
     "algorithm": "symbol_node", "sample": "symbol_audio", "steps": "symbol_grid_nine", "accent": "symbol_thunder_f",
     "time": "symbol_clock", "phase": "function_phase", "fade": "waveform_fade", "mix": "symbol_combine",
-    "keytrack": "symbol_keyboard", "size": "control_arrow_both", "damp": "symbol_weight",
+    "keytrack": "symbol_keyboard", "size": "control_arrow_both",
     "tone": "function_filter_band", "sweep": "symbol_warp", "vibrato": "waveform_cos", "loop": "waveform_loop",
     "hold": "symbol_lock_close_f", "order": "symbol_sort", "prob": "symbol_dice",
     "length": "control_arrow_end", "division": "note_quarter", "chip": "symbol_primitives_f",
@@ -73,7 +72,7 @@ EXTRA = {
     "x_cog": "symbol_cog", "x_lock": "symbol_lock_close_f", "x_power": "control_power",
     "x_folder": "symbol_folder", "x_doc": "symbol_document", "x_plus": "symbol_plus", "x_minus": "symbol_minus",
     "x_undo": "symbol_arrow_undo", "x_redo": "symbol_arrow_redo", "x_warn": "symbol_error",
-    "x_palette": "symbol_primitives_o", "x_speaker": "control_speaker_2", "x_info": "symbol_info_f",
+    "x_palette": "symbol_primitives_o", "x_info": "symbol_info_f",
     "x_back": "control_arrow_back", "x_down": "symbol_carret_down", "x_up": "symbol_carret_up",
     "x_left": "symbol_carret_left", "x_right": "symbol_carret_right", "x_hugelton": "symbol_hugelton",
     # page and state icons (Fukiai 0.8.0): MIXER / PHRASES / SONG pages, motion, calibration, the battery
@@ -82,13 +81,7 @@ EXTRA = {
     "x_motion": "symbol_motion", "x_motion_rec": "symbol_motion_rec", "x_motion_del": "symbol_motion_delete",
     "x_doctor": "symbol_doctor", "x_bat0": "system_battery_0", "x_bat1": "system_battery_1",
     "x_bat3": "system_battery_3", "x_bat4": "system_battery_4", "x_bat_chg": "system_battery_charging",
-    # the FX hold layer (ui_draw.c draw_layer, Fukiai 0.8.3) and the HOLD menu row
-    "x_fx": "control_fx", "x_timer": "symbol_stopwatch", "x_hpf": "function_filter_hpf",
-    "x_repeat": "control_arrow_loop", "x_reverse": "control_reverse_f", "x_tstop": "symbol_stop",
-    "x_freeze": "symbol_freeze",
-    # OCT UP / OCT DN (the harmonizer): stand-ins until Fukiai has a pitch-shift glyph;
-    # the first of each tuple the font has
-    "x_oct_up": ("symbol_pitch_up", "control_arrow_up"), "x_oct_dn": ("symbol_pitch_down", "control_arrow_down"),
+    "x_timer": "symbol_stopwatch",
 }
 
 # a glyph given as a tuple: the first one the font has (a glyph still to be drawn falls back to a stand-in;
@@ -105,21 +98,19 @@ FIT_TO = {"system_battery_0": "system_battery_4"}
 SMALL_EXTRA = ["x_trk1", "x_trk2", "x_trk3", "x_trk4", "x_trk1_o", "x_trk2_o", "x_trk3_o", "x_trk4_o",
                "x_star", "x_star_o", "x_check", "x_lock", "x_cog", "x_usb", "x_plus", "x_minus", "x_undo", "x_redo",
                "x_warn", "x_folder", "x_doc", "x_back", "x_down", "x_up", "x_left", "x_right",
-               "x_mixer", "x_pattern", "x_song", "x_motion", "x_motion_rec", "x_motion_del",
-               "x_fx", "x_hpf", "x_repeat", "x_reverse", "x_tstop", "x_freeze"]
+               "x_mixer", "x_pattern", "x_song", "x_motion", "x_motion_rec", "x_motion_del",]
 
 # the 24 px set: the header battery (Fukiai's battery is a wide, short glyph: at 16 px its body was 12 x 6)
-# and the FX map's effect cells (ui_layer.c layer_fx: the icon alone, no name)
-HUGE_DEFAULT = ["x_bat0", "x_bat1", "x_bat3", "x_bat4", "x_bat_chg", "x_usb",   # (+ the USB-C plug: as flat)
-                "x_repeat", "x_reverse", "cutoff", "x_hpf", "x_tstop", "x_freeze", "x_oct_up", "x_oct_dn"]
+
+HUGE_DEFAULT = ["x_bat0", "x_bat1", "x_bat3", "x_bat4", "x_bat_chg", "x_usb"]
 
 # the 16 px set: header, footer, dialogs and menu rows (everything else only exists at 12 px)
 BIG_DEFAULT = ["x_play", "x_stop", "x_pause", "x_rec", "x_rec_o", "x_trk1", "x_trk2", "x_trk3", "x_trk4",
                "x_trk1_o", "x_trk2_o", "x_trk3_o", "x_trk4_o", "x_usb", "x_star", "x_star_o", "x_check",
-               "x_cog", "x_power", "x_warn", "x_palette", "x_speaker", "x_info", "x_hugelton", "x_doc",
+               "x_cog", "x_power", "x_warn", "x_palette", "x_info", "x_hugelton", "x_doc",
                "wave", "algorithm", "phase", "bits", "sample", "mouth", "trio", "drawbar", "slice", "grain",
                "phys", "drum", "noise", "mod", "tempo", "tape",
-               "x_song", "x_motion_del", "x_doctor", "x_fx", "x_timer", "x_bat0", "x_bat1", "x_bat3", "x_bat4", "x_bat_chg"]
+               "x_song", "x_motion_del", "x_doctor", "x_timer", "x_bat0", "x_bat1", "x_bat3", "x_bat4", "x_bat_chg"]
 
 
 def glyph_table(font_path):

@@ -74,6 +74,7 @@ static void reset(void)
     memset(&song, 0, sizeof song); memset(trk, 0, sizeof trk);
     memset(&chain, 0, sizeof chain); chain_defaults(&chain_config);
     pattern_init();
+    memset(&sx_import,0,sizeof sx_import);memset(&bulk,0,sizeof bulk);resource_release(RES_NOTE_HISTORY);note_transaction_ptr=0;fm6_rx_ready=0;
     memset(&ed_w, 0, sizeof ed_w); memset(&ui, 0, sizeof ui);
     memset(&favorites, 0, sizeof favorites); memset(&settings, 0, sizeof settings); settings_init();
     memset(proj_slot, 0, sizeof proj_slot); up_cache_reset(); native_cache_reset();
@@ -83,7 +84,7 @@ static void reset(void)
     so_r = so_w = mi_r = mi_w = 0; midi_in_overflow = 0; usb.config = 1;
     for (i = 0; i < G_COUNT; i++) song.g[i] = GP[i].def;
     for (t = 0; t < NTRK; t++) {
-        track_defaults(&trk[t]); set_engine_of(&trk[t], 0); apply_preset_to(&trk[t], 0);
+        track_defaults(&trk[t]); set_engine_of(&trk[t], 3); apply_preset_to(&trk[t], 0);   /* (SID: values on p[]) */
         trk[t].engine = trk[t].eng_req; track_defaults_steps(&trk[t]);
     }
 }
@@ -131,6 +132,8 @@ static int preferences(void)
     a[0] = 1; a[1] = 1; request(ED_UI_SET, a, 2);
     bad += check("the retired font weight is not supported (rc 2), UI_STATE says 127",
         host_wire[5] == 2 && host_wire[8] == 57 && host_wire[10] == 127);
+    a[0] = 9; request(ED_UI_SET, a, 2);
+    bad += check("retired FX latch cannot be enabled", host_wire[5] == 2);
     a[0] = 2; request(ED_UI_SET, a, 2);
     bad += check("unsupported preference is reported without applying it", host_wire[5] == 2);
     a[0] = ENGI_DRUM; a[1] = 0; a[2] = 64; a[3] = 1;
@@ -310,7 +313,6 @@ static int fm6_patches(void)
     uint8_t a[2 + FM6_PACKED], pk[FM6_PACKED];
     uint32_t n, i;
     reset();
-    upf_empty();
     a[0] = ED_FM6_FACTORY; a[1] = 3;
     n = request(ED_FM6_GET, a, 2);
     bad += check("FM6_GET factory 4: the packed record", n == 5u + 3u + FM6_PACKED + 1u && host_wire[7] == 0 &&
@@ -348,7 +350,7 @@ static int fm6_patches(void)
     i = host_wire[7];
     request(ED_FM6_PUT, a, 20);
     bad += check("FM6_PUT: a fifth track or a short record: rc 1", i == 1u && host_wire[7] == 1u);
-    a[0] = ED_FM6_BANK; a[1] = FM6_BANK_N;
+    a[0] = ED_FM6_BANK; a[1] = 31;
     request(ED_FM6_GET, a, 2);
     bad += check("FM6_GET retired bank: rc 3", host_wire[7] == 3u);
     return bad;
@@ -362,7 +364,7 @@ static int user_preset_roundtrip(void)
     uint32_t k = 0, i, p, ok;
     int bad = 0;
     reset();
-    a[k++] = 3; a[k++] = 0;                                /* slot U04, ANALOG */
+    a[k++] = 3; a[k++] = 3;                                /* slot U04, SID */
     memcpy(a + k, "ROUND", 5); k += 5; a[k++] = 0;
     for (i = 0; i < P_COUNT; i++) {
         const param_desc_t *d = param_desc_of(0, i);
@@ -385,7 +387,7 @@ static int user_preset_roundtrip(void)
     bad += check("UP_PUT keeps every value (PAN -20, FLT -40, min and max)", ok);
     a[0] = 3;
     request(ED_UP_GET, a, 1);
-    ok = host_wire[5] == 3 && host_wire[6] == 1 && host_wire[7] == 0 && !memcmp(host_wire + 8, "ROUND", 6);
+    ok = host_wire[5] == 3 && host_wire[6] == 1 && host_wire[7] == 3 && !memcmp(host_wire + 8, "ROUND", 6);   /* (slot, used, SID) */
     for (i = 0, p = 14; i < P_COUNT; i++, p += 2u)
         ok &= (int32_t)(host_wire[p] | host_wire[p + 1] << 7) - 8192 == want[i];
     for (i = 0; i < 16u; i++, p += 2u)
@@ -424,13 +426,20 @@ static int cz_native_protocol(void)
     a[40]=16;request(ED_CZ_PUT,a,290);bad+=check("invalid CZ upload leaves live patch intact",host_wire[7]==1 && !memcmp(cz_patch[2].raw,raw,CZ_BYTES));a[40]=raw[19]&15;
     a[0]=1;a[1]=8;request(ED_CZ_PUT,a,290);bad+=check("CZ tone uses atomic ordinary preset storage",host_wire[7]==0 && up_used(8) && up_rec(8)->ver==UP_VER_CZ && !memcmp(up_rec(8)->packed,raw,CZ_BYTES));
     song.sel=1;up_load(8);bad+=check("loading user CZ preset restores all 144 native bytes",TSEL->p[P_E7]==CZ_NATIVE && !memcmp(cz_patch[1].raw,raw,CZ_BYTES));
-    project_t q,r;project_store_t packed;project_capture(&q);bad+=check("native tones survive project serialization",proj_pack(&packed,&q) && proj_unpack(&r,packed.raw,sizeof packed) && !memcmp(q.cz,r.cz,sizeof q.cz));
+    project_t q,r;project_store_t packed;project_capture(&q);bad+=check("native tones survive project serialization",proj_pack(&packed,&q) && proj_unpack(&r,packed.raw) && !memcmp(q.cz,r.cz,sizeof q.cz));
     static uint8_t banked[BANK_STORE_SIZE];
     bad+=check("native tones survive full pattern-bank serialization",bank_pack(banked,&q,1) && bank_valid(banked,sizeof banked) && !memcmp(q.cz,proj_scratch.cz,sizeof q.cz));
     template_save(); static tmpl_t saved; saved=tmpl;
     memset(cz_patch,0,sizeof cz_patch); memset(&tmpl,0,sizeof tmpl);
     int restored=tmpl_take((const uint8_t *)&saved,sizeof saved);template_load();
     bad+=check("native tone bytes and mode survive a saved template",restored && trk[1].p[P_E7]==CZ_NATIVE && !memcmp(cz_patch[1].raw,raw,CZ_BYTES));
+    const uint32_t sizes[]={sizeof(tmpl_fx_legacy_t),sizeof(tmpl_fx_single_t),sizeof(tmpl_t)-40u,sizeof(tmpl_t)-16u,sizeof(tmpl_t)};
+    for(uint32_t k=0;k<NELEM(sizes);k++){
+        uint8_t begin[12]={0,1},abort[2]={3,1};uint32_t len=sizeof(persist_t)+sizes[k];
+        for(uint32_t j=0;j<5;j++)begin[2+j]=(uint8_t)((len>>(7*j))&127u);
+        bad+=check("settings transfer accepts every supported template layout",!ed_bk_write(begin,sizeof begin) && !ed_bk_write(abort,sizeof abort));
+    }
+    {uint8_t malformed[12]={0,1,1};bad+=check("settings transfer rejects undersized template payload",ed_bk_write(malformed,sizeof malformed)==1);}
     return bad;
 }
 static int cz_casio_sysex(void)
@@ -438,46 +447,13 @@ static int cz_casio_sysex(void)
     int bad=0;reset();cz_init();trk[0].eng_req=ENGI_CZ;uint8_t raw[CZ_BYTES],frame[296],got[CZ_BYTES];cz_patch_init(raw);raw[16]=0x42;raw[17]=17;raw[18]=5;raw[19]=83;raw[128]='S';
     const uint8_t head[]={0xf0,0x44,0,0,0x70,0x21,0x60};memcpy(frame,head,7);for(uint32_t j=0;j<CZ_BYTES;j++){frame[7+2*j]=raw[j]&15;frame[8+2*j]=raw[j]>>4;}frame[295]=0xf7;
     for(uint32_t j=0;j<sizeof frame;j++)sysex_byte(frame[j]);cz_service();host_drain();
-    bad+=check("direct Casio MIDI SysEx preserves complete native tone",!memcmp(cz_patch[0].raw,raw,CZ_BYTES));memcpy(got,cz_patch[0].raw,CZ_BYTES);
+    bad+=check("direct Casio MIDI SysEx stages exact named tone in the CZ user list",sx_import.count==1 && library_engine()==ENGI_CZ && !memcmp(sx_import.data,raw,CZ_BYTES) && cur_page()->graph==GR_USER);
+    ui.uslot=7;sysex_choose();native_load(ENGI_CZ,7,0);memcpy(got,cz_patch[0].raw,CZ_BYTES);
     frame[10]=16;for(uint32_t j=0;j<sizeof frame;j++)sysex_byte(frame[j]);cz_service();
     bad+=check("invalid direct Casio SysEx leaves the native tone intact",!memcmp(cz_patch[0].raw,got,CZ_BYTES));
     const uint8_t request[]={0xf0,0x44,0,0,0x70,0x11,0x60,0xf7};host_wire_n=0;for(uint32_t j=0;j<sizeof request;j++)sysex_byte(request[j]);cz_service();host_drain();
     int same=host_wire_n==295 && host_wire[5]==0x30;for(uint32_t j=0;same && j<CZ_BYTES;j++)same=host_wire[6+2*j]==(raw[j]&15) && host_wire[7+2*j]==(raw[j]>>4);
     bad+=check("direct Casio tone request exports exact native bytes",same);return bad;
-}
-
-static void legacy_cz_fixture(uint8_t *p)
-{
-    memset(p,0,LCZ_PACKED);memset(p+LCZ_NP,' ',16);memcpy(p+LCZ_NP,"MIGRATED",8);p[LCZ_OCT]=1;
-    for(uint32_t l=0;l<2;l++){p[LCZ_LBASE(l)+LCZ_LEVEL]=15;p[LCZ_LBASE(l)+LCZ_KW]=5;
-        for(uint32_t e=0;e<3;e++){uint32_t b=LCZ_EBASE(l,e);for(uint32_t j=0;j<8;j++)p[b+j]=99;p[b+8]=e?99:0;p[b+16]=0;p[b+17]=1;}}
-}
-#include "frozen_project.h"
-static int cz_legacy_saved_sounds(void)
-{
-    int bad=0;reset();cz_init();uint8_t tone[LCZ_PACKED],native[CZ_BYTES];legacy_cz_fixture(tone);
-    bad+=check("earlier next CZ tone becomes documented native wire bytes",cz_legacy_tone(native,tone,sizeof tone) && native[18]==5 && native[19]==83 && native[128]=='M');
-    project_t q,r;project_capture(&q);project_store_t packed;proj_pack(&packed,&q);
-    uint8_t legacy[PROJ_LEGACY_CZ];memset(legacy,0,sizeof legacy);frozen_project92(legacy,packed.raw,PROJ_CZ_OFF-PROJ_PARAM_EXTRA);
-    uint32_t magic=0x46554E42u,size=sizeof legacy,sum;memcpy(legacy,&magic,4);memcpy(legacy+4,&size,4);
-    for(uint32_t k=0;k<NTRK;k++){memcpy(legacy+PROJ_CZ_OFF-PROJ_PARAM_EXTRA+k*LCZ_PACKED,tone,LCZ_PACKED);legacy[68u+k*(92u+2u+NSTEP*9u)+92u]=14;}
-    sum=proj_hash(legacy,sizeof legacy-4);memcpy(legacy+sizeof legacy-4,&sum,4);
-    bad+=check("earlier next FUNB project migrates CZ engine and full envelopes",proj_import_any(&r,legacy,sizeof legacy) && r.t[0].engine==ENGI_CZ && r.t[0].p[P_E7]==CZ_NATIVE && !memcmp(r.cz[0].raw,native,CZ_BYTES));
-    uint8_t full[BANK_STORE_SIZE];bank_pack(full,&q,0);uint32_t oldExtra=BANK_EXTRA_OFF;
-    frozen_bank_tail(full+8u+sizeof legacy,full+8u+PROJ_STORE_SIZE,BANK_SIZE_CZ_NEXT-8u-sizeof legacy-4u);
-    memcpy(full+8u,legacy,sizeof legacy);magic=0x434B4246u;size=BANK_SIZE_CZ_NEXT;memcpy(full,&magic,4);memcpy(full+4,&size,4);sum=proj_hash(full,size-4u);memcpy(full+size-4u,&sum,4);
-    bad+=check("earlier next FBKC pattern bank validates without losing timing",bank_valid(full,size));bank_upgrade(full);
-    bad+=check("normalized CZ pattern bank upgrades to native project format",bank_valid(full,BANK_STORE_SIZE) && proj_scratch.t[0].engine==ENGI_CZ && !memcmp(proj_scratch.cz[0].raw,native,CZ_BYTES));
-    uint8_t tpl[TMPL_CZ_NEXT];memset(tpl,0,sizeof tpl);frozen_template92(tpl,(const uint8_t *)&tmpl,TMPL_SIZE6-8u);
-    for(uint32_t k=0;k<NTRK;k++){memcpy(tpl+TMPL_SIZE6-8u+k*LCZ_PACKED,tone,LCZ_PACKED);tpl[(2u*G_COUNT+2u)+k*(2u+92u*2u)]=14;}
-    size=sizeof tpl;magic=0x394C5054u;memcpy(tpl+size-8,&size,4);memcpy(tpl+size-4,&magic,4);
-    bad+=check("earlier next TPL9 template migrates native CZ tone",tmpl_take(tpl,sizeof tpl) && tmpl.t[0].engine==ENGI_CZ && !memcmp(tmpl.cz[0].raw,native,CZ_BYTES));
-    up_rec_t rec;memset(&rec,0,sizeof rec);rec.used=UP_USED;rec.engine=14;rec.ver=7;rec.np=92u;memcpy(rec.name,"OLD CZ",6);
-    uint32_t pos=0;for(uint32_t k=0;k<LCZ_PACKED;k++){uint32_t w=up_legacy_width(k);for(uint32_t j=0;j<w;j++,pos++){uint32_t at=pos>>3;uint8_t *p=at<144?rec.packed+at:rec.cz_extra+at-144;*p|=((tone[k]>>j)&1u)<<(pos&7);}}
-    for(uint32_t k=0;k<92u;k++){uint32_t val=(uint32_t)(TP[k<84u?k:k+P_COUNT-92u].def-LCZ_PRESET_MIN[k]);if(k==P_REV)val=77;for(uint32_t j=0;j<LCZ_PRESET_WIDTH[k];j++,pos++){uint32_t at=pos>>3;uint8_t *p=at<144?rec.packed+at:rec.cz_extra+at-144;*p|=((val>>j)&1u)<<(pos&7);}}
-    uint8_t converted[CZ_BYTES];int16_t values[P_COUNT];up_values(&rec,values);
-    bad+=check("earlier next CZ preset retains native tone and effect settings",up_valid(&rec) && up_cz_raw(&rec,converted) && !memcmp(converted,native,CZ_BYTES) && values[P_REV]==77 && values[P_E7]==CZ_NATIVE);
-    return bad;
 }
 
 static int cz_dedicated_banks(void)
@@ -521,8 +497,8 @@ static int native_protocol(void)
     bad+=check("malformed native nibbles cannot replace a committed tone",host_wire[8]==1 && !memcmp(native_raw(ENGI_CZ,127),cz,sizeof cz));
     a[1]=0;a[2]=120;a[3]=16;request(ED_NATIVE,a,4);
     bad+=check("last native page clamps to Z128 and reports 128 slots",!host_wire[8] && host_wire[9]==8 && host_wire[10]==0 && host_wire[11]==1);
-    a[1]=4;a[2]=127;a[3]=2;trk[2].p[P_REV]=77;trk[2].p[P_LEVEL]=61;trk[2].step[0].note[0]=67;request(ED_NATIVE,a,4);
-    bad+=check("native load targets track 3 and preserves effects, level and pattern",!host_wire[8] && trk[2].user==128 && trk[2].user_native && trk[2].p[P_REV]==77 && trk[2].p[P_LEVEL]==61 && trk[2].step[0].note[0]==67 && !memcmp(cz_patch[2].raw,cz,sizeof cz));
+    a[1]=4;a[2]=127;a[3]=2;trk[2].p[P_PAN]=37;trk[2].p[P_LEVEL]=61;trk[2].step[0].note[0]=67;request(ED_NATIVE,a,4);
+    bad+=check("native load targets track 3 and preserves pan, level and pattern",!host_wire[8] && trk[2].user==128 && trk[2].user_native && trk[2].p[P_PAN]==37 && trk[2].p[P_LEVEL]==61 && trk[2].step[0].note[0]==67 && !memcmp(cz_patch[2].raw,cz,sizeof cz));
     trk[2].p[P_E2]=23;request(ED_NATIVE,a,4);
     bad+=check("same-engine native load also keeps track macros",trk[2].p[P_E2]==23);
     a[1]=7;a[2]=2;request(ED_NATIVE,a,3);
@@ -551,7 +527,7 @@ static int names_whole(void)
             ok = n >= 12u && n <= sizeof ed_out && host_wire[5] == e && count <= 127u;
             for (k = 0; ok && k < count; k++) {
                 char want[21];
-                str_cpy(want, ENGINES[e]->presets[got + k].name, 21);
+                str_cpy(want, eng_preset(ENGINES[e], got + k)->name, 21);
                 ok = got + k < ENGINES[e]->npresets && !strcmp((const char *)host_wire + i, want);
                 while (i < n && host_wire[i++]) ;
             }
@@ -629,15 +605,58 @@ static int native_motion_protocol(void)
     bad += check("native motion query encodes the high id in the spare step bit", host_wire[10] == 127u && host_wire[11] == (id & 127u));
     a[1] = 4; request(ED_MOTION, a, 4);
     bad += check("native motion delete removes the same high parameter id", !host_wire[6] && !motion.count);
-    a[1] = 3; a[2] = 0; a[3] = P_REV; a[4] = 64; a[5] = 64; request(ED_MOTION, a, 6);
-    bad += check("legacy motion wire writes retain the original format", !host_wire[6] && motion.event[0].param == P_REV && motion.event[0].value == 64);
+    a[1] = 3; a[2] = 0; a[3] = P_LEVEL; a[4] = 64; a[5] = 64; request(ED_MOTION, a, 6);
+    bad += check("legacy motion wire writes retain the original format", !host_wire[6] && motion.event[0].param == P_LEVEL && motion.event[0].value == 64);
+    motion_clear(&trk[0]);a[2]=0;a[3]=P_E1;a[4]=7;a[5]=64;request(ED_MOTION,a,6);
+    a[3]=MO_NATIVE;a[4]=80;a[5]=70;request(ED_MOTION,a,6); /* FM6 tag 3, byte 80 */
+    bad+=check("overlapping native/common IDs coexist through the protocol",!host_wire[6] && motion.count==2);
+    a[1]=4;request(ED_MOTION,a,6);
+    bad+=check("typed native delete retains the common engine event",!host_wire[6] && motion.count==1 && motion.event[0].param==P_E1 && motion.event[0].value==7);
+    a[1]=3;request(ED_MOTION,a,6);a[1]=4;a[4]=7;a[5]=64;request(ED_MOTION,a,6);
+    bad+=check("typed common delete retains the native event",!host_wire[6] && motion.count==1 && motion.event[0].value==(MO_TAG_FM6<<8|80));
+    request(ED_MOTION,a,4);bad+=check("legacy delete clears the remaining raw ID",!host_wire[6] && !motion.count);
     return bad;
 }
 #ifndef EDITOR_TEST_NO_MAIN
+#include "../firmware/src/fm6_store.c"
+static void receive_library(const uint8_t *frame,uint32_t n)
+{
+    for(uint32_t i=0;i<n;i++)midi_in_event(15u|(uint32_t)frame[i]<<8);
+    fm6_service();cz_service();ed_service();host_drain();ota_frame_done();
+}
+static int library_transfers(void)
+{
+    int bad=0;uint8_t frame[320],raw[CZ_BYTES];uint32_t n;
+    reset();up_store(2,"NAMED GENERAL");up_rec_t saved=*up_rec(2);int16_t level=TSEL->p[P_LEVEL];
+    bad+=check("general slot exports a complete 7-bit USB frame",!library_send(TSEL->eng_req,2));host_drain();
+    n=host_wire_n;memcpy(frame,host_wire,n);
+    bad+=check("general export has a valid checksum and exact bounded length",n==279u&&frame[0]==240&&frame[n-1]==247&&!sx_checksum(frame+1,n-2));
+    frame[15]^=1;receive_library(frame,n);
+    bad+=check("bad general checksum cannot stage or mutate a saved preset",!sx_import.count&&!memcmp(up_rec(2),&saved,sizeof saved));
+    frame[15]^=1;receive_library(frame,n);
+    bad+=check("named general import opens its pool without loading the track",sx_import.count==1&&sx_import.general&&!library_native()&&cur_page()->graph==GR_USER&&TSEL->p[P_LEVEL]==level&&!memcmp(sx_import.data,&saved,sizeof saved));
+    ui.uslot=5;sysex_choose();bad+=check("chosen general slot retains the entire record and name",!sx_import.count&&up_used(5)&&!memcmp(up_rec(5),&saved,sizeof saved));
+    bulk=(typeof(bulk)){.on=1,.engine=TSEL->eng_req,.anchor=2,.end=5};host_wire_n=0;bulk_send();host_drain();
+    bad+=check("general bulk export sends used selected slots and skips empty slots",host_wire_n==2*n&&!memcmp(host_wire,frame,n)&&!memcmp(host_wire+n,frame,n));
+    reset();p5_patch_t p;p5_patch_init(&p);memcpy(p.raw+P5_NAME,"TWENTY NAME BYTES XYZ",20);p.raw[97]=255;
+    n=p5_patch_encode(&p,frame,sizeof frame);receive_library(frame,n);
+    bad+=check("Prophet import keeps all twenty name bytes and opens P slots from another engine",sx_import.count==1&&library_engine()==ENGI_PROPHET&&user_limit()==128&&TSEL->eng_req!=ENGI_PROPHET&&!memcmp(sx_import.data,&p,sizeof p));
+    ui.uslot=127;sysex_choose();host_wire_n=0;library_send(ENGI_PROPHET,127);host_drain();
+    bad+=check("Prophet export reproduces the received frame and opaque bytes",!sx_import.count&&host_wire_n==n&&!memcmp(host_wire,frame,n));
+    reset();cz_patch_init(raw);memcpy(raw+128,"FULL CZ NAME XYZ!",16);native_put(ENGI_CZ,7,raw);host_wire_n=0;
+    library_send(ENGI_CZ,7);host_drain();n=host_wire_n;memcpy(frame,host_wire,n);receive_library(frame,n);
+    bad+=check("CZ USB export/import retains all sixteen name bytes",n==295&&sx_import.count==1&&library_engine()==ENGI_CZ&&!memcmp(sx_import.data,raw,CZ_BYTES));sysex_cancel();
+    reset();memcpy(raw,FM6_INIT,FM6_PACKED);memcpy(raw+118,"FULL DX7!!",10);native_put(ENGI_FM6,3,raw);native_put(ENGI_FM6,4,raw);
+    bulk=(typeof(bulk)){.on=1,.engine=ENGI_FM6,.anchor=3,.end=4};bulk_send();host_drain();n=163;memcpy(frame,host_wire,n);
+    bad+=check("FM6 bulk export sends two independently valid named voice frames",host_wire_n==326&&!memcmp(host_wire,host_wire+n,n)&&!sx_checksum(frame+6,156));
+    receive_library(frame,n);bad+=check("DX7 voice import retains packed bytes without loading or overwriting",sx_import.count==1&&library_engine()==ENGI_FM6&&!memcmp(sx_import.data,raw,FM6_PACKED)&&TSEL->eng_req!=ENGI_FM6);
+    sysex_cancel();bad+=check("cancel releases a pending import without changing its destination",!sx_import.count&&native_used(ENGI_FM6,3));
+    return bad;
+}
 int main(void)
 {
-    int bad = native_motion_protocol() + prophet_protocol() + bank_protocol() + preferences() + framing() + uart_recovery() + steps() + song_protocol() + malformed_saves() + names_whole() +
-              native_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_legacy_saved_sounds() + cz_casio_sysex() + concert_pitch() + scale_catalogue();
+    int bad = library_transfers() + native_motion_protocol() + prophet_protocol() + bank_protocol() + preferences() + framing() + uart_recovery() + steps() + song_protocol() + malformed_saves() + names_whole() +
+              native_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue();
     printf("%s\n", bad ? "EDITOR TEST FAILED" : "editor test passed");
     return bad != 0;
 }

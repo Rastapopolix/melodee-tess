@@ -85,7 +85,13 @@ int main(int argc, char **argv)
             }
             if (p == UI_GRAY_INDEX) assert(gray(swap16(cv_px[1])));
         }
-        assert(text_w(&AF_S, UI_PALETTES[p].name) <= 60);     /* the COLOR row's value */
+        {   /* the COLOR row's value, as ui_menu.c menu_words writes it ("CONTRAST" -> "Contrast") */
+            char w[16];
+            unsigned k;
+            snprintf(w, sizeof w, "%s", UI_PALETTES[p].name);
+            for (k = 1; w[k]; k++) if (w[k] >= 'A' && w[k] <= 'Z') w[k] = (char)(w[k] + 32);
+            assert(text_w(&AF_S, w) <= 60);
+        }
         cv_begin(240, 124, T_BG);
         cv_text(4, 2, &AF_M, UI_PALETTES[p].name, T_TEXT);
         for (unsigned k = 0; k < 5; k++) cv_rect(150 + k * 16, 4, 12, 12, tok[k]);
@@ -122,7 +128,8 @@ int main(int argc, char **argv)
     assert(palette_track(1) && !palette_track(1));             /* (and so does the track: once) */
     cv_begin(3, 1, T_BG); cv_text(0, 0, &probe, "A", T_THEME);
     assert(swap16(cv_px[1]) != night);
-    /* fonts (docs/design): Rubik X 9 px, S 11 px, M 15 px, L 30 px; tabular digits; the ellipsis; L capitals only */
+    /* fonts (docs/design): Rubik X 10 px, S 12 px (on the line metrics of 9 / 11 px), M 15 px, L 30 px; tabular
+     * digits; the ellipsis; L capitals only */
     assert(AF_X.h == 12 && AF_X.asc == 9 && AF_S.h == 14 && AF_S.asc == 11 && AF_M.h == 19 && AF_M.asc == 15 &&
            AF_L.h == 37 && AF_L.asc == 29);
     assert(text_w(&AF_X, "0000") == text_w(&AF_X, "1111"));

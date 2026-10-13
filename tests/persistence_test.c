@@ -48,7 +48,7 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
 }
 static uint32_t irq_save(void) { return 0; }
 static void irq_restore(uint32_t f) { (void)f; }
-static uint32_t fl_jedec_ram(void) { return 0; }
+static uint32_t fl_jedec_ram(void) { return 0x856014u; }   /* (persist_boot: the expected part) */
 static void fl_plain_window_init(void) {}
 #define FL_FAR(fn) (fn)
 #include "../firmware/src/storage.c"
@@ -86,6 +86,7 @@ static void reset(void)
     fm1_ms = 0;
     transport_req = 0;
     persist_pending = 0;
+    persist_old = tmpl_old = preset_old_write = 0;
     persist_retry_ms = 0;
     flash_ok = 1;
     erase_error = 0;
@@ -107,6 +108,18 @@ static int cz_bank_persistence(void)
     return bad;
 }
 #ifndef PERSISTENCE_TEST_NO_MAIN
+static int staged_import_persistence(void)
+{
+    int bad=0;reset();memset(&sx_import,0,sizeof sx_import);fm6_rx_ready=0;
+    fail_after=100000;native_put(ENGI_FM6,4,FM6_INIT);uint32_t writes=100000u-(uint32_t)fail_after;
+    reset();for(uint32_t i=0;i<32;i++){memcpy(fm6_rx+6+i*FM6_PACKED,FM6_INIT,FM6_PACKED);fm6_rx[6+i*FM6_PACKED+118]=(uint8_t)('A'+i%26);}
+    sysex_stage(ENGI_FM6,fm6_rx+6,32,FM6_PACKED);ui.uslot=4;fail_after=(int)writes;sysex_choose();
+    bad+=check("partial SysEx write retains only unsaved tones for retry",sx_import.count==31&&sx_import.first==5&&sx_import.data==fm6_rx+6+FM6_PACKED&&fm6_rx_ready==2&&native_used(ENGI_FM6,4)&&!native_used(ENGI_FM6,5));
+    native_cache_reset();bad+=check("committed import prefix survives cache reset and torn next slot",native_used(ENGI_FM6,4)&&native_raw(ENGI_FM6,4)[118]=='A'&&!native_used(ENGI_FM6,5));
+    fail_after=-1;sysex_choose();
+    bad+=check("retry starts after committed prefix and unlocks the receive buffer",!sx_import.count&&!fm6_rx_ready&&native_used(ENGI_FM6,35)&&native_raw(ENGI_FM6,5)[118]=='B'&&native_raw(ENGI_FM6,4)[118]=='A');
+    return bad;
+}
 int main(void)
 {
     int bad = 0, ok;
@@ -114,7 +127,6 @@ int main(void)
     persist_t p;
     project_store_t old;
     static uint8_t got[BANK_STORE_SIZE];
-    project_v5_t v5;
     up_bank_t bank;
     up_rec_t r;
     reset();
@@ -168,7 +180,7 @@ int main(void)
     settings_poll();
     bad += check("STOP: latest settings saved and request cleared", !persist_pending && erases == 1u &&
                   st_load(OBJ_SETTINGS, &p, sizeof p) == (int)sizeof p && p.palette == palette_to_stored(2) &&
-                  p.lowcut == 2u && p.zoom == 1u && p.bold == 1u &&
+                  p.lowcut == 0u && p.zoom == 1u && p.bold == 1u &&
                   p.favorites.factory[8][0] == 1 && p.favorites.user == (1u << 31) &&
                   !memcmp(&p.panel, &panel, sizeof panel));
     settings_save();
@@ -244,30 +256,11 @@ int main(void)
         got[BANK_EXTRA_OFF + 3u] |= 0xF0; bank_checksum(got);
         st_save(OBJ_BANK0, got, sizeof got);
         project_load(0);
-        bad += check("damaged inactive-bank chord is refused with runtime unchanged", !strcmp(ui.msg,"EMPTY SLOT") &&
+        bad += check("damaged inactive-bank chord is refused with runtime unchanged", !strcmp(ui.msg,"OLD FORMAT") &&
             !memcmp(&trk[0].step[0],&keep,sizeof keep));
     }
-    {   /* an older format (FUN5) with values FUN7 cannot pack still loads, bounded */
+    {   /* every parameter range fits the record's byte (FUN16: value + 64, 0..191) */
         uint32_t i;
-        memset(&v5, 0, sizeof v5);
-        v5.magic = PROJ_MAGIC_V5;
-        v5.size = sizeof v5;
-        for (i = 0; i < G_COUNT; i++)
-            v5.g[i] = GP[i].def;
-        for (i = 0; i < NTRK; i++) {
-            v5.t[i].engine = trk[i].engine;
-            memcpy(v5.t[i].p, trk[i].p, sizeof v5.t[i].p);
-        }
-        v5.t[0].p[P_LEVEL] = 900;                                  /* out of range */
-        v5.t[0].step[0] = (step10_t){{255, 128, 160, 200}, 255, 255, 0, 96, 255, 5};
-        v5.sum = proj_hash(&v5, sizeof v5 - 4u);
-        st_save(OBJ_BANK0 + 3u, &v5, sizeof v5);                 /* (an old record in a project slot) */
-        memset(proj_slot[3].raw, 0, 4);
-        project_load(3);
-        bad += check("FUN5 load bounds steps and masks lane accents", trk[0].step[0].n == 4u &&
-                      trk[0].step[0].time == ST_REST && trk[0].step[0].note[0] == 127u &&
-                      !trk[0].step[0].note[1] && trk[0].step[0].acc == 5u && project_used(3));
-        bad += check("FUN5 load clamps a parameter into its range", trk[0].p[P_LEVEL] == TP[P_LEVEL].max);
         for (i = 0; i < P_COUNT; i++) {
             uint32_t e;
             for (e = 0; e < NENGINES; e++)
@@ -297,7 +290,7 @@ int main(void)
     bad += check("preset initial save", up_put(3, &r) == 0 && up_used(3));
     bank = (*up_cache_bank(0));
     before = up_gen;
-    r.p[0] = 77;
+    r.packed[0] = 77;
     fail_after = 1;
     ok = up_put(3, &r) == 2;
     fail_after = -1;
@@ -339,6 +332,7 @@ int main(void)
     bad += check("PLAY consumed before the settings snapshot defers the write",
                   irq_races == 3u && song.playing && !transport_req && persist_pending && erases == before);
     bad += cz_bank_persistence();
+    bad += staged_import_persistence();
     printf("%s\n", bad ? "PERSISTENCE TEST FAILED" : "persistence test passed");
     return bad != 0;
 }

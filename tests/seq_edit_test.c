@@ -7,7 +7,7 @@
 static track_t *edit_setup(void)
 {
     ui_power_on();
-    set_engine_of(TSEL, 0u);
+    set_engine_of(TSEL, 3);                       /* (SID: the generic ENV) */
     TSEL->engine = TSEL->eng_req;
     TSEL->p[P_VOICE] = V_POLY;
     TSEL->p[P_QUANT] = Q_OFF;
@@ -77,9 +77,9 @@ static int test_note_edits(void)
     hold(B_SAVE);
     bad += check("whole-note deletion is one undo with its tail cursor", step_note_length(t, 1) == 3 && ui.cursor == 2);
     cursor_set(4); turn(EN_K3, 1);
-    bad += check("LENGTH grows the selected note directly", step_note_length(t, 4) == 2);
+    bad += check("LENGTH snaps the selected note to 1.25 steps", notes_selected(t)<RECORD_MAX && recording[notes_selected(t)].duration*(1u<<(recording[notes_selected(t)].owner>>5))==5u*RECORD_UNIT/4u);
     turn(EN_K3, 1);
-    bad += check("LENGTH keeps the onset while extending its tie tail", step_note_length(t, 4) == 3 && t->step[4].time == ST_NOTE);
+    bad += check("LENGTH snaps to 1.50 without moving the onset", notes_selected(t)<RECORD_MAX && recording[notes_selected(t)].duration*(1u<<(recording[notes_selected(t)].owner>>5))==3u*RECORD_UNIT/2u && recording[notes_selected(t)].on==0 && (recording[notes_selected(t)].step&63u)==4u);
     t = edit_setup();
     put_note(t, 0, 60, 1); t->step[2].time = ST_TIE;
     bad += check("resize cannot attach an orphan tie chain", step_note_resize(t, 0, 16) == 1);
@@ -152,7 +152,7 @@ static int test_midi_entry(void)
     bad += check("last source release advances once", ui.cursor == 1 && !step_midi_held && t->step[0].n == 1);
     midi_channel(0)->pedal = 1;
     midi_note_event(0, 65, 100); frame(); midi_note_event(0, 65, 0); frame();
-    bad += check("sustain holds audio while physical MIDI release ends step entry", ui.cursor == 2 && !step_midi_held && (midi_notes[0][65] & MIDI_PEDAL_NOTE));
+    bad += check("sustain holds audio while physical MIDI release ends step entry", ui.cursor == 2 && !step_midi_held && (mn_get(0, 65) & MIDI_PEDAL_NOTE));
     midi_pedal_up(0); frame();
     bad += check("pedal-up never advances an extra step", ui.cursor == 2);
 
@@ -252,7 +252,7 @@ static int test_step_modifiers(void)
     press(B_EDIT); fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]); frame();
     bad += check("OCT+ then EDIT redoes, either order works", !step_on(&t->step[6]) && ui.cursor == 7 && !song.octave && cur_page()->graph == GR_ROLL);
     put_note(t, 7, 62, 1); frame(); press(B_FX);
-    bad += check("FX tapped on STEP: its page, the note stays (EDIT deletes)", step_on(&t->step[7]) && cur_page()->fam == FAM_FX);
+    bad += check("FX leaves the edited note intact and opens its page", step_on(&t->step[7]) && !ui.home && cur_page()->fam == FAM_FX);
     t = edit_setup(); cursor_set(7); frame();
     press(B_OCTUP);
     bad += check("plain STEP OCT+: neither the cursor (the knobs move it) nor the octave (Stage only)", ui.cursor == 7 &&
@@ -327,7 +327,7 @@ static int test_held_gestures(void)
     {
         uint32_t ly = ui.ly;
         fm1_in.buttons &= ~(1u << panel.btn[B_FX]); frame();
-        bad += check("  FX while recording live: its performance layer, the note stays", ly == LAYER_FX &&
+        bad += check("  retired FX while recording live: no layer, the note stays", !ly &&
                      step_on(&t->step[9]));
     }
     song.octave = 0; song.rec = 0; song.playing = 0;

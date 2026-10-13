@@ -166,11 +166,11 @@ def bench(d,args):
                 for tr in range(4):
                     d.request(27,[tr]);d.request(8,[(0,3,2,5)[tr],0])
                     d.params(tr,dict(P_LEVEL=64,P_PAN=0,P_MUTE=0,P_VOICE=0,P_GLIDE=0,
-                                     P_AMODE=0,P_AHOLD=0,P_SLCR=0,P_SUS=127,
+                                     P_AMODE=0,P_AHOLD=0,P_RESERVED45=0,P_SUS=127,
                                      P_QUANT=0,P_CHRD=0,P_TRANS=0,P_ED_PIT=0,
                                      P_LD_PIT=0,P_LD_FLT=0,P_LD_AMP=0,P_ED_FLT=0,
                                      P_M1AMT=0,P_M2AMT=0,P_M3AMT=0,P_M4AMT=0,
-                                     P_DIST=30,P_CHOR=70,P_DLY=70,P_REV=70))
+                                     P_RESERVED33=30,P_RESERVED34=70,P_RESERVED35=70,P_RESERVED36=70))
                 if mode is not None:
                     reply=d.request(95,[1,0]+list(patch(raw,mode,True)))
                     if reply[:2]!=[1,0]:raise RuntimeError(f'Native patch PUT failed: {reply[:3]}')
@@ -207,8 +207,8 @@ def recordings(d,args):
         for tr in range(4):
             d.request(27,[tr]);d.request(8,[0,0])
             d.params(tr,dict(P_MUTE=int(tr!=0),P_LEVEL=64,P_PAN=0,P_VOICE=0,
-                            P_AMODE=0,P_AHOLD=0,P_SLCR=0,P_QUANT=0,P_CHRD=0,P_TRANS=0,
-                            P_DIST=0,P_CHOR=0,P_DLY=0,P_REV=0,P_LD_AMP=0,
+                            P_AMODE=0,P_AHOLD=0,P_RESERVED45=0,P_QUANT=0,P_CHRD=0,P_TRANS=0,
+                            P_RESERVED33=0,P_RESERVED34=0,P_RESERVED35=0,P_RESERVED36=0,P_LD_AMP=0,
                             P_LD_FLT=0,P_LD_PIT=0,P_ED_FLT=0,P_ED_PIT=0,
                             P_M1AMT=0,P_M2AMT=0,P_M3AMT=0,P_M4AMT=0))
         bank=next(Path(args.factory).glob('Prophet*/P5*USER*.syx')).read_bytes()

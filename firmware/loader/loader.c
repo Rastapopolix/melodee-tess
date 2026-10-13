@@ -16,7 +16,7 @@
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
 #include "fm1_time.h"
 #include "fm1_sys.h"
-/* the loader may write the app area, move the Prophet banks up (0x93000..) and erase update records; never the head */
+/* the loader writes the app area and erases update records; never the head */
 #define FL_RANGE_OK(off, n) (FL_IN(off, n, 0x4000u, 0x93000u) || FL_IN(off, n, 0x93000u, 0xFC000u))
 #include "fm1_flash.h"
 #include "../src/libc.c"
@@ -65,6 +65,8 @@ static int ldr_erase(uint32_t off)
 static int ldr_prog(uint32_t off, const void *p, uint32_t n)
 {
     uint32_t took;
+    if (!FL_IN(off, n, 0x4000u, 0x93000u))
+        return -1;
     return fl_prog_ram(off, p, n, &took);
 }
 static void ldr_record_clear(void)

@@ -28,7 +28,7 @@ import struct
 from pathlib import Path
 
 APP_SLOT = 0x8DFBC                                     # the app area [0x4000, 0x93000), as the official V15's;
-FLASH_SIZE = 0x93000                                   # the Prophet banks moved above it (storage.c, ldr_core.c)
+FLASH_SIZE = 0x93000                                   # current Prophet banks start above it (storage.c)
 KEY = 0x980F
 # flash header: JieLi SDK defaults (burner_size 544, VID "0.01", flash_size 0xFF000,
 # fs_ver 0x10, PID "AC791N_STORY"), plain, without its CRC

@@ -218,8 +218,8 @@ static void capture_pipeline(void)
         ua_hw_stop();
         assert(ua_set_interface(3, alt) && ua_set_interface(5, alt));
         for (uint32_t i = 0; i < UA_RING; i++)
-            for (uint32_t ch = 0; ch < UA_CAP_CHANNELS; ch++)
-                ua.cap[i * UA_CAP_CHANNELS + ch] = (int16_t)(1000 * (ch + 1));
+            for (uint32_t ch = 0; ch < ua_cap_channels; ch++)
+                ua.cap[i * ua_cap_channels + ch] = (int16_t)(1000 * (ch + 1));
         ua.cw = 800;
         checked_sends = 0;
         for (uint32_t packet = 0; packet < 6; packet++) {
@@ -246,7 +246,7 @@ static void capture_pipeline(void)
             ua_hw_poll();                 /* busy DMA and staged PCM stay intact */
             assert(ua.cr == queued_cr && !memcmp(active, ep_tadr[2], bytes));
             if (packet >= 3)
-                for (uint32_t ch = 0; ch < UA_CAP_CHANNELS; ch++)
+                for (uint32_t ch = 0; ch < ua_cap_channels; ch++)
                     assert(ua_decode(active + ch * ua_sample_bytes(alt), ua_sample_bytes(alt))
                            == (int16_t)(1000 * (ch + 1)));
         }
@@ -269,20 +269,33 @@ static void layouts(void)
 {
     static const struct { uint16_t len; uint8_t nif, play, cap; } L[4] = {
         {411, 6, 3, 5}, {251, 4, UA_NO_IF, 3}, {269, 4, 3, UA_NO_IF}, {109, 2, UA_NO_IF, UA_NO_IF}};
+    for (uint32_t tracks = 0; tracks < 2; tracks++)
     for (uint32_t off = 0; off < 4; off++) {
+        ua_tracks = ua_tracks_want = (uint8_t)tracks;
         const uint8_t *d;
         uint16_t len;
-        uint32_t i, next_if = 0, iad_left = 0, ac_if = UA_NO_IF;
+        uint32_t i, next_if = 0, iad_left = 0, ac_if = UA_NO_IF, current_if = UA_NO_IF, width = 0;
         ua_off = ua_off_want = (uint8_t)off;
         usb_start();
         usb.config = 1;
         assert(usb.up && get_desc(0x200, &d, &len) && d == ua_cfg && len == ua_cfg_len);
         assert(len == L[off].len && (d[2] | d[3] << 8) == len && d[4] == L[off].nif);
         assert(ua_nif == L[off].nif && ua_if_play == L[off].play && ua_if_cap == L[off].cap);
-        if (!off)
+        if (!off && tracks)
             assert(len == sizeof CFG_DESC && !memcmp(d, CFG_DESC, len));
+        assert(ua_cap_channels == (tracks ? 4u : 2u));
         for (i = 9; i < len; i += d[i]) {
             const uint8_t *r = d + i;
+            if (r[1] == 4) current_if = r[2];
+            if (current_if + 1u == ua_if_cap && r[1] == 0x24 && r[2] == 2)
+                assert(r[7] == ua_cap_channels && r[8] == (tracks ? 0 : 3) && !r[9]);
+            if (current_if == ua_if_cap && r[1] == 0x24 && r[2] == 2) {
+                assert(r[4] == ua_cap_channels && (r[5] == 2 || r[5] == 3));
+                assert(r[6] == 8*r[5] && r[7] == 1 && r[8] == 0x44 && r[9] == 0xAC && !r[10]);
+                width = r[5];
+            }
+            if (current_if == ua_if_cap && r[1] == 5)
+                assert((r[4] | r[5] << 8) == UA_MAX_FRAMES * ua_cap_channels * width);
             if (r[1] == 0x0B) {                 /* IAD: its interfaces follow, numbered on */
                 assert(!iad_left && r[2] == next_if);
                 iad_left = r[3];
@@ -365,6 +378,7 @@ int main(void)
 {
     uint32_t count;
     uint8_t previous[UA_PACKET];
+    ua_tracks = ua_tracks_want = 1; ua_cap_channels = 4;
     usb.up = usb.config = 1;
     common[S_INTRRX1E] = 2;                    /* MIDI endpoint must survive */
     ua_hw_stop();
@@ -449,5 +463,24 @@ int main(void)
     capture_pipeline();
     layouts();
     replug();
+    ua_off = ua_off_want = 0; ua_tracks = ua_tracks_want = 0;
+    usb_start(); usb.config = 1;
+    assert(ua_cap_channels == 2 && !ua_tracks);
+    assert(ua_set_interface(5, 2) && ep_cnt[2] == 264);
+    ua.cw = 700; ua.cap[0] = 12345;
+    ua_tracks_set(1, 20000); ua_tracks_set(1, 20300);
+    assert(!ua_off_apply(20599) && ua_cap_channels == 2);
+    assert(ua_off_apply(20600) && !usb.up && !usb.config && ua_cap_channels == 2);
+    usb_retry(21600); usb.config = 1;
+    assert(!ua.cap_alt && ua.cw == ua.cr);
+    assert(ua_cap_channels == 4 && ua_set_interface(5, 2) && ep_cnt[2] == 528);
+    for (uint32_t i = 0; i < ep_cnt[2]; i++) assert(!((uint8_t *)ep_tadr[2])[i]);
+    ua_tracks_set(0, 22000); ua_tracks_set(1, 22300);
+    assert(!ua_off_apply(23000) && usb.up);
+    ua_tracks_set(0, 23000); assert(ua_off_apply(23600));
+    usb_retry(24600); usb.config = 1;
+    assert(ua_cap_channels == 2 && ua_set_interface(5, 1) && ep_cnt[2] == 176);
+    capture_pipeline();
+    puts("USB input mode: stereo default, debounced live re-enumeration, no stale packets: OK");
     return 0;
 }

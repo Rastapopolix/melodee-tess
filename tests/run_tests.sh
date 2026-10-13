@@ -2,7 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 # Host tests of the Melodee sources (no hardware). Run from the repo root after ./build.sh:
-#   tests/run_tests.sh
+#   tests/run_tests.sh               everything
+#   SOUND=0 tests/run_tests.sh       everything but the sound tests
+#   SOUND=only tests/run_tests.sh    the sound tests alone
+# Sound tests: the regression suite, the DSP render and TRACKS, and every test of an engine's or an effect's rendered
+#   signal (native fp32, Prophet, SPEAKER, MOD, SLICER, the FX layer, REVERB, DELAY, MOD / SPREAD, CZ, SID,
+#   CZ-1 knobs, PHYS, DRUM, NOISE, FM6, the dual-core pairing). The rest (storage, UI, MIDI, USB, editor, web) always runs.
+# Each test (its compile and its runs) is a job; PARALLEL=n jobs run at once (default: the CPU count; 1: one by one).
+# A job's output goes to build/host/log/<n>.log and is printed in the order of this file as the jobs end; the
+# failures are listed again at the end. The cost gates count instructions, which the load leaves alone; the ns
+# figures printed beside them are noisier in parallel (PARALLEL=1 for quiet ones).
 #
 # Regression suite (tests/regress.c, tests/target_budget.py; details at the top of regress.c):
 #   golden renders  every engine x preset, the GM kit (808 DRUM), voice modes, FX sends, a 4-track mix: one hash
@@ -18,7 +27,6 @@
 #                   ellipsised), MONO gray, the draw cost, the text audit (build/ui_new/text_audit.tsv);
 #                   PNGs of MONO GREEN PAPER in build/ui_new (tests/ui_render.py), the findings in build/ui_new/report.txt;
 #                   FM6's 32 algorithm charts as drawn (no box overlapping, no route through a box or crossing another);
-#                   DIGITAL's screens (its algorithm charts, OP ENV) with MELODEE_FM4=1 too (build/ui_fm4: lint, MONO);
 #                   every frame of the rolling digits (lint, MONO), their filmstrips in build/ui_slot.
 # UI (tests/ui_test.c): the UI sources against stub display / buttons / knobs: sound loads keep the steps and
 #                   the track's ARP / SCL / SLICER, the SEQ > PATTERNS loader and its REPLACE? dialog, the
@@ -33,20 +41,11 @@
 #                   exactly what its key / MIDI note started, recording, the ARP, MIDI IN, kits ignore CHRD.
 # MOD (tests/mod_test.c): the modulation matrix: slots that do nothing are bit-identical, every source on each
 #                   kind of destination, clamping, MIDI CC1 / CC11 / aftertouch routing, the cost of 4 active
-#                   slots (at most +5 %), demos in build/mod_demo/.
-# PERFORM (tests/perform_test.c): the FX hold layer (src/perform.c): 1/16 starts, stereo buffer effects, the
-#                   too-long REPEAT, the SLICER interplay, silent layer keys, idle bit-identical, cost; build/perform_demo/;
-#                   OCT UP / DN (the harmonizer): pitch, stereo, clicks, the shimmer bounded, cost; build/fx_demo/;
-#                   FLANGER / PHASER: silence, DC, bounds, tempo-locked sweeps, clicks, stacking; the white-key map.
-# REVERB (tests/reverb_test.c): REVERB TYPE (src/fx.c): ROOM bit for bit as before, SPRING's decay against SIZE,
-#                   its chirp (group delay rising with frequency), stability at the corners, level; HALL's decay,
-#                   damping, echo density, ringing, flutter, stereo and exact silence; model changes without a
-#                   click, the cost against ROOM (+30 % at most); demos in build/fx_demo/.
-# DELAY (tests/delay_test.c): the delay bus (src/delay.c, fm1-x0x's tape delay): silent without a send, echoes on the
-#                   note value, FDBK and TONE, a long division halved, TAPE's bounded self-oscillation and its pitch
-#                   swing, the ping-pong, glides without clicks, the line given back when silent, the cost.
+#                   slots (PHYS at most +5%, mixed dry path at most 90 instructions/sample), demos in build/mod_demo/.
+# LEGACY FX (tests/no_effects_test.c): legacy values/automation do not process audio or allocate,
+#                   old notes survive, retired MIDI sends are inert, FX opens only the new knob page.
 # MOD / SPREAD (tests/mod_spread_test.c): the matrix's S&H / SLEW sources and DEPTH destination, SPREAD's sides.
-# LAYERS / SCREEN (tests/layer_screen_test.c): double-tapped layers, FX LATCH, the FX key map, SCREEN OFF, LFO 2.
+# LAYERS / SCREEN (tests/layer_screen_test.c): GLO/SCL/EDIT double-tapped layers, SCREEN OFF, LFO 2.
 # INPUT (tests/input_test.c): the key / button debounce of hal/fm1_input.h against the TIMER5 scan and bouncing
 #                   contacts: a press within 2 scans (<= 2.3 ms), one note per bouncy press, no early or hanging
 #                   release, stray samples ignored, fast repeats, the encoders' detents.
@@ -67,10 +66,6 @@
 # NOISE (tests/noise_test.c): the engine (src/eng_noise.c): COLR's slope (white, pink, brown), the filter and the
 #                   register clock following the key, META periodic at the key, no DC, no clipping at the
 #                   corners, a note from silence the same twice, the cost per voice; demos in build/noise_demo/.
-# DIGITAL -> FM6 (tests/fm4_test.c, built with MELODEE_FM4=1): the retired four-operator engine against its conversion
-#                   (src/fm4_convert.c): routes and carriers per algorithm, the converted presets, and the sound (pitch,
-#                   centroid, RMS envelope) of its presets and algorithms; demos in build/fm4_demo/. tests/digital_test.c
-#                   (MELODEE_FM4=1 too): DIGITAL's operator envelopes. Default builds have no DIGITAL (engine 1 reserved).
 # FM6 (tests/fm6_test.c): the 6-operator FM engine (src/eng_fm6.c, src/fm6_core.c) against the DX7: the 32 algorithms
 #                   against its diagrams, pitch, levels, envelopes, modulation; no DC / clipping over the factory
 #                   patches, the macros (neutral at 0, their directions), factory presets, pack / unpack and the SysEx layouts,
@@ -83,242 +78,282 @@
 #                   TESSERA_UPDATE=1 rewrites the baseline (only after an intended change of what they play).
 # Change baseline entries only for reviewed, intentional differences in sound or cost;
 # retain every unaffected golden / CPU / target entry. VERBOSE=1: every render.
-set -e
 export AC79_SDK="${AC79_SDK:-$HOME/fw-AC79_AIoT_SDK}"
 cd "$(dirname "$0")/.."
 # Pillow's Raqm (text spacing, renders): macOS strips DYLD_* on the way into /bin/sh (build.sh)
 [ "$(uname -s)" = Darwin ] && export DYLD_FALLBACK_LIBRARY_PATH="${DYLD_FALLBACK_LIBRARY_PATH:-/opt/homebrew/lib:/usr/local/lib:/usr/lib}"
 OUT=build/host
-mkdir -p "$OUT"
+LOG=$OUT/log
 CC="${CC:-cc} -O1 -ffp-contract=off -Wall -Wno-unused-function"
-fail=0
-python3 tools/gen_scales.py --check
-run() { echo "== $1"; shift; "$@" || fail=1; }
-
-$CC -o "$OUT/storage_test" tests/storage_test.c
-run "flash storage (A/B, torn writes)" "$OUT/storage_test"
-
-$CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_preset_test" tests/fm6_preset_test.c -lm
-run "native FM6/CZ user presets, scrolling, migration and interrupted saves" "$OUT/fm6_preset_test"
-$CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/prophet_integration_test" tests/prophet_integration_test.c -lm
-run "Prophet native slots, atomic saves, projects, undo and performance" "$OUT/prophet_integration_test"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/resources_test" tests/resources_test.c -lm
-run "resource lifetimes, cache eviction, tails and capacity" "$OUT/resources_test"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -pthread -o "$OUT/dual_core_test" tests/dual_core_test.c -lm
-run "paired FM6/Prophet voices: serial/concurrent sample equality and eight-voice allocation" "$OUT/dual_core_test"
-$CC -o "$OUT/audio_worker_test" tests/audio_worker_test.c
-run "audio worker: stalled jobs and wrapping deadlines" "$OUT/audio_worker_test"
-$CC -o "$OUT/cache_ram_test" tests/cache_ram_test.c
-run "cache RAM startup, memory faults and safe fallback" "$OUT/cache_ram_test"
-run "audio diagnostics schema compatibility" python3 tests/usb_audio_stats_test.py
-run "target budget: natural loops and FPU decoding" python3 tests/target_budget_test.py
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/engine_retirement_test" tests/engine_retirement_test.c -lm
-run "retired synth identities, project/user patch preservation and favorites" "$OUT/engine_retirement_test"
-$CC -DMELODEE_LEGACY_EXTRAS=1 -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/performance_test" tests/performance_test.c -lm
-run "capture gating, derived caches and silent-track clocks" "$OUT/performance_test"
-$CC -O1 -w -Ibuild/gen -o "$OUT/lcd_overlap_test" tests/lcd_overlap_test.c -lm
-run "canvas drawing overlaps DMA without changing pending pixels" "$OUT/lcd_overlap_test"
-
-$CC -o "$OUT/upreset_test" tests/upreset_test.c
-run "user presets (UP_PUT parser, bank round trip, versions, PHYS DRUM -> DRUM, grid records, DIGITAL kept)" "$OUT/upreset_test"
-
-$CC -o "$OUT/input_test" tests/input_test.c
-run "keys and buttons: fast press, long release, bouncy contacts (one note each), glitches, encoders, fast spins" "$OUT/input_test"
-
-$CC -o "$OUT/midi_uart_test" tests/midi_uart_test.c
-run "TRS MIDI parser" "$OUT/midi_uart_test"
-
-$CC -o "$OUT/usb_audio_test" tests/usb_audio_test.c -lm
-run "USB audio: routing, clock drift and stream recovery" "$OUT/usb_audio_test"
-$CC -o "$OUT/usb_audio_driver_test" tests/usb_audio_driver_test.c
-run "USB audio: endpoint lifecycle and packet ownership" "$OUT/usb_audio_driver_test"
-run "USB descriptors: MIDI, CDC and audio configurations" python3 tests/usb_audio_desc_test.py
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/usb_audio_tracks_test" tests/usb_audio_tracks_test.c -lm
-run "USB audio: four isolated track stems through the real mixer" "$OUT/usb_audio_tracks_test"
-
+FW="-w -Ibuild/gen -Ifirmware/src"
+P5=build/prophet5/Prophet-5+10-Factory-Programs-ReadMe1.03
+SOUND=${SOUND:-1}
+PARALLEL=${PARALLEL:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}
+case $SOUND in 0 | 1 | only) ;; *) echo "SOUND=0, 1 or only"; exit 2 ;; esac
+[ "$PARALLEL" -ge 1 ] 2>/dev/null || { echo "PARALLEL=n, n >= 1"; exit 2; }
+python3 tools/gen_scales.py --check || exit 1
 [ -f build/melodee-tess.fwsc ] || { echo "run ./build.sh first"; exit 1; }
+TABLES=0; [ -f build/gen/melodee_tables.h ] && TABLES=1
+PIL=0; python3 -c "import PIL" 2>/dev/null && PIL=1
+mkdir -p "$OUT" "$LOG"
+rm -f "$LOG"/*
+start=$(date +%s)
 
-$CC -DOWN_PKG=1 -o "$OUT/ota_test" tests/ota_test.c
-run "M-UPGRADE entry (own loader)" "$OUT/ota_test" build/melodee-tess.fwsc
+# ------------------------------------------------------------------- jobs ---
+# job FN ARGS...: FN ARGS in the background once one of the PARALLEL slots is free (fd 3, a FIFO holding a line per
+#   free slot), the output in $LOG/<n>.log; a failure is a line in $LOG/<n>.fail, $LOG/<n>.done marks the end.
+# In a job: step TITLE CMD... (the title, then CMD; a failure is noted and the job goes on),
+#   build OUT SRC FLAGS... (tests/SRC.c -> $OUT/OUT), fail WHAT.
+# t TITLE OUT[:SRC] FLAGS... [-- CMD...]: the job building tests/SRC.c (SRC: OUT) and running CMD ($OUT/OUT).
+n=0 shown=0 pids=
+mkfifo "$LOG/slots" && exec 3<>"$LOG/slots" && rm -f "$LOG/slots" || exit 1
+i=0; while [ $i -lt "$PARALLEL" ]; do echo; i=$((i + 1)); done >&3
+# jobs ignore SIGINT (asynchronous lists): stop them and everything under them (cc -> clang -cc1, regress -> its renders)
+tree() { echo "$1"; for c in $(pgrep -P "$1"); do tree "$c"; done; }
+stop() { kill -TERM $(for p in $pids; do tree "$p"; done) 2>/dev/null; }
+trap 'stop; exit 130' INT
+trap 'stop; exit 143' TERM
 
-head -c 200000 build/melodee.bin > "$OUT/old_app.bin"
-python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null
-$CC -o "$OUT/ldr_test" tests/ldr_test.c
-run "update loader: other app -> this build" "$OUT/ldr_test" "$OUT/old.fwsc" build/melodee-tess.fwsc
+fail() { echo "$1" >> "$LOG/$n.fail"; }
+step() { echo "== $1"; _step=$1; shift; "$@" || fail "$_step"; }
+build() {
+    _out=$1 _src=$2; shift 2
+    $CC "$@" -o "$OUT/$_out" "tests/$_src.c" -lm || { fail "compile tests/$_src.c ($_out)"; return 1; }
+}
+_t() {
+    _title=$1 _out=${2%%:*} _src=${2#*:} _flags=; shift 2
+    while [ $# -gt 0 ] && [ "$1" != -- ]; do _flags="$_flags $1"; shift; done
+    [ $# -gt 0 ] && shift
+    [ $# -gt 0 ] || set -- "$OUT/$_out"
+    echo "== $_title"
+    build "$_out" "$_src" $_flags || return
+    "$@" || fail "$_title"
+}
+flush() {                                         # the logs of the jobs ended, in order
+    while [ $shown -lt $n ] && [ -f "$LOG/$((shown + 1)).done" ]; do
+        shown=$((shown + 1))
+        cat "$LOG/$shown.log"
+        [ -f "$LOG/$shown.fail" ] && cat "$LOG/$shown.fail" >> "$LOG/failed"
+    done
+}
+job() {
+    read -r slot <&3
+    flush
+    n=$((n + 1))
+    ( "$@" 3>&- > "$LOG/$n.log" 2>&1; : > "$LOG/$n.done"; echo >&3 ) &
+    pids="$pids $!"
+}
+t() { job _t "$@"; }
+run() { job step "$@"; }
+note() { job echo "$@"; }
+core() { [ "$SOUND" != only ]; }
+sound() { [ "$SOUND" != 0 ]; }
 
-if [ -f build/gen/melodee_tables.h ]; then
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/hostsim" tests/hostsim.c -lm
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/synth_fpu_test" tests/synth_fpu_test.c -lm
-    run "native fp32: independent numerical references, exact pitch, quiet signals and fractional envelopes" "$OUT/synth_fpu_test"
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/prophet_test" tests/prophet_test.c -lm
-    run "Prophet native frames, five voices, filters, sync and Poly-Mod" "$OUT/prophet_test"
-    if [ -d "build/prophet5/Prophet-5+10-Factory-Programs-ReadMe1.03" ]; then
-        run "Prophet factory-file playback and exact round trips" "$OUT/prophet_test" \
-            "build/prophet5/Prophet-5+10-Factory-Programs-ReadMe1.03/P5_Factory_Programs_FACTORY_v1.03.syx" \
-            "build/prophet5/Prophet-5+10-Factory-Programs-ReadMe1.03/P5_Factory_Programs_USER_v1.03.syx"
+# ----------------------------------------------------------- multi-step jobs ---
+web_tests() {                                     # the editor mock's tables must equal the firmware's (desc.json)
+    if [ $TABLES = 1 ]; then
+        build descdump descdump $FW &&
+            step "parameter and engine tables as JSON (for the editor mock test)" desc_json
     fi
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/scale_test" tests/scale_test.c -lm
-    run "scales: white-key mapping and note lifecycle" "$OUT/scale_test"
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/microtonal_test" tests/microtonal_test.c -lm
-    run "microtonal: catalogue, layouts, note ownership, recordings and rendered pitch" "$OUT/microtonal_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/scale_picker_test" tests/scale_picker_test.c -lm
-    run "scale picker: families, favorites, empty lists, shared settings and navigation" "$OUT/scale_picker_test"
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/chord_test" tests/chord_test.c -lm
-    run "chord keys: diatonic and fixed chords, voicings, MONO root, releases, recording, ARP, MIDI IN, kits" "$OUT/chord_test"
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/speaker_test" tests/speaker_test.c -lm
-    run "SPEAKER BASS+: harmonics of the bass, the sub cut, no offset after" "$OUT/speaker_test"
-    run "DSP render (ANALOG preset 0)" "$OUT/hostsim" 0 0 1 "$OUT/render.wav"
-    mkdir -p build/tracks_demo
-    run "TRACKS: 4-track pattern, live recording (lengths, swing), voice budget, engine switch, cost" env TRACKS=build/tracks_demo "$OUT/hostsim" 0 0 1 "$OUT/tracks.wav"
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/project_test" tests/project_test.c -lm
-    run "project formats (FUN1..FUN5 -> FUN6, the grid and song chain; DIGITAL tracks -> FM6)" "$OUT/project_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/motion_test" tests/motion_test.c -lm
-    run "motion, whole-step chance, FUN7 migration, song restore and ARP repeat" "$OUT/motion_test"
-    $CC -O1 -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -o "$OUT/pattern_test" tests/pattern_test.c -lm
-    run "32 pattern banks: chords, ties, independent loop switching, copy and persistence" "$OUT/pattern_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/performance_tools_test" tests/performance_tools_test.c -lm
-    run "recording/performance tools and legacy migrations" "$OUT/performance_tools_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_control_test" tests/midi_control_test.c -lm
-    run "USB/TRS clock, bend, sustain, ownership and panic recovery" "$OUT/midi_control_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_timing_test" tests/midi_timing_test.c -lm
-    run "MIDI timing: quantized TRS/USB recording, audio timeline, tempo changes and timer wrap" "$OUT/midi_timing_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/recording_test" tests/recording_test.c -lm
-    run "MIDI recording: raw events, reversible quantization, independent releases, banks and capacity" "$OUT/recording_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/seq_notes_test" tests/seq_notes_test.c -lm
-    run "Recorded notes: individual selection/deletion, zoom, undo, playback ownership and persistence" "$OUT/seq_notes_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_scale_test" tests/midi_scale_test.c -lm
-    run "MIDI IN through the scale layouts (WHITE, ALL, MPC), shared SCL / QNT" "$OUT/midi_scale_test"
-    $CC -DMELODEE_LEGACY_EXTRAS=1 -O1 -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -o "$OUT/tuning_test" tests/tuning_test.c -lm
-    run "Concert pitch: A4 frequency, engines, modulation, held notes and project-independent settings" "$OUT/tuning_test"
-    $CC -O1 -w -DMELODEE_FM4=1 -Ibuild/gen -Ifirmware/src -o "$OUT/digital_test" tests/digital_test.c -lm
-    run "DIGITAL (retired, built here with MELODEE_FM4=1): operator envelopes/levels" "$OUT/digital_test"
-    $CC -O2 -w -DMELODEE_FM4=1 -Ibuild/gen -Ifirmware/src -o "$OUT/fm4_test" tests/fm4_test.c -lm
-    mkdir -p build/fm4_demo
-    run "DIGITAL -> FM6: the conversion against DIGITAL (MELODEE_FM4=1): pitch, centroid, RMS envelope; demos" \
-        "$OUT/fm4_test" build/fm4_demo
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/theme_test" tests/theme_test.c -lm
-    run "themes: contrast, text blending and font metrics" "$OUT/theme_test"
-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/text_ref_test" tests/text_ref_test.c -lm
-    run "text: pens, kerning and pixels equal the reference renderer" "$OUT/text_ref_test"
-    if python3 -c "import PIL" 2>/dev/null; then
-        run "text spacing: glyph gaps against the font's own (16x supersampled), S M <= 0.25 px, L <= 0.5 px" \
-            python3 tests/text_spacing_test.py build/gen/ui_fonts.h
+    if command -v node >/dev/null 2>&1; then
+        step "web pages: editor protocol + native CZ patches, package builder, update protocol" node web/test_web.mjs
+        step "web backup: capture, validation before writes, restore order" node web/test_backup.mjs
+    else
+        echo "== skip web tests (no node)"
     fi
-    $CC -O1 -w -Ibuild/gen -o "$OUT/settings_test" tests/settings_test.c
-    run "settings: PER1..PER5 migration, palette ids and preference preservation" "$OUT/settings_test"
-    $CC -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -o "$OUT/ui_test" tests/ui_test.c -lm
-    run "UI: sounds keep steps, undo, recording, MIDI overflow, pending saves, panel recovery, drum grid, song chain, MONO gray" "$OUT/ui_test"
-    $CC -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -o "$OUT/seq_edit_test" tests/seq_edit_test.c -lm
-    run "Sequencer: tied length/move/delete, eight-level undo/redo, MIDI step entry and playing-step recording" "$OUT/seq_edit_test"
-    $CC -O1 -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -Itests -o "$OUT/ui_render" tests/ui_render.c -lm
+}
+desc_json() { "$OUT/descdump" > "$OUT/desc.json"; }
+old_to_new() {                                    # a package of another app (this one cut short) -> this build
+    head -c 200000 build/melodee.bin > "$OUT/old_app.bin" &&
+        python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null &&
+        "$OUT/ldr_test" "$OUT/old.fwsc" build/melodee-tess.fwsc
+}
+ui_renders() {
+    build ui_render ui_render -O1 -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -Itests || return
     mkdir -p build/ui_new/ppm build/ui_slot
-    run "UI renders: layout lint (every screen and palette, every page, engine and column value), MONO gray, draw cost" \
+    step "UI renders: layout lint (every screen and palette, every page, engine and column value), MONO gray, draw cost" \
         "$OUT/ui_render" build/ui_new build/ui_slot
-    if python3 -c "import PIL" 2>/dev/null; then
-        python3 tests/ui_render.py build/ui_new build/ui_slot
-        python3 tools/ui_mockcmp.py build/ui_new build/ui_mock    # redesign parity (docs/design): a report, no gate yet
+    if [ $PIL = 1 ]; then
+        python3 tests/ui_render.py build/ui_new build/ui_slot || fail "tests/ui_render.py"
+        python3 tools/ui_mockcmp.py build/ui_new build/ui_mock || fail "tools/ui_mockcmp.py" # redesign parity (docs/design): a report, no gate yet
     fi
-    $CC -w -DMELODEE_FM4=1 -Ibuild/gen -Ifirmware/src -o "$OUT/ui_test_fm4" tests/ui_test.c -lm
-    run "UI built with MELODEE_FM4=1 (DIGITAL, kept in the tree): its OP pages, EDIT cycle, algorithm charts" "$OUT/ui_test_fm4"
-    $CC -O1 -w -DMELODEE_FM4=1 -Ibuild/gen -Ifirmware/src -Itests -o "$OUT/ui_render_fm4" tests/ui_render.c -lm
-    mkdir -p build/ui_fm4/ppm build/ui_fm4_slot
-    run "UI renders with MELODEE_FM4=1: DIGITAL's screens (EDIT, OP ENV, the 8 algorithm charts), lint, MONO gray" \
-        "$OUT/ui_render_fm4" build/ui_fm4 build/ui_fm4_slot
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/audio_test" tests/audio_test.c -lm
-    run "audio: overload protection, bounded fades and DMA diagnostics" "$OUT/audio_test"
-    $CC -w -DMELODEE_BENCH_SILENT=1 -Ibuild/gen -Ifirmware/src -o "$OUT/audio_silent_test" tests/audio_test.c -lm
-    run "audio: silent bench keeps synthesis running and silences physical output" "$OUT/audio_silent_test"
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/persistence_test" tests/persistence_test.c -lm
-    run "persistence: deferred settings, retry and failed-save rollback" "$OUT/persistence_test"
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/backup_test" tests/backup_test.c -lm
-    run "full backup: CRC before writes, stale runtime, USB reset / timeout, malformed objects, older projects" "$OUT/backup_test"
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test" tests/editor_test.c -lm
-    run "editor: real C protocol, malformed transfers and queue recovery" "$OUT/editor_test"
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_sysex_test" tests/fm6_sysex_test.c -lm
-    run "DX7 librarian: USB voice/bank receive, dump replies and malformed frame recovery" "$OUT/fm6_sysex_test"
-    $CC -DMELODEE_LEGACY_EXTRAS=1 -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/mod_test" tests/mod_test.c -lm
-    mkdir -p build/mod_demo
-    run "modulation matrix: off = bit-identical, the math, MIDI CC1 / CC11 / aftertouch, cost, demos" "$OUT/mod_test" build/mod_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/slicer_test" tests/slicer_test.c -lm
-    mkdir -p build/slicer_demo
-    run "SLICER: no clicks, timing, sync with the sequencer, STUT, cost, demos" "$OUT/slicer_test" build/slicer_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/swing_test" tests/swing_test.c -lm
-    run "SWING: track + global at most 100, sequencer and SLICER step lengths, the SWG display" "$OUT/swing_test"
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/tessera_test" tests/tessera_test.c -lm
-    mkdir -p build/tessera_log
-    run "TESSERA generators: notes per scenario against tests/tessera_baseline.txt, stops clean, saved block" "$OUT/tessera_test" tests/tessera_baseline.txt build/tessera_log
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/perform_test" tests/perform_test.c -lm
-    mkdir -p build/perform_demo build/fx_demo
-    run "FX layer effects: on the 1/16, stereo, too-long REPEAT, SLICER, silent keys, idle bit-identical, clicks, OCT UP / DN, cost, demos" "$OUT/perform_test" build/perform_demo build/fx_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/reverb_test" tests/reverb_test.c -lm
-    run "REVERB TYPE: ROOM bit-identical, SPRING decay / chirp / stability / level, HALL decay / damping / density / stereo / silence, model change, cost, demos" "$OUT/reverb_test" build/fx_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/delay_test" tests/delay_test.c -lm
-    mkdir -p build/delay_demo
-    run "DELAY (x0x's tape delay): off = silent, echo timing, feedback, TAPE bounded / swing, ping-pong, glides, idle release, cost, demos" "$OUT/delay_test" build/delay_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/mod_spread_test" tests/mod_spread_test.c -lm
-    run "matrix S&H / SLEW / DEPTH, SPREAD: off = bit-identical, sides, sends mono, SLICER and mutes" "$OUT/mod_spread_test"
-    $CC -O1 -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -o "$OUT/layer_screen_test" tests/layer_screen_test.c -lm
-    run "double-tap layers, FX LATCH, FX key map, SCREEN OFF, LFO 2 SYNC / TRIG / POL" "$OUT/layer_screen_test"
-    $CC -O1 -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -o "$OUT/punch_fx_test" tests/punch_fx_test.c -lm
-    run "punch FX: exclusive knob routing, release detents, DEPTH direction and double-press lock" "$OUT/punch_fx_test"
-    $CC -DMELODEE_LEGACY_EXTRAS=1 -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/phase_test" tests/phase_test.c -lm
-    run "CZ: oscillator boundaries, native rate/target envelopes and independent lines" "$OUT/phase_test"
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/sid_test" tests/sid_test.c -lm
-    run "SID: oscillator/LFSR/register semantics, revisions and 32 factory presets" "$OUT/sid_test"
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/cz1_knob_test" tests/cz1_knob_test.c -lm
-    run "CZ-1: every knob changes a full tone; the dim ones leave INIT and factory tones bit for bit" "$OUT/cz1_knob_test"
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
-    run "regression: golden renders, health, voices, CPU budget" "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/descdump" tests/descdump.c -lm
-    echo "== parameter and engine tables as JSON (for the editor mock test)"
-    "$OUT/descdump" > "$OUT/desc.json" || fail=1
-    $CC -DMELODEE_LEGACY_EXTRAS=1 -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/phys_test" tests/phys_test.c -lm
-    mkdir -p build/phys_demo
-    run "PHYS: stability C-1..G9 over the parameter corners, worst-case cost against PHASE WIRE, demos" "$OUT/phys_test" build/phys_demo
+}
+dsp_tracks() {
+    build hostsim hostsim -O2 $FW || return
+    step "DSP render (CZ-1 preset 0)" "$OUT/hostsim" 15 0 1 "$OUT/render.wav"
+    mkdir -p build/tracks_demo
+    step "TRACKS: 4-track pattern, live recording (lengths, swing), voice budget, engine switch, cost" \
+        env TRACKS=build/tracks_demo "$OUT/hostsim" 15 0 1 "$OUT/tracks.wav"
+}
+prophet() {
+    build prophet_test prophet_test -O2 $FW || return
+    step "Prophet native frames, five voices, filters, sync and Poly-Mod" "$OUT/prophet_test"
+    if [ -d "$P5" ]; then
+        step "Prophet factory-file playback and exact round trips" "$OUT/prophet_test" \
+            "$P5/P5_Factory_Programs_FACTORY_v1.03.syx" "$P5/P5_Factory_Programs_USER_v1.03.syx"
+    fi
+}
+phys_ref() {
     D=${DAISYSP:-vendor/DaisySP}/Source
-    if [ -d "$D/PhysicalModeling" ] && command -v c++ >/dev/null 2>&1; then
-        $CC -DMELODEE_LEGACY_EXTRAS=1 -O2 -w -Ibuild/gen -Ifirmware/src -Itests -c -o "$OUT/phys_fixed.o" tests/phys_fixed.c
+    if [ ! -d "$D/PhysicalModeling" ] || ! command -v c++ >/dev/null 2>&1; then
+        echo "== skip PHYS reference test (no DaisySP: set DAISYSP to a checkout)"
+        return
+    fi
+    $CC -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW -Itests -c -o "$OUT/phys_fixed.o" tests/phys_fixed.c &&
         c++ -O2 -std=c++14 -w -I"$D" -I"$D/Utility" -o "$OUT/phys_ref" tests/phys_ref.cpp \
             "$D/PhysicalModeling/modalvoice.cpp" "$D/PhysicalModeling/resonator.cpp" "$D/PhysicalModeling/stringvoice.cpp" \
             "$D/PhysicalModeling/KarplusString.cpp" "$D/Filters/svf.cpp" "$D/Utility/dcblock.cpp" \
-            "$D/Dynamics/crossfade.cpp" "$OUT/phys_fixed.o"
-        run "PHYS: the fixed-point models against DaisySP's float originals (mode frequencies, decays, Svf)" "$OUT/phys_ref"
-    else
-        echo "== skip PHYS reference test (no DaisySP: set DAISYSP to a checkout)"
+            "$D/Dynamics/crossfade.cpp" "$OUT/phys_fixed.o" || { fail "compile tests/phys_ref.cpp"; return; }
+    step "PHYS: the fixed-point models against DaisySP's float originals (mode frequencies, decays, Svf)" "$OUT/phys_ref"
+}
+
+# ------------------------------------------------------------------ tests ---
+# the longest first: they set the length of the run
+sound && t "FX performance: all effects, four-track mixer, shared send bus and ordered three-effect chains" fx_performance -O2 $FW -- "$OUT/fx_performance" full
+sound && t "FX: three-slot chains, reverb decay/density/rate conversion, smooth Tape, track ownership, dry bypass and frozen legacy storage" fx_test -O1 $FW
+core && t "EQ accelerator: register layout, isolated histories and bounded timeout" eq_hw_test
+core && job web_tests
+sound && [ $TABLES = 1 ] && job dsp_tracks
+
+if core; then
+    t "flash storage (A/B, torn writes)" storage_test
+    t "native FM6/CZ user presets, scrolling, migration and interrupted saves" fm6_preset_test -O1 $FW
+    t "Prophet native slots, atomic saves, projects, undo and performance" prophet_integration_test -O1 $FW
+    t "resource lifetimes, cache eviction, tails and capacity" resources_test -O2 $FW
+    t "audio worker: stalled jobs and wrapping deadlines" audio_worker_test
+    t "cache RAM startup, memory faults and safe fallback" cache_ram_test
+    t "system clock retune and rollback" clock_test -O1
+    job step "nightly and synth-only site preserve release and editor" python3 tests/nightly_site_test.py
+    run "audio diagnostics schema compatibility" python3 tests/usb_audio_stats_test.py
+    run "target budget: natural loops and FPU decoding" python3 tests/target_budget_test.py
+    t "retired synth identities, project/user patch preservation and favorites" engine_retirement_test -O2 $FW
+    t "capture gating, derived caches and silent-track clocks" performance_test -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW
+    t "canvas drawing overlaps DMA without changing pending pixels" lcd_overlap_test -O1 -w -Ibuild/gen
+    t "user presets (UP_PUT parser, bank round trip, versions, PHYS DRUM -> DRUM, grid records)" upreset_test
+    t "keys and buttons: fast press, long release, bouncy contacts (one note each), glitches, encoders, fast spins" input_test
+    t "LED hardware PWM: pin ownership, duty per scan, overlapping planes, blanking" led_pwm_test
+    t "TRS MIDI parser" midi_uart_test
+    t "USB audio: routing, clock drift and stream recovery" usb_audio_test
+    t "USB audio: endpoint lifecycle and packet ownership" usb_audio_driver_test
+    run "USB descriptors: MIDI, CDC and audio configurations" python3 tests/usb_audio_desc_test.py
+    run "resident audio: call graph and flash/RAM ABI boundaries" python3 tests/audio_ram_test.py
+    t "removed effects: old songs and motion, MIDI, physical input and dry output" no_effects_test -O1 $FW
+    t "resident audio: four-track resource budget and removed buses" ram_audio_test -O2 $FW
+    t "resident audio: expanded voice budget and CPU1 fallback" ram_voice_budget_test -O2 $FW
+    t "USB audio: four isolated track stems through the real mixer" usb_audio_tracks_test -O2 $FW
+    t "M-UPGRADE entry (own loader)" ota_test -DOWN_PKG=1 -- "$OUT/ota_test" build/melodee-tess.fwsc
+    t "update loader: other app -> this build" ldr_test -- old_to_new
+    run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/install_test.py
+    run "ROM USB recovery: backup, protected regions, interrupted writes and transport failures" python3 tests/recovery_test.py
+    run "release assets: firmware identity, application bytes, native provenance and ZIP integrity" python3 tests/release_assets_test.py
+fi
+
+if core && [ $TABLES = 1 ]; then
+    t "scales: white-key mapping and note lifecycle" scale_test -O2 $FW
+    t "microtonal: catalogue, layouts, note ownership, recordings and rendered pitch" microtonal_test -O2 $FW
+    t "scale picker: families, favorites, empty lists, shared settings and navigation" scale_picker_test -O1 $FW
+    t "chord keys: diatonic and fixed chords, voicings, MONO root, releases, recording, ARP, MIDI IN, kits" chord_test $FW
+    t "project record (FUN16 round trip, the song chain, names, FM6 patches; older formats refused)" project_test $FW
+    t "motion, whole-step chance, an older parameter count, song restore and ARP repeat" motion_test -O1 $FW
+    t "32 pattern banks: chords, ties, independent loop switching, copy and persistence" pattern_test \
+        -O1 -DMELODEE_USB_AUDIO=1 $FW
+    t "recording/performance tools and legacy migrations" performance_tools_test -O1 $FW
+    t "USB/TRS clock, bend, sustain, ownership and panic recovery" midi_control_test -O1 $FW
+    t "MIDI timing: quantized TRS/USB recording, audio timeline, tempo changes and timer wrap" midi_timing_test -O1 $FW
+    t "MIDI recording: raw events, quantization at take end, independent releases, banks and capacity" recording_test \
+        -O1 $FW
+    t "Recorded notes: individual selection/deletion, zoom, undo, playback ownership and persistence" seq_notes_test \
+        -O1 $FW
+    t "MIDI IN through the scale layouts (WHITE, ALL, MPC), shared SCL / QNT" midi_scale_test -O1 $FW
+    t "Concert pitch: A4 frequency, engines, modulation, held notes and project-independent settings" tuning_test \
+        -DMELODEE_LEGACY_EXTRAS=1 -O1 -DMELODEE_USB_AUDIO=1 $FW
+    t "themes: contrast, text blending and font metrics" theme_test -O1 $FW
+    t "text: pens, kerning and pixels equal the reference renderer" text_ref_test -O1 $FW
+    if [ $PIL = 1 ]; then
+        run "text spacing: glyph gaps against the font's own (16x supersampled), S M <= 0.25 px, L <= 0.5 px" \
+            python3 tests/text_spacing_test.py build/gen/ui_fonts.h
     fi
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/drum_test" tests/drum_test.c -lm
-    mkdir -p build/drum_demo
-    run "DRUM: 808 instruments, velocity, hat choke, release, eight lanes and shared voice budget" "$OUT/drum_test" build/drum_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/drum_editor_test" tests/drum_editor_test.c -lm
-    run "DRUM EDITOR: synthesized 909, sound controls, individual pitch/length, undo and storage" "$OUT/drum_editor_test"
-    $CC -DMELODEE_LEGACY_EXTRAS=1 -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/noise_test" tests/noise_test.c -lm
-    mkdir -p build/noise_demo
-    run "NOISE: colour slopes, key-tracked filter and clock, META period, DC, clipping, retrigger, cost, demos" "$OUT/noise_test" build/noise_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_test" tests/fm6_test.c -lm
-    mkdir -p build/fm6_demo
-    run "FM6: the DX7's algorithms, pitch, levels, envelopes, modulation; DC, clipping, macros, patches, voices, cost, demos" "$OUT/fm6_test" build/fm6_demo
-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_ams_test" tests/fm6_ams_test.c -lm
-    run "FM6: native fp32 AMS against the double reference, every modulation" "$OUT/fm6_ams_test"
+    t "settings: PER5 records, palette ids and preference preservation" settings_test -O1 -w -Ibuild/gen
+    t "UI: sounds keep steps, undo, recording, MIDI overflow, pending saves, panel recovery, drum grid, song chain, MONO gray" \
+        ui_test -DMELODEE_USB_AUDIO=1 $FW
+    t "Prophet: all native tone knobs through the panel and sound engine" prophet_knob_test -O2 -DMELODEE_USB_AUDIO=1 $FW
+    t "Sound designer: native recipes, dependencies, compare, discard and save" designer_test -O2 -DMELODEE_USB_AUDIO=1 $FW
+    t "Sequencer: tied length/move/delete, eight-level undo/redo, MIDI step entry and playing-step recording" seq_edit_test \
+        -DMELODEE_USB_AUDIO=1 $FW
+    t "Note/library gestures: quarter snapping, range moves/copies, undo and bulk preset erase" note_tools_test \
+        -O1 -DMELODEE_USB_AUDIO=1 $FW
+    job ui_renders
+    t "boot audio: codec waits for settled silent DMA and shuts down before I2S" audio_boot_test -w
+    t "audio: overload protection, bounded fades and DMA diagnostics" audio_test $FW
+    t "audio: silent bench keeps synthesis running and silences physical output" audio_silent_test:audio_test \
+        -DMELODEE_BENCH_SILENT=1 $FW
+    t "persistence: deferred settings, retry and failed-save rollback" persistence_test $FW
+    t "storage safety: protect unreadable records until confirmed replacement" storage_safety_test $FW
+    t "full backup: CRC before writes, stale runtime, USB reset / timeout, malformed objects, older projects" backup_test $FW
+    t "editor: real C protocol, malformed transfers and queue recovery" editor_test $FW
+    t "DX7 librarian: USB voice/bank receive, dump replies and malformed frame recovery" fm6_sysex_test $FW
+    t "SWING: track + global at most 100, sequencer step lengths, the SWG display" swing_test -O2 $FW
+    mkdir -p build/tessera_log
+    t "TESSERA generators: notes per scenario against tests/tessera_baseline.txt, stops clean, saved block" tessera_test \
+        -O2 $FW -- "$OUT/tessera_test" tests/tessera_baseline.txt build/tessera_log
+    t "double-tap layers, SCREEN OFF, LFO 2 SYNC / TRIG / POL" layer_screen_test \
+        -O1 -DMELODEE_USB_AUDIO=1 $FW
+    t "DRUM EDITOR: synthesized 909, sound controls, individual pitch/length, undo and storage" drum_editor_test -O2 $FW
+fi
+
+if sound && [ $TABLES = 1 ]; then
+    mkdir -p build/mod_demo \
+        build/phys_demo build/drum_demo build/noise_demo build/fm6_demo
+    t "regression: golden renders, health, voices, CPU budget" regress -O2 $FW -- \
+        "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
+    t "PHYS: stability C-1..G9 over the parameter corners, worst-case cost against PHASE WIRE, demos" phys_test \
+        -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW -- "$OUT/phys_test" build/phys_demo
+    t "paired FM6/Prophet voices: serial/concurrent sample equality and eight-voice allocation" dual_core_test \
+        -O2 $FW -pthread
+    t "CZ-1: every knob changes a full tone; the dim ones leave INIT and factory tones bit for bit" cz1_knob_test -O2 $FW
+    t "native fp32: independent numerical references, exact pitch, quiet signals and fractional envelopes" synth_fpu_test \
+        -O2 $FW
+    job prophet
+    t "modulation matrix: off = bit-identical, the math, MIDI CC1 / CC11 / aftertouch, cost, demos" mod_test \
+        -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW -- "$OUT/mod_test" build/mod_demo
+    t "matrix S&H / SLEW / DEPTH, SPREAD: off = bit-identical, stereo sides and routing" mod_spread_test -O2 $FW
+    t "CZ: oscillator boundaries, native rate/target envelopes and independent lines" phase_test \
+        -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW
+    t "SID: oscillator/LFSR/register semantics, revisions and 32 factory presets" sid_test -O2 $FW
+    job phys_ref
+    t "DRUM: 808 instruments, velocity, hat choke, release, eight lanes and shared voice budget" drum_test -O2 $FW -- \
+        "$OUT/drum_test" build/drum_demo
+    t "NOISE: colour slopes, key-tracked filter and clock, META period, DC, clipping, retrigger, cost, demos" noise_test \
+        -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW -- "$OUT/noise_test" build/noise_demo
+    t "FM6: the DX7's algorithms, pitch, levels, envelopes, modulation; DC, clipping, macros, patches, voices, cost, demos" \
+        fm6_test -O2 $FW -- "$OUT/fm6_test" build/fm6_demo
+    t "FM6: native fp32 AMS against the double reference, every modulation" fm6_ams_test -O2 $FW
     if [ -n "${DEXED_SRC:-}" ]; then
         run "FM6 vs Dexed: informational fp32 render comparison (DEXED_SRC)" sh tests/fm6_parity.sh --quick --diagnostic
     else
-        echo "== FM6 vs Dexed: skipped (DEXED_SRC=<dexed>/Source to run tests/fm6_parity.sh)"
+        note "== FM6 vs Dexed: skipped (DEXED_SRC=<dexed>/Source to run tests/fm6_parity.sh)"
     fi
-
-else
-    echo "== skip hostsim (run ./build.sh once)"
 fi
-
-run "regression: target cost of the render loops (pi32v2 disassembly)" python3 tests/target_budget.py \
-    build/melodee.dis tests/target_budget.txt
-
-run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/install_test.py
-
-if command -v node >/dev/null 2>&1; then
-    run "web pages: editor protocol + native CZ patches, package builder, update protocol" node web/test_web.mjs
-    run "web backup: capture, validation before writes, restore order" node web/test_backup.mjs
-else
-    echo "== skip web tests (no node)"
+if sound; then
+    run "regression: target cost of the render loops (pi32v2 disassembly)" python3 tests/target_budget.py \
+        build/melodee.dis tests/target_budget.txt
 fi
+[ $TABLES = 1 ] || note "== skip hostsim (run ./build.sh once)"
 
-[ $fail -eq 0 ] && echo "ALL HOST TESTS PASSED" || { echo "HOST TESTS FAILED"; exit 1; }
+# every slot back: every job ended
+i=0; while [ $i -lt "$PARALLEL" ]; do read -r slot <&3; flush; i=$((i + 1)); done
+wait
+flush
+exec 3>&-
+secs=$(($(date +%s) - start))
+case $SOUND in
+    1) what="ALL HOST TESTS" ;;
+    0) what="HOST TESTS (sound tests skipped: SOUND=0)" ;;
+    only) what="SOUND TESTS (SOUND=only)" ;;
+esac
+if [ -s "$LOG/failed" ]; then
+    echo "$what FAILED in $secs s:"
+    sed 's/^/  /' "$LOG/failed"
+    exit 1
+fi
+echo "$what PASSED in $secs s"

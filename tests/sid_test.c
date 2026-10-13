@@ -132,7 +132,7 @@ static uint32_t play(int32_t *buf, uint32_t ms, uint32_t note, uint32_t release_
 static void fresh(uint32_t preset)
 {
     memset(trk, 0, sizeof trk); host_tracks_init(); host_preset(&trk[0], 3, preset); T = &trk[0];
-    T->p[P_DIST] = T->p[P_CHOR] = T->p[P_DLY] = T->p[P_REV] = 0;
+    T->p[P_RESERVED33] = T->p[P_RESERVED34] = T->p[P_RESERVED35] = T->p[P_RESERVED36] = 0;
 }
 
 /* Hann-windowed DFT from f0 / 2 to FS / 4: the share of energy (dB) outside +-3 bins of the harmonics of f0 */
@@ -174,7 +174,7 @@ static void combined_tests(void)
             }
             fclose(f);
             memset(got, 0xa5, sizeof got);
-            sid_unpack(got, SID_WAVE_LZ + SID_WAVE_AT[m][w], 4096);
+            lz_unpack(got, SID_WAVE_LZ + SID_WAVE_AT[m][w], 4096);
             same &= !memcmp(got, want, 4096);
         }
     check("combined waveforms: the 8 packed tables unpack to reSID's samples bit for bit", same && !missing);

@@ -34,6 +34,16 @@ takes P_COUNT and P_E0 from `INFO` keeps working (see "The chord keys" below).
 
 ## Framing
 
+The device USER sheet also exports general Melodee presets as `F0 7D 4D 4C 01 <packed record>
+<checksum> F7`. This is a preset file rather than an editor request. The record is the complete
+238-byte `up_rec_t`, including its twelve-byte name and stored pattern. Pack groups of seven
+raw bytes as one high-bit mask (bit j is byte j's bit 7), followed by seven low-seven-bit bytes.
+The final shorter group uses only its corresponding mask bits. The checksum makes the sum of
+all bytes between F0 and F7 zero modulo 128. Version, exact length, 7-bit encoding, checksum and
+record validity are checked before staging. Imports open the general USER list for choosing a
+slot and confirming replacement. FM6, CZ-1 and Prophet slot exports use their native single-voice
+formats instead. Bulk export concatenates a frame for each used selected slot.
+
 A request is `F0 7D 46 4C <cmd> <args...> F7`:
 
 - `7D` is the non-commercial SysEx ID.
@@ -55,7 +65,7 @@ watches (v2, `WATCH`), the device also sends push frames (cmds 23, 24, 26) at an
 | string | ASCII bytes, ended by a 0 byte |
 | scope | 0 = parameter of the selected track (`P_*`, 0..P_COUNT−1); 1 = global parameter (`G_*`, 0..G_COUNT−1) |
 | track | 0..3: tracks 1..4 (synth parts) |
-| engine byte | 0..NENGINES−1 (firmware before 1.0: NENGINES = its drum track, no engine). The numbers are fixed, new engines are appended: 0 ANALOG, 1 reserved (DIGITAL before 1.0: see below), 2 PHASE, 3 SID (LOFI before this change), 4 reserved (SAMPLE retired), 5 VOICE, 6 reserved (TRIO retired), 7 reserved (WHEEL retired), 8 reserved (GRAIN retired), 9 reserved (PHYS retired), 10 DRUM, 11 NOISE, 12 FM6, 13 reserved (SLICE retired), 14 reserved (OBXF retired), 15 CZ-1, 16–18 reserved, 19 PROPHET (NENGINES 20). The new-sound browser order is PROPHET FM6 PHASE CZ-1 SID VOICE NOISE DRUM (`ENGINE_ORDER`). ANALOG 0 remains playable for legacy data; the numbers stay |
+| engine byte | 0..NENGINES−1 (firmware before 1.0: NENGINES = its drum track, no engine). The numbers are fixed, new engines are appended: 0 reserved (ANALOG before 2.0), 1 reserved (DIGITAL before 1.0: see below), 2 PHASE, 3 SID (LOFI before this change), 4 reserved (SAMPLE retired), 5 VOICE, 6 reserved (TRIO retired), 7 reserved (WHEEL retired), 8 reserved (GRAIN retired), 9 reserved (PHYS retired), 10 DRUM, 11 NOISE, 12 FM6, 13 reserved (SLICE retired), 14 reserved (OBXF retired), 15 CZ-1, 16–18 reserved, 19 PROPHET (NENGINES 20). The new-sound browser order is PROPHET FM6 PHASE CZ-1 SID VOICE NOISE DRUM (`ENGINE_ORDER`). 0 ANALOG is retired since 2.0 (its stored sounds keep the number and play silent); the numbers stay |
 
 The engine parameters are `P_E0..P_E7`: P_COUNT−8 .. P_COUNT−1 (83..90), and `INFO` gives `P_E0`.
 Their meaning, range and names depend on the current engine, so re-read `DESC` for them
@@ -67,7 +77,7 @@ P_COUNT 69): slot k (1..4) is `SRCk`, `DSTk`, `AMTk` at ids 49 + 3 (k − 1) .. 
 | id | label | values |
 | --- | --- | --- |
 | 49, 52, 55, 58 | SRC1..SRC4 | enum: 0 OFF, 1 LFO, 2 ENV, 3 VEL, 4 KEY, 5 RAND, 6 MODW (CC1), 7 AT (channel aftertouch), 8 EXPR (CC11) |
-| 50, 53, 56, 59 | DST1..DST4 | enum (20 names): 0 OFF, 1 PITCH, 2 CUT, 3 SHP, 4 AMP (per voice); 5 PAN, 6 DIST, 7 CHO, 8 reserved (retired DLY), 9 REV, 10 RATE (LFO rate), 11 VIB (LFO pitch depth), 12..19 E1..E8 = `P_E0..P_E7` (per block) |
+| 50, 53, 56, 59 | DST1..DST4 | enum (20 names): 0 OFF, 1 PITCH, 2 CUT, 3 SHP, 4 AMP (per voice); 5 PAN, 6..9 retired (empty names), 10 RATE (LFO rate), 11 VIB (LFO pitch depth), 12..19 E1..E8 = `P_E0..P_E7` (per block) |
 | 51, 54, 57, 60 | AMT1..AMT4 | −64..63 (fmt BIPCT) |
 
 `DESC` names E1..E8 as such; the device shows the engine's label of that parameter instead (`DESC` of
@@ -130,7 +140,7 @@ global `G_CLOCK` (id 2, label "CLK") 3 (INT, USB, TRS). `G_MIDI` (id 12) is an e
 | 5 DESC | scope, id | scope, id, fmt, min v14, max v14, def v14, label string, unit string, then for an enum (fmt 8) one name string per value (at most 24; firmware before the matrix: at most 16) |
 | 6 STEP_GET | index 0..NSTEP−1 | index, n (0..4 notes), note0..note3, time (0 NOTE, 1 TIE, 2 REST), flags (1 accent, 2 slide), vel, then (v5) hits (3 bytes, below), then (v7) chance 0..100 |
 | 7 STEP_SET | index, n, note0..3, time, flags, vel [, hits (3 bytes, v5) [, chance 0..100 (v7)]] | same as STEP_GET (after the write). Without the hits the step keeps its own; without the chance it keeps its own. The chance can only follow the hits |
-| 8 PRESET | engine, preset [, preset >> 7] | engine, preset, preset >> 7 (applies the preset's sound and sends; the steps and the track's own parameters stay, see "Sound loads and undo") |
+| 8 PRESET | engine, preset [, preset >> 7] | engine, preset, preset >> 7 (applies the preset's sound; the steps and the track's own parameters stay, see "Sound loads and undo") |
 | 9 PROJECT | op (0 load, 1 save, 2 query), slot 0..3 | op, slot, used (1/0). Save writes flash: allow ~2 s; it stops the transport first (see "Saves while playing") |
 | 10 NAMES | engine [, first preset, 2 × 7 bit] | engine, count (≤ 127), count preset-name strings (≤ 20 characters) from the first, then the two edit-page titles, then all presets and the first (2 × 7 bit each). Ask again from first + count until all are read |
 | 11 SMP_BEGIN | slot 0..2 | slot, rc (0 ok). Erases the slot's header sector: the slot is empty from now on |
@@ -170,7 +180,7 @@ an older editor sees the first page (the names that fit 1024 bytes).
 
 | cmd (v7) | Request args | Reply args |
 | --- | --- | --- |
-| 64 MOTION | track (query); track, 1, on 0/1 (play on / off); track, 2 (clear); track, 3, step, id, v14 (set an event); track, 4, step, id (delete an event) | track, rc, on (0/1), count (this track's events), max (64), then count × (step, id, v14) |
+| 64 MOTION | track (query); track, 1, on 0/1 (play on / off); track, 2 (clear); track, 3, step, id, v14 (set an event); track, 4, step, id[, v14] (delete an event) | track, rc, on (0/1), count (this track's events), max (64), then count × (step, id, v14) |
 | 65 BACKUP_LIST | — | 1, rc, count (11), then per object: id, size u32, crc u32 |
 | 66 BACKUP_GET | id, offset u32, count lo, count hi (≤ 256) | id, rc, offset u32, count lo, count hi, pack7 data |
 | 67 BACKUP_PUT | op 0 begin: 0, id, size u32, crc u32; op 1 data: 1, id, offset u32, pack7 data; op 2 commit: 2, id; op 3 abort: 3, id | op, id, rc |
@@ -236,7 +246,7 @@ numbered 0..63 (the device shows U01..U64).
   TONE, DECY, SNAP, ACC, KICK 0 PUNCH / 1 ROUND (old ≥ 64), DRV 0}), and `UP_GET` / `UP_LIST` give it so.
   Projects do the same. PHYS's MODEL is 0..3 (MODAL STRNG MEMB SYMP) now.
 - `UP_STORE`: name "" stores with the automatic name the device uses (engine name + slot number,
-  "ANALOG 07"). rc 1 for a bad slot or name.
+  "SID 07"). rc 1 for a bad slot or name.
 - rc 2 = the flash write failed or there is no flash. A failed flash write keeps the previous
   record in RAM and flash, including its name. Without flash, a valid change is RAM-only until power-off.
   (`UP_PUT` / `UP_STORE` / `UP_ERASE` stop the transport first, see "Saves while playing"; a device
@@ -321,13 +331,10 @@ grid lives in the steps themselves, so every engine has it:
   byte as before; only the meaning changed. Firmware before 1.0 had a GM drum track there: engine byte
   NENGINES, no presets (`UP_LOAD` / `UP_STORE` rc 1), its level the global `G_DRLVL`. Drums are now the
   SAMPLE engine's PERC set and the DRUM engine on any part: the first C key is the kick (C2 = 36), notes are GM numbers.
-- The globals `G_DRCH`, `G_DRLVL`, `G_DRREV` (ids 24..26: the old drum track's MIDI channel, level and
-  reverb send) keep their ids, and `G_COUNT` stays 27. Ids 25 and 26 are the delay's TYPE and WEAR now
-  (`G_DTYPE`, `G_DWEAR`, on the DLY 2 page); between 1.0 and the delay's return they were inert (`DESC`
-  label "-", range 0..0). Id 24 (`G_DRCH`, never read since 1.0) is `G_RTYPE`
-  since 1.0: the reverb's model, `DESC` label "TYPE", enum ROOM (0) / SPRING (1), on the REVERB
-  page (FX); projects of formats before FUN7 load it as ROOM. MIDI channel 10 is no longer special (channels 1..4 play
-  tracks 1..4, every other channel the selected track; with ROUT SEL every channel the selected track).
+- Global ids 24..26 are retired format padding, as are 4..11. `G_COUNT` stays 27.
+  Their descriptors have empty labels and no page; loading a song clears their runtime values.
+  MIDI channel 10 is no longer special (channels 1..4 play tracks 1..4, every other
+  channel the selected track; with ROUT SEL every channel the selected track).
 - Selecting a track with `TRACK` does not push `RELOAD` (the editor re-reads `DUMP`, the steps and the
   engine `DESC` itself); selecting one on the device does (`RELOAD` with the new track).
 - Pushes are about the selected track only: `CHANGED` (scope 0) and `STEP_CHANGED` refer to it, and
@@ -372,7 +379,7 @@ grid lives in the steps themselves, so every engine has it:
 - **Sound loads and undo.** A load that changes a track's sound (`PRESET`, `SET` of `G_ENGSEL`, `UP_LOAD`,
   and the same on the device) changes the sound only: the engine and the parameters of the sound. It
   never changes the steps, nor the track's own parameters: `P_LEVEL`, `P_PAN`, `P_MUTE` (0, 39, 40), the
-  ARP pages, SCL and LEN / DIV / SWING / GATE (17..32), the SLICER (45..48). It does drop the track's recorded
+  ARP pages, SCL and LEN / DIV / SWING / GATE (17..32). It does drop the track's recorded
   motion (the device's SAVE held brings it back). (Before 1.0 a preset also
   set the arp and replaced the steps with its pattern; a factory preset turned the SLICER off.) The byte
   layout of every command is unchanged. Steps are recorded on the device or written by the editor with
@@ -462,7 +469,7 @@ are meaningful only while running. Rows always start from 0, with track 1's
 loop as the repeat and transition boundary; the last row stops.
 
 A row takes all four tracks' steps (with their chance) and LEN / DIV / SWING / GATE from its saved
-project slot, retaining the current sounds, mix, ARP, scales and effects. The
+project slot, retaining the current sounds, mix, ARP, scales. The
 four sources are copied before starting, with no flash operation in playback.
 Original editable patterns and timing are restored on stop. Sources are shared
 project slots; overwriting a slot changes its uses on the next start.
@@ -490,7 +497,7 @@ when the track's engine is not the saved one).
   0..63, parameter id, value). While a track plays its motion, the step sets the value at the step and it
   holds until another step changes it; the loop restarts from the sound's own value, and stopping puts the
   sound's own values back. Parameters that can be recorded (`motion_param`): ids 0..16 (LEVEL, ENV, LFO),
-  33, 34, 36 (DIST, CHO, REV; retired DLY 35 is ignored), 38 (GLIDE), 39 (PAN), 44 (DETUNE), 61..80 (the FM operator parameters) and
+  38 (GLIDE), 39 (PAN), 44 (DETUNE), 61..80 (the FM operator parameters) and
   83..90 (the engine parameters; not the chord keys 81, 82). The device records them while the track is armed, playing and selected, from its knobs
   and from `SET` / `TRACK_PARAM` alike.
   - `MOTION` with the track alone is the query. `on` 0 keeps the data and stops playing it; 1 plays it. Clear
@@ -538,12 +545,12 @@ this firmware sends 3. Requests name objects, never flash addresses.
 | id | object | size |
 | --- | --- | --- |
 | 0 | runtime: the music being played now, as a FUN8 project (firmware before FM6: FUN7, 3388) | 3584 |
-| 1 | settings (palette, speaker, HOLD time, favorites, panel calibration, USB audio devices, BOOT, CLK TUNE MIDI ROUT, ...), then the template (SAVE > PROJECT, SLOT TMPL) when one is saved; Felucca 1.0's record (PER4, no ext) restores too | the settings record's size: 604, or 1924 with the template |
+| 1 | settings (palette, retired speaker padding, HOLD time, favorites, panel calibration, USB audio devices, BOOT, CLK TUNE MIDI ROUT, ...), then the template (SAVE > PROJECT, SLOT TMPL) when one is saved; PER5 only (2.0: older records restore on 1.2), a tagged palette id | the settings record's size: 604, or 1924 with the template |
 | 2..5 | PROJECT slots 1..4 (FUN8) | 3584, or 0 if empty |
 | 6, 7 | user preset banks (slots 1..16, 17..32) | the bank's size, or 0 if empty |
-| 8 | retired FM6 bank; nonempty restores are rejected | 0 when listed |
+| 8 | retired FM6 bank; a payload is refused at begin | 0 |
 | 17, 18 | user records U33..U48, U49..U64 | 3816 or 0 |
-| 19, 20 | owned FM6 voices U01..U32, U33..U64 | 3728 or 0 |
+| 19..22 | native FM6 voices F033..F064, F001..F032 | 2060 or 0 |
 | 32..34 | user sample slots 1..3: header (512 bytes) then ADPCM data | 512 + data length, or 0 if empty |
 
 Reading: `BACKUP_LIST` (no arguments) stops the transport, then takes a snapshot of the runtime object and
@@ -555,8 +562,8 @@ against the list; if it differs the device changed, so start again.
 Restoring: `BACKUP_PUT` takes ids 0..8 (the samples are written with `SMP_BEGIN` / `SMP_WRITE` / `SMP_END`,
 or `SMP_ERASE` for an empty slot). Begin: `0, id, size u32, crc u32`: size is 3584 (FUN8) or 3388 (FUN7, FUN6) for id 0,
 the settings record's size for id 1, 3584, 3388 or 0 (empty the slot) for ids 2..5, the bank's size or 0 for 6 and 7,
-3612 or 0 for 8 (the FM6 bank: its magic, version 2, 32 slots and its function settings in range are checked). FUN7 and FUN6 become FUN8.
-An archive without id 8 (written before FM6) still restores; the web editor reads both. Data: `1, id, offset u32, pack7` with the next offset (they must follow each other)
+0 for 8 (the retired FM6 bank). A size the firmware does not read is refused at begin (rc 1), so the web
+editor begins and aborts every object first and refuses the whole archive before any write. Data: `1, id, offset u32, pack7` with the next offset (they must follow each other)
 and at most 256 decoded bytes. Commit: `2, id`: the device checks the length and the CRC, validates the
 content, and then writes. Abort: `3, id`. Id 0 replaces the music now playing (RAM only, no flash);
 ids 1..7 are written to flash (settings and presets are applied too). Nothing is written before the commit.
@@ -599,7 +606,7 @@ The device stores every value clamped into its range.
 Targets: 0 track (index 0..3), 1 retired bank (GET/PUT always rc 3),
 2 factory (index 0..23, GET only), 3 user preset voice (index 0..63).
 Target 3 GET returns rc 2 for a preset without a stored FM6 voice. Target 3 PUT
-requires an existing FM6 user record and writes the owned voice to flash. Library
+requires an existing FM6 user record and writes its voice (every value into its range) to native slot k. Library
 transfers send UP_PUT first, then FM6_PUT target 3. UP_STORE saves both automatically.
 FM6_LIST lists only factory voices; FM6_ERASE always returns rc 3 for the retired bank.
 Erase a user sound through UP_ERASE. Track PUT replaces the track voice.
@@ -640,12 +647,12 @@ from an experimental firmware is not a SONG or preference capability.
 Command 33 remains SONG. Older editors can ignore the additional INFO bytes.
 
 `uiCaps`: bit 0 palette, bit 1 font weight (retired: firmware since the 1.0 UI has one
-weight and no longer sets it), bit 2 reserved for a MIDI monitor, bit 3 favorites, bit 4 recording preferences. This build
-advertises 25 (palette, favorites and recording preferences).
+weight and no longer sets it), bit 2 reserved for a MIDI monitor, bit 3 favorites, bit 4 recording preferences, bit 5 layer/screen preferences. This build
+advertises 57. Layer preference 9 is retired; screen preference 10 remains.
 
 | cmd | Request args | Reply args |
 | --- | --- | --- |
-| 34 UI_STATE | none | caps, palette, font, monitor, filter, favoriteSig u28, bankSig u28, [click, clickLevel, countin, preview, chordAdd] |
+| 34 UI_STATE | none | caps, palette, font, monitor, filter, favoriteSig u28, bankSig u28, [click, clickLevel, countin, preview, chordAdd, retired=127, screen] |
 | 35 UI_SET | id, value | rc, id, value, UI_STATE payload |
 | 36 UI_PALETTES | none | count, count × name string |
 | 37 FAV_GET | engine, start v14, count 1..32 | rc; on success: engine, start v14, count, count × on/off |
@@ -737,16 +744,18 @@ accents only. Full backups retain recorded gates.
 Track parameter **8**, previously the inert `P_ED_FX` field, is now `P_RECQ`: **OFF** (0),
 then the ten existing DIV values plus one (1/4 = 1, 1/16 = 3, 16T = 6, 4BAR = 10).
 P_COUNT stays 92 and P_E0 stays 84. This parameter is per track, survives sound loads, and
-is shown on SEQ > TIMING and the web sequencer. Scale QNT remains parameter 27. Old projects
+is shown on SEQ > TEMPO and the web sequencer. Scale QNT remains parameter 27. Old projects
 and templates initialize timing QNT to OFF. New TPLB templates retain it without changing size.
 Web library files use `TQNT` for parameter 8 and keep `QNT` for scale parameter 27, so older
 library files retain their scale mapping. The timing page appears only when the device advertises it.
 
-Live recording stores original note edges even when timing QNT is enabled. Playback alone rounds
-onsets to the nearest swung boundary of the selected division, with loop-end mapping to zero.
-Each note retains its captured duration; its release shifts with its quantized onset. Switching OFF
-restores original timing. Repeated hits within one step and independent chord releases are retained.
-Playback fires each recorded event at most once per loop, including when QNT changes mid-loop.
+Live recording captures original note edges. When the take finishes, timing QNT commits the new
+take's onsets to the nearest swung boundary of the selected division, with loop-end mapping to zero.
+Each note retains its captured duration; its release shifts with its committed onset. OFF leaves
+the take unchanged. Changing QNT afterward configures the next take without changing playback.
+Repeated hits within one step and independent chord releases are retained. A destination occupied
+by a manual step or its tie tail rejects the pass without modifying the take or the existing steps.
+Playback fires each stored event at most once per loop.
 
 FUN13 LE magic is `0x46554E3D`, size 12352. The original FM6/CZ payload offsets stay fixed.
 Header bytes 65 and 67 hold a 12-bit active-bank selection (four 3-bit bank ids, low byte at 65).
@@ -771,27 +780,23 @@ group to manual step playback. Replies mask the internal recorded flag. Full run
 retain original timing and every bank. User-preset patterns carry the overview only. Capacity is 1024
 notes across the project; overflow reports RECORDING FULL without overwriting existing entries.
 
-0.12 retired the shared FX delay: track parameter 35 and global parameters 4..7 kept their IDs
-and ranges but advertised `-`. The delay is back (firmware/src/delay.c, fm1-x0x's tape delay): 35
-is DLY again, 4..7 are TIME (enum: the ten divisions, then `1/16.` `1/8.` `1/4.` `4T`), FDBK, TONE,
-MIX, and 25, 26 are TYPE (DIGI, TAPE, DG-PP, TP-PP) and WEAR; modulation destination 8 is DLY again
-and THROW feeds the delay and the reverb. Web editors hide the DLY / DLY 2 pages when a device
-advertises `-` there (firmware without the delay). Projects (formats before FUN16), templates and
-user presets saved before it load with their delay sends 0 (and their delay-send automation 0).
+All external effects have been removed. Track ids 33..36 and 45..48, global ids
+4..11 and 24..26, and modulation destination ids 6..9 retain their positions as
+inert format padding. Their labels are empty and editors must hide them. Old
+project/preset bytes still parse; runtime loads clear the track/global values,
+and old motion or modulation routes to these ids are ignored. New FX motion
+cannot be captured. CC91 and CC93 have no effect. No FX pages, hold layer, key
+assignment or latch setting remain; UI preference 9 reports 127 (unsupported)
+and UI_SET for id 9 returns rc 2. The physical FX button has no action.
 
-## Legacy owned FM6 presets and expanded user storage
+## Expanded user storage
 
 UP_LIST reports 64 shared user slots, U01..U64. All slot indices remain 7-bit.
-BACKUP_LIST now lists ids 0..20. Ids 0..7 and 9..16 keep their established meanings;
-id 8 is empty (retired bank). Restoring an older id 8 migrates bank voices into
-referencing user records already restored through ids 6 and 7.
-Ids 17 and 18 hold user records U33..U48 and U49..U64 (3816-byte UPB1 banks);
-ids 19 and 20 formerly held owned FM6 voices U01..U32 and U33..U64 (3728 bytes each).
-Each UPF6 object has magic 0x36465055, version 1, 32 slots, a used mask and reserved
-word, then 32 entries: a u32 FNV-1a record tag and 112 packed bytes. Tags cover the
-238-byte Melodee user record except name bytes 4..15. Renames preserve the tag;
-saving a whole FM6 sound writes a fresh nonce into the otherwise unused cz_extra
-bytes 0..3 before tagging. A mismatched tag never attaches an older voice.
+BACKUP_LIST lists ids 0..27. Id 8 is always empty (the retired FM6 bank) and refuses a payload.
+Ids 17 and 18 hold user records U33..U48 and U49..U64 (3816-byte UPB1 banks). Ids 19..22 hold the
+native FM6 voice banks F033..F048, F049..F064, F001..F016, F017..F032 (2060 bytes each); the owned-voice
+objects (UPF6, 3728 or 4240 bytes) that ids 19 and 20 held before 1.0 are refused since 2.0
+(Melodee 1.2 restores and rewrites them). An FM6 general preset's voice is native slot k.
 
 On flash, extension user banks omit their eight-byte UPB1 header (3808 record
 bytes), which is reconstructed at boot and included in backups. New storage objects
@@ -805,7 +810,7 @@ INFO appends `4E 01 40 00 00 01`: tag N, version 1, FM6 capacity u14 = 64, CZ ca
 These are unsigned low-first 7-bit pairs (unlike signed v14). Native slots appear after each engine's
 factory presets in global and engine-specific scrolling; only used slots are listed for playing.
 SAVE > USER and FM6 STORE write to these collections. They store no common Felucca parameters,
-effects, patterns or function settings. Loading preserves those track settings and same-engine macros;
+patterns or function settings. Loading preserves those track settings and same-engine macros;
 changing engine initializes only its engine-specific controls. General UP_* commands retain 64 legacy/general
 slots for compatibility. New native transfers use command 78 rather than UP_PUT + a sidecar voice.
 
@@ -884,7 +889,7 @@ panel limits: DSP clamps these without rewriting them.
 
 A complete PUT validates before changing RAM, initializes native performance,
 sets engine 19, resets its eight common macros and clears user-slot origin.
-It retains effects, matrix, scales, chords and sequencer and participates in
+It retains matrix, scales, chords and sequencer and participates in
 sound undo/redo. Whole patches replace sounding voices using the normal panic
 fade. Field edits affect held notes; unknown/opaque fields cannot be addressed
 by panel operation 2. Native names occupy raw 65–84.
@@ -897,7 +902,9 @@ unused mask bits must be zero. Length, embedded status bytes and addresses
 are checked before mutation. Exact GET/export preserves original model,
 length, command, address and all unused bytes. Native dump send uses command 3.
 
-Direct USB native command 2/3 loads the selected RAM track without a flash
+Direct USB native command 2/3 stages the validated named patch and opens the Prophet USER list for
+destination selection. OCT+ > Import here commits it while stopped; occupied slots ask first.
+Command 95 PUT still loads the selected RAM track without a flash
 save. Native command 6 requests its edit dump. Command 5 plus group/program
 requests a used user slot at `group * 40 + program`, limited to 0–127.
 Unsupported/empty program requests have no native reply. Native NRPN/CC
@@ -907,7 +914,7 @@ Command **78** adds engine 19 using the same operations as FM6/CZ. Its native
 record is 138 bytes: raw[133], raw size, model, command, group, program. All
 138 bytes use low-first nibble pairs (276 transfer bytes). Rename permits
 1–20 characters, GET retains all twenty, LIST truncates only its display name
-to twelve. LOAD sets native performance and keeps track effects/matrix/patterns.
+to twelve. LOAD sets native performance and keeps track matrix/patterns.
 The dedicated collection stores the complete native record rather than common
 Melodee parameters. Native slot indices remain unsigned bytes 0–127.
 
@@ -987,6 +994,20 @@ Decode `step = wire_step & 63`, `param = wire_param | ((wire_step & 64) << 1)`.
 Existing events keep their original wire representation. Values retain the signed 14-bit encoding.
 The web editor displays and edits the raw native byte while preserving its engine tag.
 
+With three track FX slots (`P_COUNT = 117`, `P_E0 = 109`), common engine IDs
+112–115 overlap the first native IDs. Native values carry a tag and are at least
+256; ordinary values remain -64..127. Both kinds may coexist at the same step
+and raw ID. A six-byte delete request includes the event's v14 to select its
+kind. The legacy four-byte delete removes both kinds at that step and ID.
+Editors should send typed deletes when INFO reports `pe0 >= 108`.
+
+FX slots occupy IDs 96–99, 100–103 and 104–107 (TYPE, MIX, RATE, CHAR). They
+belong to the track; preset loads and sound undo preserve them. Projects and
+templates store all three slots. REVERB is appended as type 8; previous type IDs
+are unchanged.
+
 INFO advertises motion capability version 2 (`4D 02 40 01`), so cached v1 editors
 do not offer a motion interface that would truncate native parameter IDs. The current editor
 accepts both versions 1 and 2 and retains all other tagged capabilities.
+
+The send bus appends track SEND at ID 108; engine parameters are 109–116. Globals 27–38 are three shared FX slots (TYPE/MIX/RATE/CHAR); global 39 is RETURN. `G_COUNT=40`. SEND is track-owned during preset loads; shared controls are song globals. FUN19/TPLI store the routing; FUN18/TPLH and earlier records map engine IDs by count and default shared FX off. Native tagged motion IDs retain their meaning during conversion.

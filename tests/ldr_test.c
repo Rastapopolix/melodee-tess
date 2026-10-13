@@ -92,8 +92,8 @@ static int ldr_prog(uint32_t off, const void *p, uint32_t n)
     const uint8_t *s = p;
     uint32_t i;
     if (prog_fail_after && !--prog_fail_after) return -1;
-    /* the app area, the Prophet banks' new place above it */
-    if (off < 0x4000u || off + n > 0x9D000u || ((off & 0xFFu) + n) > 256u) bad_range++;
+    /* Programming is restricted to the application. */
+    if (off < 0x4000u || off + n > 0x93000u || ((off & 0xFFu) + n) > 256u) bad_range++;
     for (i = 0; i < n; i++) nor[off + i] &= s[i];
     return 0;
 }
@@ -170,15 +170,20 @@ int main(int argc, char **argv)
         ota_wr32(s+28,~c);
     }
     memcpy(nor+0x89000,prophet_banks,sizeof prophet_banks);
-    memset(nor+0x93000,0x5A,0x8000);                   /* (the legacy projects' place they take: not erased) */
-    prog_fail_after = 2u * 16u + 5u;                   /* the power gone while the third sector is copied */
+    static uint8_t current_banks[0xA000];
+    memset(current_banks,0x5A,sizeof current_banks);
+    for(uint32_t i=3840u;i<sizeof current_banks;i+=4096u)memset(current_banks+i,0xFF,256u);
+    memcpy(nor+0x93000,current_banks,sizeof current_banks);
+    prog_fail_after = 2u * 16u + 5u;                   /* power gone while programming the application */
     rc = ldr_session();
-    bad += check("a copy cut short: the session fails, the old banks intact", rc == -10 &&
-                 !memcmp(nor+0x89000,prophet_banks,sizeof prophet_banks));
+    bad += check("interrupted app write leaves bootloader and current banks intact", rc == -10 &&
+                 !memcmp(nor,head,sizeof head) && !memcmp(nor+0x93000,current_banks,sizeof current_banks));
+    bad += check("interrupted update retains the flash resume record", nor[0xE4F06]==0x41u);
     prog_fail_after = 0;
     rc = ldr_session();
-    bad += check("Prophet native banks moved above the app area (0x93000) on installation",
-                 !memcmp(nor+0x93000,prophet_banks,sizeof prophet_banks));
+    bad += check("legacy Prophet banks are ignored; current bank area is untouched",
+                 !memcmp(nor+0x93000,current_banks,sizeof current_banks) &&
+                 memcmp(nor+0x89000,prophet_banks,sizeof prophet_banks));
     bad += check("project extensions survive firmware installation",!memcmp(nor+0xEA000u,extensions,sizeof extensions));
     printf("  rc %d, %u requests, %u sector erases\n", rc, requests, erases);
     bad += check("install completes", rc == 0);
@@ -206,7 +211,7 @@ int main(int argc, char **argv)
         uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
         for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,0x89000u);ota_jl_enc(e,0x50);}
         ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
-        erases=0;rc=ldr_session();bad+=check("older smaller partition refused before erasing anything",rc==-3&&!erases&&!memcmp(nor+0x93000,prophet_banks,sizeof prophet_banks));
+        erases=0;rc=ldr_session();bad+=check("older smaller partition refused before erasing anything",rc==-3&&!erases&&!memcmp(nor+0x93000,current_banks,sizeof current_banks));
         memcpy(logical,saved,sizeof saved);
     }
     printf("%s\n", bad ? "LOADER TEST FAILED" : "loader test passed");

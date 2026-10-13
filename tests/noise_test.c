@@ -66,7 +66,7 @@ static void setup(const int16_t *e)
     trk[0].p[P_REL] = 10;
     trk[0].p[P_ED_FLT] = 0;
     trk[0].p[P_VOICE] = V_POLY;
-    trk[0].p[P_CHOR] = trk[0].p[P_DLY] = trk[0].p[P_REV] = 0;
+    trk[0].p[P_RESERVED34] = trk[0].p[P_RESERVED35] = trk[0].p[P_RESERVED36] = 0;
 }
 
 /* the voices' sum (track_render, before the mix) of note for n samples, after 0.1 s */

@@ -10,15 +10,15 @@ int main(int argc,char **argv)
     uint32_t default_erases=erases;int defaults=1;
     for(uint32_t slot=0;slot<128u;slot++)defaults &= !p5_user_used(slot);
     bad+=check("fresh Prophet user storage is empty without erasing flash",defaults&&erases==default_erases);
-    bad+=check("Sequential's first factory program remains separate",!memcmp(P5_FACTORY[0].raw+P5_NAME,"It's a Prophet 5",15)&&P5_FACTORY[0].model==0x32);
+    bad+=check("Sequential's first factory program remains separate",!memcmp(p5_fac(0)->raw+P5_NAME,"It's a Prophet 5",15)&&p5_fac(0)->model==0x32);
     p5_bank_t empty;memset(&empty,0,sizeof empty);empty.magic=P5_BANK_MAGIC;
     bad+=check("an existing intentionally empty saved bank keeps its empty collection",!st_save(OBJ_P5BANK0,&empty,sizeof empty)&&(p5_user_reset(),!p5_user_used(0)&&!p5_user_used(25)&&!p5_user_used(26)));
-    bad+=check("an explicitly saved copy remains in its user slot",!p5_user_put(0,&P5_FACTORY[0])&&(p5_user_reset(),p5_user_used(0)));
+    bad+=check("an explicitly saved copy remains in its user slot",!p5_user_put(0,p5_fac(0))&&(p5_user_reset(),p5_user_used(0)));
     reset();up_boot();
     p5_patch_init(&p);for(uint32_t i=88;i<133;i++)p.raw[i]=(uint8_t)(i*179u);
     int all=1;for(uint32_t slot=0;slot<128;slot++){p.raw[65]=(uint8_t)('A'+slot%26);all &= !native_put(ENGI_PROPHET,slot,(const uint8_t *)&p);}
     bad+=check("all 128 native slots fit without changing historical object IDs",all && OBJ_P5BANK0==OBJ_NATIVEFM0+2 && st_sector(OBJ_P5BANK0,0)==0x93000 && st_sector(OBJ_P5BANK0+4,1)==0x9C000 &&
-                 OBJ_P5BANK0==25u);   /* (ldr_core.c LDR_P5_OBJ0: the loader moves them from 0x89000) */
+                 OBJ_P5BANK0==25u);   /* persistent and backup object identifiers stay fixed */
     p5_user_reset();bad+=check("P128 survives reboot with all opaque bytes and wire metadata",!p5_user_get(127,&q)&&!memcmp(&p,&q,sizeof p));
     uint32_t before=erases;bad+=check("slot 129 is rejected before any erase",native_put(ENGI_PROPHET,128,(const uint8_t *)&p)==1&&erases==before);
     q=p;q.raw[17]=13;fail_after=2;bad+=check("interrupted native save reports failure and rolls RAM back",native_put(ENGI_PROPHET,127,(const uint8_t *)&q)==2&&!memcmp(native_raw(ENGI_PROPHET,127),&p,sizeof p));fail_after=-1;p5_user_reset();
@@ -28,8 +28,8 @@ int main(int argc,char **argv)
     bad+=check("Prophet favorites survive cache reset without moving old identifiers",favorite_has(USER_NATIVE_P5,127)&&favorite_has(ENGI_PROPHET,0)&&USER_GENERAL==16&&USER_NATIVE_FM==17&&USER_NATIVE_CZ==18);
     favorite_set(0,11,1);favorite_set(ENGI_PROPHET,200,1);settings_save();
     persist_t prefs;int prefs_len=st_load(OBJ_SETTINGS,&prefs,sizeof prefs);memset(&favorites,0,sizeof favorites);
-    bad+=check("all Prophet factory stars persist without overwriting ANALOG stars",prefs_len==(int)sizeof prefs&&settings_import(&prefs,prefs_len)&&favorite_has(ENGI_PROPHET,0)&&favorite_has(ENGI_PROPHET,200)&&favorite_has(0,11)&&favorite_has(USER_NATIVE_P5,127));
-    track_t *t=&trk[0];t->p[P_CHOR]=t->p[P_DLY]=t->p[P_REV]=0;t->p[P_M1AMT]=43;t->step[2]=(step_t){{64},1,ST_NOTE,0,100,0,0,100};
+    bad+=check("all Prophet factory stars persist without overwriting retired ANALOG's stars",prefs_len==(int)sizeof prefs&&settings_import(&prefs,prefs_len)&&favorite_has(ENGI_PROPHET,0)&&favorite_has(ENGI_PROPHET,200)&&favorite_has(0,11)&&favorite_has(USER_NATIVE_P5,127));
+    track_t *t=&trk[0];t->p[P_RESERVED34]=t->p[P_RESERVED35]=t->p[P_RESERVED36]=0;t->p[P_M1AMT]=43;t->step[2]=(step_t){{64},1,ST_NOTE,0,100,0,0,100};
     bad+=check("native load selects engine 19 and keeps track effects, matrix and sequence",!native_load(ENGI_PROPHET,127,0)&&t->eng_req==19&&t->p[P_M1AMT]==43&&t->step[2].note[0]==64);
     for(uint32_t j=0;j<8u;j++)t->p[P_E0+j]=17;
     int clean=!native_load(ENGI_PROPHET,127,0);
@@ -44,7 +44,7 @@ int main(int argc,char **argv)
     bad+=check("new projects retain a native origin even after the live patch was edited",proj_pack(&wire,&saved)&&proj_import(&readback,&wire,sizeof wire)&&!project_restore_runtime(&readback)&&t->user_native&&t->user==128u);
     apply_preset_to(t,200u);project_capture(&saved);
     bad+=check("project restore resumes at the last of all 200 factory programs",proj_pack(&wire,&saved)&&proj_import(&readback,&wire,sizeof wire)&&!project_restore_runtime(&readback)&&!t->user&&t->preset==200u&&eng_list_pos(&total)==200u);
-    apply_preset_to(t,0u);project_capture(&saved);saved.p5[0]=P5_FACTORY[199];saved.t[0].preset=0;*proj_p5_origin(&saved,0)=0;saved.sum=proj_sum(&saved);
+    apply_preset_to(t,0u);project_capture(&saved);saved.p5[0]=*p5_fac(199);saved.t[0].preset=0;*proj_p5_origin(&saved,0)=0;saved.sum=proj_sum(&saved);
     uint32_t origin_at=68u+NTRK*(P_COUNT+2u+NSTEP*9u)+sizeof saved.chain+sizeof saved.motion;
     proj_pack(&wire,&saved);wire.raw[origin_at]=wire.raw[origin_at+1u]=0u;
     uint32_t checksum=proj_hash(wire.raw,PROJ_STORE_SIZE-4u);memcpy(wire.raw+PROJ_STORE_SIZE-4u,&checksum,4u);

@@ -106,23 +106,6 @@ static int corners909(void)
     }
     return bad;
 }
-static int legacy_current(void)
-{
-    int bad=0;kit(DK_808);TSEL->step[3]=(step_t){{0},0,ST_NOTE,SF_RECORDED,100,1,0,0};
-    recording[0]=(recorded_note_t){43217,32769,36,110,33,3,12,1};recording_reindex();project_capture(&proj_scratch);
-    project_store_t wire;proj_pack(&wire,&proj_scratch);uint8_t old[PROJ_STORE_V16];
-    memcpy(old,wire.raw,sizeof old);memcpy(old+sizeof old-4u-PROJ_NAME_LEN,wire.raw+PROJ_NAME_OFF,PROJ_NAME_LEN);
-    memcpy(old+PROJ_REC_OFF,&recording[0],8u);memset(old+PROJ_REC_OFF+8u,0,(RECORD_MAX-1u)*8u);
-    uint32_t magic=PROJ_MAGIC_V16,size=sizeof old,sum;memcpy(old,&magic,4);memcpy(old+4,&size,4);sum=proj_hash(old,sizeof old-4);memcpy(old+sizeof old-4,&sum,4);
-    project_t decoded;
-    bad+=check("previous FUN16 saves retain exact timing and initialize new hit controls",proj_import(&decoded,old,sizeof old) && decoded.recording[0].on==43217 && decoded.recording[0].duration==32769 && decoded.recording[0].owner==33 && !decoded.recording[0].pitch && !decoded.recording[0].length && !memcmp(decoded.drum,(drum_patch_t[NTRK]){0},sizeof decoded.drum));
-    bank_pack(proj_wire_u.raw,&proj_scratch,1);uint8_t bank[BANK_STORE_SIZE]={0};memcpy(bank+8,old,sizeof old);
-    frozen_bank_tail(bank+8+sizeof old,proj_wire_u.raw+8+PROJ_STORE_SIZE,BANK_SIZE_J-8-sizeof old);
-    magic=BANK_MAGIC_J;size=BANK_SIZE_J;memcpy(bank,&magic,4);memcpy(bank+4,&size,4);sum=proj_hash(bank,size-4);memcpy(bank+size-4,&sum,4);
-    int ok=bank_valid(bank,size);if(ok){bank_upgrade(bank);ok=bank_valid(bank,BANK_STORE_SIZE);}
-    bad+=check("previous FBKJ banks upgrade within the same flash allocation",ok && proj_scratch.recording[0].on==43217 && proj_scratch.recording[0].duration==32769 && !proj_scratch.recording[0].pitch);
-    return bad;
-}
 static int capacity_and_controls(void)
 {
     int bad=0;kit(DK_808);
@@ -144,6 +127,6 @@ static int capacity_and_controls(void)
 }
 int main(void)
 {
-    int bad=voices909()+controls()+edits_and_store()+capacity_and_controls()+legacy_current()+corners909();
+    int bad=voices909()+controls()+edits_and_store()+capacity_and_controls()+corners909();
     printf("DRUM EDITOR: %s\n",bad?"FAILED":"all passed");return bad!=0;
 }

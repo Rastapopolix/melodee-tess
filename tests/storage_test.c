@@ -117,7 +117,7 @@ int main(void)
         bad += check("legacy project objects retired: no load, no save, no flash access", ok && io_calls == calls);
     }
     {
-        static uint8_t bank[3612], back[3612];                 /* (fm6_bank.c fm6_bank_t) */
+        static uint8_t bank[3612], back[3612];                 /* (any record up to a sector) */
         uint32_t i;
         for (i = 0; i < sizeof bank; i++) bank[i] = (uint8_t)(i * 7u);
         bad += check("FM6 bank save / load (A then B)", st_save(OBJ_FM6BANK, bank, sizeof bank) == 0 &&

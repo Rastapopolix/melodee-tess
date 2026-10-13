@@ -59,7 +59,8 @@ static void stage_columns(void)
         const char *unit;
         char val[12];
         const param_desc_t *d = page_desc(sp, c, &vp);
-        int dim = sp->scope == SC_CZ1 && !cz_ed_active(cz_patch[song.sel % NTRK].raw, sp->id[c]);
+        int dim = (sp->scope == SC_CZ1 && !cz_ed_active(cz_patch[song.sel % NTRK].raw, sp->id[c])) ||
+                  (sp->scope == SC_P5 && !p5_ed_active(TSEL, sp->id[c]));
         if (!d || !vp || !d->label || d->label[0] == '-') {
             draw_column(c, "", "", "", T_THEME, -1, ICON_NONE);
             continue;
@@ -75,7 +76,7 @@ static void stage_columns(void)
  * the mean of three, 2 px anti-aliased (gfx.c cv_vspan_aa); rows top .. top + h */
 static void stage_wave(uint16_t c, int32_t top, int32_t h)
 {
-    static int16_t snap[SCOPE_N];
+    int16_t *snap = scope_snap;
     uint32_t w = scope_w, i, trig = 1;
     int32_t peak = 1500, x, py = 0, cy = (top + h / 2) * 16 - 16;
     for (i = 0; i < SCOPE_N; i++) {

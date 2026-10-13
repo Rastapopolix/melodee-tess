@@ -127,7 +127,7 @@ const put=(id,s)=>document.getElementById(id).innerHTML=r(0,0,240,240,BG,0)+s;
  for(let i=0;i<4;i++)s+=r(4+i*58,22,54,44,SF,6)+t(10+i*58,34,'LEVEL',8.5,C[i],0,1)+t(10+i*58,52,['-11','-4','-4','-4'][i]+'<tspan font-size="9" fill="'+MD+'"> dB</tspan>',15,TX,0,1);
  s+=`<rect x="0" y="70" width="240" height="170" fill="${BG}" opacity=".7"/>`+r(4,80,232,156,SF,10,LN)+t(14,96,'Keys',9,MD,0,1);
  [[0,'Mute','1',0],[1,'Mute','2',1],[3,'Mute','3',0],[4,'Mute','4',0],[5,'','',0]].forEach(([i,a,b,on])=>{const x=10+i*28+14;if(a)s+=r(x,104,26,40,on?mix(REC,SF,.55):PN,4,on?null:LN)+t(x+13,120,a,7.5,on?TX:SC,'middle',1)+t(x+13,134,b,9,on?TX:MD,'middle',1)});
- const K=[['Solo','1'],['Solo','2'],['Solo','3'],['Solo','4'],['Mute','all'],['',''],['',''],['Tap','tempo']];
+ const K=[['Solo','1'],['Solo','2'],['Solo','3'],['Solo','4'],['Mute','all'],['',''],['',''],['Tap','bpm']];
  K.forEach((k,i)=>{const x=10+i*28,on=i==2;s+=r(x,152,26,76,on?c:k[0]?PN:QT,4,k[0]&&!on?LN:null)+t(x+13,206,k[0],7.5,on?BG:SC,'middle',1)+t(x+13,220,k[1],9,on?BG:TX,'middle',1)});
  put('q_layer',s)}
 /* NAME */

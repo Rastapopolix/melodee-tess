@@ -125,7 +125,7 @@ int main(void)
     host_tracks_init();
     host_preset(t, ENGI_CZ, 0);
     for (k = 0; k < 4u; k++)
-        t->p[P_DIST + k] = 0;
+        t->p[P_RESERVED33 + k] = 0;
     cz_ed_decode(p, cz_patch[0].raw);
     rich_tone(p);
     lcz_sx_encode(p, base, 1);
@@ -154,7 +154,7 @@ int main(void)
         if (k < sizeof PRE) {
             host_preset(t, ENGI_CZ, PRE[k]);
             for (uint32_t i = 0; i < 4u; i++)
-                t->p[P_DIST + i] = 0;
+                t->p[P_RESERVED33 + i] = 0;
             memcpy(base, cz_patch[0].raw, CZ_BYTES);
         } else {                                         /* the full tone as LINE2, no vibrato DEPTH, END at 4 */
             rich_tone(p);

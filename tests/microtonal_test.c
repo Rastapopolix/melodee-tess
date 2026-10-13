@@ -12,7 +12,7 @@ static track_t *setup(const char *name)
 {
     ui_power_on();
     memset(live_held, 0, sizeof live_held);
-    memset(midi_ch, 0, sizeof midi_ch); memset(midi_notes, 0, sizeof midi_notes);
+    memset(midi_ch, 0, sizeof midi_ch); memset(midi_sel_on, 0, sizeof midi_sel_on);
     memset(midi_owners, 0, sizeof midi_owners); memset(mchord, 0, sizeof mchord);
     mi_r = mi_w = 0; fm1_in.notes = kb_prev = 0;
     TSEL->p[P_SCALE] = scale_id(name); TSEL->p[P_QUANT] = Q_ALL;
@@ -89,7 +89,7 @@ static void lifecycle(void)
     assert(t->step[0].n == 1 && t->step[0].note[0] == 62);
     static project_t before, after; static project_store_t wire;
     project_capture(&before); assert(proj_pack(&wire, &before));
-    assert(proj_unpack(&after, wire.raw, sizeof wire.raw));
+    assert(proj_unpack(&after, wire.raw));
     assert(after.t[0].p[P_SCALE] == (int16_t)scale_id("JI-MAJ") && after.t[0].step[0].note[0] == 62);
     assert(micro_pitch(t, 62) == 600000 + (int32_t)round(120000 * log2(1.25)));
     puts("microtonal: close pitches, MIDI releases after changes, chords, ARP periods and project recordings ok");
@@ -114,27 +114,22 @@ static double audio_frequency(track_t *t)
 static void frequency(void)
 {
     const char *names[] = {"24EDO", "31EDO", "JI-MAJ", "MT-1/4", "RAST", "BP-ET"};
-    for (uint32_t engine = 0; engine <= 12; engine += 12)
-        for (uint32_t s = 0; s < NELEM(names); s++) {
-            track_t *t = setup(names[s]);
-            if (engine == 12) {
-                t->eng_req = t->engine = ENGI_FM6;
-                eng_state_reset(); fm6_fn_reset();
-                uint8_t patch[FP_SIZE + 1]; fm6_unpack(FM6_INIT, patch); fm6_put_patch(0, patch, 1);
-                for (uint32_t j = P_E0; j < P_COUNT; j++) t->p[j] = 0;
-            } else {
-                t->p[P_E0] = 0; t->p[P_E2] = t->p[P_E7] = 0; t->p[P_E4] = 127;
-            }
-            t->p[P_GLIDE] = t->p[P_LD_PIT] = t->p[P_ED_PIT] = 0;
-            t->p[P_ATK] = 0; t->p[P_SUS] = 127;
-            uint32_t note = s == 2 || s == 4 ? 62 : 61;
-            double expected = 440 * pow(2, (micro_pitch(t, note) / 10000.0 - 69) / 12);
-            trk_note_on(t, note, 100);
-            double measured = audio_frequency(t);
-            double error = fabs(1200 * log2(measured / expected));
-            printf("microtonal: %s %s %.3f Hz, error %.3f cents\n", engine ? "FM6" : "ANALOG", names[s], measured, error);
-            assert(error < 0.6);
-        }
+    for (uint32_t s = 0; s < NELEM(names); s++) {     /* (FM6's INIT VOICE: one sine) */
+        track_t *t = setup(names[s]);
+        t->eng_req = t->engine = ENGI_FM6;
+        eng_state_reset(); fm6_fn_reset();
+        uint8_t patch[FP_SIZE + 1]; fm6_unpack(FM6_INIT, patch); fm6_put_patch(0, patch, 1);
+        for (uint32_t j = P_E0; j < P_COUNT; j++) t->p[j] = 0;
+        t->p[P_GLIDE] = t->p[P_LD_PIT] = t->p[P_ED_PIT] = 0;
+        t->p[P_ATK] = 0; t->p[P_SUS] = 127;
+        uint32_t note = s == 2 || s == 4 ? 62 : 61;
+        double expected = 440 * pow(2, (micro_pitch(t, note) / 10000.0 - 69) / 12);
+        trk_note_on(t, note, 100);
+        double measured = audio_frequency(t);
+        double error = fabs(1200 * log2(measured / expected));
+        printf("microtonal: FM6 %s %.3f Hz, error %.3f cents\n", names[s], measured, error);
+        assert(error < 0.6);
+    }
 }
 int main(void)
 {

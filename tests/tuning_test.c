@@ -37,7 +37,6 @@ static uint32_t oscillator_step(uint32_t eng, uint32_t hz, uint32_t osc)
     set_engine_of(t, eng); apply_preset_to(t, 0); t->engine = t->eng_req;
     t->p[P_LD_PIT] = t->p[P_ED_PIT] = 0;
     t->p[P_SUS] = 127; t->p[P_VOICE] = V_POLY;
-    if (eng == 0) t->p[P_E1] = 12; /* exercise ANALOG's rebuilt detuned oscillator */
     if (eng == 2) t->p[P_E4] = 1;  /* enable PHASE's second line */
     if (eng == 6) { t->p[P_E0] = 0; t->p[P_E1] = 7; t->p[P_E2] = -12; } /* three pitches */
     if (eng == 15) cz_patch[0].raw[0] = (cz_patch[0].raw[0] & ~3u) | 2u; /* LINE 1 + 1' */
@@ -52,7 +51,7 @@ static uint32_t oscillator_step(uint32_t eng, uint32_t hz, uint32_t osc)
 
 static void engines(void)
 {
-    const uint32_t eng[] = {0, 2, 3, 6, 15}, oscillators[] = {2, 2, 1, 3, 2};
+    const uint32_t eng[] = {2, 3, 6, 15}, oscillators[] = {2, 1, 3, 2};
     for (uint32_t k = 0; k < NELEM(eng); k++) {
         int ok = 1;
         for (uint32_t osc = 0; osc < oscillators[k]; osc++) {

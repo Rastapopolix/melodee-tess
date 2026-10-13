@@ -89,6 +89,7 @@ static void reset(void)
     erase_error = 0;
     erases = 0;
     ed_bk_valid = ed_bk_put = 0;
+    persist_old = tmpl_old = preset_old_write = 0;
 }
 
 static uint32_t call(uint32_t cmd, const uint8_t *a, uint32_t n)
@@ -174,7 +175,7 @@ static int full_pattern_archive(void)
     for (uint32_t k=0; k<NTRK; k++) for (uint32_t b=0; b<NPAT; b++) {
         track_t *t=&trk[k]; pattern_request(t,b); t->p[P_SLEN]=(int16_t)(16+b);
         t->step[3]=(step_t){{(uint8_t)(40+k*8+b),60,64,67},4,ST_NOTE,SF_ACCENT,100,0x81,0x80,(uint8_t)(20+b)};
-        t->step[4]=(step_t){{0},0,ST_TIE}; motion_set_event(t,3,P_REV,(int16_t)(k*8+b));
+        t->step[4]=(step_t){{0},0,ST_TIE}; motion_set_event(t,3,P_PAN,(int16_t)(k*8+b));
     }
     chain_config.count=1; chain_config.row[0]=(chain_row_t){0,2};
     for (uint32_t k=0; k<NTRK; k++) chain_patterns[0][k]=(uint8_t)(k+1);
@@ -262,7 +263,7 @@ int main(void)
     int bad = 0;
     uint32_t len = 0, crc = 0, before;
     static project_store_t st;
-    static project_v6_t v6;
+    static project_store_t v6;
     persist_t ps;
 
     reset();
@@ -280,24 +281,43 @@ int main(void)
     bad += check("a USB reset after LIST: GET is stale (5)", get(2, 0, 16) == 5u);
 
     /* settings */
+    {
+        static uint8_t old_settings[sizeof(persist_t)+sizeof(tmpl_fx_legacy_t)];
+        persist_t defaults={0};settings_export(&defaults);memcpy(old_settings,&defaults,sizeof defaults);
+        FILE *f=fopen("tests/fixtures/fx/tplf.bin","rb");
+        uint32_t n=f?(uint32_t)fread(old_settings+sizeof defaults,1,sizeof(tmpl_fx_legacy_t),f):0;
+        if(f)fclose(f);
+        bad+=check("previous TPLF settings archive restores through PUT and remains dry",
+            n==sizeof(tmpl_fx_legacy_t) && put_all(1,old_settings,sizeof old_settings,st_crc32(old_settings,sizeof old_settings))==0 &&
+            template_used() && tmpl.t[0].p[P_E0]==17 && !tmpl.t[0].p[P_FXTYPE]);
+        uint32_t before=erases;old_settings[sizeof defaults+__builtin_offsetof(tmpl_fx_legacy_t,cz)+2u]=255;
+        bad+=check("damaged previous template is refused before any flash erase",
+            put_all(1,old_settings,sizeof old_settings,st_crc32(old_settings,sizeof old_settings))==2 && erases==before);
+    }
     reset();
     memset(&ps, 0, sizeof ps);
     settings_export(&ps);
     ps.lowcut = 2;                                       /* SPEAKER BASS+ */
     ps.palette = palette_to_stored(2);
     bad += check("settings with SPEAKER BASS+ restore", put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 &&
-                 settings.lowcut == 2u && fx_lowcut == 2u && settings.palette == 2u);
-    ps.palette = 13;                                     /* an older backup: its PAPER (Felucca's id 13): DAY */
-    bad += check("settings of an older backup restore with the palette migrated",
-                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings.palette == 1u);
-    ps.palette = 64u + 7u;                               /* Melodee 0.13's HI-CON: CONTRAST */
-    bad += check("settings of a Melodee 0.13 backup restore with the palette migrated",
-                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings.palette == 2u);
+                 settings.lowcut == 0u && settings.palette == 2u);
+    before = erases;
+    ps.palette = 13;                                     /* an untagged id (before 1.0; 1.2 rewrote them) */
+    bad += check("settings with an untagged palette id are refused, nothing written",
+                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 2u && erases == before && settings.palette == 2u);
     ps.palette = palette_to_stored(2);
+    settings_click = 1; settings_countin = 2;
+    settings_export(&ps);                                /* (the record prefs, tagged in the zoom word) */
+    settings_click = settings_countin = 0;
+    bad += check("settings with a click and a count-in restore",
+                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings_click == 1u && settings_countin == 2u);
+    ps.zoom = 0x12340100u;
+    bad += check("settings with an untagged zoom word are refused", put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 2u);
+    ps.zoom = 0;
     before = erases;
     ps.lowcut = 3;
     bad += check("settings with an unknown SPEAKER value are refused, nothing written",
-                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 2u && erases == before && settings.lowcut == 2u);
+                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 2u && erases == before && settings.lowcut == 0u);
     ps.lowcut = 0;
     ps.bold = hold_to_stored(0, 3);                      /* HOLD 0.6 s */
     bad += check("settings with HOLD 0.6 s restore",
@@ -371,55 +391,37 @@ int main(void)
     trk[1].step[3] = (step_t){{64}, 1, ST_NOTE, 0, 96, 0, 0};
     project_capture(&proj_scratch);
     proj_pack(&st, &proj_scratch);
-    bad += check("a FUN7 project restores into slot 3 (flash and RAM)",
+    bad += check("a bare FUN16 record restores into slot 3 (flash and RAM) as a bank",
                  put_all(4, &st, sizeof st, st_crc32(&st, sizeof st)) == 0 && project_used(2) &&
                  !memcmp(&proj_slot[2], &st, sizeof st) && st_load(OBJ_BANK0 + 2, proj_wire_u.raw, sizeof proj_wire_u.raw) == BANK_STORE_SIZE);
-    memset(&v6, 0, sizeof v6);                           /* FUN6: 69 parameters, steps out of range */
-    v6.magic = PROJ_MAGIC_V6;
-    v6.size = sizeof v6;
-    for (uint32_t i = 0; i < G_COUNT; i++)
-        v6.g[i] = GP[i].def;
-    for (uint32_t i = 0; i < NTRK; i++)
-        v6.t[i].engine = trk[i].engine;
-    v6.t[0].step[0] = (step10_t){{255, 72}, 9, 7, 0, 96, 0, 0};
-    v6.t[0].p[61] = 3;                                   /* old E0 */
-    chain_defaults(&v6.chain);
-    v6.sum = proj_hash(&v6, sizeof v6 - 4u);
-    bad += check("a FUN6 project restores as FUN7, bounded, its E0 at P_E0",
-                 put_all(5, &v6, sizeof v6, st_crc32(&v6, sizeof v6)) == 0 && ((uint32_t *)proj_slot[3].raw)[0] == PROJ_MAGIC &&
-                 proj_import(&proj_scratch, &proj_slot[3], sizeof st) && proj_scratch.t[0].step[0].n == 4u &&
-                 proj_scratch.t[0].step[0].note[0] == 127u && proj_scratch.t[0].p[P_E0] ==
-                 clamp(3, param_desc_of(trk[0].engine, P_E0)->min, param_desc_of(trk[0].engine, P_E0)->max));
-    {   /* Selector-based archives are retired; owned-voice backups still restore. */
-        static fm6_bank_t bk;
-        static upf_t got;
+    {   /* a record of an older format: refused before anything is written (archives of before 1.0.0: 1.2) */
+        static uint8_t old[3388];
+        memset(old, 0, sizeof old);
+        ((uint32_t *)old)[0] = 0x46554E36u; ((uint32_t *)old)[1] = sizeof old;
+        bad += check("a FUN6 project archive is refused (1)", put_begin(5, sizeof old, st_crc32(old, sizeof old)) == 1u);
+    }
+    {   /* the retired FM6 bank (8) and owned-voice archives (19, 20 at 4,240 B) are refused; native voices restore */
+        static native_fm_t got;
         static up_bank_t records;
-        uint8_t pk[FM6_PACKED], rec[FM6_PACKED];
-        upf_empty();
+        static uint8_t owned[4240];
+        uint8_t pk[FM6_PACKED];
         set_engine_of(TSEL, ENGI_FM6);
         up_store(2, "OLD FM6");
-        up_set_value(up_rec(2), P_E7, FM6_NFAC + 2u);up_save_bank(0);
-        memset(&bk, 0, sizeof bk);
-        bk.magic = FM6_BANK_MAGIC; bk.ver = FM6_BANK_VER; bk.nslot = FM6_BANK_N; bk.used = 1u << 2;
-        memcpy(bk.fn, FM6_FNDEF, FM6_NFN);
-        fm6_factory(5, pk); fm6_pack7(bk.pk[2], pk, FM6_PACKED);
-        bad += check("retired selector bank backup is refused without changing native voices",
-                     put_all(8, &bk, sizeof bk, st_crc32(&bk, sizeof bk)) == 2 && !native_used(ENGI_FM6,2));
+        bad += check("retired bank id 8 refuses a payload", put_begin(8, 3612, 0) == 1u);
         bad += check("retired bank id 8 is listed empty", list(8, &len, &crc) == 0 && !len);
-        bad += check("refusing the retired bank leaves native object 21 empty", list(21, &len, &crc) == 0 && !len);
-        upf_set(2,pk); /* construct a historical owned-voice archive */
-        memcpy(&got, upf_bank((0) * UPF_SLOTS), sizeof got); upf_empty();
-        bad += check("owned voices restore through id 19", put_all(19, &got, sizeof got, st_crc32(&got, sizeof got)) == 0 && native_used(ENGI_FM6,2) && !memcmp(native_raw(ENGI_FM6,2), pk, FM6_PACKED));
+        bad += check("an owned-voice archive (id 19) is refused", put_begin(19, sizeof owned, st_crc32(owned, sizeof owned)) == 1u);
+        fm6_factory(5, pk); native_put(ENGI_FM6, 2, pk);
         bad += check("native voice id 21 is listed with its CRC", list(21, &len, &crc) == 0 && len == sizeof(native_fm_t) && crc == st_crc32(native_fm_bank(0), len));
-        bk.fn[FN_ENGINE] = 9;
-        bad += check("damaged historical bank is refused", put_all(8, &bk, sizeof bk, st_crc32(&bk, sizeof bk)) == 2u);
+        memcpy(&got, native_fm_bank(0), sizeof got); native_put(ENGI_FM6, 2, 0);
+        bad += check("native voices restore through id 21", !native_used(ENGI_FM6, 2) && put_all(21, &got, sizeof got, st_crc32(&got, sizeof got)) == 0 && native_used(ENGI_FM6, 2) && !memcmp(native_raw(ENGI_FM6, 2), pk, FM6_PACKED));
+        got.magic ^= 1u;
+        bad += check("a damaged native voice bank is refused", put_all(21, &got, sizeof got, st_crc32(&got, sizeof got)) == 2u);
         up_store(63, "LAST FM6");
         bad += check("additional user record bank id 18 retains U64", list(18, &len, &crc) == 0 && len == sizeof(up_bank_t));
         memcpy(&records, up_cache_bank(3), sizeof records); memset(up_cache_bank(3), 0, sizeof (*up_cache_bank(3)));
         bad += check("additional user record bank id 18 restores U64", put_all(18, &records, sizeof records, st_crc32(&records, sizeof records)) == 0 && up_used(63));
-        fm6_pack(fm6_patch[0],pk);upf_set(63,pk);
-        memcpy(&got, upf_bank((1) * UPF_SLOTS), sizeof got); upf_empty_bank(1);
-        bad += check("additional voice bank id 20 restores U64", put_all(20, &got, sizeof got, st_crc32(&got, sizeof got)) == 0 && native_used(ENGI_FM6,63) && !memcmp(native_raw(ENGI_FM6,63),pk,FM6_PACKED));
+        fm6_pack(fm6_patch[0], pk);
+        bad += check("U64 keeps its own voice in native bank 3 (id 20)", native_used(ENGI_FM6, 63) && !memcmp(native_raw(ENGI_FM6, 63), pk, FM6_PACKED) && list(20, &len, &crc) == 0 && len == sizeof(native_fm_t));
     }
     memcpy(&st, &proj_slot[2], sizeof st);
     erase_error = 1;
@@ -443,6 +445,22 @@ int main(void)
                  put_all(0, &st, sizeof st, st_crc32(&st, sizeof st)) == 0 && trk[2].step[5].note[0] == 67u &&
                  trk[2].p[P_LEVEL] == 77);
 
+    /* Unsupported banks and settings export their committed bytes, not empty cache defaults. */
+    reset();
+    {
+        uint8_t old[3080]; memset(old, 0x5a, sizeof old);
+        const uint32_t objects[] = {OBJ_SETTINGS, OBJ_UPRESET0, OBJ_NATIVEFM0, OBJ_CZBANK0};
+        const uint32_t ids[] = {1u, 6u, 21u, 9u};
+        int intact = 1;
+        for (uint32_t k = 0; k < NELEM(objects); k++) intact &= st_save(objects[k], old, sizeof old) == 0;
+        up_cache_reset(); native_cache_reset(); persist_old = 1;
+        for (uint32_t k = 0; k < NELEM(ids); k++) {
+            intact &= list(ids[k], &len, &crc) == 0 && len == sizeof old && crc == st_crc32(old, sizeof old);
+            const uint8_t *raw = ed_bk_object(ids[k], &len);
+            intact &= raw && len == sizeof old && !memcmp(raw, old, sizeof old);
+        }
+        bad += check("full backup retains unsupported settings and preset bank bytes", intact);
+    }
     /* user preset banks: unknown record versions are kept as bytes */
     reset();
     {
@@ -454,7 +472,7 @@ int main(void)
         b.r[4].used = UP_USED;
         b.r[4].ver = 99;                                 /* a future record */
         memcpy(b.r[4].name, "Future", 7);
-        b.r[4].p[0] = 55;
+        b.r[4].packed[0] = 55;
         bad += check("a bank with a future record version restores byte for byte",
                      put_all(6, &b, sizeof b, st_crc32(&b, sizeof b)) == 0 &&
                      st_load(OBJ_UPRESET0, &proj_wire, sizeof proj_wire) == (int)sizeof b &&
@@ -470,7 +488,7 @@ int main(void)
         bad += check("CZ-1: a never-saved BANK A (its factory default) lists as length 0",
                      list(9, &len, &crc) == 0 && len == 0 && cz_bank_load(0)->used == 0xFFFFu);
         cz_bank_empty(&cb, 0);
-        memcpy(cb.tone[3].raw, CZ_FACTORY[7], CZ_BYTES);
+        memcpy(cb.tone[3].raw, cz_fac(7), CZ_BYTES);
         cb.used = 1u << 3;
         bad += check("CZ-1: a saved BANK A restores and lists with its 2332 B",
                      put_all(9, &cb, sizeof cb, st_crc32(&cb, sizeof cb)) == 0 && list(9, &len, &crc) == 0 &&

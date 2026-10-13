@@ -16,7 +16,6 @@ static int p5_favorite_set(uint32_t slot,int on,int factory){(void)slot;(void)on
 #define USER_NATIVE_CZ 18u
 #define ENGI_FM6 12u
 #define ENGI_CZ 15u
-static uint8_t fx_lowcut;
 static void fm1_led_key(unsigned k, int on) { (void)k; (void)on; }
 static int fm1_enc_take(unsigned k) { (void)k; return 0; }
 static void lcd_sync(void) {}
@@ -27,8 +26,6 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
 #include "../firmware/src/panel.c"
 static void settings_save(void) {}
 static uint8_t settings_boot, settings_drumch = 10;  /* (params.c) */
-#define PF_KEYS 16u                                       /* (perform.c: the FX key map's keys and effects) */
-#define PF_NFX 12u
 static int native_used(uint32_t e, uint32_t k) { (void)e; (void)k; return 0; }
 #if __has_include("../firmware/src/favorites.c")
 #include "../firmware/src/favorites.c"
@@ -38,27 +35,21 @@ int main(void)
 {
     persist_t original = {0}, p;
     original.magic = PERSIST_MAGIC;
-    original.palette = 4; original.bold = original.lowcut = original.zoom = 1;   /* Felucca's id 4: MONO -> NIGHT */
+    original.palette = 4; original.bold = original.lowcut = original.zoom = 1;   /* an untagged id: the default */
     original.panel = PANEL_DEFAULT; original.panel.enc[0] = 3;
     original.favorites.factory[8][0] = 1;
     original.favorites.user = 1u << 31; original.favorites.filter = 1;
     p = original;
     assert(settings_import(&p, sizeof p) == 1); settings_init();
-    assert(settings.palette == UI_DEFAULT_INDEX && fx_lowcut && settings.zoom && panel.enc[0] == 3);
-    assert(p.palette == palette_to_stored(UI_DEFAULT_INDEX));     /* migrated in place */
-    {   /* every old id (Felucca's 0..19, Melodee 0.13's 64..71) maps to a palette; tagged ids round trip; anything
-         * else is NIGHT */
+    assert(settings.palette == UI_DEFAULT_INDEX && !settings.lowcut && settings.zoom && panel.enc[0] == 3);
+    assert(p.palette == palette_to_stored(UI_DEFAULT_INDEX));
+    {   /* tagged ids round trip; any other id (the untagged ones of before 1.0 too) is the default */
         persist_t q = original;
-        for (uint32_t i = 0; i < 20u; i++) assert(palette_from_stored(i) < NPALETTES);
-        for (uint32_t i = 64; i < 72u; i++) assert(palette_from_stored(i) < NPALETTES && palette_stored_ok(i));
-        assert(palette_from_stored(13) == 1u && palette_from_stored(11) == 2u && palette_from_stored(19) == 2u);
-        assert(palette_from_stored(64u + 6u) == 1u && palette_from_stored(64u + 7u) == 2u && palette_from_stored(64u) == 0u);
         for (uint32_t i = 0; i < NPALETTES; i++) assert(palette_from_stored(palette_to_stored(i)) == i);
-        assert(palette_from_stored(40) == UI_DEFAULT_INDEX && !palette_stored_ok(40) && palette_stored_ok(3));
+        for (uint32_t i = 0; i < 72u; i++) assert(palette_from_stored(i) == UI_DEFAULT_INDEX && !palette_stored_ok(i));
+        assert(palette_stored_ok(palette_to_stored(3)));
         q.palette = palette_to_stored(2);
         assert(settings_import(&q, sizeof q) == 1 && settings.palette == 2u);
-        settings.magic = SETTINGS_MAGIC_OLD; settings.palette = 13; settings_init();   /* retained SET3 */
-        assert(settings.magic == SETTINGS_MAGIC && settings.palette == 1u);
         p = original; assert(settings_import(&p, sizeof p) == 1); settings_init();
     }
 #ifdef MELODEE_FAVORITES
@@ -104,13 +95,35 @@ int main(void)
             q.ext.spare[1] = invalid[k]; tuning_a4 = 432;
             assert(settings_import(&q, sizeof q) == 1 && tuning_a4 == 440);
         }
-        q = original; q.magic = PERSIST_MAGIC4; tuning_a4 = 432;
-        assert(settings_import(&q, PERSIST_LEN4) == 2 && tuning_a4 == 440);
         p = original; settings_import(&p, sizeof p);
     }
-    p = original; p.magic = PERSIST_MAGIC4; p.ext.usb_off = 3;   /* PER4 (Felucca 1.0): favorites, no ext */
-    assert(settings_import(&p, PERSIST_LEN4) == 2 && p.magic == PERSIST_MAGIC);
-    assert(p.favorites.user == (1u << 31) && p.favorites.factory[8][0] == 1 && !p.ext.usb_off);
+    {   /* AUTOSAVE: default ON for old/unknown bytes, tagged OFF survives a settings round trip. */
+        persist_t q = original;
+        assert(settings_autosave);
+        settings_autosave = 0;
+        settings_export(&q);
+        assert(sizeof q == 604u && q.favorites.factory[15][28] == AUTOSAVE_OFF_TAG);
+        settings_autosave = 1;
+        assert(settings_import(&q, sizeof q) && !settings_autosave);
+        settings_autosave = 1;
+        settings_export(&q);
+        settings_autosave = 0;
+        assert(settings_import(&q, sizeof q) && settings_autosave);
+        for (uint32_t byte = 0; byte < 256u; byte++) {
+            q.favorites.factory[15][28] = (uint8_t)byte;
+            assert(settings_import(&q, sizeof q) && settings_autosave == (byte != AUTOSAVE_OFF_TAG));
+        }
+        p = original; settings_import(&p, sizeof p);
+    }
+    {   /* records before PER5 (Felucca's PER1..PER4; 1.2 rewrote them) and short ones: not read */
+        const uint32_t magic[4] = {0x50455231u, 0x50455232u, 0x50455233u, 0x50455234u};
+        for (uint32_t k = 0; k < 4u; k++) {
+            p = original; p.magic = magic[k];
+            assert(!settings_import(&p, sizeof p) && !settings_import(&p, (int)(sizeof p - sizeof p.ext)));
+        }
+        p = original;
+        assert(!settings_import(&p, (int)sizeof p - 1));
+    }
     settings_drumch = 0; settings_export(&p);        /* DRUM OFF: 17 in the record; 10 (the default): 0 */
     assert(p.ext.drumch == 17u && settings_import(&p, sizeof p) == 1 && !settings_drumch);
     settings_drumch = 10; settings_export(&p); assert(!p.ext.drumch);
@@ -118,17 +131,6 @@ int main(void)
     p = original; p.ext.usb_off = 2;                /* PER5: ext kept by a build without USB audio */
     assert(settings_import(&p, sizeof p) == 1 && p.ext.usb_off == 2u);
     settings_export(&p); assert(p.ext.usb_off == 2u);
-    p = original; p.magic = 0x50455233u;
-    assert(settings_import(&p, PERSIST_LEN4 - sizeof p.favorites) == 2);
-    assert(p.bold == 1 && !p.favorites.user && !p.favorites.filter);
-    settings_export(&p); assert(p.bold == 1); /* favorites-only preserves PER3 font */
-    p = original; p.magic = 0x50455232u;
-    assert(settings_import(&p, PERSIST_LEN4 - sizeof p.favorites - sizeof p.bold) == 2);
-    assert(!p.bold && !p.favorites.user && settings.zoom && panel.enc[0] == 3);
-    p = original; p.magic = 0x50455231u;
-    memcpy((uint8_t *)&p + 8, &PANEL_DEFAULT, sizeof(panel_t));
-    assert(settings_import(&p, 8 + sizeof(panel_t)) == 2);
-    assert(!p.bold && !p.zoom && !p.lowcut && !p.favorites.user && panel.magic == PANEL_MAGIC);
     {   /* HOLD: in the retired bold field; older records (bold 0 / 1) are 0.4 s, and stay as saved */
         p = original; p.bold = 0;
         assert(settings_import(&p, sizeof p) == 1 && settings_hold == HOLD_DEF && HOLD_MS[settings_hold] == 400u);
@@ -143,12 +145,8 @@ int main(void)
         settings_export(&p);
         assert(p.bold == 0u && settings_import(&p, sizeof p) == 1 && settings_hold == HOLD_DEF);
         assert(!hold_stored_ok(2u) && !hold_stored_ok(HOLD_TAG + 4u) && hold_stored_ok(HOLD_TAG | 2u));
-        p = original; p.magic = 0x50455231u;
-        memcpy((uint8_t *)&p + 8, &PANEL_DEFAULT, sizeof(panel_t));
-        settings_hold = 2;
-        assert(settings_import(&p, 8 + sizeof(panel_t)) == 2 && settings_hold == HOLD_DEF);
     }
     assert(settings_import(&p, 3) == 0 && settings_import(&p, -1) == 0);
     assert(settings_import(&p, sizeof p - 1) == 0);
-    puts("Settings: PER1..PER4 migration, palette ids, calibration, HOLD, ext and independent feature preservation passed.");
+    puts("Settings: PER5 only, palette ids, calibration, HOLD, AUTOSAVE, ext and independent feature preservation passed.");
 }

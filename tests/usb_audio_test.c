@@ -102,13 +102,15 @@ static void drift(int ppm, int play, int cap)
             feedback = ua_feedback();
         if (cap) {
             bytes = ua_transmit(captured);
-            assert(bytes <= 45u * cw * 4u && bytes >= 43u * cw * 4u && bytes % (cw * 4u) == 0);
+            assert(bytes <= 45u * cw * ua_cap_channels && bytes >= 43u * cw * ua_cap_channels && bytes % (cw * ua_cap_channels) == 0);
             if (ms > 1000)
-                for (i = 0; i < bytes; i += cw * 4u) {
+                for (i = 0; i < bytes; i += cw * ua_cap_channels) {
                     assert(ua_decode(captured + i, cw) == 1000);
                     assert(ua_decode(captured + i + cw, cw) == -1000);
-                    assert(ua_decode(captured + i + cw * 2u, cw) == 300);
-                    assert(ua_decode(captured + i + cw * 3u, cw) == -700);
+                    if (ua_cap_channels == 4u) {
+                        assert(ua_decode(captured + i + cw * 2u, cw) == 300);
+                        assert(ua_decode(captured + i + cw * 3u, cw) == -700);
+                    }
                 }
         }
         assert(ua.pw - ua.pr <= UA_RING && ua.cw - ua.cr <= UA_RING);
@@ -279,6 +281,7 @@ static void tone(int capture, double frequency, uint32_t channel, uint32_t alt)
 
 int main(void)
 {
+    ua_cap_channels = 4;
     routing();
     recovery();
     pcm24();
@@ -297,6 +300,18 @@ int main(void)
     }
     drift(1000, 2, 1);
     drift(-1000, 1, 2);
-    puts("USB audio routing, drift, packet bounds and recovery: OK");
+    ua_cap_channels = 2;
+    ua_reset(); ua.cap_alt = 1;
+    int32_t master[64];
+    for (uint32_t i = 0; i < 32; i++) {master[2*i] = 32767; master[2*i+1] = -32768;}
+    ua_audio(master, 0, 32, 4096);
+    assert(ua.cw == 32 && ua.cap[0] == 32767 && ua.cap[1] == -32768);
+    for (int alt = 1; alt <= 2; alt++) {
+        drift(-1000, alt, alt);
+        drift(0, alt, alt);
+        drift(1000, alt, alt);
+        drift(1000, 0, alt);
+    }
+    puts("USB stereo/master and track routing, drift, packet bounds and recovery: OK");
     return 0;
 }

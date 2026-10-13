@@ -8,7 +8,8 @@ whole string (advances and GPOS kerning at 16 x the size).
 
 Per glyph: its displacement d = ink centroid (tables) - ink centroid (reference); area coverage keeps the first
 moment, so d is how far the glyph sits from its true place. Per pair: gap error = d[i+1] - d[i], the error of
-the space between two neighbours. Fails when a pair of S or M is off by more than 0.25 px or L by more than 0.5 px.
+the space between two neighbours. Fails when a pair is off by more than 0.51 px: every face has 2 phases (a half
+pixel step) since the 2026-10 storage pass, as L always had; X, S and M had 4 and a 0.25 px limit before.
 
   text_spacing_test.py [ui_fonts.h] [--png DIR [--tag NAME]] [--rule gfx|rounded] [--no-limit]
   (PNG: the specimen strings x4, gray on black; --rule rounded measures tables made before the phases)
@@ -33,7 +34,7 @@ LOWER = ["oeo", "coco", "eco", "nono", "minimum", "hello", "level", "decay", "re
 UPPER = ["CUTOFF", "RESO", "LEVEL", "DECAY", "RELEASE", "SOUND", "OCOE", "COCO", "NONO", "MINIMUM", "SUPER SAW",
          "MELODEE", "PRESETS", "ANALOG", "DIGITAL", "PITCH", "SWING", "AV AW LT TA YO"]
 RULE = ["gfx"]   # "gfx": src/gfx.c cv_text; "rounded": the earlier rule (each glyph at the rounded pen, 1 phase)
-LIMIT = {"X": 0.25, "S": 0.25, "M": 0.25, "L": 0.5}
+LIMIT = {"X": 0.51, "S": 0.51, "M": 0.51, "L": 0.51}   # a phase step, plus raster noise
 
 
 def parse(path):
@@ -48,12 +49,15 @@ def parse(path):
              re.findall(r"\{(-?\d+, -?\d+, -?\d+, -?\d+, -?\d+, -?\d+)\}",
                         re.search(r"AF_%s_G\[\d+\] = \{(.*?)\n\};" % name, t, re.S).group(1))]
         kern = {}
-        if f[8] != "0":
-            kern = dict(zip(arr("KERN"), arr("KD")))
+        codes = list(range(int(f[2]), int(f[3]) + 1)) + arr("EX")[:int(f[4])]
+        if f[8] != "0":                      # the class tables, back to pairs keyed a << 8 | b
+            kl, kr, km, nkr = arr("KL"), arr("KR"), arr("KM"), int(f[5])
+            kern = {a << 8 | b: km[(kl[i] - 1) * nkr + kr[j] - 1] for i, a in enumerate(codes)
+                    for j, b in enumerate(codes) if kl[i] and kr[j] and a < 256 and b < 256}
         faces[name] = {"h": int(f[0]), "asc": int(f[1]), "first": int(f[2]), "last": int(f[3]), "nex": int(f[4]),
                        "g": g, "data": bytes(arr("DATA")), "kern": kern, "ex": arr("EX")[:int(f[4])],
-                       "psh": int(f[11]) if len(f) > 11 else 0,
-                       "hc": arr("HC") if len(f) > 12 and f[12] != "0" else None}
+                       "psh": int(f[12]) if len(f) > 12 else 0,
+                       "hc": arr("HC") if len(f) > 13 and f[13] != "0" else None}
     return faces
 
 

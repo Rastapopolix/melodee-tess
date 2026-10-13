@@ -52,7 +52,7 @@ static void lane_budget(void)
     for (p = 0; p < NPART; p++)
         memset(trk[p].v, 0, sizeof trk[p].v);
     host_preset(&trk[0], ENGI_DRUM, 0);
-    host_preset(&trk[1], 0, 0);
+    host_preset(&trk[1], HOST_SYNTH, 0);
     trk[1].p[P_VOICE] = V_POLY;
     trk[1].p[P_SUS] = 127;
     trk_note_on(&trk[1], 48, 100);
@@ -73,7 +73,7 @@ static void lane_budget(void)
            bad ? "FAIL" : "ok");
     fails += bad != 0;
     /* A new track can still take a drum voice: no permanent reservation for the kit. */
-    host_preset(&trk[2], 0, 0);
+    host_preset(&trk[2], HOST_SYNTH, 0);
     trk[2].p[P_VOICE] = V_MONO;
     trk_note_off(&trk[0], TOM[3]);
     trk_note_on(&trk[2], 72, 100);
