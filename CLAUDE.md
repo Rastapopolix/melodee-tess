@@ -1,11 +1,12 @@
 # CLAUDE.md
 
-melodee-tess: a fork of Melodee (FM-1 alternative firmware, GPL-3.0) that adds the Tessera
-generative sequencing engines (`firmware/src/tessera.c`, `tessera.h`).
+melodee-tess: a fork of Melodee (FM-1 alternative firmware, GPL-3.0) where the Tessera
+generators (Turing, Euclid, Markov, Morph; `firmware/src/tessera.c`, `tessera.h`) were built.
+It becomes the Tessera firmware, a hard fork. Plan, phases and tasks: `ROADMAP.md`.
 
-## Start of each session
+## Start and end of each session
 
-Read `ROADMAP.md` first: it holds the current goals and what to work on next.
+Read `ROADMAP.md` first. At the end, update it (tick tasks, record decisions) and commit.
 
 ## Build
 
@@ -31,15 +32,23 @@ Generators can be developed and tested on the PC; flash the device only to check
 
 ## Hardware constraints
 
-- JieLi AC79 at 360 MHz; CPU1 is optional and retires itself on units that misread SRAM.
-- Audio at 44.1 kHz. Keep DSP and modulation work bounded per audio block.
-- The build requires at least 152 KiB of audio working arena (engine state, recording,
-  effects); it reports the free arena and fails below the minimum. Watch RAM and flash headroom.
+- JieLi AC79 at 360 MHz. CPU1 is optional and retires itself on units that misread SRAM:
+  everything must work single-core.
+- Audio at 44.1 kHz. Modulation runs at control rate (once per audio block).
+- The build requires at least 152 KiB of audio working arena; it reports the free arena and
+  fails below the minimum. Watch RAM and flash headroom.
 
 ## Rules
 
 - Follow the existing code conventions: the unity build (`melodee.c` and `tests/hostsim.c`
   `#include` the `.c` files), C style, naming, comment density. New sources go in both.
+- Prefer new files over heavy rewrites of shared upstream files, to keep upstream syncing easy.
+- All hardware access stays behind the platform layer (`firmware/hal/`), so generator,
+  sequencer, mod and UI code compiles for host tests and the web simulator.
+- Every automatic layer (Energy, Entries, Wander, Evolve, Gravity, Piece Length) has an
+  off/zero position with no effect. Automation is opt-in.
+- Every parameter has a central ID and range. Fixed maximums for cords, sources, scopes, voices.
+- Flag risky areas before changing them: bootloader, flash layout, update/install, dual-core start.
 - Run `tests/run_tests.sh` after every change. Report failures; do not hide them.
 - Small commits, one change each, on a feature branch. Leave `main` untouched unless asked.
 - Never release a `MELODEE_CORE1_TEST` build (fault-injection test firmware).
