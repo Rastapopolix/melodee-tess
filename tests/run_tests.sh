@@ -293,6 +293,8 @@ if core && [ $TABLES = 1 ]; then
     t "editor: real C protocol, malformed transfers and queue recovery" editor_test $FW
     t "DX7 librarian: USB voice/bank receive, dump replies and malformed frame recovery" fm6_sysex_test $FW
     t "SWING: track + global at most 100, sequencer step lengths, the SWG display" swing_test -O2 $FW
+    t "upgrade: a project with a generator on each track saved, booted, loaded (tests/upgrade_check.sh: from an older build)" \
+        upgrade_test -O1 $FW
     mkdir -p build/tessera_log
     t "TESSERA generators: notes per scenario against tests/tessera_baseline.txt, stops clean, saved block" tessera_test \
         -O2 $FW -- "$OUT/tessera_test" tests/tessera_baseline.txt build/tessera_log
