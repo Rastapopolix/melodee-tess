@@ -506,9 +506,20 @@ static int tess_obj_read(void)
 static uint8_t *tess_slot(uint32_t slot) { return tess_blob + 4u + (slot & 3u) * TESS_SLOT_BYTES; }
 #endif
 
+/* FNV of the Tessera state each slot last saved or loaded: autosave also writes when only the generators changed
+ * (their state is not in the project record, so the record's hash alone does not see it) */
+static uint32_t tess_saved_hash[4];
+static uint32_t tessera_live_hash(void)
+{
+    uint8_t b[TESSERA_PK_BYTES];                      /* (main loop: on the stack) */
+    tessera_pack(b);
+    return proj_hash(b, sizeof b);
+}
+
 /* the live Tessera state -> slot's block, tagged with the record just written: 0 saved */
 static int tessera_store_save(uint32_t slot)
 {
+    tess_saved_hash[slot & 3u] = tessera_live_hash();
 #if MELODEE_FLASH
     uint32_t tag = proj_saved_hash[slot & 3u];
     if (!flash_ok) return 1;
@@ -653,8 +664,8 @@ static void project_autosave(void)
     proj_wire_gen++;                                    /* (the staging RAM: a backup's copy there is gone) */
     if (!bank_pack(proj_wire_u.raw, p, 1))
         return;
-    if (proj_hash(proj_wire_u.raw, BANK_STORE_SIZE) == proj_saved_hash[slot])
-        return;                                         /* as saved: nothing to write */
+    if (proj_hash(proj_wire_u.raw, BANK_STORE_SIZE) == proj_saved_hash[slot] && tessera_live_hash() == tess_saved_hash[slot])
+        return;                                         /* as saved, the generators too: nothing to write */
     project_quick_save();
 }
 static void project_cur_name(char *b) { str_cpy(b, proj_name, PROJ_NAME_LEN + 1u); }   /* b: 13 bytes */
@@ -833,6 +844,7 @@ static void project_load(uint32_t slot)
         proj_cur = (uint8_t)(slot & 3u);
         tessera_reset();
         if (n == BANK_STORE_SIZE) tessera_store_load(slot);
+        tess_saved_hash[slot & 3u] = tessera_live_hash();   /* (autosave: what this slot now holds) */
     }
 }
 

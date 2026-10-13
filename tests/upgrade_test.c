@@ -27,7 +27,8 @@ static void panel_setup(void) {}
 
 static uint8_t nor[0x100000], flash_ok = 1;
 static int st_read(uint32_t off, void *dst, uint32_t n) { memcpy(dst, nor + off, n); return 0; }
-static int st_erase(uint32_t off) { memset(nor + off, 0xFF, 4096); return 0; }
+static uint32_t erases;
+static int st_erase(uint32_t off) { erases++; memset(nor + off, 0xFF, 4096); return 0; }
 static int st_prog(uint32_t off, const void *src, uint32_t n)
 {
     const uint8_t *s = src;
@@ -138,13 +139,39 @@ static int load(const char *path)
     return fail;
 }
 
+/* autosave (stopped, untouched): a change of the generators alone must reach the flash too */
+static int autosave(void)
+{
+    uint8_t edited[TESSERA_PK_BYTES];
+    uint32_t i, same = 1;
+    power_on();
+    memset(nor, 0xFF, sizeof nor);
+    music();
+    song.sel = 0;                                 /* (the selected track is in the record: chosen before the save) */
+    if (project_save_as(0, "UPGRADE")) { printf("upgrade: the save failed\n"); return 1; }
+    tessera_knob(2, 30);                          /* only Turing's PROB turned: the project record is unchanged */
+    tessera_pack(edited);
+    project_autosave();
+    power_on();                                   /* power-off, power-on, load */
+    memset(proj_slot, 0, sizeof proj_slot);
+    persist_boot();
+    project_load(0);
+    tessera_pack(got);
+    for (i = 0; i < TESSERA_PK_BYTES; i++) same &= edited[i] == got[i];
+    check("autosave keeps a change of the generators alone (PROB turned)", same);
+    erases = 0;
+    project_autosave();
+    check("autosave after a load, nothing changed: no flash written", erases == 0u);
+    return fail;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 3 && !strcmp(argv[1], "save")) return save(argv[2]);
     if (argc == 3 && !strcmp(argv[1], "load")) return load(argv[2]);
     if (argc == 1) {                              /* a round trip in this build */
         static const char tmp[] = "build/host/upgrade_self.nor";
-        return save(tmp) || load(tmp);
+        return save(tmp) || load(tmp) || autosave();
     }
     printf("usage: upgrade_test [save OUT.nor | load IN.nor]\n");
     return 2;
