@@ -890,6 +890,7 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
 /* ---- Tessera: its state is one flash object (OBJ_TESSERA: 4 slots x tag + block), apart from the project record
  * (no room in it). A slot's block is valid only while its tag equals the project record's hash (proj_saved_hash):
  * any other write to the slot (an archive, a failed or interrupted save) loads the project with Tessera OFF. */
+#if MELODEE_FLASH
 #define TESS_OBJ_MAGIC 0x31525354u                    /* "TSR1" */
 #define TESS_SLOT_BYTES (4u + TESSERA_PK_BYTES)
 #define TESS_OBJ_BYTES (4u + 4u * TESS_SLOT_BYTES)
@@ -908,6 +909,7 @@ static int tess_obj_read(void)
     return 0;
 }
 static uint8_t *tess_slot(uint32_t slot) { return tess_blob + 4u + (slot & 3u) * TESS_SLOT_BYTES; }
+#endif
 
 /* the live Tessera state -> slot's block, tagged with the record just written: 0 saved */
 static int tessera_store_save(uint32_t slot)

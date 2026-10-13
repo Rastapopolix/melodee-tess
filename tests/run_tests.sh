@@ -132,15 +132,15 @@ run "USB descriptors: MIDI, CDC and audio configurations" python3 tests/usb_audi
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/usb_audio_tracks_test" tests/usb_audio_tracks_test.c -lm
 run "USB audio: four isolated track stems through the real mixer" "$OUT/usb_audio_tracks_test"
 
-[ -f build/melodee.fwsc ] || { echo "run ./build.sh first"; exit 1; }
+[ -f build/melodee-tess.fwsc ] || { echo "run ./build.sh first"; exit 1; }
 
 $CC -DOWN_PKG=1 -o "$OUT/ota_test" tests/ota_test.c
-run "M-UPGRADE entry (own loader)" "$OUT/ota_test" build/melodee.fwsc
+run "M-UPGRADE entry (own loader)" "$OUT/ota_test" build/melodee-tess.fwsc
 
 head -c 200000 build/melodee.bin > "$OUT/old_app.bin"
 python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null
 $CC -o "$OUT/ldr_test" tests/ldr_test.c
-run "update loader: other app -> this build" "$OUT/ldr_test" "$OUT/old.fwsc" build/melodee.fwsc
+run "update loader: other app -> this build" "$OUT/ldr_test" "$OUT/old.fwsc" build/melodee-tess.fwsc
 
 if [ -f build/gen/melodee_tables.h ]; then
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/hostsim" tests/hostsim.c -lm

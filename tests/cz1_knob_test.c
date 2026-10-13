@@ -29,7 +29,7 @@ static void reset_all(track_t *t)
     eng_state_clear(0);
 }
 
-static void render(track_t *t, int16_t *dst)
+static void render(track_t *t, int32_t *dst)
 {
     static const uint8_t N[4] = {36, 55, 72, 84}, V[4] = {30, 70, 100, 127};
     int32_t o[CTL];
