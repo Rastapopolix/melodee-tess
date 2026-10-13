@@ -97,8 +97,7 @@ void tessera_kill(track_t *t)
         trk_note_off(t, tessera.last_note[tr]);
         tessera.active_gate[tr] = 0;
     }
-    t->seq_n = 0;
-    seq_release(t);
+    seq_release(t);                                   /* (it empties seq_n: the step sequencer's notes go too) */
 }
 
 static void tess_realign(uint32_t tr);
