@@ -13,11 +13,32 @@ static int fail_bytes = -1;            /* power loss after any programmed byte *
 static int erase_error, write_protected;
 static uint32_t fail_erase_off = 0xFFFFFFFFu;
 static uint32_t io_calls;
+/* the sector map check: each sector an object erases or programs, while trace_obj is set, is its own */
+static int trace_obj = -1;
+static int16_t sec_owner[0x100000 / 4096];
+static uint32_t sec_clash, sec_reserved;
+static void trace(uint32_t off, uint32_t n)
+{
+    uint32_t s;
+    if (trace_obj < 0 || !n) return;
+    for (s = off >> 12; s <= (off + n - 1u) >> 12; s++) {
+        if (sec_owner[s] >= 0 && sec_owner[s] != trace_obj) {
+            printf("  sector %#x: object %d and object %d\n", s << 12, sec_owner[s], trace_obj);
+            sec_clash++;
+        }
+        sec_owner[s] = (int16_t)trace_obj;
+        if ((s << 12) < 0x93000u || ((s << 12) >= 0xE0000u && (s << 12) < 0xE5000u)) {
+            printf("  object %d writes %#x: the app area or the OTA staging\n", trace_obj, s << 12);
+            sec_reserved++;
+        }
+    }
+}
 
 static int st_read(uint32_t off, void *dst, uint32_t n) { io_calls++; memcpy(dst, nor + off, n); return 0; }
 static int st_erase(uint32_t off)
 {
     io_calls++;
+    trace(off, 4096);
     if (erase_error || off == fail_erase_off) return -8;
     if (!write_protected) memset(nor + off, 0xFF, 4096);
     return 0;
@@ -31,7 +52,8 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
         return -9;
     if (fail_after > 0)
         fail_after--;
-    if ((off & 0xFFu) + n > 256u) {
+    trace(off, n);
+    if ((off & 0xFFu) + n > 256u && trace_obj < 0) {   /* (the sector map: split, as hal/fm1_flash.h fl_write does) */
         printf("page wrap at %#x\n", off);
         exit(1);
     }
@@ -237,6 +259,28 @@ int main(void)
         fail_erase_off=st_extension(OBJ_BANK0,0);
         ok=st_save(OBJ_BANK0,old,sizeof old)!=0;fail_erase_off=0xFFFFFFFFu;
         bad+=check("extension erase failure preserves the committed expanded copy",ok && st_load(OBJ_BANK0,got,sizeof got)==sizeof payload && !memcmp(got,payload,sizeof got));
+    }
+    {   /* every live object saved twice (both copies) at its full size: no sector shared by two objects, none in the
+         * app area or the OTA staging. Guards the free pair OBJ_TESSERA uses (0x9D000) at every upstream merge. */
+        static uint8_t full[64u * 1024u];
+        uint32_t obj, saved = 1;
+        memset(nor, 0xFF, sizeof nor);
+        memset(full, 0x5A, sizeof full);
+        for (obj = 0; obj < sizeof sec_owner / sizeof sec_owner[0]; obj++) sec_owner[obj] = -1;
+        sec_clash = sec_reserved = 0;
+        for (obj = 0; obj < OBJ_COUNT; obj++) {
+            if (st_retired(obj)) continue;
+            trace_obj = (int)obj;
+            saved &= st_capacity(obj) <= sizeof full && st_save(obj, full, st_capacity(obj)) == 0 &&
+                     st_save(obj, full, st_capacity(obj)) == 0;
+        }
+        trace_obj = -1;
+        bad += check("every live object saves both copies at full size", saved);
+        bad += check("no two live objects share a flash sector", !sec_clash);
+        bad += check("no object writes the app area or the OTA staging", !sec_reserved);
+        bad += check("Tessera's object stays in the free pair 0x9D000..0x9EFFF",
+                     st_sector(OBJ_TESSERA, 0) == 0x9D000u && st_sector(OBJ_TESSERA, 1) == 0x9E000u &&
+                     sec_owner[0x9D] == OBJ_TESSERA && sec_owner[0x9E] == OBJ_TESSERA);
     }
     printf("%s\n", bad ? "STORAGE TEST FAILED" : "storage test passed");
     bad += check("CZ banks have disjoint A/B sectors outside project and preset data",

@@ -338,7 +338,7 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [x] Flash layout checked: `OBJ_TESSERA` (0x9D000/0x9E000) is in a free pair. It overlaps only the
       retired legacy project objects, which nothing reads or writes (the 2026-10-13 "bug" was wrong;
       see `docs/analysis/upstream.md`)
-- [ ] Storage test: no two live flash objects share a sector (guards the free pair at upstream merges)
+- [x] Storage test: no two live flash objects share a sector (guards the free pair at upstream merges)
 - [x] Merge upstream v1.3.1 before phase 1 (decided 2026-10-14; `1b4c9e9`): both builds pass, the
       Tessera baseline is unchanged, FORM's labels shortened to CONTR / FLRSH for the new fonts
 - [ ] Check the merged build on the device: play, stop (no hanging notes), GLO mute, MIDI Start/Stop,
