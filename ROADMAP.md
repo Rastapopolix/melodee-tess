@@ -223,6 +223,16 @@ Principles:
   Gravity, Piece Length) are active.
 - Musical language in labels (for example "Density", "Home", "Wander"), not engineering terms.
 
+In-box help:
+- Hold the help combo and touch a knob: a 1–2 line description of the parameter, plus a
+  live-state line saying what it is doing now (for example "Wander 0: the chain plays exactly
+  as written").
+- A one-line summary per page, shown on the first visit or on request.
+- The full manual online, with a QR code to it on the About page.
+- Help text lives in the central parameter table, next to each parameter's ID and range. The
+  online parameter reference is generated from that table, so the device and the docs stay in
+  sync.
+
 Process: draft a page map before the end of phase 2, and review designs with the PNGs the test
 suite renders (`tests/ui_render.c` → `build/ui_new/`, with one contact sheet per palette).
 Visual styling comes later.
@@ -302,6 +312,8 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
       rate, extending `mod.c`
 - [ ] Generators and a first set of mod sources (LFO, envelope, S&H) on the bus
 - [ ] UI page map drafted before the phase ends; review it with the rendered UI PNGs
+- [ ] Help text field in the central parameter table, filled for every parameter
+- [ ] Generate the online parameter reference from the table
 
 ### 3. Normalled default patch
 - [ ] Default patch that sounds good with no cords; cords override the normals
@@ -330,6 +342,8 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 
 ### 7. Performance page, boot behaviour, web simulator
 - [ ] Performance page
+- [ ] In-box help: help combo + knob touch, live-state line, page summaries
+- [ ] Online manual; QR code on the About page
 - [ ] Boot behaviour and curated random patches
 - [ ] WebAssembly build; GitHub Pages demo
 

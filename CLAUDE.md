@@ -47,7 +47,8 @@ Generators can be developed and tested on the PC; flash the device only to check
   sequencer, mod and UI code compiles for host tests and the web simulator.
 - Every automatic layer (Energy, Entries, Wander, Evolve, Gravity, Piece Length) has an
   off/zero position with no effect. Automation is opt-in.
-- Every parameter has a central ID and range. Fixed maximums for cords, sources, scopes, voices.
+- Every parameter has a central ID, range and help text (the online reference is generated
+  from it). Fixed maximums for cords, sources, scopes, voices.
 - Flag risky areas before changing them: bootloader, flash layout, update/install, dual-core start.
 - Run `tests/run_tests.sh` after every change. Report failures; do not hide them.
 - Small commits, one change each, on a feature branch. Leave `main` untouched unless asked.
