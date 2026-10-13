@@ -2044,8 +2044,8 @@ function makeMockDevice(opt = {}) {
   for(let slot=0;slot<3;slot++)TP.push(E("FX", ["OFF","PHASER","WIDTH","FORMANT","TAPE","SPIT","ECHO","ROOM","REVERB","CHORUS"],0),D("MIX",F.PCT,0,127,0),D("RATE",F.LFOHZ,0,127,60),D("CHAR",F.PCT,0,127,64));
   TP.push(D("SEND",F.PCT,0,127,0),D("SEND 2",F.PCT,0,127,0),D("SEND 3",F.PCT,0,127,0));
   for(let slot=0;slot<3;slot++)GP.push(E("TYPE", ["OFF","PHASER","WIDTH","FORMANT","TAPE","SPIT","ECHO","ROOM","REVERB","CHORUS"],0),D("MIX",F.PCT,0,127,127),D("RATE",F.LFOHZ,0,127,60),D("CHAR",F.PCT,0,127,64));
-  GP.push(D("RETURN",F.PCT,0,127,100),E("MODE",["CHAIN","SPLIT"],0));
-  const P_COUNT = 119, G_COUNT = 41, NSTEP = 64, P_E0 = 111, G_ENGSEL = 20, P_RESERVED45 = 45;
+  GP.push(D("RETURN",F.PCT,0,127,100),E("MODE",["CHAIN","SPLIT"],0),D("BUDGET",F.INT,8,32,16,null,"pts"));
+  const P_COUNT = 119, G_COUNT = 42, NSTEP = 64, P_E0 = 111, G_ENGSEL = 20, P_RESERVED45 = 45;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const enumOrig = (d, v) => d.fmt === F.ENUM && d.names ? aliasOf(d.names, v - d.min) + d.min : v;   /* params.c enum_orig */
   /* four tracks (firmware v3), four synth parts (1.0); engine / preset / p / step below are the selected track's */
@@ -2495,9 +2495,10 @@ function makeMockDevice(opt = {}) {
         if (a[0] > 2) return null;
         if (a[0] === 1) { st.chainPlaying = false; st.slots[k] = project(); }
         else if (a[0] === 0 && st.slots[k]) {
-          const a4 = st.g[21];   /* device concert pitch stays selected across project loads */
+          const a4 = st.g[21], budget=st.g[41]; /* device settings survive project loads */
           st.chainPlaying = false; Object.assign(st, JSON.parse(JSON.stringify(st.slots[k])));
           st.g[21] = a4;
+          st.g[41] = budget;
           /* Removed factory presets keep their saved sound; only the display index is normalized. */
           st.tracks.forEach((t) => { if (t.preset >= ENG[t.engine].presets.length) t.preset = 0; });
         }
@@ -3108,7 +3109,7 @@ const LAYOUT = (pe0) => [
   { t: "ARP", pages: [["ARP", 0, [17, 18, 19, 20]], ["ARP 2", 0, [21, 22, 23, 24]]] },
   { t: "SEQ PATTERN", tab: "seqgroups", pages: [["PATTERN", 0, [29, 30, 31, 32]], ["TIMING", 0, [8]]] },
   { t: "TEMPO", tab: "seqgroups", pages: [["TEMPO", 1, [0, 1]]] },   /* BPM SWG: the project's (SEQ > TEMPO) */
-  { t: "GLOBAL", tab: "setgroups", pages: [["GLOBAL", 1, [21, 2, 3]], ["SYSTEM", 1, [14]]] },   /* G_ROUTE: MIDI IN */
+  { t: "GLOBAL", tab: "setgroups", pages: [["GLOBAL", 1, [21, 41, 2, 3]], ["SYSTEM", 1, [14]]] }, /* device workload budget */
 ];
 /* globals that are actions or placeholders on the device: buttons instead, or hidden */
 const G_SKIP = new Set(["SLOT", "NAME", "BOOT", "LOAD", "SAVE", "ENG", "SET", "CLRSQ", "INIT", "MIDI", "SYNC", "DRUM", "CPU", "CLK"]);

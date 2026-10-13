@@ -29,7 +29,13 @@ typedef struct {
     uint32_t coeff_valid;
     p5_env_t filter, amp;
 } p5_voice_t;
-typedef struct { p5_voice_t voice[P5_POLY]; uint32_t lfo; int32_t lfo_value, last_pitch, mod_noise, dc_x1, dc_y1; float wheel[CTL * P5_OVERSAMPLE], wheel_pitch[CTL * P5_OVERSAMPLE]; uint8_t value[55]; } p5_part_t;
+typedef struct {
+    float f0,a0,f1,a1,cut,k,filter_gain,filter_velocity,amp_velocity,env_amount;
+    float pa_env,pa_b,pf_env,pf_b,pw_env,pw_b,pwm_a,pwm_b,la,lb,ln;
+    uint32_t ia,ib;
+    const float *wheel,*wheel_pitch;
+} p5_render_params_t;
+typedef struct { p5_voice_t voice[P5_POLY]; uint32_t lfo; int32_t lfo_value, last_pitch, mod_noise, dc_x1, dc_y1; float wheel[CTL * P5_OVERSAMPLE], wheel_pitch[CTL * P5_OVERSAMPLE]; uint8_t value[56],input_key[56],base_valid; int16_t base_e[8]; int32_t coarse_a,coarse_b,fixed_b,fine_b; p5_render_params_t base; } p5_part_t;
 static p5_part_t *p5_part(uint32_t part);
 static p5_patch_t p5_patch[NPART] __attribute__((section(".pool")));
 static uint8_t p5_ready[NPART];
@@ -163,7 +169,9 @@ static inline __attribute__((always_inline)) float p5_lfo_wave(uint32_t phase,co
     if(p[P5_LFO_SAW]){y+=pos;n++;}
     if(p[P5_LFO_TRI]){y+=phase<0x80000000u?pos*2.0f-0.5f:1.5f-pos*2.0f;n++;}
     if(p[P5_LFO_PULSE]){y+=phase<0x80000000u?1.0f:0.0f;n++;}
-    return n ? y/(float)n : 0.0f;
+    /* Division by one/two is exact in binary; only the three-wave blend
+     * needs division. This runs for every wheel sample, not every voice. */
+    return n==1u?y:n==2u?y*0.5f:n==3u?y/3.0f:0.0f;
 }
 /* Float interpolation of one octave, with an exact power-of-two scale.
  * Audio-rate Poly-Mod and the shared wheel avoid repeating a polynomial.
@@ -189,14 +197,48 @@ static __attribute__((section(".dsp_text"))) void p5_mod_samples(p5_part_t *s,co
     }
     s->lfo=phase;s->lfo_value=(int32_t)(p5_lfo_wave(phase,p)*32768.0f);
 }
+static __attribute__((noinline)) void p5_cache_update(track_t *t,p5_part_t *s,const uint8_t *p)
+{
+    if(s->base_valid && !memcmp(s->input_key,p,55u) && !memcmp(s->base_e,t->p+P_E0,sizeof s->base_e))return;
+    memcpy(s->input_key,p,55u);
+    for(uint32_t k=0;k<55u;k++)s->value[k]=(uint8_t)p5_value(p,k);
+    memcpy(s->base_e,t->p+P_E0,sizeof s->base_e);s->base_valid=1;
+    const uint8_t *q=s->value;int curtis=!!p[P5_FILTER_REV];p5_render_params_t *c=&s->base;
+    s->coarse_a=(clamp(q[P5_FREQ_A],0,96)/2-12)*16+t->p[P_E2]*16;
+    s->coarse_b=(clamp(q[P5_FREQ_B],0,96)/2-12)*16+t->p[P_E3]*16;
+    s->fixed_b=12*16+q[P5_FREQ_B]*108*16/127+t->p[P_E3]*16;
+    s->fine_b=q[P5_FINE_B]*100/128;
+    int32_t cut=q[P5_CUTOFF],res=clamp(q[P5_RESONANCE]+t->p[P_E1],0,127);
+    c->cut=(float)(1618+cut*236+(curtis?0:(127-cut>66?66:127-cut)*38)+t->p[P_E0]*256)/256.0f;
+    c->k=(float)(res*(curtis?19200:18800)/127)/4096.0f;
+    c->filter_gain=(float)(32767-res*(curtis?100:45))/32768.0f;
+    c->env_amount=(float)(q[P5_ENV_FILTER]*165)/256.0f;
+    c->pa_env=(float)(q[P5_POLY_ENV]*85)/4096.0f;c->pa_b=(float)(q[P5_POLY_B]*35)/4096.0f;
+    c->pf_env=(float)(q[P5_POLY_ENV]*226)/256.0f;c->pf_b=(float)(q[P5_POLY_B]*226)/256.0f;
+    c->pw_env=(float)(q[P5_POLY_ENV]*64)/32768.0f;c->pw_b=(float)(q[P5_POLY_B]*258)/32768.0f;
+    c->pwm_a=(float)(q[P5_PW_A]*258+t->p[P_E4]*256)/32768.0f;
+    c->pwm_b=(float)(q[P5_PW_B]*258+t->p[P_E5]*256)/32768.0f;
+    c->la=(float)(clamp(q[P5_LEVEL_A]+t->p[P_E6],0,127)*258)/32768.0f;
+    c->lb=(float)(clamp(q[P5_LEVEL_B]+t->p[P_E7],0,127)*258)/32768.0f;c->ln=(float)(q[P5_NOISE]*258)/32768.0f;
+    c->wheel=s->wheel;c->wheel_pitch=s->wheel_pitch;
+}
 static void p5_update_bend(track_t *t);
 static void p5_block(track_t *t)
 {
     p5_part_t *s=p5_part((uint32_t)(t-trk));const uint8_t *p=p5_patch_of(t)->raw;
     if(!s)return;p5_update_bend(t);
     /* Raw-to-DSP clamping is part-wide; envelopes and all voices share it. */
-    for(uint32_t k=0;k<55u;k++)s->value[k]=(uint8_t)p5_value(p,k);
+    p5_cache_update(t,s,p);
     uint32_t inc=P5_LFO_INC[p5_value(p,P5_LFO_RATE)]/P5_OVERSAMPLE;
+    uint32_t live=0;for(uint32_t i=0;i<NVOICE;i++)live|=t->v[i].active;
+    if(!live){
+        /* Keep the wheel clock and noise sequence exact while skipping
+         * stateless modulation buffers that no voice can read. */
+        if(!s->mod_noise)s->mod_noise=0x517953;
+        for(uint32_t i=0;i<CTL*P5_OVERSAMPLE;i++)p5_fast_noise32(&s->mod_noise);
+        s->lfo+=inc*(CTL*P5_OVERSAMPLE);
+        s->lfo_value=(int32_t)(p5_lfo_wave(s->lfo,p)*32768.0f);return;
+    }
     float amount=P5_AMOUNT[clamp(p5_value(p,P5_LFO_INITIAL)+t->mw+(p[P5_PRESS_LFO]?t->at:0),0,127)];
     void (*volatile run)(p5_part_t *,const uint8_t *,uint32_t,float,float)=p5_mod_samples;
     run(s,p,inc,amount,(float)p5_value(p,P5_WHEEL_MIX)*(1.0f/127.0f));
@@ -262,6 +304,7 @@ static float p5_filter(p5_voice_t *s,float input,float cutoff,float resonance,in
 }
 static inline __attribute__((always_inline)) float p5_wave(uint32_t phase, uint32_t inc, uint32_t pw, int saw, int pulse, int tri, float *triangle)
 {
+    if(!saw && !pulse && !tri)return 0.0f;
     float y=0.0f,a=p5_fast_osc_saw(phase,inc),square=0.0f;
     if(saw)y+=a*0.5f;
     if(pulse){square=(a-p5_fast_osc_saw(phase+pw,inc))*0.5f;y+=square;}
@@ -292,12 +335,6 @@ static inline __attribute__((always_inline)) uint32_t p5_wheel_inc(uint32_t base
     if(ratio==1.0f)return base;
     return (uint32_t)fm_minf((float)base*ratio,1932735232.0f);
 }
-typedef struct {
-    float f0,a0,f1,a1,cut,k,filter_gain,filter_velocity,amp_velocity,env_amount;
-    float pa_env,pa_b,pf_env,pf_b,pw_env,pw_b,pwm_a,pwm_b,la,lb,ln;
-    uint32_t ia,ib;
-    const float *wheel,*wheel_pitch;
-} p5_render_params_t;
 static __attribute__((section(".dsp_text"))) void p5_samples(p5_voice_t *restrict s,const uint8_t *restrict p,int32_t *restrict out,uint32_t n,const vmod_t *m,const p5_render_params_t *c)
 {
     int32_t last=0;
@@ -339,6 +376,17 @@ static __attribute__((section(".dsp_text"))) void p5_samples(p5_voice_t *restric
         last=(int32_t)(sum*gain*amp*(2.0f*VOICE_FS));out[i]+=last;
     }
     s->last_pcm=last;
+}
+
+typedef struct {
+    p5_voice_t *voice;const uint8_t *patch;p5_render_params_t params;vmod_t modulation;uint32_t n;
+} p5_batch_t;
+_Static_assert(sizeof(p5_batch_t)<=AUDIO_BATCH_BYTES,"Prophet batch descriptor");
+static void p5_batch_kernel(const void *data,int32_t *pcm)
+{
+    const p5_batch_t *j=data;
+    void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_samples;
+    run(j->voice,j->patch,pcm,j->n,&j->modulation,&j->params);
 }
 
 #if MELODEE_DUAL_CORE
@@ -422,6 +470,7 @@ static void p5_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
         }
         s->last_pcm=0;return;
     }
+    if(!part->base_valid)p5_cache_update(t,part,p);
     const uint8_t *q=part->value;
     float f0=s->filter_prev, a0=s->amp_prev;
     int curtis=!!p[P5_FILTER_REV];
@@ -438,12 +487,10 @@ static void p5_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
      * selecting the same detent (24/25 are both the C1 anchor). Its four
      * octaves end at raw 96. B's keyboard-off knob instead spans nine octaves
      * continuously. Only the rendered pitch is quantized; patch bytes stay exact. */
-    int32_t coarse_a=(clamp(q[P5_FREQ_A],0,96)/2-12)*16;
-    int32_t coarse_b=(clamp(q[P5_FREQ_B],0,96)/2-12)*16;
-    int32_t pitch_a = m->pitch16 + glide + coarse_a + t->p[P_E2]*16;
-    int32_t pitch_b = (p[P5_KEY_B] ? m->pitch16+glide+coarse_b : 12*16+q[P5_FREQ_B]*108*16/127) + t->p[P_E3]*16;
+    int32_t pitch_a=m->pitch16+glide+part->coarse_a;
+    int32_t pitch_b=p[P5_KEY_B]?m->pitch16+glide+part->coarse_b:part->fixed_b;
     uint32_t ia = cents_inc(pitch_a, s->drift, m->fine) / P5_OVERSAMPLE;
-    uint32_t ib = cents_inc(pitch_b, q[P5_FINE_B]*100/128-s->drift, m->fine) / P5_OVERSAMPLE;
+    uint32_t ib = cents_inc(pitch_b, part->fine_b-s->drift, m->fine) / P5_OVERSAMPLE;
     /* Lo Freq drops B seven octaves: Pickle Pincher's keyboard-off B (raw 48,
      * 173 Hz) moves its filter at the demo's 1.35 Hz (ten octaves: 0.17 Hz). */
     if (p[P5_LOW_B]) ib >>= 7;
@@ -453,31 +500,19 @@ static void p5_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
      * at 0). Fitted to Rev-4 recordings: the Curtis knob puts the lowest C
      * (MIDI 36) near 870 Hz * 2^((raw-67)/15.2); SSI sits ~0.7 octave higher
      * below the middle of the knob, converging at the top. */
-    int32_t c0=q[P5_CUTOFF];
-    int32_t cut=1618+c0*236+(curtis?0:(127-c0>66?66:127-c0)*38) + m->cutoff + t->p[P_E0]*256 + s->filter_drift;
-    /* Keyboard tracking pivots on the lowest C, where the keyboard CV is 0 V:
-     * full tracking doubles Hz per keyboard octave; half tracks sqrt(2). */
-    cut += (m->pitch16-36*16) * p5_fast_clamp(p[P5_KEY_FILTER],0,2)*P5_KEYTRACK_HALF_Q7/128;
+    int32_t cut=m->cutoff+s->filter_drift;
+    cut+=(m->pitch16-36*16)*p5_fast_clamp(p[P5_KEY_FILTER],0,2)*P5_KEYTRACK_HALF_Q7/128;
     if(p[P5_PRESS_FILTER])cut+=t->at*96;
-    int32_t resonance=p5_fast_clamp(q[P5_RESONANCE]+t->p[P_E1],0,127);
-    int32_t k=resonance*(curtis?19200:18800)/127;
-    int32_t filter_gain=32767-resonance*(curtis?100:45);
-    int32_t env_amount=q[P5_ENV_FILTER]*165;     /* 0.046 octave per step (Rev-4 recordings) */
-    /* Poly-Mod. Oscillator A (Q12 octaves): filter envelope 2 octaves at 96,
-     * oscillator B +-1.1 octave at 127. Filter (Q8 steps): 8 octaves at 127. */
-    int32_t pa_env=q[P5_POLY_ENV]*85, pa_b=q[P5_POLY_B]*35;
-    int32_t pf_env=q[P5_POLY_ENV]*226, pf_b=q[P5_POLY_B]*226;
-    int32_t pw_env=q[P5_POLY_ENV]*64, pw_b=q[P5_POLY_B]*258;
-    int32_t width_mod=m->shape-(64<<8);
-    int32_t pwm_a=q[P5_PW_A]*258+t->p[P_E4]*256+width_mod, pwm_b=q[P5_PW_B]*258+t->p[P_E5]*256+width_mod;
-    int32_t la=clamp(q[P5_LEVEL_A]+t->p[P_E6],0,127)*258, lb=clamp(q[P5_LEVEL_B]+t->p[P_E7],0,127)*258, ln=q[P5_NOISE]*258;
-    const p5_render_params_t c={f0,a0,f1,a1,
-        (float)cut/256.0f,(float)k/4096.0f,(float)filter_gain/32768.0f,
-        (float)filter_velocity/32768.0f,(float)amp_velocity/32768.0f,(float)env_amount/256.0f,
-        (float)pa_env/4096.0f,(float)pa_b/4096.0f,(float)pf_env/256.0f,(float)pf_b/256.0f,
-        (float)pw_env/32768.0f,(float)pw_b/32768.0f,(float)pwm_a/32768.0f,(float)pwm_b/32768.0f,
-        (float)la/32768.0f,(float)lb/32768.0f,(float)ln/32768.0f,
+    const p5_render_params_t *base=&part->base;
+    float width_mod=(float)(m->shape-(64<<8))/32768.0f;
+    const p5_render_params_t c={f0,a0,f1,a1,base->cut+(float)cut/256.0f,base->k,base->filter_gain,
+        (float)filter_velocity/32768.0f,(float)amp_velocity/32768.0f,base->env_amount,
+        base->pa_env,base->pa_b,base->pf_env,base->pf_b,base->pw_env,base->pw_b,
+        base->pwm_a+width_mod,base->pwm_b+width_mod,base->la,base->lb,base->ln,
         ia,ib,part->wheel,part->wheel_pitch};
+    if(audio_batch_active){
+        const p5_batch_t job={s,p,c,*m,n};audio_batch_push(p5_batch_kernel,&job,sizeof job,out,n,AP_PROPHET);return;
+    }
     /* An indirect call crosses the XIP/RAM distance beyond direct branch range. */
     void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_samples;
 #if MELODEE_DUAL_CORE

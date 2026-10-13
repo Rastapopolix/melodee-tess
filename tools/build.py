@@ -273,7 +273,7 @@ def build_app(stub):
     flags = [*CFLAGS, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
     for flag in ("MELODEE_FLASH", "MELODEE_OTA", "MELODEE_OTA_DRYRUN", "MELODEE_OTA_RAMONLY", "MELODEE_CDC",
                  "MELODEE_UART", "MELODEE_USB_AUDIO", "MELODEE_ICONS", "MELODEE_PROPHET_PROTOTYPE", "MELODEE_PROPHET", "MELODEE_FM6", "MELODEE_CZ", "MELODEE_PLAITS",
-                 "MELODEE_BENCH_SILENT", "MELODEE_FX_PROFILE", "MELODEE_DUAL_CORE", "MELODEE_CACHE_RAM", "MELODEE_CORE1_TEST", "MELODEE_RAM_AUDIO", "MELODEE_HW_EQ"):
+                 "MELODEE_BENCH_SILENT", "MELODEE_FX_PROFILE", "MELODEE_AUDIO_PROFILE", "MELODEE_BATCH_AUDIO", "MELODEE_ADMISSION", "MELODEE_AUDIO_BENCH", "MELODEE_DUAL_CORE", "MELODEE_CACHE_RAM", "MELODEE_CORE1_TEST", "MELODEE_RAM_AUDIO", "MELODEE_HW_EQ"):
         v = os.environ.get(flag)    # unset: the default in firmware/src/melodee.c
         if v in ("0", "1"):
             flags.append(f"-D{flag}={v}")
@@ -402,7 +402,7 @@ def check(img, syms, dis, rt):
             if (name == kernel or address) and not sym("_dsp_start") <= address < sym("_dsp_end"):
                 errors.append(f"{name} must remain in internal DSP RAM")
         notes.append("FM6: sample kernel and operator helpers in internal DSP RAM")
-    for name in ("fm6_output", "fm6_dc_samples", "fm6_control_ram", "fm6_eg_go", "fm6_eg_step", "fm6_peg_go", "p5_dc_samples", "mix_mono_samples", "master_samples", "master_out"):
+    for name in ("fm6_output", "fm6_dc_samples", "fm6_eg_go", "fm6_eg_step", "fm6_peg_go", "p5_dc_samples", "mix_mono_samples", "master_samples", "master_out"):
         address = sym(name)
         if address and not sym("_dsp_start") <= address < sym("_dsp_end"):
             errors.append(f"{name} must remain in internal DSP RAM")

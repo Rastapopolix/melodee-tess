@@ -52,15 +52,19 @@ static uint32_t lfo_rand(track_t *t)
  * advances 2^32 x CTL / cycle a block (two 32-bit divides; the 1-bit truncation of 0xFFFFFFFF drifts by less than a
  * millionth of a cycle a cycle). OFF: RATE's table, as before */
 static uint32_t div_samples(uint32_t div);         /* (mix.c) */
+static struct { uint32_t cycle, inc; } lfo_sync_cache[NTRK];
 static __attribute__((noinline)) uint32_t lfo_sync_inc(const track_t *t)   /* (not inlined: its divides stay out of
                                                                            * the audio ISR's loop over the tracks) */
 {
     uint32_t cyc, q, r;
     cyc = div_samples(LSYNC_DIV[(uint32_t)t->p[P_LSYNC] % NELEM(LSYNC_DIV)]);
     cyc = cyc ? cyc : 1u;
+    uint32_t ti=(uint32_t)(t-trk)%NTRK;
+    if(lfo_sync_cache[ti].cycle==cyc)return lfo_sync_cache[ti].inc;
     q = 0xFFFFFFFFu / cyc;
     r = 0xFFFFFFFFu % cyc;
-    return q * CTL + (r * CTL + CTL) / cyc;
+    lfo_sync_cache[ti].cycle=cyc;
+    return lfo_sync_cache[ti].inc=q*CTL+(r*CTL+CTL)/cyc;
 }
 
 static void track_lfo_tick(track_t *t)
@@ -80,12 +84,36 @@ static void track_lfo_tick(track_t *t)
     }
 }
 
+static uint32_t capacity_steals,admission_rejections;
+#if MELODEE_AUDIO_BENCH
+static uint32_t audio_bench_until;
+static int audio_bench_active(void)
+{
+#ifdef FM1_IRQ_TARGET
+    return audio_bench_until && (int32_t)(audio_bench_until-fm1_ticks())>0;
+#else
+    return audio_bench_until!=0;
+#endif
+}
+#endif
+/* Engine capacity is independent of admission. Sounding voices, including
+ * releases, compete in one weighted pool; idle tracks reserve no voices. */
+static uint32_t voice_contract_cap(const track_t *t)
+{
+    const engine_t *e=ENGINES[t->engine];uint32_t n=e->cap?e->cap(t):e->poly;
+    return !n?NPOLY:n<NVOICE?n:NVOICE;
+}
+
 /* voices the engine may use (POLY and UNISON): its cap, else NPOLY */
 static uint32_t trk_nvoice(const track_t *t)
 {
     const engine_t *e = ENGINES[t->engine];
     uint32_t c = e->cap ? e->cap(t) : e->poly;
-    return !c ? NPOLY : c < NVOICE ? c : NVOICE;
+    uint32_t cap=!c?NPOLY:c<NVOICE?c:NVOICE;
+#if MELODEE_AUDIO_BENCH
+    if(audio_bench_active())return cap;
+#endif
+    uint32_t contract=voice_contract_cap(t);return cap<contract?cap:contract;
 }
 
 /* the part's voice mode: P_VOICE, POLY for an engine of hits (engine_t.oneshot: DRUM) */
@@ -95,9 +123,30 @@ static uint32_t trk_vmode(const track_t *t)
 }
 
 /* ------------------------------------------------- the shared voice budget --- */
+#if MELODEE_ADMISSION
+static const track_t *voice_admitting;
+static uint8_t voice_admitting_p5parts;
+static uint32_t voice_p5_parts(void)
+{
+    if(voice_admitting)return voice_admitting_p5parts;
+    uint32_t parts=0;
+    for(uint32_t p=0;p<NPART;p++)if(trk[p].engine==ENGI_PROPHET){
+        uint32_t live=0;for(uint32_t i=0;i<NVOICE;i++)live|=trk[p].v[i].active && trk[p].v[i].stage!=4u;
+        parts+=live!=0;
+    }
+    return parts;
+}
+#endif
 static uint32_t voice_units(const track_t *t)
 {
     const engine_t *e = ENGINES[t->engine];
+#if MELODEE_ADMISSION
+    if(e==&ENG_P5_TEST){
+        return voice_p5_parts()>1u?4u:3u;
+    }
+    if(e==&ENG_CZ)return 3u;
+    if(e==&ENG_FM6 || e==&ENG_SID || e==&ENG_DRUM)return 2u;
+#endif
     return e->units ? e->units(t) : trk_nvoice(t) > NPOLY ? 1u : 2u;
 }
 
@@ -106,16 +155,20 @@ static uint32_t voice_units(const track_t *t)
 static uint32_t vbudget_cpu1 = VBUDGET;
 static uint32_t voice_budget(void)
 {
+#if MELODEE_AUDIO_BENCH
+    if(audio_bench_active())return NPART*NVOICE*3u;
+#endif
 #if MELODEE_RAM_AUDIO
 #if MELODEE_DUAL_CORE
     /* CPU1 retirement removes the extra headroom. New notes then use the
      * original budget; overload shedding still handles already-active work. */
-    return audio_worker_online ? vbudget_cpu1 : 16u;
+    uint32_t selected=(uint32_t)settings_budget;
+    return audio_worker_online?selected*vbudget_cpu1/VBUDGET:selected<16u?selected:16u;
 #else
-    return 16u;
+    return (uint32_t)settings_budget<16u?(uint32_t)settings_budget:16u;
 #endif
 #else
-    return VBUDGET;
+    return (uint32_t)settings_budget;
 #endif
 }
 
@@ -185,6 +238,12 @@ static void voice_kill(voice_t *v)                      /* fade out over the nex
     if (part < NPART) voice_kills_part[part]++;
 }
 
+static void voice_capacity_kill(voice_t *v)
+{
+    capacity_steals++;
+    voice_kill(v); /* preserve the legacy explicit-fade counter */
+}
+
 /* the budget is full: free room for a voice of part t. 0 = nothing to take (soft) */
 static int voice_room(track_t *t, int soft)
 {
@@ -194,7 +253,7 @@ static int voice_room(track_t *t, int soft)
         if (k == NVOICE)
             return !soft;                               /* hard: over the budget (cannot happen: each of the
                                                          * NPART parts protects one voice at most) */
-        voice_kill(&vp->v[k]);
+        voice_capacity_kill(&vp->v[k]);
     }
     return 1;
 }
@@ -242,11 +301,11 @@ static voice_t *voice_alloc(track_t *t, uint32_t note)
             return &t->v[k];                            /* our own: restart it in place (no click) */
         if (k >= NVOICE)
             break;
-        voice_kill(&vp->v[k]);
+        voice_capacity_kill(&vp->v[k]);
     }
     if (t->p[P_ALLOC] || t->p[P_GLIDE]) {
+        int32_t target=micro_active(t)?clamp(micro_pitch(t,(int32_t)note),0,1270000)*16/10000:(int32_t)note*16;
         for (i = 0; i < np; i++) {
-            int32_t target = micro_active(t) ? clamp(micro_pitch(t, (int32_t)note), 0, 1270000) * 16 / 10000 : (int32_t)note * 16;
             int32_t d = t->v[i].pitch_cur - target;
             if (t->v[i].active)
                 continue;
@@ -313,11 +372,13 @@ static void voice_scale_pitch(const track_t *t, voice_t *v, uint32_t note)
 
 static void voice_start(track_t *t, voice_t *v, uint32_t note, uint32_t vel, int glide)
 {
+    AP_START(attack_start);
     const engine_t *e = ENGINES[t->engine];
     int sounding = v->active && v->stage != 0;
     uint32_t ph0 = v->ph[0], ph1 = v->ph[1], ph2 = v->ph[2];
     int32_t s0 = v->s[0], s1 = v->s[1], s4 = v->s[4], s5 = v->s[5], s6 = v->s[6], s7 = v->s[7];
     uint32_t keep = e->keep;
+    capacity_steals+=(uint32_t)(sounding && (v->note!=note || !v->gate));
     voice_was = (uint8_t)(!v->active ? 0u : v->gate ? 2u : 1u);
     v->note = (uint8_t)note;
     v->vel = (uint8_t)vel;
@@ -337,6 +398,7 @@ static void voice_start(track_t *t, voice_t *v, uint32_t note, uint32_t vel, int
     }                                                   /* sounding: the attack starts from the current level */
     if (!eng_state_prepare(t)) { v->active = v->gate = 0; return; }
     e->note_on(t, v);
+    AP_END(AP_ATTACK,attack_start);
     if (sounding && !e->sampled) {                     /* retrigger / steal: keep phases and filter */
         v->ph[0] = ph0;                                 /* states (resetting them clicks) */
         v->ph[1] = ph1;
@@ -418,7 +480,7 @@ static void mono_remove(track_t *t, uint32_t note)
     t->nmono = (uint8_t)k;
 }
 
-static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
+static void trk_note_on_work(track_t *t, uint32_t note, uint32_t vel)
 {
     uint32_t any = 0, i, mode = trk_vmode(t);
     if (t->p[P_MUTE])
@@ -442,7 +504,7 @@ static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
         t->lfo_fade = 0;
     }
     if (mode == V_POLY) {
-        voice_t *v = voice_alloc(t, note);
+        AP_START(alloc_start);voice_t *v = voice_alloc(t, note);AP_END(AP_ALLOC,alloc_start);
         t->nmono = 0;                                   /* no stale mono stack after a mode change */
         t->mono_note = 0;
         v->fine = 0;
@@ -465,6 +527,19 @@ static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
         else                                            /* LEGATO / UNISON: glide only between held notes */
             mono_play(t, want, vel, !sounding, sounding && (t->p[P_GLIDE] != 0 || t->slide_glide));
     }
+}
+
+static void trk_note_on(track_t *t,uint32_t note,uint32_t vel)
+{
+#if MELODEE_ADMISSION
+    const track_t *previous=voice_admitting;uint8_t previous_parts=voice_admitting_p5parts;
+    voice_admitting=0;uint32_t parts=voice_p5_parts();
+    if(t->engine==ENGI_PROPHET){uint32_t live=0;for(uint32_t i=0;i<NVOICE;i++)live|=t->v[i].active && t->v[i].stage!=4u;parts+=!live;}
+    voice_admitting=t;voice_admitting_p5parts=(uint8_t)parts;
+    trk_note_on_work(t,note,vel);voice_admitting=previous;voice_admitting_p5parts=previous_parts;
+#else
+    trk_note_on_work(t,note,vel);
+#endif
 }
 
 static void trk_note_off(track_t *t, uint32_t note)
@@ -597,7 +672,8 @@ static int32_t env_tick(track_t *t, voice_t *v)
  * voices of side 0 into spread_buf and the others into out, then adds spread_buf to out: out is every voice, as always
  * (the engines add into either the same way), spread_buf the left ones. A cost per block, none per voice */
 static uint8_t spread_on;
-static int32_t spread_buf[CTL];
+static int32_t spread_storage[CTL];
+static int32_t *spread_buf=spread_storage;
 static __attribute__((noinline)) void spread_clear(void)
 {
     uint32_t i;
@@ -627,6 +703,33 @@ static __attribute__((noinline)) void tune_cache_update(void)
     tune_cache.pitch=song.g[G_TUNE]>=0?song.g[G_TUNE]*16/100:-((-song.g[G_TUNE]*16+99)/100);
     tune_cache.fine=(song.g[G_TUNE]*16-tune_cache.pitch*100)*2367/16000;
 }
+typedef struct {
+    track_t *track;voice_t *voice;const engine_t *engine;vmod_t modulation;uint32_t n;
+    int16_t engine_params[8],lane_params[DV_NLANE];
+} engine_batch_t;
+_Static_assert(sizeof(engine_batch_t)<=AUDIO_BATCH_BYTES,"Engine batch descriptor");
+static void engine_batch_kernel(const void *data,int32_t *pcm)
+{
+    const engine_batch_t *j=data;int16_t params[P_COUNT];
+    for(uint32_t k=0;k<8u;k++)params[P_E0+k]=j->engine_params[k];
+    for(uint32_t k=0;k<DV_NLANE;k++)params[P_LN0+k]=j->lane_params[k];
+    if(j->engine==&ENG_DRUM){dr_scratch_t scratch;drum_render_into(j->track,j->voice,pcm,j->n,&j->modulation,&scratch,params);}
+    else if(j->engine==&ENG_SID)sid_render_into(j->track,j->voice,pcm,j->n,&j->modulation,params);
+    else j->engine->render(j->track,j->voice,pcm,j->n,&j->modulation);
+}
+
+static inline void engine_join(void) {}
+static void engine_render(track_t *t,voice_t *v,const engine_t *e,int32_t *out,uint32_t n,const vmod_t *m)
+{
+    if(audio_batch_active && (e==&ENG_CZ || e==&ENG_SID || e==&ENG_DRUM)){
+        engine_batch_t j;j.track=t;j.voice=v;j.engine=e;j.modulation=*m;j.n=n;
+        for(uint32_t k=0;k<8u;k++)j.engine_params[k]=t->p[P_E0+k];
+        for(uint32_t k=0;k<DV_NLANE;k++)j.lane_params[k]=t->p[P_LN0+k];
+        audio_batch_push(engine_batch_kernel,&j,sizeof j,out,n,e==&ENG_CZ?AP_CZ:e==&ENG_SID?AP_SID:drum_is909(t)?AP_909:AP_808);return;
+    }
+    e->render(t,v,out,n,m);
+}
+
 /* Keep the per-voice renderer separate from the bus/ISR loops. This bounds
  * the ISR's code footprint and permits an independent target cost check. */
 static __attribute__((noinline)) uint32_t track_render_audio(track_t *t, int32_t *out, uint32_t n, int clear_idle)
@@ -658,9 +761,11 @@ static __attribute__((noinline)) uint32_t track_render_audio(track_t *t, int32_t
             pe_new[i] = t->p[P_E0 + i];
             t->p[P_E0 + i] = t->pe_old[i];
         }
+    AP_START(control_start);
     track_lfo_tick(t);
     if (e->block)                                       /* the engine's per-part work (WHEEL: bars, rotor) */
         e->block(t);
+    AP_END(AP_TRACK_CONTROL,control_start);
     if(!live){
         /* FM6's block keeps ghost envelopes running; its post resets the DC
          * filter. LFO, bend and switch fades also continue on silent tracks. */
@@ -679,6 +784,7 @@ static __attribute__((noinline)) uint32_t track_render_audio(track_t *t, int32_t
         if (!v->active)
             continue;
         {
+            AP_START(env_start);
             env = env_tick(t, v);
             if (e->ownenv && v->active) {               /* the engine's envelopes (FM6): they end the voice */
                 if (e->done(t, v)) {                    /* its last block, faded out (the engine's state goes on */
@@ -703,6 +809,7 @@ static __attribute__((noinline)) uint32_t track_render_audio(track_t *t, int32_t
                 m.amp1 = m.amp1 * (int32_t)(t->xf - 1u) / (int32_t)XF_BLOCKS;
             m.amp0 = v->env_out;
             v->env_out = m.amp1;
+            AP_END(AP_ENVELOPE,env_start);
         }
         if (v->pitch_cur != v->pitch16) {               /* glide */
             int32_t d = v->pitch16 - v->pitch_cur;
@@ -726,16 +833,18 @@ static __attribute__((noinline)) uint32_t track_render_audio(track_t *t, int32_t
         if ((MELODEE_LEGACY_EXTRAS && e == ENGINES[2]) || e == &ENG_CZ)   /* native DCA remains the matrix's ENV source */
             m.envq15 = phase_env_source(t, v);
         if(e==&ENG_P5_TEST)m.envq15=p5_env_source(t,v);
-        if (mod.on)                                     /* the modulation matrix (mod.c) */
-            mod_voice(t, v, &m, m.fine);
+        if (mod.on){
+            AP_START(mod_start);mod_voice(t,v,&m,m.fine);AP_END(AP_MODULATION,mod_start);
+        }
         /* 1/16 st and 1/4096 -> Q24 octaves: the voice's own offset (the matrix's pitch too), without TUNE and bend */
         m.plog = (m.pitch16 - tune - bend16 - (int32_t)v->note * 16) * 87381 + (m.fine - tune_fine - bend_fine) * 5909;
-        e->render(t, v, spread_on > v->side ? spread_buf : out, n, &m);
+        engine_render(t,v,e,spread_on>v->side?spread_buf:out,n,&m);
         nr++;
     }
+    engine_join();
     if (spread_on) fm6_join();
-    if (spread_on) spread_sum(out);
-    if (e->post)
+    if (spread_on && !audio_batch_active) spread_sum(out);
+    if (e->post && !audio_batch_active)
         e->post(t, out, n, nr);
 track_render_done:
     if (fade) {

@@ -280,7 +280,32 @@ static void shared_bus_case(int parallel,uint32_t type)
     }
     for(uint32_t i=G_MFXTYPE;i<G_COUNT;i++)song.g[i]=GP[i].def;memset(fx_state,0,sizeof fx_state);serial_render=0;
 }
-int main(void)
+static _Atomic uint32_t batch_advances;
+static void batch_count_kernel(const void *context,int32_t *pcm)
+{
+    (void)context;atomic_fetch_add(&batch_advances,1u);
+    for(uint32_t i=0;i<CTL;i++)pcm[i]=6;
+}
+static void batch_corruption(void)
+{
+    int32_t dropped[CTL]={0},producer[CTL]={0};audio_worker_online=1;serial_render=0;
+    audio_batch_count=2;AB_STORE(&audio_batch_invalid,0u);AB_STORE(&audio_batch_closed,1u);
+    AB_STORE(&audio_batch_published,2u);AB_STORE(&audio_batch_worker_mask,1u);
+    for(uint32_t k=0;k<2;k++){
+        audio_batch_job_t *j=&audio_batch_jobs[k];j->run=batch_count_kernel;j->n=k?CTL:CTL+1u;
+        j->profile_id=AP_FM6;j->guard=(uint32_t)(uintptr_t)j->run^j->n^j->profile_id^0x913ab267u;
+        j->out=k?producer:dropped;
+    }
+    atomic_store(&batch_advances,0u);audio_batch_started=(uint8_t)audio_worker_submit(audio_batch_parallel,0);
+    assert(audio_batch_started);audio_batch_flush();
+    assert(!audio_worker_online && atomic_load(&batch_advances)==1u);
+    for(uint32_t i=0;i<CTL;i++)assert(!dropped[i] && producer[i]==6);
+    AB_STORE(&audio_batch_invalid,0u);AB_STORE(&audio_batch_published,AUDIO_BATCH_JOBS+1u);
+    audio_batch_parallel(0);assert(AB_LOAD(&audio_batch_invalid));
+    AB_STORE(&audio_batch_invalid,0u);AB_STORE(&audio_batch_published,0u);
+    puts("Audio batch: corrupt bounds retire worker, drop partial PCM and never replay advanced state: OK");
+}
+static int dual_core_suite(void)
 {
     pthread_t thread;
     assert(!pthread_create(&thread, 0, worker_thread, 0));
@@ -315,8 +340,9 @@ int main(void)
     for(uint32_t mode=0;mode<8;mode++)for(uint32_t voices=1;voices<=2;voices++){
         prophet_case(0,0,mode,voices,2);prophet_case(1,0,mode,voices,2);prophet_cases++;
     }
-    assert(p5_pairs>0);
+    assert(p5_pairs>0 || audio_batch_pairs>0);
     prophet_retire();
+    batch_corruption();
     audio_worker_online = 0;
     assert(!audio_worker_submit(fm6_worker_kernel, 0));
     assert(audio_worker.jobs > 0);
@@ -340,3 +366,7 @@ int main(void)
     printf("dual-core: 1536 FM6 + %u Prophet serial/concurrent cases identical; %u FM6 / %u Prophet pairs; eight-voice allocation, retire mid-song, busy/offline/wrap ok\n", prophet_cases,fm6_pairs,p5_pairs);
     return 0;
 }
+
+#ifndef AUDIO_MATRIX_INCLUDE
+int main(void){return dual_core_suite();}
+#endif

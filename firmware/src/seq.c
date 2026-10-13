@@ -1218,7 +1218,8 @@ static void events_block(uint32_t n)
     }
     audition_tick(n);
     keyboard_block();
-    while (mi_r != mi_w) {                            /* USB-MIDI (and TRS) in */
+    uint32_t midi_dispatch_left=64u;
+    while (mi_r != mi_w && midi_dispatch_left) {       /* bounded USB-MIDI/TRS burst, order retained */
         uint32_t at = mi_r % MQ, pkt = midi_in_q[at], status = (pkt >> 8) & 0xFFu;
         uint32_t st = status & 0xF0u, ch = status & 0x0Fu;
         uint32_t d1 = (pkt >> 16) & 0x7Fu, d2 = (pkt >> 24) & 0x7Fu;
@@ -1226,7 +1227,7 @@ static void events_block(uint32_t n)
         uint32_t time = midi_in_time[at];
         if (midi_render_timed && (int32_t)(time - midi_render_time) > 0)
             break;
-        mi_r++;
+        mi_r++;midi_dispatch_left--;
         if (status >= 0xF8u) {
             if (selected_clock == source) {
                 if (status == 0xFAu || status == 0xFBu || status == 0xFCu) {

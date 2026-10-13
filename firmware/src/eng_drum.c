@@ -83,7 +83,7 @@ static void drum909_values(track_t *t,drum909_part_t *k,uint32_t ins,int32_t pit
         if(s->field==D9_F_ATTACK || s->field==D9_F_SNAPPY || (ins>=D9_RS && s->field==D9_F_TUNE))value+=c[2]+(s->field==D9_F_SNAPPY?0:t->p[P_E2]-64);
         if(s->field==D9_F_SNAPPY)value+=t->p[P_E4]-64;
         if(s->field==D9_F_TONE)value+=t->p[P_E2]-64;
-        drum909_set(d,(int)ins,j,value);
+        d9_set_panel(d,(int)ins,j,value,1);
     }
     float ratio=fm_exp2f((float)(c[0]+pitch)/12.0f+(float)(t->p[P_E1]-64)*3.0f/192.0f);
     float decay=fm_exp2f((float)(c[1]+t->p[P_E3]-64)/24.0f);
@@ -95,6 +95,12 @@ static void drum909_values(track_t *t,drum909_part_t *k,uint32_t ins,int32_t pit
     }else if(ins==D9_RS){d->rim.tune*=ratio;d->rim.tune2=220.0f*ratio;d->rim.decay=40.0f*decay;d9_rim_retune(&d->rim);}
     else if(ins==D9_CP){d->clap.tune*=ratio;d->clap.tail_decay*=decay;d9_clap_retune(&d->clap);}
     else {d->smp[ins-D9_CH].pitch*=ratio;d->smp[ins-D9_CH].decay*=decay;d9_smp_rate(&d->smp[ins-D9_CH]);}
+    /* No sample runs between panel fields. Prepare only their final shape
+     * and final tuned filters; histories and trigger ordering stay intact. */
+    if(ins<=D9_HT)d9_shape_prep(&d->bt[ins].shape,d->bt[ins].drive,d->bt[ins].dist_type);
+    else if(ins==D9_RS)d9_shape_prep(&d->rim.shape,d->rim.drive,d->rim.dist_type);
+    else if(ins==D9_CP)d9_shape_prep(&d->clap.shape,d->clap.drive,d->clap.dist_type);
+    else d9_shape_prep(&d->smp[ins-D9_CH].shape,d->smp[ins-D9_CH].drive,d->smp[ins-D9_CH].dist_type);
     d->accent=2.0f*(float)dr8_level(vel,t->p[P_E5])/(float)dr8_level(vel,100);
     if(ins==D9_BD && t->p[P_E6])d->bt[0].attack*=0.5f;
     drum909_trigger(d,(int)ins,(float)vel/127.0f);
@@ -317,14 +323,16 @@ static int32_t drum_amp(track_t *t, voice_t *v, int32_t adsr)
 }
 
 /* Optional processing has bounded helpers; the neutral output loop stays small. */
-static __attribute__((noinline)) int drum_source(track_t *t,voice_t *v,drum_lane_t *L,int32_t *y,uint32_t n)
+static __attribute__((noinline)) int drum_source(track_t *t,voice_t *v,drum_lane_t *L,int32_t *y,uint32_t n,dr_scratch_t *scratch,const int16_t *p)
 {
     uint32_t i;
-    if(drum_is909(t)) {
+    if(p[P_E0]==DK_909) {
         drum909_part_t *k=drum909_of(t); if(!k || !k->nz)return 0;
         float f[CTL]={0}; drum909_render_voice(&k->d,v->s[1],k->nz,f,(int)n);
         for(i=0;i<n;i++)y[i]=(int32_t)(fm_clampf(f[i],-2.0f,2.0f)*12000.0f);
-    } else {int16_t local[P_COUNT];drum808_values(t,L->sound,local);dr8_run(&L->r,local,y,n);}
+    } else {int16_t local[P_COUNT];for(uint32_t k=0;k<8u;k++)local[P_E0+k]=p[P_E0+k];const int8_t *c=drum_patch[t-trk].c[L->sound];
+        local[P_E3]=(int16_t)clamp(local[P_E3]+c[1],0,127);
+        if(L->sound==D9_SD)local[P_E4]=(int16_t)clamp(local[P_E4]+c[2],0,127);dr8_run_into(&L->r,local,y,n,scratch);}
     return 1;
 }
 static __attribute__((noinline)) void drum_limit(voice_t *v,int32_t *y,uint32_t n)
@@ -341,9 +349,8 @@ static __attribute__((noinline)) void drum_color(drum_lane_t *L,int32_t value,in
     int32_t k=dr_lp1(dr_exp(4000u,value,24));
     for(uint32_t i=0;i<n;i++){L->r.color+=(int32_t)(((int64_t)(y[i]-L->r.color)*k)>>14);y[i]=value<0?L->r.color:y[i]+((y[i]-L->r.color)*value>>6);}
 }
-static void drum_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
+static void drum_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m,dr_scratch_t *scratch,const int16_t *p)
 {
-    const int16_t *p = t->p;
     drum_lane_t *L = drum_lane_of(t, v);
     int32_t y[CTL], drv = p[P_E7], g = 0, mk = 0;
     uint32_t i;
@@ -351,7 +358,7 @@ static void drum_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
         return;
     if (n > CTL)
         n = CTL;
-    if(!drum_source(t,v,L,y,n))return;
+    if(!drum_source(t,v,L,y,n,scratch,p))return;
     if(v->s[5])drum_limit(v,y,n);
     if (drv > 0) {                                       /* DRV: x1..x4 into the soft clip, the level kept (Q12) */
         g = 4096 + drv * 3 * 4096 / 127;
@@ -378,6 +385,9 @@ static void drum_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
         out[i] += s << 1;
     }
 }
+
+static void drum_render(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m)
+{ drum_render_into(t,v,out,n,m,&dr_scratch,t->p); }
 
 /* the GM drum map, the first C (key 7) is the kick (C2, 36) */
 static int32_t drum_keys(const track_t *t, uint32_t k)

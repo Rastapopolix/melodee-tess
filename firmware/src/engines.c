@@ -3,6 +3,7 @@
 /* Engine table (order = PRESETS browsing order and the engine numbers of the editor protocol) and the parts'
  * sounds at power-on. */
 #include "dsp.c"
+#include "audio_batch.h"
 #include "eng_prophet_test.c"   /* (always: what the rest names; MELODEE_PROPHET 0: nothing reaches it, core.h) */
 #include "eng_phase.c"
 #include "eng_cz.c"

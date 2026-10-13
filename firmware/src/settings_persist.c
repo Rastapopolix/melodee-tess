@@ -39,12 +39,15 @@ static int settings_owned(const persist_t *p)
 }
 /* Legacy Melodee has no owner tag. Require its tagged palette and complete
  * schema, then check the optional template in project.c before accepting it. */
+#define WORK_BUDGET_TAG 0x57420000u /* WB: high bits of usb_off; low two bits retain USB mode */
 static int settings_legacy_valid(const persist_t *p)
 {
+    uint32_t work = p->ext.usb_off, points = (work >> 8) & 255u;
+    int usb_ok = work <= 3u || ((work & 0xFFFF00FCu) == WORK_BUDGET_TAG && points >= 8u && points <= 32u);
     return p->magic == PERSIST_MAGIC && palette_stored_ok(p->palette) &&
         p->panel.magic == PANEL_MAGIC && p->lowcut <= 2u && (p->zoom & 0xFFu) <= 1u &&
         (p->zoom <= 0xFFu || (p->zoom & 0xFFFF0000u) == RECORD_PREF_TAG) &&
-        hold_stored_ok(p->bold) && p->favorites.filter <= 1u && p->ext.usb_off <= 3u &&
+        hold_stored_ok(p->bold) && p->favorites.filter <= 1u && usb_ok &&
         p->ext.boot <= 4u && p->ext.drumch <= 17u && p->ext.lights <= LIGHTS_N;
 }
 
@@ -52,7 +55,10 @@ static int settings_legacy_valid(const persist_t *p)
 static int settings_import(persist_t *p, int n)
 {
     if (n != (int)sizeof *p || p->magic != PERSIST_MAGIC) return 0;
-    if (p->ext.usb_off > 3u) p->ext.usb_off = 0;
+    uint32_t work=p->ext.usb_off,points=(work>>8)&255u;
+    settings_budget=(int16_t)(((work&0xffff0000u)==WORK_BUDGET_TAG && points>=8u && points<=32u)?points:VOICE_BUDGET_DEFAULT);
+    uint32_t mode = work <= 3u || (work & 0xFFFF00FCu) == WORK_BUDGET_TAG ? work & 3u : 0u;
+    p->ext.usb_off=mode|(settings_budget!=VOICE_BUDGET_DEFAULT?WORK_BUDGET_TAG|((uint32_t)settings_budget<<8):0u);
     if (p->ext.boot > 4u)
         p->ext.boot = 0;
     settings_boot = (uint8_t)p->ext.boot;
@@ -119,6 +125,7 @@ static void settings_export(persist_t *p)
 #endif
     p->favorites.factory[15][27]=settings_screen;
     p->favorites.factory[15][28] = settings_autosave ? 0u : AUTOSAVE_OFF_TAG;
+    p->ext.usb_off=(p->ext.usb_off&3u)|(settings_budget!=VOICE_BUDGET_DEFAULT?WORK_BUDGET_TAG|((uint32_t)settings_budget<<8):0u);
     p->ext.boot = settings_boot;
     p->ext.drumch = settings_drumch == 10u ? 0u : !settings_drumch ? 17u : settings_drumch;
     p->ext.lights = settings_lights == LIGHTS_MID ? 0u : settings_lights + 1u;

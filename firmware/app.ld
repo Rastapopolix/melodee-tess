@@ -49,10 +49,16 @@ SECTIONS
     _cpu1_ustack_top = _cpu1_stacks_lo + 4096;
     _cpu1_sstack_top = _cpu1_stacks_lo + 8192;
     _resource_end = ORIGIN(POOL) + LENGTH(POOL);
-    _resource_minimum = DEFINED(AUDIO_RESIDENT) ? 64K : 139K;
+    /* Complete resident interrupt/input graph trades arena capacity for code.
+     * Four largest engine states must fit 48 KiB (ram_audio_test); effect
+     * delay memory has its own admission/allocation limits. */
+    _resource_minimum = DEFINED(AUDIO_RESIDENT) ? 48K : 139K;
     ASSERT(_resource_end - _resource_start >= _resource_minimum, "audio working arena below worst-case budget")
     .noinit (NOLOAD) : { *(.noinit*) . = ALIGN(4); _noinit_end = .; } > NOINIT
-    _resource_retained_start = _noinit_end;
+    /* These transfer/job buffers are always filled before use, never retained
+     * musical state. Keep diagnostic .noinit addresses ahead of them intact. */
+    .audio_scratch (NOLOAD) : { . = ALIGN(32); *(.audio_scratch*) . = ALIGN(4); _audio_scratch_end = .; } > NOINIT
+    _resource_retained_start = _audio_scratch_end;
     _resource_retained_end = ORIGIN(NOINIT) + LENGTH(NOINIT);
     /* Never part of .bss or startup zeroing: use only after HAL self-test. */
     _resource_cache_start = ORIGIN(CACHE);

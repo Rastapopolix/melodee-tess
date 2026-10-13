@@ -92,8 +92,12 @@ static void controls(void)
     verify("A4 card shows 432 Hz", str_eq(value, "432") && str_eq(unit, "Hz"));
     stop_transport(); project_save(0); tuning_a4 = 444;
     project_load(0); verify("Loading a project keeps the device's chosen A4", tuning_a4 == 444);
+    int16_t previous_budget=settings_budget;settings_budget=32;
+    project_load(0);verify("Loading a project keeps the shared workload allowance",settings_budget==32);
     template_save(); tuning_a4 = 432;
     template_load(); verify("Loading a template keeps the device's chosen A4", tuning_a4 == 432);
+    settings_budget=24;template_load();verify("Loading a template keeps the device workload allowance",settings_budget==24);
+    settings_budget=previous_budget;
     song.g[G_TUNE] = 7; go_title("GLOBAL"); turn(EN_K4, 1);
     verify("TUNE remains an independent cents adjustment", song.g[G_TUNE] == 8 && tuning_a4 == 432);
     tuning_a4 = 440; turn(EN_K1, -1000);

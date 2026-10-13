@@ -336,7 +336,8 @@ static inline __attribute__((always_inline)) int32_t fm6_peg_step(fm6_peg_t *e, 
 typedef struct fm6_voice {                               /* a voice; operators in Dexed's order: 0 = OP6 */
     fm6_eg_t eg[6];
     uint32_t ph[6];                                      /* phase, Q24 = a cycle */
-    int32_t fq[6];
+    int32_t fq[6], freq_log[6];
+    uint8_t freq_valid;
     float gout[6], g[6], dg[6];                 /* step; gain at the block's end, now, per sample */
     int32_t base[6], porta[6];                           /* the note's log frequency; portamento's */
     int16_t ol[6];                                       /* output level (note, velocity), microsteps */

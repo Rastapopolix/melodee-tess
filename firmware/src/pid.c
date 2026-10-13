@@ -203,6 +203,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     G_(G_FXRETURN, 0, "FX RETURN", "The level of the send effects in the mix."),
     G_(G_FXMODE, 0, "FX MODE",
         "CHAIN: one send through all three effects in a row; SPLIT: a send to each effect of its own."),
+    G_(G_BUDGET, PID_F_DEVICE, "VOICE BUDGET",
+       "How much sound work the FM-1 shares out between the tracks; lower leaves more headroom, higher allows more voices."),
     X_(TX_MODE, "GENERATOR MODE", "STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; "
                                   "GRIDS plays kick, snare and hat (best on a DRUM track)."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),

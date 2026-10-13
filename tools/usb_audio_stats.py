@@ -23,9 +23,12 @@ MEMORY_FIELDS = ('cache_status', 'cache_con_before', 'cache_data_before', 'cache
 HEADER = [0x7D, 0x46, 0x4C, 72]
 PART_FIELDS = tuple(f'track_{p}_{field}' for field in ('voices_shed', 'voices_given_up') for p in range(1, 5))
 
+COMPLETE_FIELDS=('audio_full_max_us','audio_full_last_us','audio_deadline_misses','audio_target_exceeded',
+                 'audio_batch_pairs','capacity_steals','admission_rejections','admission_enabled','fixed_voice_bench')
 
-def snapshot(incoming, outgoing, window=False, voices=False, cores=False, memory=False, parts=False):
-    flags = int(window) | (2 if voices else 0) | (4 if cores else 0) | (8 if memory else 0) | (16 if parts else 0)
+
+def snapshot(incoming, outgoing, window=False, voices=False, cores=False, memory=False, parts=False, complete=False):
+    flags = int(window) | (2 if voices else 0) | (4 if cores else 0) | (8 if memory else 0) | (16 if parts else 0) | (32 if complete else 0)
     outgoing.send(mido.Message('sysex', data=HEADER + ([flags] if flags else [])))
     deadline = time.monotonic() + 3
     while time.monotonic() < deadline:
@@ -35,9 +38,12 @@ def snapshot(incoming, outgoing, window=False, voices=False, cores=False, memory
             data = message.data[4:]
             fields = {2: FIELDS, 3: FIELDS + VOICE_FIELDS, 4: FIELDS + VOICE_FIELDS + CORE_FIELDS,
                       5: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS,
-                      6: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS + PART_FIELDS}.get(data[0] if data else 0, ())
+                      6: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS + PART_FIELDS,
+                      7: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS + PART_FIELDS + COMPLETE_FIELDS}.get(data[0] if data else 0, ())
             if not fields or len(data) != 1 + 5 * len(fields):
                 raise RuntimeError('Unsupported audio diagnostics schema')
+            if complete and data[0]<7:
+                raise RuntimeError('Complete timing requires AUDIO_STATS schema 7')
             if cores and data[0] < 4:
                 raise RuntimeError('Core diagnostics require firmware with AUDIO_STATS schema 4')
             if memory and data[0] < 5:
@@ -61,13 +67,14 @@ def main():
     parser.add_argument('--cores', action='store_true', help='include second-core worker and FM6 pairing counters')
     parser.add_argument('--memory', action='store_true', help='include SRAM capacity and cache-RAM boot self-test results')
     parser.add_argument('--parts', action='store_true', help='include voice cuts for each of the four tracks')
+    parser.add_argument('--complete',action='store_true',help='include complete C interrupt timing and admission counters')
     args = parser.parse_args()
     if args.interval < 1 or args.seconds < 0:
         parser.error('interval must be >= 1 s; seconds must be >= 0')
     with mido.open_input(args.port) as incoming, mido.open_output(args.port) as outgoing:
         start = time.monotonic()
         while True:
-            stats = snapshot(incoming, outgoing, args.window, args.voices, args.cores, args.memory, args.parts)
+            stats = snapshot(incoming, outgoing, args.window, args.voices, args.cores, args.memory, args.parts, args.complete)
             stats['cpu_pct'] = round(stats['cpu_q8'] * 100 / 256, 1)
             stats['elapsed_s'] = round(time.monotonic() - start, 3)
             print(json.dumps(stats), flush=True)

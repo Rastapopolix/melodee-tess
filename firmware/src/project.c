@@ -90,7 +90,7 @@ static uint8_t proj_p5_origin_value(const project_t *p,uint32_t track)
 #define PROJ_P5_ORIGIN_TAG1 0x35u
 #define PROJ_P5_ORIGIN_MAX 128u /* native Prophet user collection */
 typedef union { uint32_t align; uint8_t raw[PROJ_STORE_SIZE]; } project_store_t;
-_Static_assert(G_MFXTYPE == PROJ_GLOBALS && G_FXMODE==40u && G_COUNT==41u, "old global IDs and wire header stay fixed");
+_Static_assert(G_MFXTYPE == PROJ_GLOBALS && G_FXMODE==40u && G_BUDGET==41u && G_COUNT==42u, "old global IDs and wire header stay fixed");
 _Static_assert(sizeof(project_store_t) == 13212u, "FUN17 keeps the FUN16 extent");
 #define PROJ_DEF_SOUND 0xFFu                   /* preset byte: the track's power-on sound, no steps (kept from an
                                                 * import of before 1.0) */
@@ -1431,6 +1431,13 @@ static void settings_poll(void)
     if (!persist_pending || !flash_ok || transport_busy() ||
         (persist_pending == 2u && (uint32_t)(fm1_ms - persist_retry_ms) < 1000u))
         return;
+#ifdef FM1_IRQ_TARGET
+    /* Live preference edits queue their flash save until audio is idle. */
+    for(uint32_t k=0;k<NPART;k++)for(uint32_t i=0;i<NVOICE;i++)if(trk[k].v[i].active)return;
+#if MELODEE_USB_AUDIO
+    if(ua.play_alt || ua.cap_alt)return;
+#endif
+#endif
     if (template_old()) {
         if (!ui.confirm && !ui.name_active) {
             persist_pending = 0;

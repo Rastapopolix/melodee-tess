@@ -106,7 +106,7 @@ static struct {
 
 static int16_t *ed_val(uint32_t i)
 {
-    return i < P_COUNT ? &TSEL->p[i] : i == P_COUNT + G_A4 ? &tuning_a4 : &song.g[i - P_COUNT];
+    return i<P_COUNT?&TSEL->p[i]:i==P_COUNT+G_A4?&tuning_a4:i==P_COUNT+G_BUDGET?&settings_budget:&song.g[i-P_COUNT];
 }
 static uint32_t ed_step_sig(const step_t *s)
 {
@@ -347,6 +347,63 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     if (ed_cz_handle(cmd, a, na)) { ed_send(); return; }
     if (ed_native_handle(cmd, a, na)) { ed_send(); return; }
     switch (cmd) {
+    case 100: {
+#ifdef FM1_IRQ_TARGET
+        if(na){ed_b(1);break;}
+        uint32_t values[8u+NPART];fm1_irq_off();
+        values[0]=fm1_clock_mhz_of(fm1_clock_mult());values[1]=audio_timer5_max_ticks;values[2]=audio_irq_max_ticks;
+        values[3]=MELODEE_AUDIO_PROFILE;values[4]=MELODEE_AUDIO_BENCH;values[5]=MELODEE_ADMISSION;values[6]=HALF_FRAMES;
+        for(uint32_t p=0;p<NPART;p++)values[7u+p]=voice_contract_cap(&trk[p]);
+        values[7u+NPART]=(uint32_t)settings_budget;
+        fm1_irq_on();ed_b(0);ed_b(2);ed_b(8u+NPART);
+        for(uint32_t k=0;k<8u+NPART;k++)for(uint32_t j=0;j<5u;j++)ed_b(values[k]>>(7u*j));
+#else
+        ed_b(2);
+#endif
+        break;
+    }
+    case 98: {
+#if MELODEE_AUDIO_PROFILE
+        uint32_t values[AP_COUNT*3u+5u];
+        if(na>1u || (na && a[0]>1u)){ed_b(1);break;}
+        fm1_irq_off();
+        for(uint32_t k=0;k<AP_COUNT;k++){
+            values[k*3u]=audio_profile[k].ticks;values[k*3u+1u]=audio_profile[k].calls;values[k*3u+2u]=audio_profile[k].max_ticks;
+        }
+#if MELODEE_DUAL_CORE
+        values[AP_COUNT*3u]=audio_worker.job_ticks;values[AP_COUNT*3u+1u]=audio_worker.wait_ticks;
+        values[AP_COUNT*3u+2u]=audio_worker.jobs;values[AP_COUNT*3u+3u]=audio_worker.waits;
+#else
+        for(uint32_t k=0;k<4u;k++)values[AP_COUNT*3u+k]=0;
+#endif
+#ifdef FM1_IRQ_TARGET
+        values[AP_COUNT*3u+4u]=fm1_clock_mhz_of(fm1_clock_mult());
+#else
+        values[AP_COUNT*3u+4u]=0;
+#endif
+        if(na && a[0]){
+            memset(audio_profile,0,sizeof audio_profile);
+#if MELODEE_DUAL_CORE
+            audio_worker.job_ticks=audio_worker.wait_ticks=audio_worker.waits=0;
+#endif
+        }
+        fm1_irq_on();ed_b(0);ed_b(1);ed_b(AP_COUNT);
+        for(uint32_t k=0;k<AP_COUNT*3u+5u;k++)for(uint32_t j=0;j<5u;j++)ed_b(values[k]>>(7u*j));
+#else
+        ed_b(2);
+#endif
+        break;
+    }
+#if MELODEE_AUDIO_BENCH
+    case 99: {
+        if(na==3u && a[0]==2u && a[1]<NTRK && a[2]<=FM6_OPL){
+            fm1_irq_off();fm6_fn_set(a[1],FN_ENGINE,a[2]);fm1_irq_on();ed_b(0);break;
+        }
+        if(na!=1u || a[0]>1u){ed_b(1);break;}
+        fm1_irq_off();audio_bench_until=a[0]?fm1_ticks()+30u*24000000u:0;fm1_irq_on();
+        ed_b(0);break;
+    }
+#endif
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     case 97: {
         uint32_t rc=0;
@@ -361,7 +418,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
 #endif
 #if MELODEE_USB_AUDIO
     case ED_AUDIO_STATS: {                         /* flags: 1 resets maxima, 2 voices, 4 cores, 8 memory, 16 part victims */
-        uint32_t snapshot[55] = {0}, k, count = na && (a[0] & 16u) ? 55u : na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
+        uint32_t snapshot[64] = {0}, k, count = na && (a[0] & 32u) ? 64u : na && (a[0] & 16u) ? 55u : na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
         fm1_irq_off();
         snapshot[0] = ua.play_alt;
         snapshot[1] = ua.cap_alt;
@@ -426,19 +483,35 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
                     (uintptr_t)resource[r].ptr < (uintptr_t)_resource_cache_end)
                     snapshot[46] += resource[r].size;
         }
-        if (count == 55u)
+        if (count >= 55u)
             for (uint32_t p = 0; p < NPART; p++) {
                 snapshot[47u+p] = shed_part[p];
                 snapshot[51u+p] = voice_kills_part[p];
             }
+        if(count==64u){
+            /* Upper envelope includes measured C entry/exit and allows one
+             * TIMER5 preemption during the short assembly footer, plus 4 us
+             * for register/timestamp/return overhead at supported clocks. */
+            uint32_t upper=(audio_irq_max_ticks+audio_timer5_max_ticks+96u+23u)/24u;
+            snapshot[55]=audio_full_max_us>upper?audio_full_max_us:upper;snapshot[56]=audio_full_last_us;
+            snapshot[57]=audio_deadline_misses;snapshot[58]=audio_target_exceeded;
+            snapshot[59]=audio_batch_pairs;snapshot[60]=capacity_steals;snapshot[61]=admission_rejections;
+            snapshot[62]=MELODEE_ADMISSION;
+#if MELODEE_AUDIO_BENCH
+            snapshot[63]=(uint32_t)audio_bench_active()|(audio_bench_shed_requests<<1u);
+#endif
+        }
         if (na && (a[0] & 1u)) {
+            audio_full_max_us=0;
+            audio_irq_max_ticks=0;
+            audio_timer5_max_ticks=0;
             ua.poll_max_ticks = ua.service_max_ticks = melodee_dbg.max_us = 0;
 #if MELODEE_DUAL_CORE
             audio_worker.max_job_ticks = audio_worker.max_wait_ticks = 0;
 #endif
         }
         fm1_irq_on();
-        ed_b(count == 55u ? 6u : count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
+        ed_b(count == 64u ? 7u : count == 55u ? 6u : count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
         for (i = 0; i < count; i++)
             for (k = 0; k < 5u; k++)
                 ed_b(snapshot[i] >> (7u * k));
@@ -578,7 +651,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
                 set_engine((uint32_t)clamp(ed_rv(a + 2), 0, NENGINES - 1));
             } else if (d->max > d->min) {
                 *vp = (int16_t)enum_orig(d, clamp(ed_rv(a + 2), d->min, d->max));
-                if (a[0] == 1 && a[1] == G_A4)
+                if (a[0] == 1 && (a[1] == G_A4 || a[1] == G_BUDGET))
                     settings_save();
                 if (a[0] == 0) {
                     (void)motion_capture(TSEL, a[1], *vp);

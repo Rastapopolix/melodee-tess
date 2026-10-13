@@ -1013,3 +1013,61 @@ do not offer a motion interface that would truncate native parameter IDs. The cu
 accepts both versions 1 and 2 and retains all other tagged capabilities.
 
 The send bus appends track SEND at ID 108; engine parameters are 109–116. Globals 27–38 are three shared FX slots (TYPE/MIX/RATE/CHAR); global 39 is RETURN. `G_COUNT=40`. SEND is track-owned during preset loads; shared controls are song globals. FUN19/TPLI store the routing; FUN18/TPLH and earlier records map engine IDs by count and default shared FX off. Native tagged motion IDs retain their meaning during conversion.
+
+## Complete audio profiling (laboratory builds)
+
+`72 AUDIO_STATS`, flag `32`, returns schema 7: all 55 schema-6 fields followed
+by complete interrupt maximum bound (us), last complete C span (us), elapsed C
+deadline violations, 80% target violations, cross-track batch pairs, occupied
+slot capacity steals, admission rejections, admission-enabled flag, and fixed
+benchmark status. Benchmark status bit 0 is its lease; higher bits count
+suppressed emergency fade requests. Existing diagnostic flags remain compatible.
+The complete bound includes an assembly entry/exit envelope, the largest observed
+nested TIMER5 span as a footer-preemption allowance, and 4 us wrapper allowance.
+
+With `MELODEE_AUDIO_PROFILE=1`, editor 98 (`[]` or `[0]` read, `[1]` read then
+reset scope totals) replies `rc, schema=1, scope_count=21`, then three unsigned
+32-bit values per scope (five little-endian 7-bit bytes each): total TIMER4 ticks,
+calls, maximum ticks. Scope order is defined in `audio_profile.h`. Five trailing
+values are worker ticks, CPU0 waiting ticks, lifetime worker jobs, waits since
+scope reset, and current SYS PLL clock in MHz. Inclusive/nested scopes must not
+be summed; worker engine spans are published privately and merged after joins.
+The FX span includes track inserts, shared preparation and the CPU1 shared
+kernel; output includes master processing, USB copy and output conversion.
+
+Editor 100 is a read-only target query available in production too. It replies
+`rc=0, schema=2, count=12`, then twelve u32 values in five 7-bit bytes each:
+PLL clock MHz, maximum TIMER5 ticks, maximum assembly audio-envelope ticks,
+profiling-enabled, benchmark-support-enabled, admission-enabled, half-buffer
+frames, four native engine capacities, and the selected shared workload budget
+in points. Schema 1 has the same eleven-field prefix but reports the earlier
+fixed track reservations; readers should accept both schemas. TIMER4 runs at
+24 MHz. The footer
+allowance above is valid only while maximum TIMER5 service is below its 100-us
+period (2400 ticks). This command writes no musical or persisted state.
+
+With `MELODEE_AUDIO_BENCH=1`, editor 99 `[0|1]` disables/enables a 30-second fixed
+voice lease. It bypasses normal admission and records emergency requests without
+cutting voices, preventing overloaded runs from reducing their own workload.
+`[2, track, mode]` sets the live FM6 render mode (0 MODERN, 1 MARK I, 2 OPL) for
+laboratory coverage. Both reply `rc`. Neither writes saved projects or patches.
+These controls are absent from production builds. A passing performance contract
+must also be checked with normal admission and emergency protection enabled.
+
+### Shared workload budget
+
+Global ID 41 is BUDGET (`G_COUNT=42`), range 8–32 integer points. Existing
+global IDs remain unchanged; FXMODE is 40. GLO > GLOBAL knob 2 edits this
+device setting. Like A4, it is a virtual global value preserved across project
+and template loads. A tagged high word (`0x5742`) in PER5 `ext.usb_off` stores
+nondefault budgets in bits 8–15 while retaining the low two USB flags. The
+604-byte settings record and project/template layouts are unchanged. Unknown
+or absent tags use the build default (16 with admission enabled).
+
+The shared pool borrows idle capacity and retains native engine slot counts.
+Its weights are Prophet 3 points with one active Prophet track, 4 with multiple
+active Prophet tracks; FM6, SID and DRUM 2 points; CZ 3 points. Capacity fades
+retain the legacy `voices_given_up` count and also increment `capacity_steals`;
+normal pool fades can be read as `voices_given_up - voices_shed`. Emergency
+CPU cuts remain `voices_shed`. Automatic settings writes wait until voices and
+USB audio streams are idle.

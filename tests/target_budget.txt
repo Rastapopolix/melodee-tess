@@ -51,10 +51,14 @@ mod_end 7
 fx_tape 259
 cz_native_render 529
 cz_native_wave 0
-drum_source 10
+# Eight-control snapshot loop is now local and visible here; it replaces
+# drum808_values' full-track copy. The original PCM conversion loop remains.
+drum_source 15
 drum_limit 22
 drum_color 19
-dr_metal_tune 7
+# Private scratch pointer adds one loop instruction; concurrent voices no
+# longer race on global metal increments. All other kernel budgets retained.
+dr_metal_tune 8
 d9_render_bd 224
 d9_render_sd 280
 d9_render_tom 3064

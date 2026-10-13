@@ -636,6 +636,9 @@ static inline __attribute__((always_inline)) uint32_t fx_send_gain(const track_t
     return (uint32_t)(t->p[P_FXSEND]+(t->p[P_FXSEND]==127))*512u;
 }
 static int fx_bus_result,fx_bus_pending;
+#if MELODEE_AUDIO_PROFILE
+static uint32_t fx_audio_ticks,fx_audio_ready;
+#endif
 static int32_t fx_bus_mix,fx_bus_target;
 static fx_plan_t fx_bus_plan[FX_SLOTS];
 /* Fade the return before changing topology, then reset only the global histories.
@@ -650,6 +653,7 @@ static void fx_bus_select(void)
 }
 static void fx_bus_kernel(void *unused)
 {
+    AP_START(audio_fx_start);
     (void)unused;fx_bus_result=0;
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     uint32_t on=fx_profile_control>>30u,start=on?fm1_ticks():0;
@@ -670,6 +674,9 @@ static void fx_bus_kernel(void *unused)
         }
         memcpy(fx_left,fx_bus_sum_l,fx_bus_n*sizeof *fx_left);memcpy(fx_right,fx_bus_sum_r,fx_bus_n*sizeof *fx_right);
     }else for(uint32_t slot=0;slot<FX_SLOTS;slot++)fx_bus_result|=fx_slot_run(&fx_bus_plan[slot],fx_bus_n);
+#if MELODEE_AUDIO_PROFILE
+    fx_audio_ticks=AUDIO_PROFILE_TICKS()-audio_fx_start;fx_audio_ready=1;
+#endif
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     if(on){uint32_t elapsed=fm1_ticks()-start+fx_profile_bus_setup;fx_profile_ticks[0]+=elapsed;if(elapsed>fx_profile_max[0])fx_profile_max[0]=elapsed;fx_profile_blocks[0]++;}
 #endif
@@ -686,8 +693,12 @@ static int fx_bus_active(void)
 }
 static void fx_bus_start(uint32_t n)
 {
+#if MELODEE_AUDIO_PROFILE
+    fx_audio_ready=0;fx_audio_ticks=0;
+#endif
     fx_bus_select();
     fx_bus_result=fx_bus_pending=0;fx_bus_target=0;fx_bus_n=n;if(!fx_bus_active())return;
+    AP_START(audio_start);
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     uint32_t start=fm1_ticks();
 #endif
@@ -700,6 +711,7 @@ static void fx_bus_start(uint32_t n)
      * after all three preparations have completed. */
     for(uint32_t slot=0;slot<FX_SLOTS;slot++)if(fx_bus_plan[slot].active && fx_bus_plan[slot].f->type>=FX_ECHO)fx_bus_plan[slot].mem=resource[RES_FX0+NPART*FX_SLOTS+slot].ptr;
     for(uint32_t i=0;i<n;i++){fx_left[i]=fx_send_l[i];fx_right[i]=fx_send_r[i];}
+    AP_END(AP_FX,audio_start);
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     fx_profile_bus_setup=fm1_ticks()-start;
 #endif
@@ -714,4 +726,7 @@ static void fx_bus_join(void)
     if(fx_bus_pending && !audio_worker_join()){fx_bus_result=0;fx_bus_mix=0;for(uint32_t slot=0;slot<FX_SLOTS;slot++)fx_state[NPART*FX_SLOTS+slot].epoch=fx_epoch-1u;}
 #endif
     fx_bus_pending=0;
+#if MELODEE_AUDIO_PROFILE
+    if(fx_audio_ready){audio_profile_add(AP_FX,fx_audio_ticks);fx_audio_ready=0;}
+#endif
 }

@@ -314,12 +314,20 @@ async function editorMock() {
   const set = E.parse[E.CMD.SET](await rq(E.req.set(0, 3, 500)));
   ok(set.value === 127, "editor: SET clamps to the range");
   {
-    /* GLO > SYSTEM ROUT (G_ROUTE 14): MIDI IN CH1-4 (0, the default) / SEL (1); the id and G_COUNT unchanged */
+    /* ROUT keeps id 14; the device workload setting is appended at 41. */
     const rd = E.parse[E.CMD.DESC](await rq(E.req.desc(1, 14)));
     const r1 = E.parse[E.CMD.SET](await rq(E.req.set(1, 14, 5)));
     const r0 = E.parse[E.CMD.SET](await rq(E.req.set(1, 14, 0)));
-    ok(rd.label === "ROUT" && rd.def === 0 && eq(rd.names, ["CH1-4", "SEL", "CH5-8", "CH9-12", "CH13-16"]) && r1.value === 4 && r0.value === 0 && info.gcount === 41,
+    ok(rd.label === "ROUT" && rd.def === 0 && eq(rd.names, ["CH1-4", "SEL", "CH5-8", "CH9-12", "CH13-16"]) && r1.value === 4 && r0.value === 0 && info.gcount === 42,
       "editor: MIDI IN routing (ROUT four-channel ranges / SEL, global id 14)");
+  }
+  {
+    const d=E.parse[E.CMD.DESC](await rq(E.req.desc(1,41)));
+    await rq(E.req.set(1,41,24));await rq(E.req.project(1,0));
+    await rq(E.req.set(1,41,32));await rq(E.req.project(0,0));
+    const r=E.parse[E.CMD.GET](await rq(E.req.get(1,41)));
+    ok(d.label==="BUDGET" && d.min===8 && d.max===32 && r.value===32,"editor: device workload budget survives project loads");
+    await rq(E.req.set(1,41,16));
   }
   {
     for(const id of [4,5,6,7,8,9,10,11,24,25,26]){

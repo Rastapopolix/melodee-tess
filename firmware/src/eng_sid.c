@@ -69,6 +69,9 @@ typedef struct {
     int32_t held;                            /* the oscillator mix one sample late (an edge corrects both sides) */
     uint16_t rate_counter, cycle_frac;       /* envelope: the 15-bit rate counter; SID cycles left over (Q16) */
     uint8_t env, env_prev, state, exp_counter, exp_period, hold_zero;
+    int32_t pitch_key, fine_key, shape_key;
+    uint32_t inc_cache[3], rcp_cache[3], rsh_cache[3], tune_key, stack_key, edge_key;
+    tsvf_t filter_cache;int32_t fc_key, kd_key;uint8_t freq_valid, filter_valid;
     uint8_t quiet;                           /* the filter and output stage have settled (the voice may end) */
 } sid_voice_t;
 typedef struct {
@@ -282,9 +285,8 @@ static int32_t sid_env_q15(track_t *t, voice_t *v)
 }
 
 /* --------------------------------------------------------------------------------------- render --- */
-static void sid_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
+static void sid_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m,const int16_t *p)
 {
-    const int16_t *p = t->p;
     sid_voice_t *s = sid_voice(t, v);
     uint32_t model = p[P_E0] == SID_8580, wave = (uint32_t)p[P_E1] & 7u, stack = (uint32_t)p[P_E2] & 7u;
     const sid_stack_t *st = &SID_STACKS[stack];
@@ -309,19 +311,31 @@ static void sid_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
         if (heard >> k & 1u)
             hl[nh++] = k;                              /* the voices mixed */
     }
+    uint32_t edge=blep||sync;
+    if(!s->freq_valid || s->pitch_key!=m->pitch16 || s->fine_key!=m->fine || s->shape_key!=shp ||
+       s->tune_key!=tuning_a4 || s->stack_key!=stack || s->edge_key!=edge){
     for (k = 0; k < nosc; k++) {
         int32_t c = st->cents[k] + (k == 1u && (sync || ring) ? (shp * 75) >> 10 : 0);   /* SHP: +-24 st */
         uint32_t fn = (uint32_t)(((uint64_t)cents_inc(m->pitch16, c, m->fine) * SID_FREQ_R32 + 0x80000000u) >> 32);
         inc[k] = (uint32_t)(((uint64_t)(fn > 0xffffu ? 0xffffu : fn) * SID_FREQ_K16) >> 16);
-        for (rsh[k] = 0; inc[k] >> rsh[k] >= 65536u; rsh[k]++)
-            ;
-        rcp[k] = inc[k] ? 0xffffffffu / (inc[k] >> rsh[k]) : 0u;   /* (sid_frac) */
+        rsh[k]=rcp[k]=0;
+        if(edge){
+            for(rsh[k]=0;inc[k]>>rsh[k]>=65536u;rsh[k]++);
+            rcp[k]=inc[k]?0xffffffffu/(inc[k]>>rsh[k]):0u;
+        }
+        s->inc_cache[k]=inc[k];s->rcp_cache[k]=rcp[k];s->rsh_cache[k]=rsh[k];
     }
+    s->pitch_key=m->pitch16;s->fine_key=m->fine;s->shape_key=shp;s->tune_key=tuning_a4;
+    s->stack_key=stack;s->edge_key=edge;s->freq_valid=1;
+    }else for(k=0;k<nosc;k++){inc[k]=s->inc_cache[k];rcp[k]=s->rcp_cache[k];rsh[k]=s->rsh_cache[k];}
     pt = (uint32_t)clamp(p[P_E3] * 32 + (sync || ring ? 0 : shp / 32), 0, 4095) << 20;
     fcr = clamp(p[P_E4] * 16 + (p[P_E4] >> 3) + (m->cutoff >> 4), 0, 2047);
     g = gt[fcr >> 4] + (((gt[(fcr >> 4) + 1] - gt[fcr >> 4]) * (fcr & 15)) >> 4);
     kd = SID_RES_K[model][clamp(p[P_E5], 0, 15)];
-    tsvf_coef_gk(&fc, g, kd);
+    if(!s->filter_valid || s->fc_key!=g || s->kd_key!=kd){
+        tsvf_coef_gk(&s->filter_cache,g,kd);s->fc_key=g;s->kd_key=kd;s->filter_valid=1;
+    }
+    fc=s->filter_cache;
     sl = bits & 1u ? 1 : 0;                            /* the chip's sum: LP and HP against BP */
     sb = bits & 2u ? -1 : 0;
     sh = bits & 4u ? 1 : 0;
@@ -392,6 +406,11 @@ static void sid_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
     s->quiet = o > -32 && o < 32 && xlp > -128 && xlp < 128 && ic1 > -256 && ic1 < 256 && ic2 > -256 && ic2 < 256;
 }
 
+static void sid_render(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m)
+{ sid_render_into(t,v,out,n,m,t->p); }
+static void sid_block(track_t *t)
+{ (void)sid_table(t,t->p[P_E0]==SID_8580,SID_WAVE_BITS[t->p[P_E1]&7u]); }
+
 /* name, MODEL WAVE STACK PW CUT RES MODE DRIVE, ATK DEC SUS REL (the track's: SID_ADSR_RATE), ENV -> FILTER,
  * mono, sends */
 #define SIDP(n, mo, wa, st, pw, cu, re, md, dr, a, d, s, r, fe, mi, di, ch, de, rv) \
@@ -449,7 +468,7 @@ static const engine_t ENG_SID = {
     .presets = SID_PRESETS,
     .npresets = NELEM(SID_PRESETS),
     .note_on = sid_note_on,
-    .render = sid_render,
+    .render = sid_render, .block = sid_block,
     .knob = {P_E1, P_E3, P_E4, P_E5},
     .poly = SID_POLY,
     .ownenv = 1,                 /* the chip's envelope generator: it ends the voice (sid_done) */

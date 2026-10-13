@@ -52,7 +52,7 @@ static int audio_tests(void)
     audio_resources_reset();host_tracks_init();
     const uint8_t engines[4]={0,ENGI_FM6,3,ENGI_DRUM};uint32_t expected=sizeof(fm6_part_t)+sizeof(sid_part_t)+sizeof(drum_lane_t)*DV_NLANE;
     for(uint32_t k=0;k<4u;k++){trk[k].engine=engines[k];eng_state_prepare(&trk[k]);}
-    bad+=check("default engine setup uses 12440 bytes rather than 51552",resource_used()==expected && expected==12440u);
+    bad+=check("default engine setup and derived caches stay within 16 KiB",resource_used()==expected && expected<=16u*1024u);
     for(uint32_t cycle=0;cycle<2048u;cycle++){
         uint32_t k=cycle%NPART,e=eng_vis(cycle/NPART);
         eng_state_clear(k);trk[k].engine=(uint8_t)e;
@@ -67,7 +67,7 @@ static int audio_tests(void)
     for(uint32_t k=0;k<4u;k++){
         eng_state_clear(k);trk[k].engine=(uint8_t)largest_engine;eng_state_prepare(&trk[k]);
     }
-    bad+=check("four maximum engine states fit without effect buffers",resource_used()==maximum && maximum<=64u*1024u);
+    bad+=check("four maximum engine states fit without effect buffers",resource_used()==maximum && maximum<=48u*1024u);
     bad+=check("capacity exhaustion returns failure and preserves live memory",resource_get(RES_ENGINE0,RESOURCE_CAPACITY+4u)==0 && resource[RES_ENGINE0].size==largest);
     bad+=check("zero-byte requests release rather than return an arena pointer",!resource_get(RES_ENGINE0,0) && !resource[RES_ENGINE0].size);
     printf("resources: default engine bytes %u, worst audio bytes %u, host arena %u\n",expected,maximum,RESOURCE_CAPACITY);

@@ -16,7 +16,7 @@ FUNCTION = re.compile(r'^define ([^\n]+?)@([\w.]+)\(([^\n]*)\)([^\n]*)\{\n(.*?)^
 REFERENCE = re.compile(r'@([\w.]+)')
 CALL = re.compile(r'\bcall\b[^\n@]*@([\w.]+)\(')
 ROOTS = {'fm1_alnk0_irq', 'audio_block', 'mix_block', 'ua_audio', 'click_render',
-         'p5_worker_kernel', 'fm6_worker_kernel'}
+         'p5_worker_kernel', 'fm6_worker_kernel', 'audio_batch_worker', 'audio_batch_parallel', 'p5_batch_kernel', 'fm6_batch_kernel', 'engine_batch_kernel', 'fm1_timer5_irq'}
 CALLBACKS = {'note_on', 'render', 'amp', 'block', 'done', 'alloc', 'legato',
              'mono_key', 'post', 'units', 'cap', 'keys', 'desc'}
 COLD_CALLBACKS = {'preset_make'}
@@ -81,7 +81,9 @@ def relocate(ir, roots):
     pending = list(roots)
     while pending:
         name = pending.pop()
-        if name not in functions or name in selected:
+        # usb_poll is deliberately excluded: TIMER5 calls it only outside
+        # the audio interrupt. Nested endpoint/UART/input work remains resident.
+        if name == 'usb_poll' or name not in functions or name in selected:
             continue
         selected.add(name)
         pending.extend(REFERENCE.findall(functions[name][5]))

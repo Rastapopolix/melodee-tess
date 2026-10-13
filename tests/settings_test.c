@@ -26,6 +26,8 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
 #include "../firmware/src/panel.c"
 static void settings_save(void) {}
 static uint8_t settings_boot, settings_drumch = 10;  /* (params.c) */
+#define VOICE_BUDGET_DEFAULT 16u
+static int16_t settings_budget=VOICE_BUDGET_DEFAULT;
 static int native_used(uint32_t e, uint32_t k) { (void)e; (void)k; return 0; }
 #if __has_include("../firmware/src/favorites.c")
 #include "../firmware/src/favorites.c"
@@ -34,6 +36,17 @@ static int native_used(uint32_t e, uint32_t k) { (void)e; (void)k; return 0; }
 int main(void)
 {
     persist_t original = {0}, p;
+    {   /* Device workload budget shares tagged high USB bits, never its low flags. */
+        persist_t q={0};q.magic=PERSIST_MAGIC;q.panel=PANEL_DEFAULT;
+        for(uint32_t usb=0;usb<4u;usb++)for(int16_t points=8;points<=32;points++){
+            q.ext.usb_off=usb;settings_budget=points;settings_export(&q);
+            assert((q.ext.usb_off&3u)==usb && sizeof q==604u);
+            settings_budget=0;assert(settings_import(&q,sizeof q) && settings_budget==points);
+        }
+        q.ext.usb_off=WORK_BUDGET_TAG|(7u<<8)|2u;
+        assert(settings_import(&q,sizeof q) && settings_budget==VOICE_BUDGET_DEFAULT && q.ext.usb_off==2u);
+        q.ext.usb_off=0;assert(settings_import(&q,sizeof q) && settings_budget==VOICE_BUDGET_DEFAULT);
+    }
     original.magic = PERSIST_MAGIC;
     original.palette = 4; original.bold = original.lowcut = original.zoom = 1;   /* an untagged id: the default */
     original.panel = PANEL_DEFAULT; original.panel.enc[0] = 3;

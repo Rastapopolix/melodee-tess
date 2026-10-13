@@ -120,6 +120,7 @@
 0x126 SEND FX 3 CHARACTER      global 0..127 def 64
 0x127 FX RETURN                global 0..127 def 100
 0x128 FX MODE                  global 0..1 def 0
+0x129 VOICE BUDGET             global device 8..32 def 16
 0x200 GENERATOR MODE           track 0..5 def 0
 0x201 TURING LENGTH            track 2..16 def 16
 0x202 TURING PROB              track 0..100 def 0

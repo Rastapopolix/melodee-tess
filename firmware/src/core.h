@@ -7,6 +7,7 @@
  * Sections: sizes, parameters, voices and engines, tracks and the song, system. */
 #include <stdint.h>
 #include "tuning.h"
+#include "audio_profile.h"
 
 /* ------------------------------------------------------------ sizes --- */
 #define NVOICE 16                /* voice slots per part (FM6 plays Dexed's 16) */
@@ -18,6 +19,13 @@
 #ifndef VBUDGET
 #define VBUDGET (MELODEE_RAM_AUDIO ? 18u : 16u) /* shared weighted voices; RAM profile uses 18 with CPU1 online
                                                  * at 360 MHz (voice.c voice_budget: scaled with a kept 320) */
+#endif
+#ifndef MELODEE_ADMISSION
+#define MELODEE_ADMISSION 0 /* enable only with a calibrated performance contract */
+#endif
+#define VOICE_BUDGET_DEFAULT (MELODEE_ADMISSION ? 16u : VBUDGET)
+#ifndef MELODEE_AUDIO_BENCH
+#define MELODEE_AUDIO_BENCH 0 /* laboratory fixed-voice admission bypass; never a release default */
 #endif
 #define NTRK NPART               /* tracks (the formats and the protocol count these): every track is a part */
 #define NSTEP 64
@@ -147,6 +155,7 @@ enum {                          /* global parameters */
     G_MFX3TYPE, G_MFX3MIX, G_MFX3RATE, G_MFX3CHAR,
     G_FXRETURN,
     G_FXMODE, /* 0: one shared serial chain; 1: independent slot sends */
+    G_BUDGET, /* device-wide shared workload allowance; appended, not a song field */
     G_COUNT
 };
 static int param_master_fx(uint32_t id){return id>=G_MFXTYPE && id<=G_MFX3CHAR;}

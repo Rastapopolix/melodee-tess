@@ -38,6 +38,7 @@ static int16_t drumch_cell;
 /* SAVE > PROJECT KNOB 2, BOOT: the project power-on loads (OFF, A..D; OFF or an empty slot: the template, if one is
  * saved). A device setting kept with the settings (ext.boot), not the project's: the column shows boot_cell */
 static uint8_t settings_boot;
+static int16_t settings_budget = VOICE_BUDGET_DEFAULT;
 /* Device recording preferences: defaults preserve existing behavior. */
 #include "recording_preferences.h"
 static int16_t boot_cell;
@@ -254,6 +255,7 @@ static const param_desc_t GP[G_COUNT] = {
     [G_MFX3CHAR] = PD("CHAR", F_PCT, 0, 127, 64),
     [G_FXRETURN] = PD("RETURN", F_PCT, 0, 127, 100),
     [G_FXMODE] = {"MODE", F_ENUM, 0, 1, 0, (const char *const []){"CHAIN", "SPLIT"}, 0},
+    [G_BUDGET] = {"BUDGET", F_INT, 8, 32, VOICE_BUDGET_DEFAULT, 0, "pts"},
 
 };
 
@@ -576,7 +578,7 @@ static const page_t PAGES[] = {
     {"VOICE", FAM_EDIT, SC_TRACK, GR_NONE, {P_VOICE, P_GLIDE, P_GLMODE, P_PRIO}},
     {"VOICE 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_ALLOC, P_DETUNE, P_PAN, P_MUTE}},
     {"VOICE 3", FAM_EDIT, SC_TRACK, GR_NONE, {P_SPRD, 0xFF, 0xFF, 0xFF}},
-    {"GLOBAL", FAM_GLO, SC_GLOBAL, GR_NONE, {G_A4, 0xFF, G_CLOCK, G_TUNE}},      /* A4 device reference; CLK/TUNE kept (GLO_KEPT) */
+    {"GLOBAL", FAM_GLO, SC_GLOBAL, GR_NONE, {G_A4, G_BUDGET, G_CLOCK, G_TUNE}}, /* device reference/budget; CLK/TUNE kept */
     {"SYSTEM", FAM_GLO, SC_GLOBAL, GR_NONE, {G_MIDI, G_DRUMCH, G_ROUTE, G_INFO}},
     {"PRESETS", FAM_SAVE, SC_GLOBAL, GR_BROWSE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* browser: KNOB 1 LIST, 2 / PRESETS the sounds */
     {"USER", FAM_SAVE, SC_GLOBAL, GR_USER, {0xFF, 0xFF, 0xFF, 0xFF}},       /* user presets: SLOT LOAD ERASE SAVE */
@@ -714,6 +716,10 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
     }
     if (pg->scope == SC_GLOBAL && id == G_A4) {
         *valp = &tuning_a4;
+        return global_desc(id);
+    }
+    if (pg->scope == SC_GLOBAL && id == G_BUDGET) {
+        *valp = &settings_budget;
         return global_desc(id);
     }
     if (pg->scope == SC_GLOBAL && id == G_DRUMCH) {

@@ -560,6 +560,11 @@ static int concert_pitch(void)
     a[2] = 0; a[3] = 0; request(ED_SET, a, sizeof a);
     bad += check("A4 SET clamps to its supported range", tuning_a4 == A4_MIN);
     tuning_a4 = 440;
+    int16_t old_budget=settings_budget,old_global=song.g[G_BUDGET];
+    a[1]=G_BUDGET;a[2]=(32+8192)&127;a[3]=(32+8192)>>7;request(ED_SET,a,sizeof a);
+    bad+=check("BUDGET SET changes the device pool without changing project data",settings_budget==32 && song.g[G_BUDGET]==old_global);
+    request(ED_GET,a,2);bad+=check("BUDGET GET reports the live allowance",ed_rv(host_wire+7)==32);
+    settings_budget=old_budget;
     return bad;
 }
 static int scale_catalogue(void)

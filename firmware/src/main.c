@@ -27,7 +27,8 @@ void fm1_timer5_irq(void)
     uint32_t t0 = fm1_ticks(), usb_due = sub % 5u == 0u;
     fm1_timer5_ack();
     melodee_dbg.timer_irqs++;
-    fm1_input_tick();
+    AP_START(input_start);fm1_input_tick();
+    if(melodee_dbg.in_audio){AP_END(AP_INPUT,input_start);}
     {   /* milliseconds from the 24 MHz TIMER4 (robust to a late tick) */
         static uint32_t last, acc;
         acc += t0 - last;
@@ -53,7 +54,8 @@ void fm1_timer5_irq(void)
             if (last_ua && gap > ua.poll_max_ticks)
                 ua.poll_max_ticks = gap;
             last_ua = t0;
-            ua_service();                       /* at most 4 kHz, independent of coalesced ticks */
+            AP_START(usb_start);ua_service();
+            if(melodee_dbg.in_audio){AP_END(AP_USB,usb_start);}                       /* at most 4 kHz, independent of coalesced ticks */
             gap = fm1_ticks() - t0;
             if (gap > ua.service_max_ticks)
                 ua.service_max_ticks = gap;
@@ -64,18 +66,27 @@ void fm1_timer5_irq(void)
      * can safely nest in audio; deferring it made clock jitter depend on load. */
 #if MELODEE_UART
     if (owed & 2u) {
-        uart_midi_poll();
+        AP_START(midi_start);uart_midi_poll();
+        if(melodee_dbg.in_audio){AP_END(AP_MIDI_RX,midi_start);}
         owed &= ~2u;
     }
 #endif
     if (melodee_dbg.in_audio) {
         melodee_dbg.nested++;
-        t5_nested_ticks += fm1_ticks() - t0;
+        uint32_t elapsed=fm1_ticks()-t0;t5_nested_ticks+=elapsed;
+        if(elapsed>audio_timer5_max_ticks)audio_timer5_max_ticks=elapsed;
+#if MELODEE_AUDIO_PROFILE
+        audio_profile_add(AP_TIMER5,elapsed);
+#endif
         return;
     }
     if (owed & 1u)
         usb_poll();
     owed = 0;
+    /* The ISR footer can be preempted after the C audio-active flag clears.
+     * Its conservative bound therefore needs ordinary TIMER5 service too. */
+    uint32_t elapsed=fm1_ticks()-t0;
+    if(elapsed>audio_timer5_max_ticks)audio_timer5_max_ticks=elapsed;
 }
 extern void isr_timer5(void);
 

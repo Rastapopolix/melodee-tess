@@ -36,8 +36,11 @@ OPTIONAL = {}                   # built only with an option, not in BUDGET: abse
 # The FM6 operator kernel may be extracted from its renderer. Keep the original
 # combined budget, so moving work into a helper cannot weaken the existing guard.
 EXTRACTED = {
+    "sid_render": ("sid_render_into",),
+    "drum_render": ("drum_render_into",),
+    "dr8_run": ("dr8_run_into",),
     "fm6_render": ("fm6_run", "fm6_run_into", "fm6_output", "fm6_join"),
-    "fm1_alnk0_irq": ("mix_mono_samples", "master_samples", "master_out"),
+    "fm1_alnk0_irq": ("mix_block", "mix_part", "mix_prepare_batch", "audio_batch_flush", "mix_mono_samples", "master_samples", "master_out"),
     "track_render_audio": ("fm6_dc_samples", "p5_dc_samples"),
 }
 KERNEL_NAMES = {n for names in EXTRACTED.values() for n in names}
@@ -184,6 +187,11 @@ def main():
         return 0
     fns = functions(dis)
     res = {n: cost(fns[n]) for n in FUNCS if fns.get(n)}
+    # A wrapper may inline away; keep its old budget identity and include
+    # all extracted work rather than reporting a missing or zero-cost render.
+    for parent,kernels in EXTRACTED.items():
+        if parent not in res and any(fns.get(k) for k in kernels):
+            res[parent]={key:0 for key in ("insns","loop","div","call","cost")}
     for parent, kernels in EXTRACTED.items():
         if parent not in res: continue
         for kernel in kernels:

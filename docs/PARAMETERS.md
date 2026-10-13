@@ -133,6 +133,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x126 | SEND FX 3 CHARACTER | 0 to 127 | 64 | Send effect 3's character (its depth, decay or the like, by the effect). |
 | 0x127 | FX RETURN | 0 to 127 | 100 | The level of the send effects in the mix. |
 | 0x128 | FX MODE | CHAIN, SPLIT | CHAIN | CHAIN: one send through all three effects in a row; SPLIT: a send to each effect of its own. |
+| 0x129 | VOICE BUDGET | 8 to 32 pts | 16 | How much sound work the FM-1 shares out between the tracks; lower leaves more headroom, higher allows more voices. (The device's, not the project's.) |
 
 ## Tessera (one value per track)
 
