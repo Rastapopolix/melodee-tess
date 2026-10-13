@@ -77,6 +77,10 @@
 #                   Dexed's 16 voices, the cost per voice; demos in build/fm6_demo/. tests/fm6_ams_test.c: the fp32 AMS share
 #                   against Dexed's double reference. With DEXED_SRC (a Dexed checkout's Source/): tests/fm6_parity.sh
 #                   --quick renders scores through Dexed's own code and FM6 and reports sample differences (strict parity predates the fp32 port).
+# TESSERA (tests/tessera_test.c): every note the generators play in 22 scenarios (each generator, EVOLVE, FORM, TWEAK,
+#                   scales, divisions, transport, mute, knobs while playing) against tests/tessera_baseline.txt,
+#                   no note held after the stop, the saved block's bytes and round trip; logs in build/tessera_log/.
+#                   TESSERA_UPDATE=1 rewrites the baseline (only after an intended change of what they play).
 # Change baseline entries only for reviewed, intentional differences in sound or cost;
 # retain every unaffected golden / CPU / target entry. VERBOSE=1: every render.
 set -e
@@ -240,6 +244,9 @@ if [ -f build/gen/melodee_tables.h ]; then
     run "SLICER: no clicks, timing, sync with the sequencer, STUT, cost, demos" "$OUT/slicer_test" build/slicer_demo
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/swing_test" tests/swing_test.c -lm
     run "SWING: track + global at most 100, sequencer and SLICER step lengths, the SWG display" "$OUT/swing_test"
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/tessera_test" tests/tessera_test.c -lm
+    mkdir -p build/tessera_log
+    run "TESSERA generators: notes per scenario against tests/tessera_baseline.txt, stops clean, saved block" "$OUT/tessera_test" tests/tessera_baseline.txt build/tessera_log
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/perform_test" tests/perform_test.c -lm
     mkdir -p build/perform_demo build/fx_demo
     run "FX layer effects: on the 1/16, stereo, too-long REPEAT, SLICER, silent keys, idle bit-identical, clicks, OCT UP / DN, cost, demos" "$OUT/perform_test" build/perform_demo build/fx_demo

@@ -1,0 +1,25 @@
+# Tessera generators: what they play, per scenario of tests/tessera_test.c: hash of the note log, notes.
+# Rewrite (TESSERA_UPDATE=1) only after an intended change of what they play.
+turing 0x49680ea4 65
+turing_len8_prob30_oct3 0xc0faef27 69
+euclid 0x1b1a694b 16
+euclid_13_5_rot3_roll 0x19bac061 49
+markov 0x3f74e113 129
+markov_tension81_density60_oct3 0xe079af21 83
+morph 0x476b28aa 32
+morph_64_son_rumba 0xbb5d1717 44
+evolve_turing_lock90_every1_amount50 0xac00a426 138
+evolve_euclid_every1_amount80 0x9f5c04e9 75
+evolve_markov_lock60_every2 0x3851e19a 257
+evolve_morph_lock100_every1 0x2e39e616 146
+form_turing_abac_contrast80_flourish5 0x3a2417a7 157
+form_markov_aaba_lock50 0xb59a022d 385
+form_euclid_abcb_morph_aabc 0x403a1ae6 219
+tweak_shift_drop_human_follow 0x94dff827 152
+scale_root_transpose 0x70debcf5 103
+division_gate_length 0x437cb520 119
+all_four_tracks 0x3550521c 1088
+transport_stop_start 0x946e7a1b 286
+mute_and_unmute 0xdbaeb96c 65
+knobs_while_playing 0x7d925608 75
+saved_block 0xaf90c7b2 180

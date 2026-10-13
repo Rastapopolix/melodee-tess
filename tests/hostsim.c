@@ -41,7 +41,14 @@ static void fm1_delay_ms(uint32_t ms) { (void)ms; }
 #include "../firmware/src/tessera.h"
 #include "../firmware/src/song_chain.c"
 #include "../firmware/src/seq.c"
+#ifdef TESSERA_NOTE_HOOK                       /* tests/tessera_test.c: every note a generator plays, logged on its way */
+static void TESSERA_NOTE_HOOK(track_t *t, uint32_t note, uint32_t vel);
+#define trk_note_on(t, n, v) (TESSERA_NOTE_HOOK((t), (n), (v)), trk_note_on((t), (n), (v)))
+#endif
 #include "../firmware/src/tessera.c"
+#ifdef TESSERA_NOTE_HOOK
+#undef trk_note_on
+#endif
 #define inst (trk[0])                   /* the single-part renders below: part 1 */
 
 static void wav_hdr(FILE *f, uint32_t frames)

@@ -1,0 +1,494 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 Theo Dainis */
+/* Host test of the Tessera generators (firmware/src/tessera.c) through the real sequencer and transport
+ * (hostsim.c, mix_block): the baseline for phase 1 (ROADMAP.md), which moves the generators behind a new
+ * interface and must play exactly what they play today.
+ *   build/host/tessera_test tests/tessera_baseline.txt [LOGDIR]
+ * Each scenario runs in its own process from power-on state with a fixed seed of the shared rng(): it sets a
+ * generator up through the same knob functions the UI calls (tessera_knob, tessera_evolve_knob, ..), plays for
+ * some bars at 120 BPM, and logs every note a generator plays (hostsim.c TESSERA_NOTE_HOOK): the block (32
+ * samples) it starts in, the track, the note, the velocity and its length in blocks (until the sequencer has let
+ * it go). The log's hash and note count must equal tests/tessera_baseline.txt. LOGDIR gets each log as text, to
+ * diff against a log of the old code when a hash changes.
+ * Also: the same scenario twice gives the same notes; stopping leaves no generator note held; the saved block
+ * (tessera_pack) has the same hash, survives a round trip, and a damaged one is refused with nothing changed.
+ * TESSERA_UPDATE=1 rewrites the baseline: only after an intended change of what the generators play. */
+#define TESSERA_NOTE_HOOK tt_note
+#define main hostsim_main
+#include "hostsim.c"
+#undef main
+
+/* ------------------------------------------------------------------ the log --- */
+#define TT_MAX 8192u
+typedef struct { uint32_t blk; uint8_t tr, note, vel; uint16_t len; } tt_ev_t;
+static tt_ev_t tt_ev[TT_MAX];
+static uint32_t tt_n, tt_blk, tt_lost;
+static int32_t tt_open[NTRK];                 /* the event of the track's note still held, -1 none */
+
+static void tt_close(uint32_t tr)
+{
+    if (tt_open[tr] >= 0) {
+        tt_ev[tt_open[tr]].len = (uint16_t)(tt_blk - tt_ev[tt_open[tr]].blk);
+        tt_open[tr] = -1;
+    }
+}
+
+static void tt_note(track_t *t, uint32_t note, uint32_t vel)
+{
+    uint32_t tr = trk_index(t);
+    if (tr >= NTRK) return;
+    tt_close(tr);
+    if (tt_n >= TT_MAX) { tt_lost++; return; }
+    tt_ev[tt_n] = (tt_ev_t){tt_blk, (uint8_t)tr, (uint8_t)note, (uint8_t)vel, 0};
+    tt_open[tr] = (int32_t)tt_n++;
+}
+
+static uint32_t fnv(uint32_t h, uint32_t v)
+{
+    for (uint32_t i = 0; i < 4u; i++) {
+        h ^= (v >> (8u * i)) & 0xFFu;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static uint32_t tt_hash(void)
+{
+    uint32_t h = 2166136261u;
+    for (uint32_t i = 0; i < tt_n; i++) {
+        const tt_ev_t *e = &tt_ev[i];
+        h = fnv(h, e->blk);
+        h = fnv(h, (uint32_t)e->tr | (uint32_t)e->note << 8 | (uint32_t)e->vel << 16);
+        h = fnv(h, e->len);
+    }
+    return h;
+}
+
+/* ------------------------------------------------------------- the knobs --- */
+static void sel(uint32_t tr) { song.sel = (uint8_t)tr; }
+static void gen(uint32_t tr, uint32_t mode) { sel(tr); tessera_knob(0, (int32_t)mode); }   /* from OFF */
+static void knob(void (*f)(uint32_t, int32_t), uint32_t k, int32_t s) { f(k, s); }
+static void turns(void (*f)(uint32_t, int32_t), uint32_t k, int32_t n)    /* EVERY, FORM, FOLLOW: one a turn */
+{
+    for (; n > 0; n--) f(k, 1);
+    for (; n < 0; n++) f(k, -1);
+}
+
+/* ---------------------------------------------------------- the scenarios --- */
+static void s_turing(void) { gen(0, TESS_ENG_TURING); }
+static void s_turing_var(void)
+{
+    gen(0, TESS_ENG_TURING);
+    knob(tessera_knob, 1, -8);                        /* LEN 8 */
+    knob(tessera_knob, 2, 15);                        /* PROB 30 */
+    knob(tessera_knob, 3, 1);                         /* 3 octaves */
+}
+static void s_euclid(void) { gen(0, TESS_ENG_EUCLID); }
+static void s_euclid_var(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    knob(tessera_knob, 1, -3);                        /* 13 steps */
+    knob(tessera_knob, 2, 1);                         /* 5 pulses */
+    knob(tessera_knob, 3, 3);                         /* rotation 3 */
+    knob(tessera_evolve_knob, 3, 1);                  /* ROLL: another pitch seed */
+}
+static void s_markov(void) { gen(0, TESS_ENG_MARKOV); }
+static void s_markov_var(void)
+{
+    gen(0, TESS_ENG_MARKOV);
+    knob(tessera_knob, 1, 14);                        /* TENSION 81 */
+    knob(tessera_knob, 2, -8);                        /* DENSITY 60 */
+    knob(tessera_knob, 3, 1);                         /* 3 octaves */
+}
+static void s_morph(void) { gen(0, TESS_ENG_MORPH); }
+static void s_morph_var(void)
+{
+    gen(0, TESS_ENG_MORPH);
+    knob(tessera_knob, 1, 16);                        /* MORPH 64 */
+    knob(tessera_knob, 2, 3);                         /* A: son clave */
+    knob(tessera_knob, 3, 3);                         /* B: rumba clave (from the B slot's 2) */
+}
+static void s_evolve_turing(void)
+{
+    gen(0, TESS_ENG_TURING);
+    knob(tessera_evolve_knob, 0, -5);                 /* LOCK 90: PROB 10 */
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 10);                 /* AMOUNT 50 */
+}
+static void s_evolve_euclid(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    turns(tessera_evolve_knob, 1, 1);
+    knob(tessera_evolve_knob, 2, 25);                 /* AMOUNT 80 */
+}
+static void s_evolve_markov(void)
+{
+    gen(0, TESS_ENG_MARKOV);
+    knob(tessera_evolve_knob, 0, 30);                 /* LOCK 60 */
+    turns(tessera_evolve_knob, 1, 2);                 /* EVERY 2 bars */
+}
+static void s_evolve_morph(void)
+{
+    gen(0, TESS_ENG_MORPH);
+    knob(tessera_evolve_knob, 0, 50);                 /* LOCK 100 */
+    turns(tessera_evolve_knob, 1, 1);
+    knob(tessera_evolve_knob, 2, 5);                  /* AMOUNT 40 */
+}
+static void s_form_turing(void)
+{
+    gen(0, TESS_ENG_TURING);
+    turns(tessera_form_knob, 0, 2);                   /* ABAC (EVERY becomes 4 bars) */
+    turns(tessera_evolve_knob, 1, -2);                /* EVERY 1 bar */
+    knob(tessera_form_knob, 1, 10);                   /* CONTRAST 80 */
+    knob(tessera_form_knob, 3, 5);                    /* FLOURISH +5 */
+}
+static void s_form_markov(void)
+{
+    gen(0, TESS_ENG_MARKOV);
+    knob(tessera_evolve_knob, 0, 25);                 /* LOCK 50 */
+    turns(tessera_form_knob, 0, 4);                   /* AABA */
+    turns(tessera_evolve_knob, 1, -1);                /* EVERY 2 bars */
+}
+static void s_form_euclid_morph(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    turns(tessera_form_knob, 0, 3);                   /* ABCB */
+    turns(tessera_evolve_knob, 1, -2);
+    gen(1, TESS_ENG_MORPH);
+    knob(tessera_evolve_knob, 0, 40);                 /* LOCK 80 */
+    turns(tessera_form_knob, 0, 6);                   /* AABC */
+    turns(tessera_evolve_knob, 1, -2);
+    knob(tessera_form_knob, 3, -3);                   /* FLOURISH -3 */
+}
+static void s_tweak(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    knob(tessera_tweak_knob, 0, 3);                   /* SHIFT +3 */
+    knob(tessera_tweak_knob, 1, 15);                  /* DROP 30 */
+    knob(tessera_tweak_knob, 2, 30);                  /* HUMAN 60 */
+    gen(1, TESS_ENG_MARKOV);
+    turns(tessera_tweak_knob, 3, 1);                  /* FOLLOW track 1 */
+    knob(tessera_tweak_knob, 0, 7);                   /* a fifth above it */
+}
+static void s_scale(void)
+{
+    gen(0, TESS_ENG_TURING);
+    knob(tessera_knob, 2, 10);
+    trk[0].p[P_SCALE] = 2;                            /* minor */
+    trk[0].p[P_ROOT] = 2;
+    trk[0].p[P_TRANS] = -5;
+    gen(1, TESS_ENG_EUCLID);
+    trk[1].p[P_SCALE] = 5;                            /* major pentatonic */
+    trk[1].p[P_ROOT] = 9;
+}
+static void s_div_gate(void)
+{
+    gen(0, TESS_ENG_MARKOV);
+    trk[0].p[P_SDIV] = 1;                             /* 1/8 */
+    trk[0].p[P_SGATE] = 100;
+    turns(tessera_evolve_knob, 1, 1);
+    gen(1, TESS_ENG_MORPH);
+    trk[1].p[P_SDIV] = 5;                             /* 16T */
+    trk[1].p[P_SLEN] = 12;
+    turns(tessera_evolve_knob, 1, 1);
+    knob(tessera_evolve_knob, 2, 20);
+}
+static void s_all(void)
+{
+    gen(0, TESS_ENG_TURING);
+    knob(tessera_knob, 2, 5);
+    turns(tessera_evolve_knob, 1, 2);
+    gen(1, TESS_ENG_EUCLID);
+    turns(tessera_evolve_knob, 1, 2);
+    gen(2, TESS_ENG_MARKOV);
+    knob(tessera_evolve_knob, 0, 35);
+    turns(tessera_form_knob, 0, 2);
+    gen(3, TESS_ENG_MORPH);
+    turns(tessera_evolve_knob, 1, 3);
+    knob(tessera_tweak_knob, 1, 10);
+}
+static void s_transport(void)
+{
+    gen(0, TESS_ENG_MARKOV);
+    knob(tessera_evolve_knob, 0, 30);
+    turns(tessera_form_knob, 0, 3);                   /* ABCB */
+    turns(tessera_evolve_knob, 1, -2);
+    gen(1, TESS_ENG_TURING);
+    turns(tessera_evolve_knob, 1, 1);
+}
+static void b_transport(uint32_t bar)               /* stop and start again: forms back to A, loops re-recorded */
+{
+    if (bar == 5u || bar == 9u) {
+        int32_t o[2 * CTL];
+        transport_req = 2;
+        mix_block(o, CTL);
+        tt_blk++;
+        transport_req = 1;
+    }
+}
+static void s_mute(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    gen(1, TESS_ENG_TURING);
+}
+static void b_mute(uint32_t bar)                     /* MUTE as the MIXER sets it (the generator keeps counting) */
+{
+    if (bar == 3u) trk[0].p[P_MUTE] = 1;
+    if (bar == 5u) trk[0].p[P_MUTE] = 0;
+}
+static void s_edit_live(void) { gen(0, TESS_ENG_TURING); }
+static void b_edit_live(uint32_t bar)                /* knobs turned while it plays: engine change, ROLL, LEN */
+{
+    sel(0);
+    if (bar == 2u) knob(tessera_knob, 1, -4);
+    if (bar == 3u) knob(tessera_evolve_knob, 3, 1);
+    if (bar == 4u) knob(tessera_knob, 0, 2);        /* TURING -> MARKOV */
+    if (bar == 6u) knob(tessera_knob, 0, 1);        /* -> MORPH */
+}
+
+typedef struct {
+    const char *name;
+    uint32_t bars, seed;
+    void (*setup)(void);
+    void (*bar)(uint32_t bar);
+} scen_t;
+static const scen_t SCEN[] = {
+    {"turing", 8, 0x1001u, s_turing, 0},
+    {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
+    {"euclid", 4, 0x1003u, s_euclid, 0},
+    {"euclid_13_5_rot3_roll", 8, 0x1004u, s_euclid_var, 0},
+    {"markov", 8, 0x1005u, s_markov, 0},
+    {"markov_tension81_density60_oct3", 8, 0x1006u, s_markov_var, 0},
+    {"morph", 8, 0x1007u, s_morph, 0},
+    {"morph_64_son_rumba", 8, 0x1008u, s_morph_var, 0},
+    {"evolve_turing_lock90_every1_amount50", 16, 0x1009u, s_evolve_turing, 0},
+    {"evolve_euclid_every1_amount80", 16, 0x100Au, s_evolve_euclid, 0},
+    {"evolve_markov_lock60_every2", 16, 0x100Bu, s_evolve_markov, 0},
+    {"evolve_morph_lock100_every1", 16, 0x100Cu, s_evolve_morph, 0},
+    {"form_turing_abac_contrast80_flourish5", 24, 0x100Du, s_form_turing, 0},
+    {"form_markov_aaba_lock50", 24, 0x100Eu, s_form_markov, 0},
+    {"form_euclid_abcb_morph_aabc", 24, 0x100Fu, s_form_euclid_morph, 0},
+    {"tweak_shift_drop_human_follow", 8, 0x1010u, s_tweak, 0},
+    {"scale_root_transpose", 8, 0x1011u, s_scale, 0},
+    {"division_gate_length", 8, 0x1012u, s_div_gate, 0},
+    {"all_four_tracks", 32, 0x1013u, s_all, 0},
+    {"transport_stop_start", 12, 0x1014u, s_transport, b_transport},
+    {"mute_and_unmute", 6, 0x1015u, s_mute, b_mute},
+    {"knobs_while_playing", 8, 0x1016u, s_edit_live, b_edit_live},
+};
+#define NSCEN (sizeof SCEN / sizeof SCEN[0])
+
+/* one scenario from power-on: "notes hash held" (held: generator notes still sounding after the stop) */
+static void scen_run(const scen_t *sc, const char *logdir, char *res, size_t cap)
+{
+    uint32_t bar_len, f, total, b = 0, tr, held = 0;
+    int32_t o[2 * CTL];
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (tr = 0; tr < NTRK; tr++) tt_open[tr] = -1;
+    sc->setup();
+    rng_state = sc->seed;
+    bar_len = 4u * seq_beat_samples();
+    total = sc->bars * bar_len;
+    transport_req = 1;
+    for (f = 0; f < total; f += CTL) {
+        if (f >= b * bar_len) {
+            if (sc->bar && b) sc->bar(b);
+            b++;
+        }
+        mix_block(o, CTL);
+        tt_blk++;
+        for (tr = 0; tr < NTRK; tr++)
+            if (tt_open[tr] >= 0 && !trk[tr].seq_n) tt_close(tr);
+    }
+    transport_req = 2;
+    for (f = 0; f < 4u * CTL; f += CTL) {
+        mix_block(o, CTL);
+        tt_blk++;
+        for (tr = 0; tr < NTRK; tr++)
+            if (tt_open[tr] >= 0 && !trk[tr].seq_n) tt_close(tr);
+    }
+    for (tr = 0; tr < NTRK; tr++) {
+        if (tessera.mode[tr] == TESS_ENG_OFF) continue;
+        held += trk[tr].seq_n != 0;
+        for (uint32_t v = 0; v < NVOICE; v++) held += trk[tr].v[v].gate != 0;
+    }
+    if (logdir) {
+        char path[512];
+        snprintf(path, sizeof path, "%s/%s.txt", logdir, sc->name);
+        FILE *fp = fopen(path, "w");
+        if (fp) {
+            fprintf(fp, "# %s: block track note velocity length (blocks of %u samples)\n", sc->name, (unsigned)CTL);
+            for (uint32_t i = 0; i < tt_n; i++)
+                fprintf(fp, "%u %u %u %u %u\n", tt_ev[i].blk, tt_ev[i].tr, tt_ev[i].note, tt_ev[i].vel, tt_ev[i].len);
+            fclose(fp);
+        }
+    }
+    snprintf(res, cap, "%u 0x%08x %u %u", tt_n, tt_hash(), held, tt_lost);
+}
+
+/* the scenario in a child process (power-on state each time): its result line */
+static int scen_fork(const scen_t *sc, const char *logdir, char *res, size_t cap)
+{
+    int fd[2];
+    pid_t pid;
+    ssize_t n;
+    if (pipe(fd)) return 1;
+    pid = fork();
+    if (pid < 0) return 1;
+    if (!pid) {
+        char r[96];
+        close(fd[0]);
+        scen_run(sc, logdir, r, sizeof r);
+        if (write(fd[1], r, strlen(r) + 1u) < 0) _exit(1);
+        _exit(0);
+    }
+    close(fd[1]);
+    n = read(fd[0], res, cap - 1u);
+    close(fd[0]);
+    waitpid(pid, 0, 0);
+    if (n <= 0) return 1;
+    res[n] = 0;
+    return 0;
+}
+
+/* --------------------------------------------------------- saved block --- */
+static uint32_t pack_hash(const uint8_t *p)
+{
+    uint32_t h = 2166136261u;
+    for (uint32_t i = 0; i < TESSERA_PK_BYTES; i++) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+/* "hash ok": the block of a project set up as s_all + s_tweak (track 2 FOLLOW) + FORM's FLOURISH; ok: it loads
+ * back to the same block, and a block with any value out of range is refused, the live state untouched */
+static void pack_run(char *res, size_t cap)
+{
+    static uint8_t a[TESSERA_PK_BYTES], b[TESSERA_PK_BYTES], c[TESSERA_PK_BYTES];
+    uint32_t ha, ok = 1;
+    host_tracks_init();
+    tessera_reset();
+    s_all();
+    sel(1);
+    turns(tessera_tweak_knob, 3, 1);
+    knob(tessera_tweak_knob, 0, -4);
+    sel(2);
+    knob(tessera_form_knob, 3, 2);
+    knob(tessera_form_knob, 1, -5);
+    tessera_pack(a);
+    ha = pack_hash(a);
+    tessera_reset();
+    ok &= tessera_unpack(a) == 1;
+    tessera_pack(b);
+    ok &= !memcmp(a, b, sizeof a);
+    memcpy(c, a, sizeof c);
+    c[1u * 45u + 0u] = TESS_ENG_COUNT;               /* track 2's engine out of range */
+    ok &= tessera_unpack(c) == 0;
+    tessera_pack(b);
+    ok &= !memcmp(a, b, sizeof a);                   /* refused whole: nothing changed */
+    snprintf(res, cap, "0x%08x %u", ha, ok);
+}
+
+/* ---------------------------------------------------------------- main --- */
+static int check(const char *what, int ok)
+{
+    printf("tessera: %-86s %s\n", what, ok ? "ok" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+/* the baseline's line for name: "<hash> <notes>" into want, 0 = not there */
+static int base_get(const char *file, const char *name, char *want, size_t cap)
+{
+    char line[256], key[128];
+    FILE *fp = fopen(file, "r");
+    if (!fp) return 0;
+    while (fgets(line, sizeof line, fp)) {
+        char rest[128];
+        if (line[0] == '#' || sscanf(line, "%127s %127[^\n]", key, rest) != 2) continue;
+        if (!strcmp(key, name)) {
+            snprintf(want, cap, "%s", rest);
+            fclose(fp);
+            return 1;
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    const char *base = argc > 1 ? argv[1] : "tests/tessera_baseline.txt", *logdir = argc > 2 ? argv[2] : 0;
+    int update = getenv("TESSERA_UPDATE") && atoi(getenv("TESSERA_UPDATE")), bad = 0;
+    char res[96], again[96], line[160], want[128], got[128];
+    FILE *out = 0;
+    uint32_t i;
+    if (update && !(out = fopen(base, "w"))) {
+        printf("tessera: cannot write %s\n", base);
+        return 1;
+    }
+    if (out)
+        fprintf(out, "# Tessera generators: what they play, per scenario of tests/tessera_test.c: hash of the note log, "
+                     "notes.\n# Rewrite (TESSERA_UPDATE=1) only after an intended change of what they play.\n");
+    for (i = 0; i < NSCEN; i++) {
+        unsigned n = 0, h = 0, held = 1, lost = 1;
+        if (scen_fork(&SCEN[i], logdir, res, sizeof res) || sscanf(res, "%u 0x%x %u %u", &n, &h, &held, &lost) != 4) {
+            snprintf(line, sizeof line, "%s: runs", SCEN[i].name);
+            bad += check(line, 0);
+            continue;
+        }
+        snprintf(got, sizeof got, "0x%08x %u", h, n);
+        snprintf(line, sizeof line, "%s: no note held after the stop, log complete", SCEN[i].name);
+        bad += check(line, !held && !lost && n > 0);
+        if (out) {
+            fprintf(out, "%s %s\n", SCEN[i].name, got);
+        } else {
+            int have = base_get(base, SCEN[i].name, want, sizeof want);
+            snprintf(line, sizeof line, "%s: %u notes, %s", SCEN[i].name, n,
+                     !have ? "not in the baseline (TESSERA_UPDATE=1)" : strcmp(want, got) ? "CHANGED" : "as the baseline");
+            bad += check(line, have && !strcmp(want, got));
+            if (have && strcmp(want, got))
+                printf("tessera:   baseline %s, now %s\n", want, got);
+        }
+    }
+    if (!scen_fork(&SCEN[NSCEN - 3u], 0, res, sizeof res) && !scen_fork(&SCEN[NSCEN - 3u], 0, again, sizeof again))
+        bad += check("the same scenario twice: the same notes", !strcmp(res, again));
+    else
+        bad += check("the same scenario twice: the same notes", 0);
+    {
+        unsigned h = 0, ok = 0;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                pack_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            ssize_t r = read(fd[0], res, sizeof res - 1u);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+            res[r > 0 ? r : 0] = 0;
+            sscanf(res, "0x%x %u", &h, &ok);
+        }
+        bad += check("saved block: round trip, out-of-range block refused whole", ok == 1);
+        snprintf(got, sizeof got, "0x%08x %u", h, (unsigned)TESSERA_PK_BYTES);
+        if (out) {
+            fprintf(out, "saved_block %s\n", got);
+        } else {
+            int have = base_get(base, "saved_block", want, sizeof want);
+            bad += check(have && !strcmp(want, got) ? "saved block: the same bytes as the baseline"
+                                                    : "saved block: CHANGED or not in the baseline", have && !strcmp(want, got));
+        }
+    }
+    if (out) {
+        fclose(out);
+        printf("tessera: baseline written to %s\n", base);
+    }
+    return bad ? 1 : 0;
+}
