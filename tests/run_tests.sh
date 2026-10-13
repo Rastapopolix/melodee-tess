@@ -72,8 +72,8 @@
 #                   Dexed's 16 voices, the cost per voice; demos in build/fm6_demo/. tests/fm6_ams_test.c: the fp32 AMS share
 #                   against Dexed's double reference. With DEXED_SRC (a Dexed checkout's Source/): tests/fm6_parity.sh
 #                   --quick renders scores through Dexed's own code and FM6 and reports sample differences (strict parity predates the fp32 port).
-# TESSERA (tests/tessera_test.c): every note the generators play in 22 scenarios (each generator, EVOLVE, FORM, TWEAK,
-#                   scales, divisions, transport, mute, knobs while playing) against tests/tessera_baseline.txt,
+# TESSERA (tests/tessera_test.c): every note the generators play in each scenario (each generator, EVOLVE, FORM, TWEAK,
+#                   scales, divisions, transport, mute, knobs while playing, external MIDI clock) against tests/tessera_baseline.txt,
 #                   no note held after the stop, the saved block's bytes and round trip; logs in build/tessera_log/.
 #                   TESSERA_UPDATE=1 rewrites the baseline (only after an intended change of what they play).
 # Change baseline entries only for reviewed, intentional differences in sound or cost;

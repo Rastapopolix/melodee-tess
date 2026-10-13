@@ -246,11 +246,41 @@ static void b_edit_live(uint32_t bar)                /* knobs turned while it pl
     if (bar == 6u) knob(tessera_knob, 0, 1);        /* -> MORPH */
 }
 
+/* external MIDI clock (GLO CLK: USB), the host at 120 BPM: 24 pulses a beat throughout, Start at 0, Stop after
+ * 2 bars, Continue at 2.5, Stop at 4.5, Start (from the top) at 5.5 bars. The transport is the clock's alone. */
+static void s_midi_clock(void)
+{
+    song.g[G_CLOCK] = 1;
+    gen(0, TESS_ENG_TURING);
+    gen(1, TESS_ENG_EUCLID);
+    gen(2, TESS_ENG_MARKOV);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar on track 3 */
+}
+static void k_midi_clock(uint32_t n)                 /* before block n: the clock's messages due by its time, in order */
+{
+    static const struct { uint32_t ms; uint8_t st; } EV[] = {{0, 0xFA}, {4000, 0xFC}, {5000, 0xFB}, {9000, 0xFC}, {11000, 0xFA}};
+    static uint32_t pulse, ev;
+    uint32_t ms = (uint32_t)((uint64_t)n * CTL * 1000u / FS);
+    fm1_ms = ms;
+    for (;;) {
+        uint32_t tp = pulse * 125u / 6u, te = ev < sizeof EV / sizeof EV[0] ? EV[ev].ms : 0xFFFFFFFFu;
+        if (tp > ms && te > ms)
+            break;
+        if (te <= tp)                                 /* (a message before the pulse at its time) */
+            midi_enqueue(0xFu | (uint32_t)EV[ev++].st << 8, 1);
+        else {
+            midi_enqueue(0xFu | 0xF8u << 8, 1);
+            pulse++;
+        }
+    }
+}
+
 typedef struct {
     const char *name;
     uint32_t bars, seed;
     void (*setup)(void);
     void (*bar)(uint32_t bar);
+    void (*blk)(uint32_t n);                         /* before each block (n from 0): it runs the transport too */
 } scen_t;
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
@@ -275,6 +305,7 @@ static const scen_t SCEN[] = {
     {"transport_stop_start", 12, 0x1014u, s_transport, b_transport},
     {"mute_and_unmute", 6, 0x1015u, s_mute, b_mute},
     {"knobs_while_playing", 8, 0x1016u, s_edit_live, b_edit_live},
+    {"midi_clock_start_stop_continue", 7, 0x1017u, s_midi_clock, 0, k_midi_clock},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -291,12 +322,14 @@ static void scen_run(const scen_t *sc, const char *logdir, char *res, size_t cap
     rng_state = sc->seed;
     bar_len = 4u * seq_beat_samples();
     total = sc->bars * bar_len;
-    transport_req = 1;
+    if (!sc->blk)
+        transport_req = 1;
     for (f = 0; f < total; f += CTL) {
         if (f >= b * bar_len) {
             if (sc->bar && b) sc->bar(b);
             b++;
         }
+        if (sc->blk) sc->blk(f / CTL);
         mix_block(o, CTL);
         tt_blk++;
         for (tr = 0; tr < NTRK; tr++)
@@ -454,7 +487,9 @@ int main(int argc, char **argv)
                 printf("tessera:   baseline %s, now %s\n", want, got);
         }
     }
-    if (!scen_fork(&SCEN[NSCEN - 3u], 0, res, sizeof res) && !scen_fork(&SCEN[NSCEN - 3u], 0, again, sizeof again))
+    for (i = 0; i < NSCEN && strcmp(SCEN[i].name, "transport_stop_start"); i++)
+        ;
+    if (i < NSCEN && !scen_fork(&SCEN[i], 0, res, sizeof res) && !scen_fork(&SCEN[i], 0, again, sizeof again))
         bad += check("the same scenario twice: the same notes", !strcmp(res, again));
     else
         bad += check("the same scenario twice: the same notes", 0);
