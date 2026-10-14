@@ -405,11 +405,11 @@ Plan: `docs/analysis/phase1-plan.md`.
       STEP as seed (`docs/analysis/phase1-plan.md`, Outcome)
 - [x] Move Turing, Euclid, Markov and Morph behind it: `gen.c` (steps, mutation, FORM sections), `tessera.c`
       the adapter; the UI reads through `tessera_turing()` .. `tessera_morph()`; knob handlers guarded
-      against the audio interrupt. Branch `phase1-gen`, not merged yet
+      against the audio interrupt. Branch `phase1-gen`, merged into `tessera-dev` 2026-10-15
 - [x] Host tests per generator: output identical to before (`tessera_test`, now with the state after the
       stop), `tests/gen_test.c` (gen.c alone: ranges, draws per step, determinism, cost), generator UI renders
-- [ ] Play test of `phase1-gen` on the device (engine changes and ROLL while playing: no stuck note), then
-      merge into `tessera-dev`
+- [x] Play test of `phase1-gen` on the device (engine changes and ROLL while playing: no stuck note): passed
+      2026-10-15 (build 1.1.1), merged into `tessera-dev`
 - [ ] Seeded random generator per track (an intended change of what the generators play: new baseline)
 
 ### 2. Signal bus and parameter IDs
