@@ -410,6 +410,9 @@ Plan: `docs/analysis/phase1-plan.md`.
       stop), `tests/gen_test.c` (gen.c alone: ranges, draws per step, determinism, cost), generator UI renders
 - [x] Play test of `phase1-gen` on the device (engine changes and ROLL while playing: no stuck note): passed
       2026-10-15 (build 1.1.1), merged into `tessera-dev`
+- [x] Turing's fresh register random (Theo 2026-10-15): picked from the hardware timer when TURING is first
+      selected or played; saved projects keep theirs. Branch `turing-random-start` (baseline rewritten: the 14
+      Turing scenarios); device check pending (build 1.1.2), then merge
 - [ ] Seeded random generator per track (an intended change of what the generators play: new baseline)
 
 ### 2. Signal bus and parameter IDs
