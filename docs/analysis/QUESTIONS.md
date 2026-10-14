@@ -26,7 +26,9 @@ upstream (5); FORM development (6) in phase 6; Markov's default (7) at the next 
    transport left step-sequencer notes hanging). I fixed it in its own commit (`279f08c`, one line in
    `tessera.c`): regress and the perform test now pass, and the Tessera baseline is unchanged. It is the
    only firmware change tonight. If you would rather review it first: `git revert 279f08c`.
-5. **The CZ-1 knob test still fails** (it is the only failing suite). It fails the same way on upstream
+5. **The CZ-1 knob test still fails** (update 2026-10-14: the draft report for upstream is
+   `docs/analysis/upstream-cz1-report.md`: on upstream `next` it does not even build with GCC 14+, the renders differ
+   under GCC 15, and with clang four factory tones have dim knobs that change the sound) (it is the only failing suite). It fails the same way on upstream
    v1.1.0 under GCC 15 / Linux. Probed tonight: two identical renders already differ at sample 11, even
    with the shared random generator and the LFO phase reset between them, so some CZ-1 or voice state
    carries over between renders that the test's `reset_all` does not clear. CZ-1 is removed in phase 4.
