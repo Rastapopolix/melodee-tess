@@ -47,7 +47,11 @@ On the **PATTERN** page, the **MODE** knob switches a track between the original
   * `LOCK`: Deja vu control determining how much of the phrase repeats.
   * `EVERY`: Mutates the phrase every (`OFF`, `1`, `2`, `4`, `8`, or `16` bars).
   * `AMOUNT`: Degree of change per mutation.
-  * `ROLL`: Instantly triggers a mutation.
+  * `SEED`: The track's random seed (1–9999). Each step of the knob is a new line; turning back brings the
+    last one again, note for note. A seed sets the track's random choices and its starting material (Turing's
+    register, Euclid's pitches, Markov's first state); PLAY starts its random choices from the top, so with
+    EVERY off a seed always plays the same line. A new track gets a random seed when a generator is first
+    selected or played, so each power-on starts somewhere new; a saved project keeps its seeds.
 
 * **Form Page**: 
   * Builds sections from mutated phrases (`AB`, `ABAC`, `ABCB`, `AABA`, `ABCA`, or `AABC`). 
@@ -66,7 +70,7 @@ On the **PATTERN** page, the **MODE** knob switches a track between the original
 
 ## Saving & Storage
 
-Tessera state is saved with the project into its own dedicated flash object (`OBJ_TESSERA` at `0x9D000`, utilizing the free sector pair) because the main project record is near capacity. 
+Tessera state is saved with the project into its own dedicated flash object (`OBJ_TESSERA` at `0x9D000`, utilizing the free sector pair) because the main project record is near capacity. Since SEED the object holds blocks of version 2 ("TSR2", with each track's seed); projects and backups saved before it still load, every setting kept, each track given a seed of its own. 
 
 * **Tagging & Validation**: Each slot's block carries a hash of its parent project record. If hashes mismatch, the project loads with Tessera `OFF` to prevent stale data. Every field is range-checked.
 * **Compatibility**: Projects saved by stock Melodee load normally with Tessera `OFF`, and projects saved by this fork remain readable.

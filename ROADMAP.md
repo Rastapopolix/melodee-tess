@@ -413,7 +413,14 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [x] Turing's fresh register random (Theo 2026-10-15): picked from the hardware timer when TURING is first
       selected or played; saved projects keep theirs. Branch `turing-random-start` (baseline rewritten: the 14
       Turing scenarios); device check pending (build 1.1.2), then merge
-- [ ] Seeded random generator per track (an intended change of what the generators play: new baseline)
+- [x] Seeded random generator per track (Theo 2026-10-15: shown and editable): each track's own stream from its
+      SEED (1..9999, knob 4 of EVOLVE, in place of ROLL); a seed sets the stream, Turing's register, Euclid's
+      pitches, Markov's first state; PLAY restarts the stream; a fresh track a random seed (all generators,
+      superseding the Turing-only start). Saved: block version 2 ("TSR2", 47 bytes a track), version 1 projects
+      and backups converted on reading. Branch `track-seed` (on `turing-random-start`); device check pending
+      (build 1.1.3), then merge both
+- [ ] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
+      done with SEED, to keep that change to one thing)
 
 ### 2. Signal bus and parameter IDs
 - [ ] Central parameter IDs and ranges

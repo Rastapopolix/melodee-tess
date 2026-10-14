@@ -80,7 +80,9 @@ Tessera adds about 1,500 lines; 923 in `tessera.c` and about 600 spread over sha
   `gen_out_t` (gate, raw note, velocity; `cv` for phase 2), then applies LOCK's replay, DROP, HUMAN,
   FOLLOW, FLOURISH, the scale snap, transpose and SHIFT, and plays the note. EVOLVE's and ROLL's
   mutation go through `gen_<name>_mutate`, FORM's sections through `gen_<name>_save` / `_load`.
-  `gen.c`'s only outside call is `rng()` (through `gen_rnd`).
+  `gen.c` calls nothing outside itself: every draw is from the stream it is handed (`gen_rnd(s, n)`).
+  Since SEED, each track has its own stream (`tessera.rnd`) from its seed (`tessera.seed`, EVOLVE knob 4);
+  `tess_seed_apply` sets the stream and the seeded material, `tessera_stop_all` restarts the stream.
 
 ### UI
 
@@ -102,7 +104,8 @@ Tessera adds about 1,500 lines; 923 in `tessera.c` and about 600 spread over sha
 
 - `storage.c`: one extra object `OBJ_TESSERA` at 0x9D000 / 0x9E000 (A/B), a pair upstream documents
   as free (it overlaps only the retired legacy project objects, which nothing reads or writes).
-- `project.c`: the object holds four slots of tag + 180 bytes (`tessera_pack`). A slot is valid only
+- `project.c`: the object holds four slots of tag + 188 bytes (`tessera_pack`; version 2, "TSR2", since SEED;
+  a version 1 object of 180-byte blocks is converted when read, `tess_obj_v1`). A slot is valid only
   while its tag equals the project record's hash (`proj_saved_hash`). Saved after a project save,
   retagged after a rename, loaded after a project load; reset on template load and new project.
 - Not saved: the recorded Markov / Morph phrases, playheads, counters.
