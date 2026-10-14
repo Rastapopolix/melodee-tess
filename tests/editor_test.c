@@ -478,7 +478,7 @@ static int cz_dedicated_banks(void)
     cz_bank_t keep=*cz_bank_load(7);bank=keep;bank.tone[0].raw[0]=255;
     memcpy(ED_BK_RAW,&bank,sizeof bank);ed_bk_id=16;ed_bk_len=ed_bk_pos=sizeof bank;ed_bk_crc=st_crc32(&bank,sizeof bank);
     bad+=check("invalid native bank rejected before replacing saved tones",ed_bk_commit()==2 && !memcmp(cz_bank_load(7),&keep,sizeof keep));
-    request(ED_BACKUP_LIST,a,0);bad+=check("full backups include all eight CZ user banks",host_wire[7]==28);
+    request(ED_BACKUP_LIST,a,0);bad+=check("full backups include all eight CZ user banks",host_wire[7]==30);   /* (28 + the generators: 28, 29) */
     return bad;
 }
 static int native_protocol(void)

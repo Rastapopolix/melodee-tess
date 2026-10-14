@@ -560,6 +560,33 @@ static void tessera_store_retag(uint32_t slot, uint32_t old_tag)
 #endif
 }
 
+#if MELODEE_FLASH
+/* the editor's backup (editor_backup.c id 28): the stored object back, every slot's block checked first (each one
+ * tried on the live state, which is put back after), nothing written for a damaged one. len 0: no blocks (an archive
+ * of a device that had none). 0 done, 2 invalid, 4 the flash write failed */
+static uint32_t tessera_store_restore(const uint8_t *raw, uint32_t len)
+{
+    uint8_t live[TESSERA_PK_BYTES];
+    uint32_t m = TESS_OBJ_MAGIC, got, tag, slot, ok = 1;
+    if (len) {
+        memcpy(&got, raw, 4);
+        if (len != TESS_OBJ_BYTES || got != m) return 2;
+        tessera_pack(live);
+        for (slot = 0; slot < 4u && ok; slot++) {
+            memcpy(&tag, raw + 4u + slot * TESS_SLOT_BYTES, 4);
+            if (tag) ok = tessera_unpack(raw + 4u + slot * TESS_SLOT_BYTES + 4u) == 1;
+        }
+        tessera_unpack(live);
+        if (!ok) return 2;
+        memcpy(tess_blob, raw, TESS_OBJ_BYTES);
+    } else {
+        memset(tess_blob, 0, sizeof tess_blob);
+        memcpy(tess_blob, &m, 4);
+    }
+    return flash_ok && !st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob) ? 0u : 4u;
+}
+#endif
+
 static void project_capture(project_t *p)
 {
     uint32_t i;

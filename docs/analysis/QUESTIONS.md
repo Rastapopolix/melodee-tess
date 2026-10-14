@@ -48,6 +48,9 @@ upstream (5); FORM development (6) in phase 6; Markov's default (7) at the next 
    is a fixed list of objects, without `OBJ_TESSERA`. Restored onto the same FM-1 the generators come back (their
    block is still there and still matches); onto a fresh or another FM-1, every project loads with Tessera OFF.
    Recommendation: add `OBJ_TESSERA` to the backup list (firmware, web page and its test) before a release.
+   **Answered (Theo: add them), done on `merge-upstream-1.3.1`:** backup objects 28 (each saved slot's generators,
+   as stored) and 29 (the live ones). An archive from this firmware does not restore on older firmware (refused
+   before any write); older archives restore here, the generators left as they are.
 9. **Turing ignores the track's LEN**, Euclid follows it (`track_len_shorter_than_loop` in the baseline). Should a
    track's LEN bound every generator? Recommendation: decide with the phase 1 interface (`gen_clock_t`).
 10. **The live simulator's demo** set EVOLVE's AMOUNT to 0 % (track 1 never evolved); fixed on `web-sim` (`73805aa`,

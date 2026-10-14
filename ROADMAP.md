@@ -346,6 +346,8 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
       2026-10-14: old projects load with every Tessera setting (`tests/upgrade_check.sh`), MIDI clock
       Start/Stop/Continue, GLO mute and stop leave no note held (Tessera baseline)
 - [x] Autosave lost generator-only edits (their state is not in the project record): fixed `38e9950`
+- [x] Backups include the generators: objects 28 (saved slots) and 29 (live); the site's editor and installer
+      must be rebuilt with the merged firmware (`web/fm1backup.js` knows 30 objects)
 - [x] Review of the merge resolutions: hooks in `seq.c`, `ui_input.c`, `ui_layer.c`, `storage.c`,
       `params.c`, `project.c` as before the merge; backups leave Tessera out (QUESTIONS.md 8)
 - [x] Simulator on the merged firmware: branch `web-sim-1.3.1` (not on the site yet)

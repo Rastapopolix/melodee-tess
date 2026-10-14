@@ -90,6 +90,7 @@ static void reset(void)
     erases = 0;
     ed_bk_valid = ed_bk_put = 0;
     persist_old = tmpl_old = preset_old_write = 0;
+    tessera_reset();
 }
 
 static uint32_t call(uint32_t cmd, const uint8_t *a, uint32_t n)
@@ -256,9 +257,56 @@ static int expanded_recording_archive(void)
     bad+=check("expanded runtime archive restores every original timed note",ok);
     return bad;
 }
+/* melodee-tess: the generators, 28 (OBJ_TESSERA: each saved slot's block) and 29 (the live state) */
+static uint32_t get_all(uint32_t id, uint8_t *out, uint32_t len)   /* 0 read */
+{
+    for (uint32_t off = 0; off < len; off += 256u) {
+        uint32_t n = len - off > 256u ? 256u : len - off;
+        if (get(id, off, n) || ed_unpack7(rep + 9u, rep_n - 9u, out + off, n) != n) return 1;
+    }
+    return 0;
+}
+static int tessera_archive(void)
+{
+    static uint8_t obj[TESS_OBJ_BYTES], live[TESSERA_PK_BYTES], now[TESSERA_PK_BYTES], bad_obj[TESS_OBJ_BYTES];
+    uint32_t len28 = 0, crc28 = 0, len29 = 0, crc29 = 0, before;
+    int bad = 0, ok;
+    reset();
+    flash_ok = 1;
+    song.sel = 0; tessera_knob(0, TESS_ENG_TURING);
+    song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
+    project_save_as(0, "GENERATORS");                 /* slot 1's block, tagged */
+    song.sel = 2; tessera_knob(0, TESS_ENG_MARKOV);   /* the live state: one more than the saved one */
+    tessera_pack(live);
+    ok = !list(28, &len28, &crc28) && !list(29, &len29, &crc29) && len28 == TESS_OBJ_BYTES && len29 == TESSERA_PK_BYTES;
+    ok &= !get_all(28, obj, len28) && !get_all(29, now, len29) && st_crc32(obj, len28) == crc28 && !memcmp(now, live, sizeof live);
+    bad += check("LIST / GET: the generators (28: the saved slots', 29: the live ones)", ok);
+    memset(nor + 0x9D000, 0xFF, 2u * ST_SECTOR);      /* a fresh FM-1: no generators stored, none live */
+    tessera_reset();
+    ok = !put_all(28, obj, len28, crc28) && !put_all(29, live, len29, crc29);
+    tessera_pack(now);
+    bad += check("PUT 28 and 29 restore the live generators", ok && !memcmp(now, live, sizeof live));
+    tessera_reset(); project_load(0);
+    bad += check("... and the saved slot's: loading it brings its generators back",
+                 tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF);
+    memcpy(bad_obj, obj, sizeof bad_obj);
+    bad_obj[4u + 4u + 1u * 45u] = TESS_ENG_COUNT;     /* slot 1's block: track 2's engine out of range */
+    before = erases; tessera_pack(live);
+    ok = put_all(28, bad_obj, sizeof bad_obj, st_crc32(bad_obj, sizeof bad_obj)) == 2 && erases == before;
+    tessera_pack(now);
+    bad += check("a damaged slot block is refused before any erase, the live state kept", ok && !memcmp(now, live, sizeof live));
+    memcpy(now, live, sizeof now); now[1u * 45u] = TESS_ENG_COUNT;
+    ok = put_all(29, now, sizeof now, st_crc32(now, sizeof now)) == 2;
+    tessera_pack(now);
+    bad += check("a damaged live state is refused, nothing changed", ok && !memcmp(now, live, sizeof live));
+    bad += check("a wrong size is refused at the start", put_begin(28, 100, 0) == 1 && put_begin(29, 100, 0) == 1);
+    bad += check("an empty 29 (no live generators in the archive): all OFF",
+                 !put_all(29, 0, 0, 0) && tessera.mode[0] == TESS_ENG_OFF && tessera.mode[1] == TESS_ENG_OFF);
+    return bad;
+}
 int main(void)
 {
-    int expanded_bad = expanded_recording_archive();
+    int expanded_bad = expanded_recording_archive() + tessera_archive();
 
     int bad = 0;
     uint32_t len = 0, crc = 0, before;
@@ -268,8 +316,8 @@ int main(void)
 
     reset();
     trk[0].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 96, 0, 0};
-    bad += check("LIST captures runtime and all 28 archive objects with CRC",
-                 list(0, &len, &crc) == 0 && rep[2] == 28u && len == BANK_STORE_SIZE &&
+    bad += check("LIST captures runtime and all 30 archive objects with CRC",
+                 list(0, &len, &crc) == 0 && rep[2] == 30u && len == BANK_STORE_SIZE &&
                  crc == st_crc32(ED_BK_RAW, len));
     bad += check("an empty project slot lists as length 0", list(2, &len, &crc) == 0 && len == 0);
     bad += check("GET of the runtime copy", get(0, 0, 64) == 0);

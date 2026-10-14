@@ -153,5 +153,21 @@ ok(await athrows(()=>restoreBackup(nativeProtected.request,badNative)) && !nativ
 const oldOwnedTarget=device([],{ids:nativeIds,refuse:(id,size)=>id>=19&&id<=22&&size!==2060?1:0});
 ok(await athrows(()=>restoreBackup(oldOwnedTarget.request,ownedFile)) && !oldOwnedTarget.log.length,"backup: an archive the firmware refuses (old owned voices) writes nothing");
 
+{   /* melodee-tess: the generators, 28 (each saved slot's, as stored) and 29 (the live ones), in a 30-object archive */
+  const tessIds = Array.from({ length: 30 }, (_, i) => i), tessObjects = [[28, rnd(740, 30)], [29, rnd(180, 31)]];
+  const tessFile = await captureBackup(device([...bankObjects, ...tessObjects], { ids: tessIds }).request, "TESSERA");
+  const tessTarget = device([], { ids: tessIds }); await restoreBackup(tessTarget.request, tessFile);
+  ok(readBackup(tessFile).objects.length === 30 && tessObjects.every(([id, v]) => tessTarget.objs.get(id).every((x, i) => x === v[i])),
+     "backup: the generators (28, 29) round trip in a 30-object archive");
+  ok(tessTarget.log.indexOf(28) < tessTarget.log.indexOf(0) && tessTarget.log.indexOf(29) < tessTarget.log.indexOf(0) && tessTarget.log.at(-1) === 0,
+     "backup: the generators restore before the live music");
+  const olderFirmware = device([], { ids: Array.from({ length: 28 }, (_, i) => i) });
+  ok(await athrows(() => restoreBackup(olderFirmware.request, tessFile)) && !olderFirmware.log.length,
+     "backup: firmware without the generators' objects refuses the archive before any write");
+  const newerTarget = device([], { ids: tessIds }); await restoreBackup(newerTarget.request, ownedFile);
+  ok(!newerTarget.log.includes(28) && !newerTarget.log.includes(29) && newerTarget.log.at(-1) === 0,
+     "backup: an older archive (no generators) restores on this firmware, the generators left alone");
+}
+
 console.log(fails ? `BACKUP WEB TESTS FAILED (${fails})` : "backup web tests passed");
 process.exit(fails ? 1 : 0);
