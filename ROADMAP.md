@@ -321,9 +321,14 @@ played in a browser. It does not validate the hardware CPU budget: check cost wi
 tests and on the device, which stays essential.
 
 1. Now: keep the platform layer strict. New code must not touch registers outside `firmware/hal/`.
-2. Mid-project: an Emscripten/WebAssembly build that reuses the host-test stubs. AudioWorklet
-   audio, the display on a canvas, an on-screen panel (our own illustration, not M-Vave photos),
-   Web MIDI, browser storage in place of flash. Single-core build.
+2. **First version done 2026-10-14** (branch `web-sim`, the pre-merge firmware): `web/sim/`. The
+   firmware on `tests/ui_test.c`'s stubs, built with Emscripten (`web/sim/build.sh` -> `build/sim/`),
+   runs in an AudioWorklet. The page and worklet are Felucca's (`web/emu` of hugelton/Felucca, after
+   X0X's), so the panel is the same FM-1 drawing as the other FM-1 browser builds (wide and upright
+   layouts); `web/sim/sim.c` exports Felucca's `web_*` interface. Mouse, touch, computer keyboard,
+   Web MIDI, MASTER, a demo with a generator per track. Tested by
+   `web/sim/test_sim.mjs` (in `run_tests.sh` when Emscripten is installed). Still to do: browser
+   storage in place of flash (saving is lost on reload), rebuild it on the merged firmware.
 3. Near release: a public demo deployed to GitHub Pages by GitHub Actions.
 
 ## Upstream sync
@@ -438,7 +443,10 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] In-box help: help combo + knob touch, live-state line, page summaries
 - [ ] Online manual; QR code on the About page
 - [ ] Boot behaviour and curated random patches
-- [ ] WebAssembly build; GitHub Pages demo
+- [x] WebAssembly build (`web/sim/`, 2026-10-14)
+- [x] Simulator on the merged firmware (`web-sim-1.3.1`)
+- [ ] Simulator: saving to browser storage
+- [ ] GitHub Pages demo
 
 ### Not yet placed in a phase
 - [x] FOLLOW, first piece (branch `follow-step`): STEP tracks as sources (the highest sounding note, held across
@@ -446,6 +454,14 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] **FOLLOW modes** (Features > FOLLOW): interval in scale degrees, chord tone, contrary, canon, bass; RHYTHM
       own / source / both; STEP tracks as sources. With phases 1-2; then in the web simulator (rebuild, site copy,
       test, guide and demo)
+- [ ] **Pitch accumulator** (OXI One style, Theo 2026-10-14): each step gets an amount (−7..+7 scale
+      degrees, 0 = off). Each pass of the pattern adds it again, so the step climbs or falls through the
+      scale, and folds or wraps at a range limit, or resets after N passes or at PLAY. Notes: the amount
+      fits the free bits 3..7 of `step_t.flags` (no bigger step, no RAM); the offset can be computed as
+      amount x passes, so only a pass counter per track is needed; `seq.c scale_degree_map` already moves
+      by scale degrees; the project loader (`project.c`, `flags & ~7u`) must accept the new bits; the
+      STEP page's per-step row gets an ACC field. Belongs with central parameter IDs (phase 2) or later,
+      after the upstream merge, since it touches `seq.c` and the step format.
 - [ ] STEP as seed: locks, Gravity, Keep, ghost-note grid; Ornament and Serial generators
       (phase 1's `input_phrase` prepares for it)
 - [ ] The remaining mod sources, clock tools, quantizer, Kria-style lanes

@@ -54,6 +54,8 @@
 #                   (usb_audio_test.c); the endpoint driver against a model SIE: SET_INTERFACE, feedback, capture
 #                   packets ready in time, Out / In left out and the replug (usb_audio_driver_test.c); the four
 #                   track stems through the real mixer (usb_audio_tracks_test.c).
+# web simulator (web/sim/): the firmware built to WebAssembly (needs Emscripten, ~/emsdk or $EMSDK) and driven as the
+#                   page drives it (web/sim/test_sim.mjs; the page and worklet are Felucca's); skipped without Emscripten.
 # web (web/test_web.mjs): the editor protocol against its mock device, whose tables must equal the
 #                   firmware's (tests/descdump.c -> build/host/desc.json), the package builder, the updater.
 # PHYS (tests/phys_test.c): stability over the whole parameter and pitch range, the worst-case cost against
@@ -341,6 +343,19 @@ if sound; then
         build/melodee.dis tests/target_budget.txt
 fi
 [ $TABLES = 1 ] || note "== skip hostsim (run ./build.sh once)"
+
+sim_tests() {                                     # the web simulator (web/sim): built, then driven as its page drives it
+    step "web simulator: build (web/sim/build.sh)" sh web/sim/build.sh &&
+        step "web simulator: power-on, keys, the demo, LEDs, PLAY / stop, MASTER, ALGORITHM, speed" \
+            "$SIM_NODE" web/sim/test_sim.mjs build/sim/melodee.wasm
+}
+EMSDK_DIR=${EMSDK:-$HOME/emsdk}                  # with Emscripten only
+if core && { command -v emcc >/dev/null 2>&1 || [ -x "$EMSDK_DIR/upstream/emscripten/emcc" ]; }; then
+    SIM_NODE=$(command -v node || ls "$EMSDK_DIR"/node/*/bin/node 2>/dev/null | head -1)
+    job sim_tests
+else
+    note "== skip web simulator (no Emscripten)"
+fi
 
 # every slot back: every job ended
 i=0; while [ $i -lt "$PARALLEL" ]; do read -r slot <&3; flush; i=$((i + 1)); done
