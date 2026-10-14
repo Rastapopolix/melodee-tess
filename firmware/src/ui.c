@@ -594,6 +594,7 @@ static int seq_is_empty(const track_t *t)
  * so the undo goes back past the whole browse. Eight levels fit in ordinary SRAM,
  * leaving the data cache available for flash reads. Not snapshotted: power-on, projects (a project load drops them all) */
 enum { UNDO_SOUND = 1, UNDO_PAT = 2 };
+#include "step_snapshot.h"
 typedef struct {
     uint8_t trk;                 /* track + 1, 0 = nothing to undo */
     uint8_t keep;                /* the track is as the last load left it (after): a next load keeps the copy */
@@ -604,7 +605,7 @@ typedef struct {
     p5_patch_t p5;
     drum_patch_t drum;
     int16_t p[P_COUNT];
-    step_t step[NSTEP];
+    step_snapshot_t step[NSTEP];
     motion_store_t motion_backup; /* one track only, swaps with the shared event pool on undo */
     uint32_t pattern_gen;
     uint32_t after;              /* track_sig right after the last load */
@@ -732,7 +733,7 @@ static void load_begin(track_t *t, uint32_t what)
     u->user = t->user;
     u->user_native=t->user_native;
     memcpy(u->p, t->p, sizeof u->p);
-    memcpy(u->step, t->step, sizeof u->step);
+    step_snapshot_save(u->step, t->step);
     memcpy(u->fm6, fm6_patch[i], FP_SIZE);
     u->cz = cz_patch[i];
     u->p5 = *p5_patch_of(&trk[i]);
@@ -824,8 +825,8 @@ static void undo_step(int redo)
         }
         for (i = 0; i < NSTEP; i++) {
             step_t s = t->step[i];
-            t->step[i] = u->step[i];
-            u->step[i] = s;
+            t->step[i] = step_snapshot_get(&u->step[i]);
+            step_snapshot_put(&u->step[i], &s);
         }
     }
     fm1_irq_on();

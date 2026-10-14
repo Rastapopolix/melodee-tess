@@ -48,10 +48,25 @@ typedef struct { uint16_t off; uint8_t w; const char *label; } kc_t;
  * there while SPI reads the first; large graphs reuse the full canvas only
  * after its transfer finishes. No second full-screen-sized allocation. */
 #define CV_ALT_MAX (240u * 24u)                   /* (240 x 24: the diff's hashes took the rest, below) */
-static uint16_t cv_primary[CV_MAX] __attribute__((section(".pool")));
+/* Decoded projects use this canvas between draws. A borrow waits for SPI;
+ * the wire/archive buffer stays separate because transfers span UI frames. */
+static union {
+    uint16_t pixels[CV_MAX];
+    uint32_t work[CV_MAX / 2u];
+} cv_primary_u __attribute__((section(".pool")));
+#define cv_primary cv_primary_u.pixels
+#define CV_WORK_BYTES (sizeof cv_primary_u)
 static uint16_t cv_alt[CV_ALT_MAX] __attribute__((section(".pool")));
 static uint16_t *cv_px = cv_primary;
 static const uint16_t *cv_flight;
+static void *cv_work(void)
+{
+    if (cv_flight == cv_primary) {
+        lcd_sync();
+        cv_flight = 0;
+    }
+    return cv_primary_u.work;
+}
 static uint32_t cv_w, cv_h;
 static uint16_t cv_bg;           /* what cv_begin cleared the canvas to */
 static uint8_t cv_scroll;        /* 1: drawing a scrolled view (its text may run past the canvas) */

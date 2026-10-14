@@ -184,13 +184,14 @@ static int full_pattern_archive(void)
     uint32_t len,crc; list(0,&len,&crc); memcpy(archive,ED_BK_RAW,sizeof archive);
     bad+=check("full bank archive contains all runtime banks with its verified CRC",len==sizeof archive && crc==st_crc32(archive,sizeof archive));
     for (uint32_t off=0; off<sizeof saved; off+=256u) {
+        cv_begin(240,124,RGB(off&255u,20,30));cv_blit(0,24);
         uint32_t n=sizeof saved-off>256u?256u:sizeof saved-off;
         ok &= get(2,off,n)==0;
         ok &= ed_unpack7(rep+9u,rep_n-9u,saved+off,n)==n;
     }
     /* GET emits pack7; the XIP payload itself remains byte-identical after other object reads. */
     ok &= !memcmp(saved,archive,sizeof saved) && (st_load(OBJ_BANK0,saved,sizeof saved)==sizeof saved && !memcmp(saved,archive,sizeof saved)) && get(0,0,64)==0;
-    bad+=check("saved-bank GET uses flash without overwriting the frozen runtime snapshot",ok);
+    bad+=check("saved-bank GET and interleaved screen draws preserve the frozen runtime snapshot",ok);
     bad+=check("full archive restores a saved slot through the A/B path",put_all(3,archive,sizeof archive,st_crc32(archive,sizeof archive))==0);
     pattern_init(); memset(&motion,0,sizeof motion); memset(proj_meta,0,sizeof proj_meta); memset(proj_slot,0,sizeof proj_slot);
     proj_fetch(1); project_load(1); ok=1;

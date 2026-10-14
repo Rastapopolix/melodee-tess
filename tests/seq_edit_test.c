@@ -334,10 +334,46 @@ static int test_held_gestures(void)
     return bad;
 }
 
+static int test_compact_history(void)
+{
+    int bad = 0, exact = 1;
+    /* Every control combination and byte value: preserve unused notes,
+     * independent n on rests/ties, per-hit gates, and all accent masks. */
+    for (uint32_t n = 0; n <= 4u; n++)
+        for (uint32_t time = ST_NOTE; time <= ST_REST; time++)
+            for (uint32_t flags = 0; flags < 8u; flags++)
+                for (uint32_t byte = 0; byte < 256u; byte++) {
+                    step_t s = {{(uint8_t)byte, (uint8_t)(byte ^ 255u), 0, 255},
+                                (uint8_t)n, (uint8_t)time, (uint8_t)flags,
+                                (uint8_t)byte, (uint8_t)byte, (uint8_t)(byte ^ 255u), (uint8_t)byte};
+                    step_snapshot_t packed;
+                    step_snapshot_put(&packed, &s);
+                    step_t decoded = step_snapshot_get(&packed);
+                    exact &= !memcmp(&s, &decoded, sizeof s);
+                }
+    bad += check("compact history preserves every step byte for all control combinations", exact);
+    bad += check("all eight levels have fixed storage even for dense patterns",
+                 sizeof step_history.state[0].step == NSTEP * 9u && sizeof undo_sram[0].step == NSTEP * 9u);
+    track_t *t = edit_setup();
+    for (uint32_t i = 0; i < NSTEP; i++) {
+        put_note(t, i, 48u + i % 36u, 1);
+        t->step[i].vel = (uint8_t)(30u + i);
+    }
+    project_capture(&proj_scratch);
+    uint32_t sum = proj_scratch.sum;
+    bad += check("decoded project borrows canvas with a separate archive buffer",
+                 (void *)&proj_scratch == (void *)cv_primary && (void *)proj_wire_u.raw != (void *)cv_primary);
+    bad += check("dense project packs while decoded and serialized scratch coexist", bank_pack(proj_wire_u.raw, &proj_scratch, 1));
+    cv_begin(240, 124, RGB(10, 20, 30));
+    bad += check("screen drawing cannot damage a pending archive; decoding reacquires scratch",
+                 bank_valid(proj_wire_u.raw, BANK_STORE_SIZE) && proj_scratch.sum == sum);
+    return bad;
+}
+
 int main(void)
 {
     int bad = test_note_edits() + test_entry_history() + test_midi_entry() + test_record_timing() + test_step_modifiers() +
-              test_held_gestures();
+              test_held_gestures() + test_compact_history();
     printf("sequencer editing: %s\n", bad ? "FAILED" : "all passed");
     return bad != 0;
 }
