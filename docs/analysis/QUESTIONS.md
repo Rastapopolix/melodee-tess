@@ -51,5 +51,5 @@ upstream (5); FORM development (6) in phase 6; Markov's default (7) at the next 
 9. **Turing ignores the track's LEN**, Euclid follows it (`track_len_shorter_than_loop` in the baseline). Should a
    track's LEN bound every generator? Recommendation: decide with the phase 1 interface (`gen_clock_t`).
 10. **The live simulator's demo** set EVOLVE's AMOUNT to 0 % (track 1 never evolved); fixed on `web-sim` (`73805aa`,
-   "the demo's EVOLVE AMOUNT stays at 30 %"), not yet on the site. Rebuild `docs/webapp/sim/` on `main` and push?
+   "the demo's EVOLVE AMOUNT stays at 30 %"). **Answered:** on the live site since 14 October 2026 (`main` `a4533b5`).
 
