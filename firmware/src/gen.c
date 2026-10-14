@@ -198,3 +198,18 @@ static void gen_morph_mutate(gen_morph_t *g, uint32_t amt)
     int32_t v = (int32_t)g->morph_pos + j;
     g->morph_pos = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
 }
+
+/* ------------------------------------------------------------------ FORM sections --- */
+static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
+static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
+static void gen_euclid_save(const gen_euclid_t *g, gen_sec_t *s) { s->p0 = g->pulses; s->p1 = g->rot; s->reg = g->pitch_seed; }
+static void gen_euclid_load(gen_euclid_t *g, const gen_sec_t *s)
+{
+    g->pulses = s->p0;
+    g->rot = s->p1;
+    g->pitch_seed = (uint8_t)s->reg;
+}
+static void gen_markov_save(const gen_markov_t *g, gen_sec_t *s) { s->p0 = g->tension; }
+static void gen_markov_load(gen_markov_t *g, const gen_sec_t *s) { g->tension = s->p0; }
+static void gen_morph_save(const gen_morph_t *g, gen_sec_t *s) { s->reg = g->snap_a; s->p0 = g->morph_pos; }
+static void gen_morph_load(gen_morph_t *g, const gen_sec_t *s) { g->snap_a = s->reg; g->morph_pos = s->p0; }

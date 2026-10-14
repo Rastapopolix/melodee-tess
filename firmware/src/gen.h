@@ -47,6 +47,13 @@ typedef struct {
     uint8_t  oct_span;    /* Octave span */
 } gen_morph_t;
 
+/* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
+ * Each generator saves and loads only its own fields; the others keep what they held */
+typedef struct {
+    uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A */
+    uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos */
+} gen_sec_t;
+
 /* One step of an input phrase (phase 6: STEP as seed) */
 typedef struct { uint8_t hit, note, vel; } gen_step_t;
 typedef struct { const gen_step_t *step; uint8_t len; } gen_phrase_t;   /* len 0: empty (phase 1: always) */

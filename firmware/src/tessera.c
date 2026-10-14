@@ -161,12 +161,19 @@ static void tess_save_sec(uint32_t tr)
 {
     tessera_evolve_t *ev = &tessera.evolve[tr];
     tessera_sec_t *s = &tessera.sec[tr][ev->sec % 3u];
+    gen_sec_t g = {s->reg, s->p0, s->p1};
     switch (tessera.mode[tr]) {
-    case TESS_ENG_TURING: s->reg = ev->rec ? tessera.turing[tr].reg : ev->base_reg; break;
-    case TESS_ENG_EUCLID: s->p0 = tessera.euclid[tr].pulses; s->p1 = tessera.euclid[tr].rot; s->reg = tessera.euclid[tr].pitch_seed; break;
-    case TESS_ENG_MARKOV: s->p0 = tessera.markov[tr].tension; break;
-    case TESS_ENG_MORPH:  s->reg = tessera.morph[tr].snap_a; s->p0 = tessera.morph[tr].morph_pos; break;
+    case TESS_ENG_TURING:
+        gen_turing_save(&tessera.turing[tr], &g);
+        if (!ev->rec) g.reg = ev->base_reg;                  /* the phrase's start, not where it has shifted to */
+        break;
+    case TESS_ENG_EUCLID: gen_euclid_save(&tessera.euclid[tr], &g); break;
+    case TESS_ENG_MARKOV: gen_markov_save(&tessera.markov[tr], &g); break;
+    case TESS_ENG_MORPH:  gen_morph_save(&tessera.morph[tr], &g); break;
     }
+    s->reg = g.reg;
+    s->p0 = g.p0;
+    s->p1 = g.p1;
 }
 
 /* Bring a remembered section back: its settings, and (Markov / Morph) its recorded phrase */
@@ -174,12 +181,13 @@ static void tess_load_sec(uint32_t tr)
 {
     tessera_evolve_t *ev = &tessera.evolve[tr];
     const tessera_sec_t *s = &tessera.sec[tr][ev->sec % 3u];
+    const gen_sec_t g = {s->reg, s->p0, s->p1};
     uint8_t v = ev->valid;
     switch (tessera.mode[tr]) {
-    case TESS_ENG_TURING: tessera.turing[tr].reg = s->reg; break;
-    case TESS_ENG_EUCLID: tessera.euclid[tr].pulses = s->p0; tessera.euclid[tr].rot = s->p1; tessera.euclid[tr].pitch_seed = (uint8_t)s->reg; break;
-    case TESS_ENG_MARKOV: tessera.markov[tr].tension = s->p0; tessera_markov_recalc(tr); break;
-    case TESS_ENG_MORPH:  tessera.morph[tr].snap_a = s->reg; tessera.morph[tr].morph_pos = s->p0; break;
+    case TESS_ENG_TURING: gen_turing_load(&tessera.turing[tr], &g); break;
+    case TESS_ENG_EUCLID: gen_euclid_load(&tessera.euclid[tr], &g); break;
+    case TESS_ENG_MARKOV: gen_markov_load(&tessera.markov[tr], &g); break;
+    case TESS_ENG_MORPH:  gen_morph_load(&tessera.morph[tr], &g); break;
     }
     tess_realign(tr);
     ev->valid = v;
