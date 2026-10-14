@@ -15,8 +15,26 @@ static const uint16_t GEN_MORPH_PRESETS[8] = {
 /* Scale degree to semitone intervals (natural minor; the track's scale snaps the notes afterwards) */
 static const uint8_t GEN_SCALE_MIN[8] = {0, 2, 3, 5, 7, 8, 10, 12};
 
-/* 0..n-1 from the shared generator; n == 0 draws nothing (phase 1: the draws stay exactly as before) */
-static uint32_t gen_rnd(uint32_t n) { return n ? rng() % n : 0u; }
+/* A track's random stream (xorshift32; never 0): each generator draws only from the stream it is handed, so a
+ * track's seed alone decides its random choices. gen_stream: a seed's starting state */
+static uint32_t gen_stream(uint32_t seed)
+{
+    uint32_t x = (seed + 1u) * 2654435761u;
+    x ^= x >> 16;
+    x *= 2246822519u;
+    x ^= x >> 13;
+    return x ? x : 0x6D2B79F5u;
+}
+static uint32_t gen_next(uint32_t *s)
+{
+    uint32_t x = *s;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return *s = x;
+}
+/* 0..n-1 from the stream; n == 0 draws nothing */
+static uint32_t gen_rnd(uint32_t *s, uint32_t n) { return n ? gen_next(s) % n : 0u; }
 
 /* 1 = step is a hit of the Euclidean pattern (pulses spread over steps, rotated) */
 static int gen_euclid_hit(uint8_t step, uint8_t steps, uint8_t pulses, uint8_t rot)
@@ -79,12 +97,12 @@ static uint16_t gen_turing_pick(uint32_t entropy)
 }
 
 /* Turing: the register shifts by one, its last bit fed back (flipped at PROB%); the low byte picks the note */
-static void gen_turing_tick(gen_turing_t *g, const gen_clock_t *clk, gen_out_t *out)
+static void gen_turing_tick(gen_turing_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
     uint8_t len = g->len ? g->len : 16;
     uint16_t bit0 = (g->reg >> (len - 1)) & 1u;
     (void)clk;
-    if (g->prob > 0 && gen_rnd(100u) < g->prob)
+    if (g->prob > 0 && gen_rnd(rnd, 100u) < g->prob)
         bit0 ^= 1u;
     g->reg = ((g->reg << 1) | bit0) & 0xFFFFu;
 
@@ -101,11 +119,12 @@ static void gen_turing_tick(gen_turing_t *g, const gen_clock_t *clk, gen_out_t *
 }
 
 /* Euclid: the pattern's next step; a hit plays the step's pitch (seed 0: the original pattern) */
-static void gen_euclid_tick(gen_euclid_t *g, const gen_clock_t *clk, gen_out_t *out)
+static void gen_euclid_tick(gen_euclid_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
     uint8_t steps = g->steps ? g->steps : 16;
     uint8_t curr_step = g->step_idx;
     (void)clk;
+    (void)rnd;
     g->step_idx = (curr_step + 1u) % steps;
     if (gen_euclid_hit(curr_step, steps, g->pulses, g->rot)) {
         out->note = (uint8_t)(48u + gen_euclid_degree(g->pitch_seed, curr_step));
@@ -115,11 +134,11 @@ static void gen_euclid_tick(gen_euclid_t *g, const gen_clock_t *clk, gen_out_t *
 }
 
 /* Markov: the next scale degree from the tension's row; the draws in this order: degree, octave, velocity, density */
-static void gen_markov_tick(gen_markov_t *g, const gen_clock_t *clk, gen_out_t *out)
+static void gen_markov_tick(gen_markov_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
     uint8_t row[8];
     gen_markov_row(g->tension, g->cur_state, row);
-    uint32_t r = gen_rnd(100u);
+    uint32_t r = gen_rnd(rnd, 100u);
     uint8_t next_state = 0;
     for (uint8_t i = 0; i < 8; i++) {
         if (r < row[i]) {
@@ -130,15 +149,15 @@ static void gen_markov_tick(gen_markov_t *g, const gen_clock_t *clk, gen_out_t *
     g->cur_state = next_state;
 
     uint8_t m_oct = g->oct_span ? g->oct_span : 1;
-    out->note = (uint8_t)(36 + clk->root + (next_state * 2) + (12 * gen_rnd(m_oct)));
-    out->vel = (uint8_t)(95 + gen_rnd(20u));
+    out->note = (uint8_t)(36 + clk->root + (next_state * 2) + (12 * gen_rnd(rnd, m_oct)));
+    out->vel = (uint8_t)(95 + gen_rnd(rnd, 20u));
     uint32_t dens = g->density ? g->density : 100;
-    if (gen_rnd(100u) < dens)
+    if (gen_rnd(rnd, 100u) < dens)
         out->gate = 1;
 }
 
 /* Morph: a step of A or B (B at MORPH_POS/128), each with its own degree pattern */
-static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, gen_out_t *out)
+static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
     uint8_t cur_s = (g->step_idx + 1u) & 0x0Fu;
     (void)clk;
@@ -147,7 +166,7 @@ static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, gen_out_t *ou
     uint8_t hit_a = (g->snap_a >> cur_s) & 1u;
     uint8_t hit_b = (g->snap_b >> cur_s) & 1u;
 
-    uint32_t roll = gen_rnd(128u);
+    uint32_t roll = gen_rnd(rnd, 128u);
     int hit = (roll < g->morph_pos) ? hit_b : hit_a;
 
     if (hit) {
@@ -164,50 +183,50 @@ static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, gen_out_t *ou
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
 /* a new Euclid pitch seed, never 0 (the original pattern) nor the one it replaces */
-static uint8_t gen_new_seed(uint8_t old)
+static uint8_t gen_new_seed(uint8_t old, uint32_t *rnd)
 {
     uint8_t n;
-    do n = (uint8_t)(1u + gen_rnd(255u)); while (n == old);
+    do n = (uint8_t)(1u + gen_rnd(rnd, 255u)); while (n == old);
     return n;
 }
 
 /* Turing: AMOUNT% of the register's active bits flip, at least one */
-static void gen_turing_mutate(gen_turing_t *g, uint32_t amt)
+static void gen_turing_mutate(gen_turing_t *g, uint32_t amt, uint32_t *rnd)
 {
     uint32_t len = g->len ? g->len : 16u;
     uint32_t n = (amt * len + 99u) / 100u;
-    while (n--) g->reg ^= (uint16_t)(1u << gen_rnd(len));
+    while (n--) g->reg ^= (uint16_t)(1u << gen_rnd(rnd, len));
 }
 
 /* Euclid: the rotation nudged by one, less often a pulse more or fewer, and the pitches re-rolled */
-static void gen_euclid_mutate(gen_euclid_t *g, uint32_t amt)
+static void gen_euclid_mutate(gen_euclid_t *g, uint32_t amt, uint32_t *rnd)
 {
     uint32_t steps = g->steps ? g->steps : 16u;
-    if (gen_rnd(100u) < amt) {
-        if (gen_rnd(2u)) g->rot = (uint8_t)((g->rot + 1u) % steps);
+    if (gen_rnd(rnd, 100u) < amt) {
+        if (gen_rnd(rnd, 2u)) g->rot = (uint8_t)((g->rot + 1u) % steps);
         else g->rot = (uint8_t)(g->rot ? g->rot - 1u : steps - 1u);
     }
-    if (gen_rnd(100u) < amt / 2u) {
-        if (gen_rnd(2u) && g->pulses < steps) g->pulses++;
+    if (gen_rnd(rnd, 100u) < amt / 2u) {
+        if (gen_rnd(rnd, 2u) && g->pulses < steps) g->pulses++;
         else if (g->pulses) g->pulses--;
     }
-    if (gen_rnd(100u) < amt) g->pitch_seed = gen_new_seed(g->pitch_seed);
+    if (gen_rnd(rnd, 100u) < amt) g->pitch_seed = gen_new_seed(g->pitch_seed, rnd);
 }
 
 /* Markov: the tension moves by up to +-AMOUNT/2 */
-static void gen_markov_mutate(gen_markov_t *g, uint32_t amt)
+static void gen_markov_mutate(gen_markov_t *g, uint32_t amt, uint32_t *rnd)
 {
-    int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
+    int32_t j = (int32_t)gen_rnd(rnd, amt + 1u) - (int32_t)(amt / 2u);
     int32_t v = (int32_t)g->tension + j;
     g->tension = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
 }
 
 /* Morph: 1..3 bits of snapshot A flip, and the position moves by up to +-AMOUNT/2 */
-static void gen_morph_mutate(gen_morph_t *g, uint32_t amt)
+static void gen_morph_mutate(gen_morph_t *g, uint32_t amt, uint32_t *rnd)
 {
     uint32_t n = 1u + amt / 34u;
-    while (n--) g->snap_a ^= (uint16_t)(1u << gen_rnd(16u));
-    int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
+    while (n--) g->snap_a ^= (uint16_t)(1u << gen_rnd(rnd, 16u));
+    int32_t j = (int32_t)gen_rnd(rnd, amt + 1u) - (int32_t)(amt / 2u);
     int32_t v = (int32_t)g->morph_pos + j;
     g->morph_pos = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
 }

@@ -72,6 +72,8 @@ typedef struct {
     uint8_t          last_note[TESSERA_TRACKS];
     uint8_t          follow_mem[TESSERA_TRACKS];   /* FOLLOW of a STEP track: its last sounding note + 1, 0 none yet */
     uint8_t          active_gate[TESSERA_TRACKS];
+    uint16_t         seed[TESSERA_TRACKS];    /* SEED 1..9999, 0 = not picked yet (tessera.c tess_seed_fresh) */
+    uint32_t         rnd[TESSERA_TRACKS];     /* each track's random stream, from its seed (gen.c gen_stream) */
 } tessera_state_t;
 
 extern tessera_state_t tessera;

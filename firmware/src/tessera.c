@@ -14,17 +14,30 @@ tessera_state_t tessera;
 #define TESS_IRQ_OFF() fm1_irq_off()
 #define TESS_IRQ_ON() fm1_irq_on()
 #endif
-/* Entropy for a fresh Turing register: the hardware timer (sub-microsecond) at the moment a person first selects or
- * plays it, so every power-on differs. The host defines a fixed value: the tests stay repeatable. */
+/* Entropy for a fresh seed: the hardware timer (sub-microsecond) at the moment a person first selects or plays a
+ * generator, so every power-on differs. The host defines a fixed value: the tests stay repeatable. */
 #ifndef TESS_ENTROPY
 #define TESS_ENTROPY() (fm1_ticks() ^ fm1_ms * 2654435761u)
 #endif
 
-/* A Turing register still 0 (the defaults: never played, nor loaded from a project) is picked now. Saved projects
- * bring their own register, so their music stays as it was saved */
-static void tess_turing_fresh(uint32_t tr)
+/* SEED (EVOLVE page): 1..TESS_SEED_MAX per track, 0 = not picked yet (the defaults). A seed decides the track's random
+ * stream and its generators' starting material: Turing's register, Euclid's pitch pattern, Markov's first state */
+#define TESS_SEED_MAX 9999u
+static void tess_seed_apply(uint32_t tr)
 {
-    if (!tessera.turing[tr].reg) tessera.turing[tr].reg = gen_turing_pick(TESS_ENTROPY() + tr * 0x9E3779B9u);
+    uint32_t sd = tessera.seed[tr];
+    tessera.rnd[tr] = gen_stream(sd);
+    tessera.turing[tr].reg = gen_turing_pick(sd);
+    tessera.euclid[tr].pitch_seed = (uint8_t)(1u + gen_stream(sd * 31u + 7u) % 255u);
+    tessera.markov[tr].cur_state = 0;
+}
+/* A track still without a seed (never played, nor loaded from a project) gets a random one now. Saved projects
+ * bring their own seed and material, so their music stays as it was saved */
+static void tess_seed_fresh(uint32_t tr)
+{
+    if (tessera.seed[tr]) return;
+    tessera.seed[tr] = (uint16_t)(1u + gen_stream(TESS_ENTROPY() + tr * 0x9E3779B9u) % TESS_SEED_MAX);
+    tess_seed_apply(tr);
 }
 
 void tessera_markov_recalc(uint32_t tr) { (void)tr; }   /* matrix is derived per step now */
@@ -38,7 +51,7 @@ void tessera_init(void)
         tessera.mode[i] = TESS_ENG_OFF;
 
         /* 1. Turing machine */
-        tessera.turing[i].reg = 0;                       /* not picked yet: tess_turing_fresh, when it is first used */
+        tessera.turing[i].reg = 0;                       /* (the seed picks it: tess_seed_fresh, when first used) */
         tessera.turing[i].len = 16;
         tessera.turing[i].prob = 0;
         tessera.turing[i].oct_span = 2;
@@ -92,6 +105,10 @@ void tessera_stop_all(void)
         tessera.evolve[i].flash = 0;
         tess_realign(i);
         tess_form_reset(i);
+        if (tessera.seed[i]) {                                /* the next PLAY: the seed's random choices from the top */
+            tessera.rnd[i] = gen_stream(tessera.seed[i]);
+            tessera.markov[i].cur_state = 0;
+        }
     }
 }
 
@@ -144,10 +161,10 @@ void tessera_mutate(uint32_t tr)
     if (amt > 100u) amt = 100u;
 
     switch (tessera.mode[tr]) {
-    case TESS_ENG_TURING: gen_turing_mutate(&tessera.turing[tr], amt); break;
-    case TESS_ENG_EUCLID: gen_euclid_mutate(&tessera.euclid[tr], amt); break;
-    case TESS_ENG_MARKOV: gen_markov_mutate(&tessera.markov[tr], amt); break;
-    case TESS_ENG_MORPH:  gen_morph_mutate(&tessera.morph[tr], amt); break;
+    case TESS_ENG_TURING: gen_turing_mutate(&tessera.turing[tr], amt, &tessera.rnd[tr]); break;
+    case TESS_ENG_EUCLID: gen_euclid_mutate(&tessera.euclid[tr], amt, &tessera.rnd[tr]); break;
+    case TESS_ENG_MARKOV: gen_markov_mutate(&tessera.markov[tr], amt, &tessera.rnd[tr]); break;
+    case TESS_ENG_MORPH:  gen_morph_mutate(&tessera.morph[tr], amt, &tessera.rnd[tr]); break;
     }
     tessera.evolve[tr].flash = 4;
     tess_realign(tr);
@@ -356,7 +373,7 @@ static void tessera_phrase_apply(uint32_t tr, uint8_t *note, uint8_t *vel, int *
         if (q > 15u) q = 15u;
         sc->note[pos] = (uint8_t)((*trig ? 0x80u : 0u) | (*note & 0x7Fu));
         sc->vel[pos >> 1] = (uint8_t)((sc->vel[pos >> 1] & ~(0xFu << sh)) | (q << sh));
-    } else if (gen_rnd(100u) < ev->lock) {
+    } else if (gen_rnd(&tessera.rnd[tr], 100u) < ev->lock) {
         uint8_t b = sc->note[pos];
         *trig = (b >> 7) & 1;
         *note = b & 0x7Fu;
@@ -409,7 +426,7 @@ static void tess_evolve_knob_body(uint32_t k, int32_t s)
         ev->amount = (uint8_t)(a < 0 ? 0 : a > 100 ? 100 : a);
     } else if (k == 3u) {
         if (tessera.mode[tr] == TESS_ENG_EUCLID) {                  /* Euclid: ROLL re-rolls the pitches, the rhythm stays */
-            tessera.euclid[tr].pitch_seed = gen_new_seed(tessera.euclid[tr].pitch_seed);
+            tessera.euclid[tr].pitch_seed = gen_new_seed(tessera.euclid[tr].pitch_seed, &tessera.rnd[tr]);
             ev->flash = 4;
         } else if (tessera.mode[tr] != TESS_ENG_OFF) {
             tessera_mutate(tr);                                      /* any turn rolls once */
@@ -464,7 +481,7 @@ void tessera_clock_step(track_t *t)
     uint32_t tr = trk_index(t);
     if (tr >= TESSERA_TRACKS) return;
 
-    if (tessera.mode[tr] == TESS_ENG_TURING) tess_turing_fresh(tr);   /* before EVOLVE captures the phrase's start */
+    tess_seed_fresh(tr);                                    /* before EVOLVE captures the phrase's start */
     tessera_evolve_tick(t, tr);
 
     if (t->p[P_MUTE]) {
@@ -490,16 +507,16 @@ void tessera_clock_step(track_t *t)
 
     switch (tessera.mode[tr]) {
     case TESS_ENG_TURING:
-        gen_turing_tick(&tessera.turing[tr], &clk, &out);
+        gen_turing_tick(&tessera.turing[tr], &clk, &tessera.rnd[tr], &out);
         break;
     case TESS_ENG_EUCLID:
-        gen_euclid_tick(&tessera.euclid[tr], &clk, &out);
+        gen_euclid_tick(&tessera.euclid[tr], &clk, &tessera.rnd[tr], &out);
         break;
     case TESS_ENG_MARKOV:
-        gen_markov_tick(&tessera.markov[tr], &clk, &out);
+        gen_markov_tick(&tessera.markov[tr], &clk, &tessera.rnd[tr], &out);
         break;
     case TESS_ENG_MORPH:
-        gen_morph_tick(&tessera.morph[tr], &clk, &out);
+        gen_morph_tick(&tessera.morph[tr], &clk, &tessera.rnd[tr], &out);
         break;
     }
     uint8_t note = out.note, vel = out.vel;
@@ -510,10 +527,10 @@ void tessera_clock_step(track_t *t)
 
     {   /* TWEAK: DROP thins any engine's hits; HUMAN varies the velocity (the gate below) */
         const tessera_evolve_t *tw = &tessera.evolve[tr];
-        if (should_trigger && tw->drop && gen_rnd(100u) < tw->drop) should_trigger = 0;
+        if (should_trigger && tw->drop && gen_rnd(&tessera.rnd[tr], 100u) < tw->drop) should_trigger = 0;
         if (should_trigger && tw->human) {
             int32_t j = (int32_t)(tw->human / 5u);                    /* up to +-20 */
-            int32_t v = (int32_t)vel + (int32_t)gen_rnd((uint32_t)(2 * j + 1)) - j;
+            int32_t v = (int32_t)vel + (int32_t)gen_rnd(&tessera.rnd[tr], (uint32_t)(2 * j + 1)) - j;
             vel = (uint8_t)(v < 1 ? 1 : v > 127 ? 127 : v);
         }
     }
@@ -550,7 +567,7 @@ void tessera_clock_step(track_t *t)
         uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]);
         t->seq_off = period * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
         if (tw2->human)                                    /* shorten by up to HUMAN/2 percent */
-            t->seq_off = t->seq_off * (100u - gen_rnd(tw2->human / 2u + 1u)) / 100u;
+            t->seq_off = t->seq_off * (100u - gen_rnd(&tessera.rnd[tr], tw2->human / 2u + 1u)) / 100u;
     }
 }
 
@@ -571,7 +588,7 @@ static void tess_knob_body(uint32_t k, int32_t s)
             tessera.active_gate[tr] = 0;
         }
         tessera.mode[tr] = (uint8_t)m;
-        if (m == TESS_ENG_TURING) tess_turing_fresh(tr);        /* (its picture shows the register at once) */
+        if (m != TESS_ENG_OFF) tess_seed_fresh(tr);             /* (its picture shows the material at once) */
         if (tessera.evolve[tr].form) tess_form_restart(tr);   /* the sections were another engine's */
         tess_rearm(tr);
         return;
@@ -786,8 +803,18 @@ uint32_t tessera_pack(uint8_t *o)
 }
 
 /* one track's record: range-checked, and (apply) written into `tessera` */
+/* A block without a seed (version 1, before SEED): one from the track's own bytes, so the same project always gets
+ * the same; 1..TESS_SEED_MAX */
+static uint16_t tess_seed_of(const uint8_t *rec, uint32_t n)
+{
+    uint32_t h = 2166136261u;
+    while (n--) h = (h ^ *rec++) * 16777619u;
+    return (uint16_t)(1u + h % TESS_SEED_MAX);
+}
+
 static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
 {
+    const uint8_t *rec = in;
     uint32_t mode = *in++;
     uint32_t t_reg = tess_get16(in); in += 2;
     uint32_t t_len = *in++, t_prob = *in++, t_oct = *in++;
@@ -835,6 +862,8 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
         tessera_sec_t *sc = &tessera.sec[tr][s];
         sc->reg = (uint16_t)tess_get16(in); in += 2; sc->p0 = *in++; sc->p1 = *in++;
     }
+    tessera.seed[tr] = mode ? tess_seed_of(rec, TESS_PK_TRACK) : 0u;   /* (an OFF track: a fresh one when first used) */
+    tessera.rnd[tr] = gen_stream(tessera.seed[tr]);       /* the stream from the top; the material is the block's */
     return 1;
 }
 

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* Unit test of the note generators (firmware/src/gen.c) on their own: no sequencer, no tracks, no Melodee; only
- * gen.h, gen.c and a counting stand-in for the shared rng(). That it builds this way is part of the test: the
+ * gen.h, gen.c and a random stream of its own, as tessera.c hands each track's. That it builds this way is part of the test: the
  * generators know nothing of the firmware (phase 1, docs/analysis/phase1-plan.md step 9).
  *   build/host/gen_test
  * Checks, per generator and across its settings: the same seed gives the same steps; notes and velocities stay
@@ -13,18 +13,16 @@
 #include <string.h>
 #include <time.h>
 
-static uint32_t rng_state = 1u, rng_calls;
-static uint32_t rng(void)                            /* (libc.c's is an xorshift too; any fixed source will do) */
-{
-    rng_calls++;
-    rng_state ^= rng_state << 13;
-    rng_state ^= rng_state >> 17;
-    rng_state ^= rng_state << 5;
-    return rng_state;
-}
-
 #include "gen.h"
 #include "gen.c"
+
+static uint32_t rng_state = 1u;                      /* the stream handed to every generator (a track's, in tessera.c) */
+static uint32_t draws_since(uint32_t before)         /* draws taken from rng_state since it was `before` (up to 16) */
+{
+    uint32_t n = 0, x = before;
+    while (x != rng_state && n < 17u) { gen_next(&x); n++; }
+    return n;
+}
 
 static int bad;
 static void check(const char *what, int ok)
@@ -53,9 +51,9 @@ static void turing_tests(void)
                 gen_turing_t g = {0xACE1u, (uint8_t)len, (uint8_t)prob, 0, 0, (uint8_t)span};
                 for (uint32_t i = 0; i < 64; i++) {
                     gen_out_t o = step_out();
-                    uint32_t c = rng_calls;
-                    gen_turing_tick(&g, &CLK0, &o);
-                    draws &= rng_calls - c == (prob ? 1u : 0u);
+                    uint32_t c = rng_state;
+                    gen_turing_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == (prob ? 1u : 0u);
                     range &= o.note >= 36 && o.note <= 36 + 12 * (span - 1) + 10 && o.vel >= 90 && o.vel <= 121;
                     range &= o.gate <= 1 && o.cv == 0;
                 }
@@ -66,7 +64,7 @@ static void turing_tests(void)
             gen_out_t seen[48];
             for (uint32_t i = 0; i < 48; i++) {
                 seen[i] = step_out();
-                gen_turing_tick(&g, &CLK0, &seen[i]);
+                gen_turing_tick(&g, &CLK0, &rng_state, &seen[i]);
                 if (i >= len) loop &= out_eq(&seen[i], &seen[i - len], 1);
             }
         }
@@ -79,7 +77,7 @@ static void turing_tests(void)
             for (uint32_t i = 0; i < 200; i++) {
                 gen_out_t *o = run ? &b[i] : &a[i];
                 *o = step_out();
-                gen_turing_tick(&g, &CLK0, o);
+                gen_turing_tick(&g, &CLK0, &rng_state, o);
             }
         }
         same = out_eq(a, b, sizeof a / sizeof a[0]);
@@ -105,7 +103,7 @@ static void turing_tests(void)
         int ok = 1;
         for (uint32_t amt = 0; amt <= 100; amt += 10) {
             gen_turing_t g = {0xACE1u, 8, 0, 0, 0, 2};
-            gen_turing_mutate(&g, amt);
+            gen_turing_mutate(&g, amt, &rng_state);
             ok &= g.len == 8 && g.prob == 0 && g.oct_span == 2 && g.step_idx == 0;
             if (!amt) ok &= g.reg == 0xACE1u;
         }
@@ -124,9 +122,9 @@ static void euclid_tests(void)
                 uint32_t hits = 0;
                 for (uint32_t i = 0; i < steps; i++) {
                     gen_out_t o = step_out();
-                    uint32_t c = rng_calls;
-                    gen_euclid_tick(&g, &CLK0, &o);
-                    draws &= rng_calls == c;
+                    uint32_t c = rng_state;
+                    gen_euclid_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == 0u;
                     if (o.gate) {
                         hits++;
                         range &= o.note >= 48 && o.note <= 59 && o.vel == 110;
@@ -143,7 +141,7 @@ static void euclid_tests(void)
             for (uint32_t i = 0; i < 64; i++) {
                 gen_out_t *o = run ? &b[i] : &a[i];
                 *o = step_out();
-                gen_euclid_tick(&g, &CLK0, o);
+                gen_euclid_tick(&g, &CLK0, &rng_state, o);
             }
         }
         same = out_eq(a, b, sizeof a / sizeof a[0]);
@@ -151,7 +149,7 @@ static void euclid_tests(void)
     for (uint32_t steps = 1; steps <= 32; steps++)
         for (uint32_t amt = 0; amt <= 100; amt += 20) {
             gen_euclid_t g = {(uint8_t)steps, (uint8_t)(steps / 2u), 0, 0, 0, 5};
-            for (uint32_t n = 0; n < 50; n++) gen_euclid_mutate(&g, amt);
+            for (uint32_t n = 0; n < 50; n++) gen_euclid_mutate(&g, amt, &rng_state);
             mut &= g.steps == steps && g.pulses <= steps && g.rot < steps && g.pitch_seed != 0;
         }
     check("euclid: a hit plays 48..59 at velocity 110; a rest keeps note 60, velocity 100", range && rest);
@@ -162,7 +160,7 @@ static void euclid_tests(void)
     {
         int ok = 1;
         for (uint32_t s = 0; s < 256; s++) {
-            uint8_t n = gen_new_seed((uint8_t)s);
+            uint8_t n = gen_new_seed((uint8_t)s, &rng_state);
             ok &= n != 0 && n != s;
         }
         check("euclid: a new seed is never 0 nor the one it replaces", ok);
@@ -181,9 +179,9 @@ static void markov_tests(void)
                     gen_clock_t clk = {0, 16, (uint8_t)root};
                     for (uint32_t i = 0; i < 64; i++) {
                         gen_out_t o = step_out();
-                        uint32_t c = rng_calls;
-                        gen_markov_tick(&g, &clk, &o);
-                        draws &= rng_calls - c == 4u;
+                        uint32_t c = rng_state;
+                        gen_markov_tick(&g, &clk, &rng_state, &o);
+                        draws &= draws_since(c) == 4u;
                         range &= g.cur_state < 8 && o.vel >= 95 && o.vel <= 114 && o.gate <= 1;
                         range &= o.note >= 36 + root && o.note <= 36 + root + 14 + 12 * (oct - 1);
                     }
@@ -197,7 +195,7 @@ static void markov_tests(void)
             for (uint32_t i = 0; i < 200; i++) {
                 gen_out_t *o = run ? &b[i] : &a[i];
                 *o = step_out();
-                gen_markov_tick(&g, &clk, o);
+                gen_markov_tick(&g, &clk, &rng_state, o);
             }
         }
         same = out_eq(a, b, sizeof a / sizeof a[0]);
@@ -216,7 +214,7 @@ static void markov_tests(void)
     for (uint32_t amt = 0; amt <= 100; amt += 10)
         for (uint32_t t0 = 0; t0 <= 100; t0 += 50) {
             gen_markov_t g = {3, 0, (uint8_t)t0, 80, 2};
-            for (uint32_t n = 0; n < 50; n++) gen_markov_mutate(&g, amt);
+            for (uint32_t n = 0; n < 50; n++) gen_markov_mutate(&g, amt, &rng_state);
             mut &= g.tension <= 100 && g.density == 80 && g.oct_span == 2 && g.cur_state == 3;
         }
     check("markov: notes root+36 .. root+50+12*(SPAN-1), velocity 95..114, a state 0..7 (every ROOT, SPAN, TENSION, DENSITY)", range);
@@ -234,9 +232,9 @@ static void morph_tests(void)
             gen_morph_t g = {(uint8_t)pos, GEN_MORPH_PRESETS[pa], GEN_MORPH_PRESETS[7 - pa], 0x0F, 2};
             for (uint32_t i = 0; i < 48; i++) {
                 gen_out_t o = step_out();
-                uint32_t c = rng_calls;
-                gen_morph_tick(&g, &CLK0, &o);
-                draws &= rng_calls - c == 1u;
+                uint32_t c = rng_state;
+                gen_morph_tick(&g, &CLK0, &rng_state, &o);
+                draws &= draws_since(c) == 1u;
                 if (o.gate) range &= o.note >= 48 && o.note <= 60 && (o.vel == 100 || o.vel == 115);
                 else rest &= o.note == 60 && o.vel == 100;
                 range &= (g.step_idx & 0xF0u) == 0;
@@ -246,7 +244,7 @@ static void morph_tests(void)
         gen_morph_t g = {0, 0x8924u, 0xFFFFu, 0x0F, 2};
         for (uint32_t i = 0; i < 32; i++) {
             gen_out_t o = step_out();
-            gen_morph_tick(&g, &CLK0, &o);
+            gen_morph_tick(&g, &CLK0, &rng_state, &o);
             ends &= o.gate == ((0x8924u >> (i & 15u)) & 1u);
         }
     }
@@ -258,14 +256,14 @@ static void morph_tests(void)
             for (uint32_t i = 0; i < 100; i++) {
                 gen_out_t *o = run ? &b[i] : &a[i];
                 *o = step_out();
-                gen_morph_tick(&g, &CLK0, o);
+                gen_morph_tick(&g, &CLK0, &rng_state, o);
             }
         }
         same = out_eq(a, b, sizeof a / sizeof a[0]);
     }
     for (uint32_t amt = 0; amt <= 100; amt += 10) {
         gen_morph_t g = {120, 0x8888u, 0xA5A5u, 0x0F, 2};
-        for (uint32_t n = 0; n < 50; n++) gen_morph_mutate(&g, amt);
+        for (uint32_t n = 0; n < 50; n++) gen_morph_mutate(&g, amt, &rng_state);
         mut &= g.morph_pos <= 127 && g.snap_b == 0xA5A5u && g.oct_span == 2;
     }
     check("morph: a hit plays 48..60 at velocity 100 or 115; a rest keeps note 60, velocity 100", range && rest);
@@ -311,10 +309,10 @@ static double ns_per_step(int kind)
     clock_gettime(CLOCK_MONOTONIC, &a);
     for (uint32_t i = 0; i < N; i++) {
         gen_out_t o = step_out();
-        if (kind == 0) gen_turing_tick(&tu, &CLK0, &o);
-        else if (kind == 1) gen_euclid_tick(&eu, &CLK0, &o);
-        else if (kind == 2) gen_markov_tick(&mk, &CLK0, &o);
-        else gen_morph_tick(&mo, &CLK0, &o);
+        if (kind == 0) gen_turing_tick(&tu, &CLK0, &rng_state, &o);
+        else if (kind == 1) gen_euclid_tick(&eu, &CLK0, &rng_state, &o);
+        else if (kind == 2) gen_markov_tick(&mk, &CLK0, &rng_state, &o);
+        else gen_morph_tick(&mo, &CLK0, &rng_state, &o);
         sink += o.note + o.gate;
     }
     clock_gettime(CLOCK_MONOTONIC, &b);
@@ -322,8 +320,24 @@ static double ns_per_step(int kind)
     return ((double)(b.tv_sec - a.tv_sec) * 1e9 + (double)(b.tv_nsec - a.tv_nsec)) / N;
 }
 
+static void stream_tests(void)
+{
+    static uint8_t seen[65536 / 8];
+    uint32_t distinct = 0;
+    int ok = 1;
+    memset(seen, 0, sizeof seen);
+    for (uint32_t sd = 0; sd <= 9999u; sd++) {
+        uint32_t x = gen_stream(sd), h = (x ^ (x >> 16)) & 0xFFFFu;
+        ok &= x != 0;
+        if (!(seen[h >> 3] & (1u << (h & 7u)))) { seen[h >> 3] |= (uint8_t)(1u << (h & 7u)); distinct++; }
+    }
+    check("streams: every seed 0..9999 starts a stream other than 0 (xorshift's dead state)", ok);
+    check("streams: the 10,000 seeds start at least 9,000 different streams (16-bit fold)", distinct >= 9000u);
+}
+
 int main(void)
 {
+    stream_tests();
     turing_tests();
     euclid_tests();
     markov_tests();
