@@ -86,6 +86,7 @@
 #include "midi_uart.c"
 #endif
 #include "tessera.h"
+#include "gen.c"
 #include "song_chain.c"
 #include "seq.c"
 #include "tessera.c"

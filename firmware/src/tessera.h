@@ -78,7 +78,6 @@ extern tessera_state_t tessera;
 
 void tessera_init(void);
 void tessera_clock_step(track_t *t);
-int  tessera_euclid_hit(uint8_t step, uint8_t steps, uint8_t pulses, uint8_t rot);
 void tessera_markov_recalc(uint32_t tr);
 void tessera_knob(uint32_t k, int32_t s);
 void tessera_ensure_init(void);

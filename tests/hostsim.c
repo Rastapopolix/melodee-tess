@@ -58,6 +58,7 @@ static void fm1_delay_ms(uint32_t ms) { (void)ms; }
 #include "../firmware/src/usb.c"
 #include "../firmware/src/midi_uart.c"                /* TRS MIDI IN: its parser (um_byte) feeds midi_in_q */
 #include "../firmware/src/tessera.h"
+#include "../firmware/src/gen.c"
 #include "../firmware/src/song_chain.c"
 #include "../firmware/src/seq.c"
 #ifdef TESSERA_NOTE_HOOK                       /* tests/tessera_test.c: every note a generator plays, logged on its way */

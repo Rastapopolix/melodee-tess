@@ -2,46 +2,9 @@
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* Tessera: the note generators of tracks 1-4 (Turing, Euclid, Markov, Morph), EVOLVE, FORM and TWEAK, clocked by the
  * sequencer (seq.c) in place of a track's steps; their state is saved with the project (project.c, OBJ_TESSERA). */
-static const uint16_t MORPH_PRESETS[8] = {
-    0x8888u, /* 4-on-floor */
-    0x2222u, /* Offbeats */
-    0xAAAAu, /* Straight 8ths */
-    0x8924u, /* Son clave */
-    0x8512u, /* Rumba clave */
-    0x9249u, /* Syncopated 3-3-2 */
-    0xA5A5u, /* Alternating sync */
-    0xB6D7u  /* Dense poly */
-};
 #include "tessera.h"
 
 tessera_state_t tessera;
-
-/* Scale degree to semitone intervals */
-static const uint8_t TESS_SCALE_MIN[8] = {0, 2, 3, 5, 7, 8, 10, 12};
-static const uint8_t TESS_SCALE_MAJ[8] = {0, 2, 4, 5, 7, 9, 11, 12};
-static const uint8_t TESS_SCALE_DOR[8] = {0, 2, 3, 5, 7, 9, 10, 12};
-static const uint8_t TESS_SCALE_PEN[8] = {0, 3, 5, 7, 10, 12, 15, 17};
-
-/* cumulative transition weights (0..100) from state s, derived from tension */
-static void tess_markov_row(uint8_t tens, uint32_t s, uint8_t out[8])
-{
-    uint32_t raw[8], sum = 0, accum = 0;
-    for (uint32_t d = 0; d < 8; d++) {
-        int32_t dist = (int32_t)d - (int32_t)s;
-        if (dist < 0) dist = -dist;
-        if      (dist == 0) raw[d] = 15;
-        else if (dist == 1) raw[d] = 50 - (tens * 30 / 100);
-        else if (dist == 2) raw[d] = 25;
-        else                raw[d] = 5 + (tens * 25 / 100);
-        if (d == 0 || d == 7) raw[d] += (100 - tens) / 5;
-        sum += raw[d];
-    }
-    if (!sum) sum = 1;
-    for (uint32_t d = 0; d < 8; d++) {
-        accum += (raw[d] * 100u) / sum;
-        out[d] = (accum > 100u || d == 7) ? 100 : (uint8_t)accum;
-    }
-}
 
 void tessera_markov_recalc(uint32_t tr) { (void)tr; }   /* matrix is derived per step now */
 
@@ -83,14 +46,6 @@ void tessera_init(void)
         tessera.evolve[i].rec = 2;
         tessera.evolve[i].contrast = 60;
     }
-}
-
-int tessera_euclid_hit(uint8_t step, uint8_t steps, uint8_t pulses, uint8_t rot)
-{
-    if (!pulses || !steps) return 0;
-    if (pulses >= steps) return 1;
-    uint32_t s = (step + rot) % steps;
-    return (((s + 1u) * (uint32_t)pulses) / (uint32_t)steps) > ((s * (uint32_t)pulses) / (uint32_t)steps);
 }
 
 void tessera_kill(track_t *t)
@@ -135,25 +90,10 @@ static uint32_t tess_steps_per_bar(const track_t *t)
     return n ? n : 1u;
 }
 
-static uint32_t tess_rnd(uint32_t n) { return n ? rng() % n : 0u; }
-
-/* Euclid pitch: semitones 0..11 above C3 for a step. Seed 0 is the original pattern; any other seed
- * gives a different, repeatable one (a hash of seed and step), which ROLL changes. */
-static uint32_t tess_euclid_degree(uint8_t seed, uint32_t step)
-{
-    uint32_t x;
-    if (!seed) return (step * 3u) % 12u;
-    x = (step + 1u) * 2654435761u ^ ((uint32_t)seed * 40503u);
-    x ^= x >> 15;
-    x *= 2246822519u;
-    x ^= x >> 13;
-    return x % 12u;
-}
-
 static uint8_t tess_new_seed(uint8_t old)
 {
     uint8_t n;
-    do n = (uint8_t)(1u + tess_rnd(255u)); while (n == old);
+    do n = (uint8_t)(1u + gen_rnd(255u)); while (n == old);
     return n;
 }
 
@@ -194,24 +134,24 @@ void tessera_mutate(uint32_t tr)
         tessera_turing_t *a = &tessera.turing[tr];
         uint32_t len = a->len ? a->len : 16u;
         uint32_t n = (amt * len + 99u) / 100u;          /* bits to flip: >= 1 when AMOUNT > 0 */
-        while (n--) a->reg ^= (uint16_t)(1u << tess_rnd(len));
+        while (n--) a->reg ^= (uint16_t)(1u << gen_rnd(len));
         break; }
     case TESS_ENG_EUCLID: {
         tessera_euclid_t *a = &tessera.euclid[tr];
         uint32_t steps = a->steps ? a->steps : 16u;
-        if (tess_rnd(100u) < amt) {                     /* nudge the rotation by one */
-            if (tess_rnd(2u)) a->rot = (uint8_t)((a->rot + 1u) % steps);
+        if (gen_rnd(100u) < amt) {                     /* nudge the rotation by one */
+            if (gen_rnd(2u)) a->rot = (uint8_t)((a->rot + 1u) % steps);
             else a->rot = (uint8_t)(a->rot ? a->rot - 1u : steps - 1u);
         }
-        if (tess_rnd(100u) < amt / 2u) {                /* less often, a pulse more or fewer */
-            if (tess_rnd(2u) && a->pulses < steps) a->pulses++;
+        if (gen_rnd(100u) < amt / 2u) {                /* less often, a pulse more or fewer */
+            if (gen_rnd(2u) && a->pulses < steps) a->pulses++;
             else if (a->pulses) a->pulses--;
         }
-        if (tess_rnd(100u) < amt) a->pitch_seed = tess_new_seed(a->pitch_seed);   /* and the pitches */
+        if (gen_rnd(100u) < amt) a->pitch_seed = tess_new_seed(a->pitch_seed);   /* and the pitches */
         break; }
     case TESS_ENG_MARKOV: {
         tessera_markov_t *a = &tessera.markov[tr];
-        int32_t j = (int32_t)tess_rnd(amt + 1u) - (int32_t)(amt / 2u);
+        int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
         int32_t v = (int32_t)a->tension + j;
         a->tension = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
         tessera_markov_recalc(tr);
@@ -219,8 +159,8 @@ void tessera_mutate(uint32_t tr)
     case TESS_ENG_MORPH: {
         tessera_morph_t *a = &tessera.morph[tr];
         uint32_t n = 1u + amt / 34u;                    /* 1..3 bits of snapshot A flip */
-        while (n--) a->snap_a ^= (uint16_t)(1u << tess_rnd(16u));
-        int32_t j = (int32_t)tess_rnd(amt + 1u) - (int32_t)(amt / 2u);
+        while (n--) a->snap_a ^= (uint16_t)(1u << gen_rnd(16u));
+        int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
         int32_t v = (int32_t)a->morph_pos + j;
         a->morph_pos = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
         break; }
@@ -418,7 +358,7 @@ static void tessera_phrase_apply(uint32_t tr, uint8_t *note, uint8_t *vel, int *
         if (q > 15u) q = 15u;
         sc->note[pos] = (uint8_t)((*trig ? 0x80u : 0u) | (*note & 0x7Fu));
         sc->vel[pos >> 1] = (uint8_t)((sc->vel[pos >> 1] & ~(0xFu << sh)) | (q << sh));
-    } else if (tess_rnd(100u) < ev->lock) {
+    } else if (gen_rnd(100u) < ev->lock) {
         uint8_t b = sc->note[pos];
         *trig = (b >> 7) & 1;
         *note = b & 0x7Fu;
@@ -553,7 +493,7 @@ void tessera_clock_step(track_t *t)
         uint8_t raw = mreg & 0xFFu;
         uint8_t idx = raw % 7;
         uint8_t oct = (raw / 7) % span;
-        note = 36 + (oct * 12) + TESS_SCALE_MIN[idx];
+        note = 36 + (oct * 12) + GEN_SCALE_MIN[idx];
         vel = 90 + ((mreg >> 8) & 0x1Fu);
         if (tur->reg & 1u) {
             should_trigger = 1;
@@ -566,8 +506,8 @@ void tessera_clock_step(track_t *t)
         uint8_t curr_step = euc->step_idx;
         euc->step_idx = (curr_step + 1u) % steps;
 
-        if (tessera_euclid_hit(curr_step, steps, euc->pulses, euc->rot)) {
-            note = (uint8_t)(48u + tess_euclid_degree(euc->pitch_seed, curr_step));
+        if (gen_euclid_hit(curr_step, steps, euc->pulses, euc->rot)) {
+            note = (uint8_t)(48u + gen_euclid_degree(euc->pitch_seed, curr_step));
             should_trigger = 1;
             vel = 110;
         }
@@ -576,7 +516,7 @@ void tessera_clock_step(track_t *t)
     case TESS_ENG_MARKOV: {
         tessera_markov_t *mk = &tessera.markov[tr];
         uint8_t row[8];
-        tess_markov_row(mk->tension, mk->cur_state, row);
+        gen_markov_row(mk->tension, mk->cur_state, row);
         uint32_t r = rng() % 100u;
         uint8_t next_state = 0;
         for (uint8_t i = 0; i < 8; i++) {
@@ -612,7 +552,7 @@ void tessera_clock_step(track_t *t)
             uint8_t deg_a = (cur_s * 2u) % 8u;
             uint8_t deg_b = (cur_s * 3u + 2u) % 8u;
             uint8_t chosen_deg = (roll < m->morph_pos) ? deg_b : deg_a;
-            note = 48 + TESS_SCALE_MIN[chosen_deg];
+            note = 48 + GEN_SCALE_MIN[chosen_deg];
             vel = 90 + ((cur_s % 4u == 0) ? 25 : 10);
             should_trigger = 1;
         }
@@ -625,10 +565,10 @@ void tessera_clock_step(track_t *t)
 
     {   /* TWEAK: DROP thins any engine's hits; HUMAN varies the velocity (the gate below) */
         const tessera_evolve_t *tw = &tessera.evolve[tr];
-        if (should_trigger && tw->drop && tess_rnd(100u) < tw->drop) should_trigger = 0;
+        if (should_trigger && tw->drop && gen_rnd(100u) < tw->drop) should_trigger = 0;
         if (should_trigger && tw->human) {
             int32_t j = (int32_t)(tw->human / 5u);                    /* up to +-20 */
-            int32_t v = (int32_t)vel + (int32_t)tess_rnd((uint32_t)(2 * j + 1)) - j;
+            int32_t v = (int32_t)vel + (int32_t)gen_rnd((uint32_t)(2 * j + 1)) - j;
             vel = (uint8_t)(v < 1 ? 1 : v > 127 ? 127 : v);
         }
     }
@@ -665,7 +605,7 @@ void tessera_clock_step(track_t *t)
         uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]);
         t->seq_off = period * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
         if (tw2->human)                                    /* shorten by up to HUMAN/2 percent */
-            t->seq_off = t->seq_off * (100u - tess_rnd(tw2->human / 2u + 1u)) / 100u;
+            t->seq_off = t->seq_off * (100u - gen_rnd(tw2->human / 2u + 1u)) / 100u;
     }
 }
 
@@ -764,13 +704,13 @@ void tessera_knob(uint32_t k, int32_t s)
             if (pa < 0) pa = 0;
             if (pa > 7) pa = 7;
             m->step_idx = (m->step_idx & 0x0Fu) | ((uint8_t)pa << 4);
-            m->snap_a = MORPH_PRESETS[pa];
+            m->snap_a = GEN_MORPH_PRESETS[pa];
         } else if (k == 3u) {
             int32_t pb = ((int32_t)m->oct_span & 7) + s;
             if (pb < 0) pb = 0;
             if (pb > 7) pb = 7;
             m->oct_span = (uint8_t)pb;
-            m->snap_b = MORPH_PRESETS[pb];
+            m->snap_b = GEN_MORPH_PRESETS[pb];
         }
     }
     tess_rearm(tr);
@@ -849,7 +789,7 @@ static int32_t tess_follow_source(uint32_t src, uint32_t tr)
 /* The pitch Euclid plays on a step, as 0..14 (mirrors tessera_clock_step: 48 + (step*3)%12, snapped) */
 uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
 {
-    int32_t n = tessera_snap_note(t, 48 + (int32_t)tess_euclid_degree(tessera.euclid[trk_index(t) % TESSERA_TRACKS].pitch_seed, step));
+    int32_t n = tessera_snap_note(t, 48 + (int32_t)gen_euclid_degree(tessera.euclid[trk_index(t) % TESSERA_TRACKS].pitch_seed, step));
     n -= 45;
     if (n < 0) n = 0;
     if (n > 14) n = 14;

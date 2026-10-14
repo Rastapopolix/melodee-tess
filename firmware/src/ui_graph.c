@@ -158,7 +158,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             }
 
             if (i < len) {
-                uint32_t active = (uint32_t)tessera_euclid_hit((uint8_t)i, (uint8_t)len, euc->pulses, euc->rot);
+                uint32_t active = (uint32_t)gen_euclid_hit((uint8_t)i, (uint8_t)len, euc->pulses, euc->rot);
                 int is_head = (song.playing && i == (euc->step_idx + len - 1u) % len);
 
                 if (active) {
@@ -183,7 +183,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         int32_t x0 = is_panel ? 18 : 14;
         uint32_t cur = mk->cur_state & 7u;
         uint8_t mrow[8];
-        tess_markov_row(mk->tension, cur, mrow);
+        gen_markov_row(mk->tension, cur, mrow);
 
         for (uint32_t i = 0; i < 8u; i++) {
             int32_t sx = x0 + (int32_t)i * col;
