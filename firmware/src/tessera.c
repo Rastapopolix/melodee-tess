@@ -14,6 +14,18 @@ tessera_state_t tessera;
 #define TESS_IRQ_OFF() fm1_irq_off()
 #define TESS_IRQ_ON() fm1_irq_on()
 #endif
+/* Entropy for a fresh Turing register: the hardware timer (sub-microsecond) at the moment a person first selects or
+ * plays it, so every power-on differs. The host defines a fixed value: the tests stay repeatable. */
+#ifndef TESS_ENTROPY
+#define TESS_ENTROPY() (fm1_ticks() ^ fm1_ms * 2654435761u)
+#endif
+
+/* A Turing register still 0 (the defaults: never played, nor loaded from a project) is picked now. Saved projects
+ * bring their own register, so their music stays as it was saved */
+static void tess_turing_fresh(uint32_t tr)
+{
+    if (!tessera.turing[tr].reg) tessera.turing[tr].reg = gen_turing_pick(TESS_ENTROPY() + tr * 0x9E3779B9u);
+}
 
 void tessera_markov_recalc(uint32_t tr) { (void)tr; }   /* matrix is derived per step now */
 
@@ -26,7 +38,7 @@ void tessera_init(void)
         tessera.mode[i] = TESS_ENG_OFF;
 
         /* 1. Turing machine */
-        tessera.turing[i].reg = 0xACE1u;
+        tessera.turing[i].reg = 0;                       /* not picked yet: tess_turing_fresh, when it is first used */
         tessera.turing[i].len = 16;
         tessera.turing[i].prob = 0;
         tessera.turing[i].oct_span = 2;
@@ -452,6 +464,7 @@ void tessera_clock_step(track_t *t)
     uint32_t tr = trk_index(t);
     if (tr >= TESSERA_TRACKS) return;
 
+    if (tessera.mode[tr] == TESS_ENG_TURING) tess_turing_fresh(tr);   /* before EVOLVE captures the phrase's start */
     tessera_evolve_tick(t, tr);
 
     if (t->p[P_MUTE]) {
@@ -558,6 +571,7 @@ static void tess_knob_body(uint32_t k, int32_t s)
             tessera.active_gate[tr] = 0;
         }
         tessera.mode[tr] = (uint8_t)m;
+        if (m == TESS_ENG_TURING) tess_turing_fresh(tr);        /* (its picture shows the register at once) */
         if (tessera.evolve[tr].form) tess_form_restart(tr);   /* the sections were another engine's */
         tess_rearm(tr);
         return;

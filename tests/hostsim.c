@@ -67,6 +67,7 @@ static void TESSERA_NOTE_HOOK(track_t *t, uint32_t note, uint32_t vel);
 #endif
 #define TESS_IRQ_OFF() ((void)0)                  /* (no audio interrupt on the host) */
 #define TESS_IRQ_ON() ((void)0)
+#define TESS_ENTROPY() 0x5EEDu                     /* (a fresh Turing register: fixed on the host, repeatable tests) */
 #include "../firmware/src/tessera.c"
 #ifdef TESSERA_NOTE_HOOK
 #undef trk_note_on

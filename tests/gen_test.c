@@ -84,6 +84,19 @@ static void turing_tests(void)
         }
         same = out_eq(a, b, sizeof a / sizeof a[0]);
     }
+    {   /* a fresh register: never 0 (the defaults' "not picked yet"), low two bits never both 0, and spread */
+        static uint8_t seen[65536 / 8];
+        uint32_t distinct = 0;
+        int ok = 1;
+        memset(seen, 0, sizeof seen);
+        for (uint32_t e = 0; e < 4096; e++) {
+            uint16_t r = gen_turing_pick(e * 7919u + 13u);
+            ok &= r != 0 && (r & 3u) != 0;
+            if (!(seen[r >> 3] & (1u << (r & 7u)))) { seen[r >> 3] |= (uint8_t)(1u << (r & 7u)); distinct++; }
+        }
+        check("turing: a picked register is never 0, its low two bits never both 0", ok);
+        check("turing: 4096 entropy values pick at least 3900 different registers", distinct >= 3900u);
+    }
     check("turing: notes 36..36+12*(SPAN-1)+10, velocity 90..121, gate 0/1, cv 0 (every LEN, SPAN, PROB)", range);
     check("turing: one draw a step when PROB > 0, none at PROB 0", draws);
     check("turing: PROB 0 repeats every LENGTH steps", loop);

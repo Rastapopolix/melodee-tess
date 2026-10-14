@@ -65,6 +65,19 @@ static void gen_markov_row(uint8_t tens, uint32_t s, uint8_t out[8])
 /* Each fills only what it plays: out arrives as {gate 0, note 60, vel 100, cv 0} (tessera.c), which a rest
  * keeps, so LOCK's recording sees exactly what it did before phase 1. */
 
+/* Turing's register picked from an entropy value (the adapter's: a timer at a human moment): never 0, the "not
+ * picked yet" of the defaults, and its low two bits never both 0, so even LENGTH 2 has a hit */
+static uint16_t gen_turing_pick(uint32_t entropy)
+{
+    uint32_t x = entropy * 2654435761u;
+    x ^= x >> 15;
+    x *= 2246822519u;
+    x ^= x >> 13;
+    x = (x ^ (x >> 16)) & 0xFFFFu;
+    if (!(x & 3u)) x |= 1u;
+    return (uint16_t)x;
+}
+
 /* Turing: the register shifts by one, its last bit fed back (flipped at PROB%); the low byte picks the note */
 static void gen_turing_tick(gen_turing_t *g, const gen_clock_t *clk, gen_out_t *out)
 {
