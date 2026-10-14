@@ -347,7 +347,13 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [x] Merge upstream v1.3.1 before phase 1 (decided 2026-10-14; `1b4c9e9`): both builds pass, the
       Tessera baseline is unchanged, FORM's labels shortened to CONTR / FLRSH for the new fonts
 - [ ] Check the merged build on the device: play, stop (no hanging notes), GLO mute, MIDI Start/Stop,
-      save and load, and a project saved before the merge (do its Tessera settings come back?)
+      save and load, a project saved before the merge, autosave of generator edits. Host-checked
+      2026-10-14: old projects load with every Tessera setting (`tests/upgrade_check.sh`), MIDI clock
+      Start/Stop/Continue, GLO mute and stop leave no note held (Tessera baseline)
+- [x] Autosave lost generator-only edits (their state is not in the project record): fixed `38e9950`
+- [x] Review of the merge resolutions: hooks in `seq.c`, `ui_input.c`, `ui_layer.c`, `storage.c`,
+      `params.c`, `project.c` as before the merge; backups leave Tessera out (QUESTIONS.md 8)
+- [x] Simulator on the merged firmware: branch `web-sim-1.3.1` (not on the site yet)
 - [x] Perform test and regress HEALTH: one bug, `tessera_kill` cleared the note list before releasing
       it, so stopping left step-sequencer notes hanging. Fixed in `279f08c` (branch `overnight-analysis`)
 - [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): two identical renders
