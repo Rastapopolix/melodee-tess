@@ -60,3 +60,29 @@ static void gen_markov_row(uint8_t tens, uint32_t s, uint8_t out[8])
         out[d] = (accum > 100u || d == 7) ? 100 : (uint8_t)accum;
     }
 }
+
+/* ------------------------------------------------------------------ the generators, one step each --- */
+/* Each fills only what it plays: out arrives as {gate 0, note 60, vel 100, cv 0} (tessera.c), which a rest
+ * keeps, so LOCK's recording sees exactly what it did before phase 1. */
+
+/* Turing: the register shifts by one, its last bit fed back (flipped at PROB%); the low byte picks the note */
+static void gen_turing_tick(gen_turing_t *g, const gen_clock_t *clk, gen_out_t *out)
+{
+    uint8_t len = g->len ? g->len : 16;
+    uint16_t bit0 = (g->reg >> (len - 1)) & 1u;
+    (void)clk;
+    if (g->prob > 0 && gen_rnd(100u) < g->prob)
+        bit0 ^= 1u;
+    g->reg = ((g->reg << 1) | bit0) & 0xFFFFu;
+
+    uint8_t span = g->oct_span ? g->oct_span : 1;
+    uint16_t tmask = (len >= 16) ? 0xFFFFu : (uint16_t)((1u << len) - 1u);
+    uint16_t mreg = g->reg & tmask;
+    uint8_t raw = mreg & 0xFFu;
+    uint8_t idx = raw % 7;
+    uint8_t oct = (raw / 7) % span;
+    out->note = (uint8_t)(36 + (oct * 12) + GEN_SCALE_MIN[idx]);
+    out->vel = (uint8_t)(90 + ((mreg >> 8) & 0x1Fu));
+    if (g->reg & 1u)
+        out->gate = 1;
+}

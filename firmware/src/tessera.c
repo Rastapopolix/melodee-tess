@@ -474,32 +474,16 @@ void tessera_clock_step(track_t *t)
     uint8_t note = 60;
     int should_trigger = 0;
     uint8_t vel = 100;
+    gen_out_t out = {0, 60, 100, 0};
+    gen_clock_t clk;
+    clk.pos = tessera.evolve[tr].pos_now;
+    clk.steps_per_bar = (uint8_t)tess_steps_per_bar(t);
+    clk.root = (uint8_t)(t->p[P_ROOT] % 12);
 
     switch (tessera.mode[tr]) {
-    case TESS_ENG_TURING: {
-        tessera_turing_t *tur = &tessera.turing[tr];
-        uint8_t len = tur->len ? tur->len : 16;
-        // tur->step_idx = (tur->step_idx + 1) % len; (Removed: Turing is a shift register, not a step sequencer)
-
-        uint16_t bit0 = (tur->reg >> (len - 1)) & 1u;
-        if (tur->prob > 0 && (rng() % 100u) < tur->prob) {
-            bit0 ^= 1u;
-        }
-        tur->reg = ((tur->reg << 1) | bit0) & 0xFFFFu;
-
-        uint8_t span = tur->oct_span ? tur->oct_span : 1;
-        uint16_t tmask = (len >= 16) ? 0xFFFFu : (uint16_t)((1u << len) - 1u);
-        uint16_t mreg = tur->reg & tmask;
-        uint8_t raw = mreg & 0xFFu;
-        uint8_t idx = raw % 7;
-        uint8_t oct = (raw / 7) % span;
-        note = 36 + (oct * 12) + GEN_SCALE_MIN[idx];
-        vel = 90 + ((mreg >> 8) & 0x1Fu);
-        if (tur->reg & 1u) {
-            should_trigger = 1;
-        }
+    case TESS_ENG_TURING:
+        gen_turing_tick(&tessera.turing[tr], &clk, &out);
         break;
-    }
     case TESS_ENG_EUCLID: {
         tessera_euclid_t *euc = &tessera.euclid[tr];
         uint8_t steps = euc->steps ? euc->steps : 16;
@@ -558,6 +542,11 @@ void tessera_clock_step(track_t *t)
         }
         break;
     }
+    }
+    if (tessera.mode[tr] == TESS_ENG_TURING) {
+        note = out.note;
+        vel = out.vel;
+        should_trigger = out.gate;
     }
 
     if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH)
