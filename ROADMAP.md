@@ -361,8 +361,10 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): two identical renders
       differ from sample 11; report upstream or skip (QUESTIONS.md 5)
 - [ ] `tests/run_tests.sh` passes end to end
-- [ ] Delete the backup files in `firmware/src` and `tools/` once nothing in them is needed
-- [ ] Decide what happens to the `master`, `tools-util` and `cleanup-claude-md` branches
+- [x] Delete the backup files in `firmware/src` and `tools/` once nothing in them is needed (checked:
+      `docs/analysis/housekeeping.md`): deleted 2026-10-14, the older save format kept in `docs/analysis/attic/`
+- [x] Decide what happens to the `master`, `tools-util` and `cleanup-claude-md` branches: deleted 2026-10-14 (the first
+      two held nothing new; `tools-util`, a refactor of six upstream tools files, dropped)
 
 ### 1. Extract the generators
 Plan: `docs/analysis/phase1-plan.md`.
