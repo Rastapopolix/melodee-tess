@@ -35,6 +35,7 @@ check("the note ends after the key is let go", peak < 0.01);
 const before = screen();
 peak = 0; x.web_demo(); run(S * 4);
 check("the demo plays (four Tessera generators, PLAY)", peak > 0.05 && x.web_playing() === 1);
+check("the demo's EVOLVE on track 1: EVERY 2 bars, AMOUNT 30 %", x.web_test_evolve(0) === (2 << 8 | 30));
 check("the PLAY button's LED is lit", (x.web_lit_buttons() & PLAY) !== 0);
 check("the HOME screen changes while it plays (scope, playheads)", screen().some((v, i) => v !== before[i]));
 check("the keys glow (the dim plane)", x.web_dim_keys() !== 0);

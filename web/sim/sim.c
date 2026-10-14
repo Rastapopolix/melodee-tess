@@ -195,6 +195,11 @@ EXPORT uint32_t web_screen_draws(void) { return (uint32_t)host_sent; }
 EXPORT uint32_t web_now_ms(void) { return fm1_ms; }
 EXPORT uint32_t web_playing(void) { return song.playing; }
 EXPORT uint32_t web_sample_rate(void) { return FS; }
+/* (web/sim/test_sim.mjs) track tr's EVOLVE: EVERY << 8 | AMOUNT */
+EXPORT uint32_t web_test_evolve(uint32_t tr)
+{
+    return tr < TESSERA_TRACKS ? (uint32_t)tessera.evolve[tr].every << 8 | tessera.evolve[tr].amount : 0u;
+}
 
 /* melodee-tess: the demo, a Tessera generator on each track (as KNOB 1 on SEQ > PATTERN sets it), EVOLVE on
  * track 1, then PLAY */
@@ -208,9 +213,8 @@ EXPORT void web_demo(void)
             tessera_knob(0, GEN[tr]);
     }
     song.sel = 0;
-    tessera_evolve_knob(1, 1);               /* EVERY: one setting a turn, OFF -> 1 -> 2 bars */
+    tessera_evolve_knob(1, 1);               /* EVERY: one setting a turn, OFF -> 1 -> 2 bars; AMOUNT stays 30 % */
     tessera_evolve_knob(1, 1);
-    tessera_evolve_knob(2, -30);             /* AMOUNT: 60 -> 30 % */
     song.sel = (uint8_t)sel;
     ui.force = 1;
     if (!song.playing)
