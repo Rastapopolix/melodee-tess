@@ -28,4 +28,5 @@ track_len_shorter_than_loop 0xfc24d42e 105
 pattern_switch_while_playing 0x1fcf1117 97
 song_chain_two_banks 0xc0bda8d9 63
 glo_mute_and_unmute 0x7648fed9 57
+follow_step_melody_third 0xfb9742d4 65
 saved_block 0xaf90c7b2 180

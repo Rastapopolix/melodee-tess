@@ -75,10 +75,12 @@ typedef struct {
     uint8_t  form_pos;    /* position inside the form */
     uint8_t  visited;     /* bit s: section s exists */
     uint8_t  valid;       /* bit s: section s's recorded phrase is complete (Markov / Morph) */
-    int8_t   shift;       /* TWEAK: semitones added to the track's notes (or to the followed note) */
+    int8_t   shift;       /* TWEAK: semitones added to the track's notes; while following, scale degrees from the
+                           * followed note (+2 a third, +4 a fifth, -7 an octave down in a seven-note scale) */
     uint8_t  drop;        /* TWEAK: 0..100 chance a hit is dropped, any engine */
     uint8_t  human;       /* TWEAK: 0..100 velocity and gate variation */
-    uint8_t  follow;      /* TWEAK: 0 = off, 1..4 = play that track's pitch, shifted, in this track's scale */
+    uint8_t  follow;      /* TWEAK: 0 = off, 1..4 = play that track's pitch (a generator's or a STEP track's sounding
+                           * note), SHIFT scale degrees away, in this track's scale */
     int8_t   flourish;    /* FORM: semitones added on the last beat of every phrase (EVERY bars), 0 = off */
 } tessera_evolve_t;
 
@@ -100,6 +102,7 @@ typedef struct {
     tessera_evolve_t evolve[TESSERA_TRACKS];
     tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
+    uint8_t          follow_mem[TESSERA_TRACKS];   /* FOLLOW of a STEP track: its last sounding note + 1, 0 none yet */
     uint8_t          active_gate[TESSERA_TRACKS];
 } tessera_state_t;
 

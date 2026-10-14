@@ -506,6 +506,9 @@ void tessera_tweak_knob(uint32_t k, int32_t s)
     }
 }
 
+static int32_t tess_scale_steps(const track_t *t, int32_t n, int32_t k);
+static int32_t tess_follow_source(uint32_t src, uint32_t tr);
+
 void tessera_clock_step(track_t *t)
 {
     uint32_t tr = trk_index(t);
@@ -636,10 +639,10 @@ void tessera_clock_step(track_t *t)
         const tessera_evolve_t *tw2 = &tessera.evolve[tr];
         int32_t base_note = (int32_t)note;
         int following = 0;
-        if (tw2->follow) {          /* harmony: the other Tessera track's pitch, shifted, back into this scale */
-            uint32_t src = (uint32_t)tw2->follow - 1u;
-            if (src < TESSERA_TRACKS && src != tr && tessera.mode[src] != TESS_ENG_OFF) {
-                base_note = (int32_t)tessera.last_note[src] + (int32_t)tw2->shift;
+        if (tw2->follow) {          /* harmony: the other track's pitch in this scale, SHIFT scale degrees away */
+            int32_t src_note = tess_follow_source((uint32_t)tw2->follow - 1u, tr);
+            if (src_note >= 0) {
+                base_note = tess_scale_steps(t, tessera_snap_note(t, src_note), tw2->shift);
                 following = 1;
             }
         }
@@ -803,6 +806,43 @@ int32_t tessera_snap_note(const track_t *t, int32_t n)
     uint32_t mask = scale_mask(t), guard = 12;
     while (guard-- && !((mask >> (uint32_t)((n - t->p[P_ROOT] + 120) % 12)) & 1u))
         n--;
+    return n;
+}
+
+/* n (a note of t's scale) moved k notes of the scale up (k > 0) or down; a scale with no notes: k semitones */
+static int32_t tess_scale_steps(const track_t *t, int32_t n, int32_t k)
+{
+    uint32_t mask = scale_mask(t) & 0xFFFu;
+    int32_t dir = k < 0 ? -1 : 1;
+    if (!mask)
+        return n + k;
+    for (; k; k -= dir) {
+        uint32_t guard = 12;
+        do n += dir;
+        while (guard-- && !((mask >> (uint32_t)((n - t->p[P_ROOT] + 1200) % 12)) & 1u));
+    }
+    return n;
+}
+
+/* FOLLOW: the note track src gives track tr, -1 none. A generator: the last note it played. A STEP track: the highest
+ * note it sounds now (a chord's top: the melody), else the last one it sounded (a rest keeps it) */
+static int32_t tess_follow_source(uint32_t src, uint32_t tr)
+{
+    const track_t *s;
+    int32_t n = -1;
+    uint32_t i;
+    if (src >= TESSERA_TRACKS || src == tr)
+        return -1;
+    if (tessera.mode[src] != TESS_ENG_OFF)
+        return (int32_t)tessera.last_note[src];
+    s = &trk[src];
+    for (i = 0; i < s->seq_n; i++)
+        if ((int32_t)s->seq_notes[i] > n)
+            n = (int32_t)s->seq_notes[i];
+    if (n >= 0)
+        tessera.follow_mem[src] = (uint8_t)(n + 1);
+    else if (tessera.follow_mem[src])
+        n = (int32_t)tessera.follow_mem[src] - 1;
     return n;
 }
 

@@ -441,6 +441,8 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] WebAssembly build; GitHub Pages demo
 
 ### Not yet placed in a phase
+- [x] FOLLOW, first piece (branch `follow-step`): STEP tracks as sources (the highest sounding note, held across
+      rests); while following, SHIFT counts scale degrees (TWEAK shows "deg"). Chromatic tracks play as before
 - [ ] **FOLLOW modes** (Features > FOLLOW): interval in scale degrees, chord tone, contrary, canon, bass; RHYTHM
       own / source / both; STEP tracks as sources. With phases 1-2; then in the web simulator (rebuild, site copy,
       test, guide and demo)

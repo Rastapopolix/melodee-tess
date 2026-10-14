@@ -334,6 +334,27 @@ static void b_glo_mute(uint32_t bar)
     if (bar == 5u) trk[1].p[P_MUTE] = 0;
 }
 
+/* FOLLOW of a STEP track: a written melody on track 1 (C major, 8 steps, with rests), track 2's Markov following
+ * it a third above (SHIFT +2 scale degrees, both tracks in C major) */
+static const uint8_t FOLLOW_MELODY[8] = {60, 62, 64, 0, 67, 65, 0, 72};   /* 0: a rest */
+static void s_follow_step(void)
+{
+    uint32_t i;
+    for (i = 0; i < 8u; i++) {
+        step_t *st = &trk[0].step[i];
+        st->n = FOLLOW_MELODY[i] ? 1u : 0u;
+        st->note[0] = FOLLOW_MELODY[i];
+        st->time = FOLLOW_MELODY[i] ? ST_NOTE : ST_REST;
+        st->vel = 100;
+    }
+    trk[0].p[P_SLEN] = 8;
+    trk[0].p[P_SCALE] = 1;                            /* major */
+    trk[1].p[P_SCALE] = 1;
+    gen(1, TESS_ENG_MARKOV);
+    turns(tessera_tweak_knob, 3, 1);                  /* FOLLOW track 1 */
+    knob(tessera_tweak_knob, 0, 2);                   /* SHIFT +2: a third */
+}
+
 typedef struct {
     const char *name;
     uint32_t bars, seed;
@@ -370,6 +391,7 @@ static const scen_t SCEN[] = {
     {"pattern_switch_while_playing", 8, 0x101Au, s_pattern_switch, b_pattern_switch},
     {"song_chain_two_banks", 6, 0x101Bu, s_song_chain, 0},
     {"glo_mute_and_unmute", 6, 0x101Cu, s_glo_mute, b_glo_mute},
+    {"follow_step_melody_third", 4, 0x101Du, s_follow_step, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -448,6 +470,33 @@ static int scen_fork(const scen_t *sc, const char *logdir, char *res, size_t cap
     if (n <= 0) return 1;
     res[n] = 0;
     return 0;
+}
+
+/* FOLLOW of a STEP track, checked note by note: each note track 2 plays is two scale degrees above (a third, in C
+ * major) the melody note track 1 sounds then, or last sounded across a rest. "notes wrong" */
+static int major_step(int n, int k)                    /* n (in C major) moved k notes of C major */
+{
+    static const uint16_t MAJ = 0xab5u;
+    int d = k < 0 ? -1 : 1;
+    for (; k; k -= d)
+        do n += d; while (!((MAJ >> ((n + 1200) % 12)) & 1u));
+    return n;
+}
+static void follow_run(char *res, size_t cap)
+{
+    const scen_t *sc = 0;
+    uint32_t i, j, n2 = 0, bad = 0;
+    for (i = 0; i < NSCEN; i++) if (!strcmp(SCEN[i].name, "follow_step_melody_third")) sc = &SCEN[i];
+    scen_run(sc, 0, res, cap);                        /* (the log has the generators' notes only: track 2's) */
+    for (i = 0; i < tt_n; i++) {                      /* Markov at DENSITY 100: one note a step, step k = note k */
+        int src = 0;
+        if (tt_ev[i].tr != 1u) continue;
+        for (j = 0; j < 8u && !src; j++)              /* the melody note sounding at step n2, or the last before */
+            src = FOLLOW_MELODY[(n2 + 8u - j) % 8u];
+        bad += (int)tt_ev[i].note != major_step(src, 2);
+        n2++;
+    }
+    snprintf(res, cap, "%u %u", n2, bad);
 }
 
 /* --------------------------------------------------------- saved block --- */
@@ -557,6 +606,25 @@ int main(int argc, char **argv)
         bad += check("the same scenario twice: the same notes", !strcmp(res, again));
     else
         bad += check("the same scenario twice: the same notes", 0);
+    {   /* FOLLOW of a STEP melody, note by note */
+        unsigned n2 = 0, wrong = 1;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                follow_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u %u", &n2, &wrong);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        snprintf(line, sizeof line, "FOLLOW a STEP melody: all %u notes a third above it (in C major)", n2);
+        bad += check(line, n2 > 16u && !wrong);
+    }
     {
         unsigned h = 0, ok = 0;
         pid_t pid;

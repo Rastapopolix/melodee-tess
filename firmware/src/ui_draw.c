@@ -763,7 +763,7 @@ static void draw_columns(void)
         fmt_int(w2, ev->human);
         if (ev->follow) { w3[0] = 'T'; w3[1] = (char)('0' + ev->follow); w3[2] = 0; }
         else str_cpy(w3, "OFF", sizeof w3);
-        draw_column(0, "SHIFT", w0, "st", VAL(0u), (sh + 24) * 1000 / 48, ICON_AUTO);
+        draw_column(0, "SHIFT", w0, ev->follow ? "deg" : "st", VAL(0u), (sh + 24) * 1000 / 48, ICON_AUTO);   /* (following: scale degrees) */
         draw_column(1, "DROP", w1, "%", VAL(1u), (int32_t)ev->drop * 10, ICON_AUTO);
         draw_column(2, "HUMAN", w2, "%", VAL(2u), (int32_t)ev->human * 10, ICON_AUTO);
         draw_column(3, "FOLLOW", w3, "", VAL(3u), (int32_t)ev->follow * 1000 / 4, ICON_AUTO);
