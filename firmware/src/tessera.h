@@ -4,6 +4,7 @@
 #define TESSERA_H
 
 #include <stdint.h>
+#include "gen.h"
 
 #define TESSERA_TRACKS 4
 
@@ -17,44 +18,11 @@ enum {
     TESS_ENG_COUNT
 };
 
-/* 1. Turing Machine State */
-typedef struct {
-    uint16_t reg;         /* 16-bit shift register */
-    uint8_t  len;         /* Active cycle length: 2..16 */
-    uint8_t  prob;        /* Mutation probability: 0 = locked, 100 = full random */
-    uint8_t  step_idx;    /* Playhead position within active length (0..len-1) */
-    uint8_t  scale_deg;   /* Current extracted scale degree */
-    uint8_t  oct_span;    /* Octave spread (1..3) */
-} tessera_turing_t;
-
-/* 2. Euclidean Generator State */
-typedef struct {
-    uint8_t  steps;       /* Total steps (1..32) */
-    uint8_t  pulses;      /* Active hits (0..steps) */
-    uint8_t  rot;         /* Step rotation offset */
-    uint8_t  step_idx;    /* Current step index */
-    uint8_t  last_hit;    /* 1 if current step fired */
-    uint8_t  pitch_seed;  /* 0 = the original fixed pitch pattern; 1..255 = a random one (ROLL) */
-} tessera_euclid_t;
-
-/* 3. Markov Pitch State */
-typedef struct {
-    uint8_t  cur_state;   /* 0..7 active scale degree */
-    uint8_t  last_hit;    /* 1 if the current step sounded, 0 if it was a rest */
-    uint8_t  tension;     /* 0 = tight/stepwise, 100 = wild leaps */
-    uint8_t  density;  /* 0=Minor, 1=Major, 2=Dorian, 3=Penta */
-    uint8_t  oct_span;    /* 1..3 octave spread */
-    /* matrix[8][8] / notes[8] removed: the row is derived from tension (tess_markov_row) */
-} tessera_markov_t;
-
-/* 4. Morph State */
-typedef struct {
-    uint8_t  morph_pos;   /* 0..127 crossfade between Snapshot A and B */
-    uint16_t snap_a;      /* Snapshot A rhythm bitmask (16 steps) */
-    uint16_t snap_b;      /* Snapshot B rhythm bitmask (16 steps) */
-    uint8_t  step_idx;    /* Playhead index (0..15) */
-    uint8_t  oct_span;    /* Octave span */
-} tessera_morph_t;
+/* The generators' own state lives in gen.h (the names below kept for the adapter and the UI) */
+typedef gen_turing_t tessera_turing_t;
+typedef gen_euclid_t tessera_euclid_t;
+typedef gen_markov_t tessera_markov_t;
+typedef gen_morph_t  tessera_morph_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
