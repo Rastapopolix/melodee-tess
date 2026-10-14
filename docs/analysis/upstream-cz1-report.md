@@ -1,6 +1,6 @@
 # Draft: upstream issue for the CZ-1 knob test
 
-For Theo to post at https://github.com/keremimo/melodee/issues (not posted). Checked 2026-10-14 on upstream
+Posted 2026-10-14 as https://github.com/keremimo/melodee/issues/47 (paragraphs unwrapped). Checked 2026-10-14 on upstream
 `next` at `4fe8f0f` (1.4.0-rc.3), Ubuntu on WSL, x86-64. Text to paste below the line.
 
 ---
