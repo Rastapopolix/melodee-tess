@@ -471,10 +471,7 @@ void tessera_clock_step(track_t *t)
         seq_release(t);
     }
 
-    uint8_t note = 60;
-    int should_trigger = 0;
-    uint8_t vel = 100;
-    gen_out_t out = {0, 60, 100, 0};
+    gen_out_t out = {0, 60, 100, 0};                       /* a rest keeps note 60, vel 100 (LOCK records it) */
     gen_clock_t clk;
     clk.pos = tessera.evolve[tr].pos_now;
     clk.steps_per_bar = (uint8_t)tess_steps_per_bar(t);
@@ -490,33 +487,12 @@ void tessera_clock_step(track_t *t)
     case TESS_ENG_MARKOV:
         gen_markov_tick(&tessera.markov[tr], &clk, &out);
         break;
-    case TESS_ENG_MORPH: {
-        tessera_morph_t *m = &tessera.morph[tr];
-        uint8_t cur_s = (m->step_idx + 1u) & 0x0Fu;
-        m->step_idx = (m->step_idx & 0xF0u) | cur_s;
-
-        uint8_t hit_a = (m->snap_a >> cur_s) & 1u;
-        uint8_t hit_b = (m->snap_b >> cur_s) & 1u;
-
-        uint32_t roll = rng() % 128u;
-        int hit = (roll < m->morph_pos) ? hit_b : hit_a;
-
-        if (hit) {
-            uint8_t deg_a = (cur_s * 2u) % 8u;
-            uint8_t deg_b = (cur_s * 3u + 2u) % 8u;
-            uint8_t chosen_deg = (roll < m->morph_pos) ? deg_b : deg_a;
-            note = 48 + GEN_SCALE_MIN[chosen_deg];
-            vel = 90 + ((cur_s % 4u == 0) ? 25 : 10);
-            should_trigger = 1;
-        }
+    case TESS_ENG_MORPH:
+        gen_morph_tick(&tessera.morph[tr], &clk, &out);
         break;
     }
-    }
-    if (tessera.mode[tr] != TESS_ENG_MORPH) {
-        note = out.note;
-        vel = out.vel;
-        should_trigger = out.gate;
-    }
+    uint8_t note = out.note, vel = out.vel;
+    int should_trigger = out.gate;
 
     if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH)
         tessera_phrase_apply(tr, &note, &vel, &should_trigger);

@@ -123,3 +123,26 @@ static void gen_markov_tick(gen_markov_t *g, const gen_clock_t *clk, gen_out_t *
     if (gen_rnd(100u) < dens)
         out->gate = 1;
 }
+
+/* Morph: a step of A or B (B at MORPH_POS/128), each with its own degree pattern */
+static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, gen_out_t *out)
+{
+    uint8_t cur_s = (g->step_idx + 1u) & 0x0Fu;
+    (void)clk;
+    g->step_idx = (g->step_idx & 0xF0u) | cur_s;
+
+    uint8_t hit_a = (g->snap_a >> cur_s) & 1u;
+    uint8_t hit_b = (g->snap_b >> cur_s) & 1u;
+
+    uint32_t roll = gen_rnd(128u);
+    int hit = (roll < g->morph_pos) ? hit_b : hit_a;
+
+    if (hit) {
+        uint8_t deg_a = (cur_s * 2u) % 8u;
+        uint8_t deg_b = (cur_s * 3u + 2u) % 8u;
+        uint8_t chosen_deg = (roll < g->morph_pos) ? deg_b : deg_a;
+        out->note = (uint8_t)(48 + GEN_SCALE_MIN[chosen_deg]);
+        out->vel = (uint8_t)(90 + ((cur_s % 4u == 0) ? 25 : 10));
+        out->gate = 1;
+    }
+}
