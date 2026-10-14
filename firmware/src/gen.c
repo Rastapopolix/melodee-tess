@@ -146,3 +146,55 @@ static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, gen_out_t *ou
         out->gate = 1;
     }
 }
+
+/* ------------------------------------------------------------------ mutation (EVOLVE, ROLL) --- */
+/* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
+
+/* a new Euclid pitch seed, never 0 (the original pattern) nor the one it replaces */
+static uint8_t gen_new_seed(uint8_t old)
+{
+    uint8_t n;
+    do n = (uint8_t)(1u + gen_rnd(255u)); while (n == old);
+    return n;
+}
+
+/* Turing: AMOUNT% of the register's active bits flip, at least one */
+static void gen_turing_mutate(gen_turing_t *g, uint32_t amt)
+{
+    uint32_t len = g->len ? g->len : 16u;
+    uint32_t n = (amt * len + 99u) / 100u;
+    while (n--) g->reg ^= (uint16_t)(1u << gen_rnd(len));
+}
+
+/* Euclid: the rotation nudged by one, less often a pulse more or fewer, and the pitches re-rolled */
+static void gen_euclid_mutate(gen_euclid_t *g, uint32_t amt)
+{
+    uint32_t steps = g->steps ? g->steps : 16u;
+    if (gen_rnd(100u) < amt) {
+        if (gen_rnd(2u)) g->rot = (uint8_t)((g->rot + 1u) % steps);
+        else g->rot = (uint8_t)(g->rot ? g->rot - 1u : steps - 1u);
+    }
+    if (gen_rnd(100u) < amt / 2u) {
+        if (gen_rnd(2u) && g->pulses < steps) g->pulses++;
+        else if (g->pulses) g->pulses--;
+    }
+    if (gen_rnd(100u) < amt) g->pitch_seed = gen_new_seed(g->pitch_seed);
+}
+
+/* Markov: the tension moves by up to +-AMOUNT/2 */
+static void gen_markov_mutate(gen_markov_t *g, uint32_t amt)
+{
+    int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
+    int32_t v = (int32_t)g->tension + j;
+    g->tension = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
+}
+
+/* Morph: 1..3 bits of snapshot A flip, and the position moves by up to +-AMOUNT/2 */
+static void gen_morph_mutate(gen_morph_t *g, uint32_t amt)
+{
+    uint32_t n = 1u + amt / 34u;
+    while (n--) g->snap_a ^= (uint16_t)(1u << gen_rnd(16u));
+    int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
+    int32_t v = (int32_t)g->morph_pos + j;
+    g->morph_pos = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
+}

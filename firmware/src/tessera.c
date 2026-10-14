@@ -90,13 +90,6 @@ static uint32_t tess_steps_per_bar(const track_t *t)
     return n ? n : 1u;
 }
 
-static uint8_t tess_new_seed(uint8_t old)
-{
-    uint8_t n;
-    do n = (uint8_t)(1u + gen_rnd(255u)); while (n == old);
-    return n;
-}
-
 /* Phrase loop length in steps (<= 32, the buffer size) */
 static uint32_t tess_loop_len(uint32_t tr)
 {
@@ -130,40 +123,10 @@ void tessera_mutate(uint32_t tr)
     if (amt > 100u) amt = 100u;
 
     switch (tessera.mode[tr]) {
-    case TESS_ENG_TURING: {
-        tessera_turing_t *a = &tessera.turing[tr];
-        uint32_t len = a->len ? a->len : 16u;
-        uint32_t n = (amt * len + 99u) / 100u;          /* bits to flip: >= 1 when AMOUNT > 0 */
-        while (n--) a->reg ^= (uint16_t)(1u << gen_rnd(len));
-        break; }
-    case TESS_ENG_EUCLID: {
-        tessera_euclid_t *a = &tessera.euclid[tr];
-        uint32_t steps = a->steps ? a->steps : 16u;
-        if (gen_rnd(100u) < amt) {                     /* nudge the rotation by one */
-            if (gen_rnd(2u)) a->rot = (uint8_t)((a->rot + 1u) % steps);
-            else a->rot = (uint8_t)(a->rot ? a->rot - 1u : steps - 1u);
-        }
-        if (gen_rnd(100u) < amt / 2u) {                /* less often, a pulse more or fewer */
-            if (gen_rnd(2u) && a->pulses < steps) a->pulses++;
-            else if (a->pulses) a->pulses--;
-        }
-        if (gen_rnd(100u) < amt) a->pitch_seed = tess_new_seed(a->pitch_seed);   /* and the pitches */
-        break; }
-    case TESS_ENG_MARKOV: {
-        tessera_markov_t *a = &tessera.markov[tr];
-        int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
-        int32_t v = (int32_t)a->tension + j;
-        a->tension = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
-        tessera_markov_recalc(tr);
-        break; }
-    case TESS_ENG_MORPH: {
-        tessera_morph_t *a = &tessera.morph[tr];
-        uint32_t n = 1u + amt / 34u;                    /* 1..3 bits of snapshot A flip */
-        while (n--) a->snap_a ^= (uint16_t)(1u << gen_rnd(16u));
-        int32_t j = (int32_t)gen_rnd(amt + 1u) - (int32_t)(amt / 2u);
-        int32_t v = (int32_t)a->morph_pos + j;
-        a->morph_pos = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
-        break; }
+    case TESS_ENG_TURING: gen_turing_mutate(&tessera.turing[tr], amt); break;
+    case TESS_ENG_EUCLID: gen_euclid_mutate(&tessera.euclid[tr], amt); break;
+    case TESS_ENG_MARKOV: gen_markov_mutate(&tessera.markov[tr], amt); break;
+    case TESS_ENG_MORPH:  gen_morph_mutate(&tessera.morph[tr], amt); break;
     }
     tessera.evolve[tr].flash = 4;
     tess_realign(tr);
@@ -411,7 +374,7 @@ void tessera_evolve_knob(uint32_t k, int32_t s)
         ev->amount = (uint8_t)(a < 0 ? 0 : a > 100 ? 100 : a);
     } else if (k == 3u) {
         if (tessera.mode[tr] == TESS_ENG_EUCLID) {                  /* Euclid: ROLL re-rolls the pitches, the rhythm stays */
-            tessera.euclid[tr].pitch_seed = tess_new_seed(tessera.euclid[tr].pitch_seed);
+            tessera.euclid[tr].pitch_seed = gen_new_seed(tessera.euclid[tr].pitch_seed);
             ev->flash = 4;
         } else if (tessera.mode[tr] != TESS_ENG_OFF) {
             tessera_mutate(tr);                                      /* any turn rolls once */
