@@ -487,30 +487,9 @@ void tessera_clock_step(track_t *t)
     case TESS_ENG_EUCLID:
         gen_euclid_tick(&tessera.euclid[tr], &clk, &out);
         break;
-    case TESS_ENG_MARKOV: {
-        tessera_markov_t *mk = &tessera.markov[tr];
-        uint8_t row[8];
-        gen_markov_row(mk->tension, mk->cur_state, row);
-        uint32_t r = rng() % 100u;
-        uint8_t next_state = 0;
-        for (uint8_t i = 0; i < 8; i++) {
-            if (r < row[i]) {
-                next_state = i;
-                break;
-            }
-        }
-        mk->cur_state = next_state;
-
-        uint8_t m_oct = mk->oct_span ? mk->oct_span : 1;
-        uint8_t root = (uint8_t)(t->p[P_ROOT] % 12);
-        note = 36 + root + (next_state * 2) + (12 * (rng() % m_oct));
-        vel = 95 + (rng() % 20u);
-        uint32_t dens = mk->density ? mk->density : 100;
-        if ((rng() % 100u) < dens) {
-            should_trigger = 1;
-        }
+    case TESS_ENG_MARKOV:
+        gen_markov_tick(&tessera.markov[tr], &clk, &out);
         break;
-    }
     case TESS_ENG_MORPH: {
         tessera_morph_t *m = &tessera.morph[tr];
         uint8_t cur_s = (m->step_idx + 1u) & 0x0Fu;
@@ -533,7 +512,7 @@ void tessera_clock_step(track_t *t)
         break;
     }
     }
-    if (tessera.mode[tr] == TESS_ENG_TURING || tessera.mode[tr] == TESS_ENG_EUCLID) {
+    if (tessera.mode[tr] != TESS_ENG_MORPH) {
         note = out.note;
         vel = out.vel;
         should_trigger = out.gate;

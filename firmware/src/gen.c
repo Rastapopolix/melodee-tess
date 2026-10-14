@@ -100,3 +100,26 @@ static void gen_euclid_tick(gen_euclid_t *g, const gen_clock_t *clk, gen_out_t *
         out->vel = 110;
     }
 }
+
+/* Markov: the next scale degree from the tension's row; the draws in this order: degree, octave, velocity, density */
+static void gen_markov_tick(gen_markov_t *g, const gen_clock_t *clk, gen_out_t *out)
+{
+    uint8_t row[8];
+    gen_markov_row(g->tension, g->cur_state, row);
+    uint32_t r = gen_rnd(100u);
+    uint8_t next_state = 0;
+    for (uint8_t i = 0; i < 8; i++) {
+        if (r < row[i]) {
+            next_state = i;
+            break;
+        }
+    }
+    g->cur_state = next_state;
+
+    uint8_t m_oct = g->oct_span ? g->oct_span : 1;
+    out->note = (uint8_t)(36 + clk->root + (next_state * 2) + (12 * gen_rnd(m_oct)));
+    out->vel = (uint8_t)(95 + gen_rnd(20u));
+    uint32_t dens = g->density ? g->density : 100;
+    if (gen_rnd(100u) < dens)
+        out->gate = 1;
+}
