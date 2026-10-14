@@ -86,3 +86,17 @@ static void gen_turing_tick(gen_turing_t *g, const gen_clock_t *clk, gen_out_t *
     if (g->reg & 1u)
         out->gate = 1;
 }
+
+/* Euclid: the pattern's next step; a hit plays the step's pitch (seed 0: the original pattern) */
+static void gen_euclid_tick(gen_euclid_t *g, const gen_clock_t *clk, gen_out_t *out)
+{
+    uint8_t steps = g->steps ? g->steps : 16;
+    uint8_t curr_step = g->step_idx;
+    (void)clk;
+    g->step_idx = (curr_step + 1u) % steps;
+    if (gen_euclid_hit(curr_step, steps, g->pulses, g->rot)) {
+        out->note = (uint8_t)(48u + gen_euclid_degree(g->pitch_seed, curr_step));
+        out->gate = 1;
+        out->vel = 110;
+    }
+}

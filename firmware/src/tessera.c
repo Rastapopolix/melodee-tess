@@ -484,19 +484,9 @@ void tessera_clock_step(track_t *t)
     case TESS_ENG_TURING:
         gen_turing_tick(&tessera.turing[tr], &clk, &out);
         break;
-    case TESS_ENG_EUCLID: {
-        tessera_euclid_t *euc = &tessera.euclid[tr];
-        uint8_t steps = euc->steps ? euc->steps : 16;
-        uint8_t curr_step = euc->step_idx;
-        euc->step_idx = (curr_step + 1u) % steps;
-
-        if (gen_euclid_hit(curr_step, steps, euc->pulses, euc->rot)) {
-            note = (uint8_t)(48u + gen_euclid_degree(euc->pitch_seed, curr_step));
-            should_trigger = 1;
-            vel = 110;
-        }
+    case TESS_ENG_EUCLID:
+        gen_euclid_tick(&tessera.euclid[tr], &clk, &out);
         break;
-    }
     case TESS_ENG_MARKOV: {
         tessera_markov_t *mk = &tessera.markov[tr];
         uint8_t row[8];
@@ -543,7 +533,7 @@ void tessera_clock_step(track_t *t)
         break;
     }
     }
-    if (tessera.mode[tr] == TESS_ENG_TURING) {
+    if (tessera.mode[tr] == TESS_ENG_TURING || tessera.mode[tr] == TESS_ENG_EUCLID) {
         note = out.note;
         vel = out.vel;
         should_trigger = out.gate;
