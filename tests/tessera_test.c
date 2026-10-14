@@ -25,6 +25,8 @@
 typedef struct { uint32_t blk; uint8_t tr, note, vel; uint16_t len; } tt_ev_t;
 static tt_ev_t tt_ev[TT_MAX];
 static uint32_t tt_n, tt_blk, tt_lost;
+static uint32_t tt_bar_blk[64];               /* the block each bar of the scenario started at */
+static uint32_t tt_mark[2];                   /* the block an action took effect at (b_seed_back, b_replay) */
 static int32_t tt_open[NTRK];                 /* the event of the track's note still held, -1 none */
 
 static void tt_close(uint32_t tr)
@@ -373,6 +375,37 @@ typedef struct {
     void (*bar)(uint32_t bar);
     void (*blk)(uint32_t n);                         /* before each block (n from 0): it runs the transport too */
 } scen_t;
+/* SEED: turned away at bar 2 and back at bar 4 (track 1 Markov, track 2 Turing at PROB 30): bars 4-5 play what
+ * bars 0-1 played, note for note. seed_check compares */
+static void s_seed_back(void)
+{
+    gen(0, TESS_ENG_MARKOV);
+    gen(1, TESS_ENG_TURING);
+    knob(tessera_knob, 2, 15);                        /* PROB 30: Turing draws too */
+}
+static void b_seed_back(uint32_t bar)
+{
+    if (bar != 2u && bar != 4u) return;
+    for (uint32_t tr = 0; tr < 2u; tr++) {
+        sel(tr);
+        knob(tessera_evolve_knob, 3, bar == 2u ? 1 : -1);
+    }
+    tt_mark[bar == 2u ? 0 : 1] = tt_blk;             /* (the step on the bar line was in the block before) */
+}
+/* PLAY again (stopped at bar 2, EVOLVE off): bars 2-3 play what bars 0-1 played */
+static void s_replay(void) { gen(0, TESS_ENG_MARKOV); }
+static void b_replay(uint32_t bar)
+{
+    if (bar == 2u) {
+        int32_t o[2 * CTL];
+        transport_req = 2;
+        mix_block(o, CTL);
+        tt_blk++;
+        transport_req = 1;
+        tt_mark[1] = tt_blk;
+    }
+}
+
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
     {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
@@ -403,6 +436,8 @@ static const scen_t SCEN[] = {
     {"song_chain_two_banks", 6, 0x101Bu, s_song_chain, 0},
     {"glo_mute_and_unmute", 6, 0x101Cu, s_glo_mute, b_glo_mute},
     {"follow_step_melody_third", 4, 0x101Du, s_follow_step, 0},
+    {"seed_back_markov_turing", 6, 0x101Eu, s_seed_back, b_seed_back},
+    {"replay_markov", 4, 0x101Fu, s_replay, b_replay},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -423,6 +458,7 @@ static void scen_run(const scen_t *sc, const char *logdir, char *res, size_t cap
         transport_req = 1;
     for (f = 0; f < total; f += CTL) {
         if (f >= b * bar_len) {
+            if (b < 64u) tt_bar_blk[b] = tt_blk;
             if (sc->bar && b) sc->bar(b);
             b++;
         }
@@ -508,6 +544,35 @@ static void follow_run(char *res, size_t cap)
         n2++;
     }
     snprintf(res, cap, "%u %u", n2, bad);
+}
+
+/* track tr's notes from block blk on, at most cap (note | vel << 8) into out: the count */
+static uint32_t tt_from(uint32_t tr, uint32_t blk, uint32_t *out, uint32_t cap)
+{
+    uint32_t n = 0;
+    for (uint32_t i = 0; i < tt_n && n < cap; i++)
+        if (tt_ev[i].tr == tr && tt_ev[i].blk >= blk) out[n++] = tt_ev[i].note | (uint32_t)tt_ev[i].vel << 8;
+    return n;
+}
+/* the scenario name, tracks 0..ntr-1: their notes of bars 0-1 (k of them) against the k from tt_mark[1] on: "same
+ * differ" (same: equal and not empty on every track; differ (mid): some track's k from tt_mark[0] on unlike them) */
+static void seed_check(const char *name, uint32_t ntr, int mid, char *res, size_t cap)
+{
+    static uint32_t a[512], b[512], c[512];
+    const scen_t *sc = 0;
+    uint32_t i, same = 1, differ = mid ? 0u : 1u;
+    for (i = 0; i < NSCEN; i++) if (!strcmp(SCEN[i].name, name)) sc = &SCEN[i];
+    scen_run(sc, 0, res, cap);
+    for (uint32_t tr = 0; tr < ntr; tr++) {
+        uint32_t k = 0;
+        for (i = 0; i < tt_n; i++)                   /* (the step on bar 2's line falls in the block before it) */
+            k += tt_ev[i].tr == tr && tt_ev[i].blk + 1u < tt_bar_blk[2];
+        if (k > 512u) k = 512u;
+        tt_from(tr, 0, a, k);
+        same &= k > 0 && tt_from(tr, tt_mark[1], b, k) == k && !memcmp(a, b, k * sizeof a[0]);
+        if (mid) differ |= tt_from(tr, tt_mark[0], c, k) != k || memcmp(a, c, k * sizeof a[0]) != 0;
+    }
+    snprintf(res, cap, "%u %u", same, differ);
 }
 
 /* --------------------------------------------------------- saved block --- */
@@ -662,6 +727,27 @@ int main(int argc, char **argv)
         }
         snprintf(line, sizeof line, "FOLLOW a STEP melody: all %u notes a third above it (in C major)", n2);
         bad += check(line, n2 > 16u && !wrong);
+    }
+    for (int which = 0; which < 2; which++) {   /* SEED back, PLAY again: in a child, as the scenarios */
+        unsigned same = 0, differ = 0;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                if (which == 0) seed_check("seed_back_markov_turing", 2, 1, res, sizeof res);
+                else seed_check("replay_markov", 1, 0, res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u %u", &same, &differ);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        bad += check(which == 0 ? "SEED turned away and back: the same line again, note for note (Markov, Turing PROB 30)"
+                                : "PLAY again (EVOLVE off): the same line from the top, note for note (Markov)", same && differ);
+        if (which == 0) bad += check("... and the other seed played another line meanwhile", differ);
     }
     {
         unsigned h = 0, ok = 0;

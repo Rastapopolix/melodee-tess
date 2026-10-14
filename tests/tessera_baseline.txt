@@ -6,8 +6,8 @@ turing_len8_prob30_oct3 0x0b2dacd5 62
 turing_len8_prob30_oct3.state 0x376f03c8
 euclid 0x75a0daf3 16
 euclid.state 0xeed80847
-euclid_13_5_rot3_roll 0x0144ce26 49
-euclid_13_5_rot3_roll.state 0xeb06340f
+euclid_13_5_rot3_roll 0x249f3676 49
+euclid_13_5_rot3_roll.state 0x533c97b7
 markov 0x51562801 129
 markov.state 0x6f4e6b30
 markov_tension81_density60_oct3 0x9f7186d1 79
@@ -42,8 +42,8 @@ transport_stop_start 0x38a907a2 320
 transport_stop_start.state 0xc653ec69
 mute_and_unmute 0x0b59f12b 53
 mute_and_unmute.state 0x709189db
-knobs_while_playing 0xcafb596f 61
-knobs_while_playing.state 0xd5ac6f35
+knobs_while_playing 0xf23913f8 69
+knobs_while_playing.state 0x0b7b0f47
 midi_clock_start_stop_continue 0x0669a429 153
 midi_clock_start_stop_continue.state 0x81981a19
 swing_track40_global30 0xfb41cfcf 96
@@ -58,4 +58,8 @@ glo_mute_and_unmute 0x87b59f4e 49
 glo_mute_and_unmute.state 0x709189db
 follow_step_melody_third 0xb92074b9 65
 follow_step_melody_third.state 0x9427e519
+seed_back_markov_turing 0x67b428e9 135
+seed_back_markov_turing.state 0xb7365445
+replay_markov 0x9f29c52d 65
+replay_markov.state 0x80834307
 saved_block 0x52473273 188

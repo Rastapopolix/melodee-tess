@@ -576,7 +576,7 @@ static const page_t PAGES[] = {
     {"ARP 2", FAM_ARP, SC_TRACK, GR_NONE, {P_ASWING, P_APROB, P_AHOLD, P_AORDER}},
     {"NOTES", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},
     {"PATTERN", FAM_SEQ, SC_TRACK, GR_STEPS, {P_SLEN, P_SDIV, P_SSWING, P_SGATE}},
-    {"EVOLVE", FAM_SEQ, SC_TRACK, GR_EVOLVE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: LOCK EVERY AMOUNT ROLL (tessera_evolve_knob) */
+    {"EVOLVE", FAM_SEQ, SC_TRACK, GR_EVOLVE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: LOCK EVERY AMOUNT SEED (tessera_evolve_knob) */
     {"FORM", FAM_SEQ, SC_TRACK, GR_FORM, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: FORM CONTRAST CLEAR (tessera_form_knob) */
     {"TWEAK", FAM_SEQ, SC_TRACK, GR_TWEAK, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: SHIFT DROP HUMAN FOLLOW (tessera_tweak_knob) */
     {"FEEL", FAM_SEQ, SC_TRACK, GR_NONE, {P_SDIV, P_SSWING, P_SGATE, 0xFF}},   /* timing, reachable while Tessera owns PATTERN */

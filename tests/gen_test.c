@@ -333,6 +333,10 @@ static void stream_tests(void)
     }
     check("streams: every seed 0..9999 starts a stream other than 0 (xorshift's dead state)", ok);
     check("streams: the 10,000 seeds start at least 9,000 different streams (16-bit fold)", distinct >= 9000u);
+    {   /* a stream left at 0 (xorshift's dead state) draws on, rather than 0 for ever (Euclid's new seed would hang) */
+        uint32_t z = 0, a = gen_rnd(&z, 1000u), b = gen_rnd(&z, 1000u), c = gen_rnd(&z, 1000u);
+        check("streams: a stream at 0 recovers (no endless draw of 0)", z != 0 && !(a == b && b == c));
+    }
 }
 
 int main(void)

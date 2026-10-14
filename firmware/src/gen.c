@@ -27,7 +27,7 @@ static uint32_t gen_stream(uint32_t seed)
 }
 static uint32_t gen_next(uint32_t *s)
 {
-    uint32_t x = *s;
+    uint32_t x = *s ? *s : gen_stream(0);               /* (0 is xorshift's dead state: it would draw 0 for ever) */
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
@@ -46,7 +46,7 @@ static int gen_euclid_hit(uint8_t step, uint8_t steps, uint8_t pulses, uint8_t r
 }
 
 /* Euclid pitch: semitones 0..11 above C3 for a step. Seed 0 is the original pattern; any other seed
- * gives a different, repeatable one (a hash of seed and step), which ROLL changes. */
+ * gives a different, repeatable one (a hash of seed and step): the track's SEED sets it, EVOLVE may change it. */
 static uint32_t gen_euclid_degree(uint8_t seed, uint32_t step)
 {
     uint32_t x;
@@ -179,7 +179,7 @@ static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, uint32_t *rnd
     }
 }
 
-/* ------------------------------------------------------------------ mutation (EVOLVE, ROLL) --- */
+/* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
 /* a new Euclid pitch seed, never 0 (the original pattern) nor the one it replaces */

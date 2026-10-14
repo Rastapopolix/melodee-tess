@@ -7,7 +7,7 @@
 tessera_state_t tessera;
 
 /* The knob handlers (main loop) change several fields the sequencer reads in the audio interrupt (an engine change
- * releases the old note then clears the gate; ROLL flips bits one at a time): each runs whole, with the interrupt
+ * releases the old note then clears the gate; SEED rewrites a register, pitches, a state): each runs whole, with the interrupt
  * held off, like project.c's loads. The sequencer runs in CPU0's audio interrupt, so this is enough. The host
  * build has no interrupt (hostsim.c defines these empty). */
 #ifndef TESS_IRQ_OFF
@@ -38,6 +38,23 @@ static void tess_seed_fresh(uint32_t tr)
     if (tessera.seed[tr]) return;
     tessera.seed[tr] = (uint16_t)(1u + gen_stream(TESS_ENTROPY() + tr * 0x9E3779B9u) % TESS_SEED_MAX);
     tess_seed_apply(tr);
+}
+static void tess_realign(uint32_t tr);
+static void tess_form_restart(uint32_t tr);
+/* SEED turned by s (1..TESS_SEED_MAX, wrapping): that seed's line from its start. The playheads back on step 1; a
+ * FORM begins again at A (its sections were the old line's) */
+void tessera_seed_turn(uint32_t tr, int32_t s)
+{
+    int32_t n;
+    if (tr >= TESSERA_TRACKS || !s) return;
+    tess_seed_fresh(tr);
+    n = ((int32_t)tessera.seed[tr] - 1 + s) % (int32_t)TESS_SEED_MAX;
+    if (n < 0) n += (int32_t)TESS_SEED_MAX;
+    tessera.seed[tr] = (uint16_t)(n + 1);
+    tess_seed_apply(tr);
+    if (tessera.evolve[tr].form) tess_form_restart(tr);
+    tess_realign(tr);
+    tessera.evolve[tr].flash = 4;
 }
 
 void tessera_markov_recalc(uint32_t tr) { (void)tr; }   /* matrix is derived per step now */
@@ -145,7 +162,7 @@ static void tess_rearm(uint32_t tr)
     tessera.evolve[tr].valid &= (uint8_t)~(1u << (tessera.evolve[tr].sec % 3u));   /* this section's phrase is being rewritten */
 }
 
-/* A phrase boundary (mutation, ROLL, stop): rearm AND put the engines' own playheads back on step 1 */
+/* A phrase boundary (mutation, SEED, stop): rearm AND put the engines' own playheads back on step 1 */
 static void tess_realign(uint32_t tr)
 {
     tess_rearm(tr);
@@ -153,7 +170,7 @@ static void tess_realign(uint32_t tr)
     tessera.morph[tr].step_idx = (uint8_t)((tessera.morph[tr].step_idx & 0xF0u) | 0x0Fu);  /* engine pre-increments */
 }
 
-/* One mutation, scaled by the track's AMOUNT. Also what ROLL calls. */
+/* One mutation, scaled by the track's AMOUNT (EVOLVE's EVERY; FORM's new sections by CONTRAST) */
 void tessera_mutate(uint32_t tr)
 {
     if (tr >= TESSERA_TRACKS) return;
@@ -398,7 +415,7 @@ void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash)
     *flash = ev->flash != 0;
 }
 
-/* EVOLVE page encoders: 0 LOCK, 1 EVERY, 2 AMOUNT, 3 ROLL */
+/* EVOLVE page encoders: 0 LOCK, 1 EVERY, 2 AMOUNT, 3 SEED */
 static void tess_evolve_knob_body(uint32_t k, int32_t s)
 {
     tessera_ensure_init();
@@ -425,12 +442,7 @@ static void tess_evolve_knob_body(uint32_t k, int32_t s)
         int32_t a = (int32_t)ev->amount + s * 2;
         ev->amount = (uint8_t)(a < 0 ? 0 : a > 100 ? 100 : a);
     } else if (k == 3u) {
-        if (tessera.mode[tr] == TESS_ENG_EUCLID) {                  /* Euclid: ROLL re-rolls the pitches, the rhythm stays */
-            tessera.euclid[tr].pitch_seed = gen_new_seed(tessera.euclid[tr].pitch_seed, &tessera.rnd[tr]);
-            ev->flash = 4;
-        } else if (tessera.mode[tr] != TESS_ENG_OFF) {
-            tessera_mutate(tr);                                      /* any turn rolls once */
-        }
+        if (tessera.mode[tr] != TESS_ENG_OFF) tessera_seed_turn(tr, s);   /* SEED: each step a new line, back = the last */
     }
 }
 void tessera_evolve_knob(uint32_t k, int32_t s)

@@ -88,6 +88,7 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step);
 uint32_t tessera_sig(uint32_t tr);
 void tessera_kill(track_t *t);
 void tessera_mutate(uint32_t tr);
+void tessera_seed_turn(uint32_t tr, int32_t s);    /* SEED (EVOLVE page): that seed's line from its start */
 void tessera_evolve_knob(uint32_t k, int32_t s);
 uint32_t tessera_every_bars(uint32_t every);
 int  tessera_lock_get(uint32_t tr);            /* 0..100, or -1 when LOCK is not available for the mode */
