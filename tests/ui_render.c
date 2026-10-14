@@ -455,7 +455,8 @@ enum { S_HOME, S_HOME_IDLE, S_HOME_NOTE, S_HOME_CHORD, S_HOME_INVERSION, S_HOME_
        S_REF_SHEET_SOUND, S_REF_SHEET_SONG, S_REF_PICKER_WAVE, S_REF_PICKER_MODE, S_REF_SECTIONS_P5, S_REF_MAP_P5, S_REF_MAP_FM6,
        S_REF_SCL_LIST, S_REF_SHEET_PROJECT, S_REF_SHEET_NOTE, S_REF_SHEET_HIT, S_REF_MOTION,
        S_REF_SHEET_MOTION, S_REF_MOD, S_REF_PICKER_MOD, S_REF_ARP, S_REF_PATTERN,
-       S_REF_FMEG, S_REF_GRID, S_REF_SCALES, S_MENU_CLOCK, S_CONFIRM_RESTART, S_FX_PHASER, S_FX_WIDTH, S_FX_FORMANT, S_FX_TAPE, S_FX_SPIT, S_FX_ECHO, S_FX_ROOM, S_FX_REVERB, S_FX_CHORUS, S_FX_FULL, S_FX_SLOT2, S_FX_SLOT3, S_FX_SEND, S_FX_SEPARATE, S_FX_SENDS, S_FX_BUS1, S_FX_BUS2, S_FX_BUS3, S_COUNT };
+       S_REF_FMEG, S_REF_GRID, S_REF_SCALES, S_MENU_CLOCK, S_CONFIRM_RESTART, S_FX_PHASER, S_FX_WIDTH, S_FX_FORMANT, S_FX_TAPE, S_FX_SPIT, S_FX_ECHO, S_FX_ROOM, S_FX_REVERB, S_FX_CHORUS, S_FX_FULL, S_FX_SLOT2, S_FX_SLOT3, S_FX_SEND, S_FX_SEPARATE, S_FX_SENDS, S_FX_BUS1, S_FX_BUS2, S_FX_BUS3,
+       S_GEN_TURING, S_GEN_EUCLID, S_GEN_MARKOV, S_GEN_MORPH, S_GEN_EVOLVE, S_COUNT };
 static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "home_note", "home_chord", "home_inversion", "home_wide", "home_released", "home_fm6", "message", "message_key", "presets", "presets_nofav", "presets_cat", "presets_pending", "presets_recent", "user",
     "project", "project_boot", "tempo", "song_empty", "song", "step", "pattern", "motion", "drum",
     "mixer", "mixer_pan", "env", "env_dest", "lfo", "mod", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
@@ -475,7 +476,8 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "home_note", "h
     "mock_home", "mock_presets", "mock_seq", "mock_drum", "mock_mixer", "mock_dialog", "mock_menu", "native_fm_user", "native_cz_user",
     "notes_slide", "notes_mixed", "notes_chord", "notes_empty", "notes_raw", "notes_zoom", "notes_loop", "notes_drum", "notes_dense", "notes_rec", "notes_erase", "notes_drum_rec", "notes_drum_erase", "scl_micro", "scl_micro_layer", "scl_micro_chord", "scale_picker_edo", "scale_picker_historical", "scale_picker_favorites", "scale_picker_empty", "scale_settings_favorite", "menu_click", "menu_click_level", "menu_countin", "menu_preview", "menu_add", "menu_autosave_on", "menu_autosave_off", "drum_sound_808", "drum_sound_909", "drum_mix_909", "drum_hit_909", "drum_hit_free", "drum_hit_long",
     "stage_drum", "stage_cz", "stage_p5", "stage_queued", "stage_browse", "stage_stopped", "stage_filter", "patterns", "patterns_stopped", "patterns_sheet", "patterns_copy", "patterns_replace", "patterns_delete", "project_new", "new_key", "new_roles",
-    "ref_stage_held", "ref_stage_released", "ref_stage_cutoff", "ref_stage_drum", "ref_browser", "ref_patterns", "ref_song", "ref_env", "ref_lfo", "ref_edit_osc", "ref_mixer", "ref_notes", "ref_settings", "ref_dialog", "ref_sheet_sound", "ref_sheet_song", "ref_picker_wave", "ref_picker_mode", "ref_sections_p5", "ref_map_p5", "ref_map_fm6", "ref_scl_list", "ref_sheet_project", "ref_sheet_note", "ref_sheet_hit", "ref_motion", "ref_sheet_motion", "ref_mod", "ref_picker_mod", "ref_arp", "ref_pattern", "ref_fmeg", "ref_grid", "ref_scales", "menu_clock", "confirm_restart", "fx_phaser", "fx_width", "fx_formant", "fx_tape", "fx_spit", "fx_echo", "fx_room", "fx_reverb", "fx_chorus", "fx_full", "fx_slot2", "fx_slot3", "fx_send", "fx_separate", "fx_sends", "fx_bus1", "fx_bus2", "fx_bus3"};
+    "ref_stage_held", "ref_stage_released", "ref_stage_cutoff", "ref_stage_drum", "ref_browser", "ref_patterns", "ref_song", "ref_env", "ref_lfo", "ref_edit_osc", "ref_mixer", "ref_notes", "ref_settings", "ref_dialog", "ref_sheet_sound", "ref_sheet_song", "ref_picker_wave", "ref_picker_mode", "ref_sections_p5", "ref_map_p5", "ref_map_fm6", "ref_scl_list", "ref_sheet_project", "ref_sheet_note", "ref_sheet_hit", "ref_motion", "ref_sheet_motion", "ref_mod", "ref_picker_mod", "ref_arp", "ref_pattern", "ref_fmeg", "ref_grid", "ref_scales", "menu_clock", "confirm_restart", "fx_phaser", "fx_width", "fx_formant", "fx_tape", "fx_spit", "fx_echo", "fx_room", "fx_reverb", "fx_chorus", "fx_full", "fx_slot2", "fx_slot3", "fx_send", "fx_separate", "fx_sends", "fx_bus1", "fx_bus2", "fx_bus3",
+    "gen_turing", "gen_euclid", "gen_markov", "gen_morph", "gen_evolve"};
 
 /* the scenes of the UI design screens: the state the UI-redesign
  * prototype drew them from (its setup(): two pattern tracks, the drum pattern on track 4, a synthetic scope),
@@ -1084,6 +1086,18 @@ static void setup(int s)
         song.g[G_FXMODE]=1;go_title("FX SEND");TSEL->p[P_FXSEND]=81;song.g[G_FXRETURN]=100;break;
     case S_FX_SENDS:
         song.g[G_FXMODE]=1;go_title("FX SENDS");TSEL->p[P_FXSEND]=50;TSEL->p[P_FXSEND2]=71;TSEL->p[P_FXSEND3]=99;break;
+    case S_GEN_TURING: case S_GEN_EUCLID: case S_GEN_MARKOV: case S_GEN_MORPH: case S_GEN_EVOLVE:
+        tessera_reset();                            /* (track 1's generator, from its defaults) */
+        song.sel = 0;
+        tessera_knob(0, s == S_GEN_TURING ? TESS_ENG_TURING : s == S_GEN_EUCLID ? TESS_ENG_EUCLID :
+                        s == S_GEN_MORPH ? TESS_ENG_MORPH : TESS_ENG_MARKOV);
+        if (s == S_GEN_EVOLVE) {
+            tessera_evolve_knob(0, 30);             /* LOCK 60 */
+            tessera_evolve_knob(1, 1);
+            tessera_evolve_knob(1, 1);              /* EVERY 2 bars */
+        }
+        go_title(s == S_GEN_EVOLVE ? "EVOLVE" : "PATTERN");
+        break;
     case S_FX_BUS1: case S_FX_BUS2: case S_FX_BUS3:
         go_title(s==S_FX_BUS1?"SEND FX 1":s==S_FX_BUS2?"SEND FX 2":"SEND FX 3");
         for(uint32_t slot=0;slot<3;slot++){uint32_t b=G_MFXTYPE+slot*4;song.g[b]=slot==0?FX_REVERB:slot==1?FX_TAPE:FX_ECHO;song.g[b+1]=127;song.g[b+2]=90;song.g[b+3]=100;}break;
