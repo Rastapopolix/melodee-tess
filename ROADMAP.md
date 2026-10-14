@@ -79,6 +79,34 @@ Rules:
 - The grid shows the original as ghost notes and the current version solid, plus a
   distance-from-home meter.
 
+### FOLLOW: one track following another's pitch
+
+Today (TWEAK > FOLLOW): a generator track plays the other track's last note plus SHIFT semitones, snapped to
+its own scale, in its own rhythm. It follows generator tracks only (a STEP track as source does nothing), plays
+one note, and SHIFT in semitones can leave the key. User feedback (2026-10-14) asked to build on a written
+melody, and for clearer control over how a track follows.
+
+Controls (TWEAK, or a FOLLOW page of its own): **FOLLOW** (source track, OFF = no effect), **HOW** (the mode),
+**INTERVAL**, **RHYTHM**. Modes:
+- **Interval:** a fixed interval in scale degrees (third, fifth, sixth, octave; above or below), so the line
+  stays in key. Replaces today's semitone SHIFT for following.
+- **Chord tone:** a note of the chord built on the source's note (third, fifth, seventh), the nearest one to the
+  last note played: smooth complementary lines.
+- **Contrary:** the opposite direction to the source (it rises, this falls), mirrored around a centre note.
+- **Canon / echo:** the source's notes again N steps later, optionally at an interval.
+- **Bass:** the source's note one or two octaves down, on the strong beats only.
+- **RHYTHM:** this generator's own rhythm (today), only when the source plays, or both.
+- **Any source:** STEP tracks as well as generators (the source's sounding note, after its scale and
+  transpose; fixes today's double transpose).
+
+Rules: every mode has an off / no-effect position; each control gets a central parameter ID, range and help
+text. Fits phase 1 (`gen_clock_t` / `input_phrase`: the source as input) and phase 2 (parameter IDs).
+
+In the web simulator: it runs the firmware, so the modes come with it. Ship them there as part of the work:
+rebuild `web/sim/` and the site copy (`docs/webapp/sim/`), extend `web/sim/test_sim.mjs` (a STEP melody followed
+in each mode), and add FOLLOW to the page's "Try the generators" guide and its demo (one track following
+another), so people can try the modes in the browser before installing.
+
 ### Mod sources and sequencing tools
 
 - LFOs; AD/ADSR envelopes triggerable from any gate; logic (AND/OR/XOR, flip-flop, comparator);
@@ -413,6 +441,9 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] WebAssembly build; GitHub Pages demo
 
 ### Not yet placed in a phase
+- [ ] **FOLLOW modes** (Features > FOLLOW): interval in scale degrees, chord tone, contrary, canon, bass; RHYTHM
+      own / source / both; STEP tracks as sources. With phases 1-2; then in the web simulator (rebuild, site copy,
+      test, guide and demo)
 - [ ] STEP as seed: locks, Gravity, Keep, ghost-note grid; Ornament and Serial generators
       (phase 1's `input_phrase` prepares for it)
 - [ ] The remaining mod sources, clock tools, quantizer, Kria-style lanes
