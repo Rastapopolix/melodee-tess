@@ -74,8 +74,9 @@
 #                   --quick renders scores through Dexed's own code and FM6 and reports sample differences (strict parity predates the fp32 port).
 # TESSERA (tests/tessera_test.c): every note the generators play in each scenario (each generator, EVOLVE, FORM, TWEAK,
 #                   scales, divisions, transport, mute, knobs while playing, external MIDI clock) against tests/tessera_baseline.txt,
-#                   no note held after the stop, the saved block's bytes and round trip; logs in build/tessera_log/.
-#                   TESSERA_UPDATE=1 rewrites the baseline (only after an intended change of what they play).
+#                   no note held after the stop, the generator state after the stop, the saved block's bytes and round
+#                   trip; logs in build/tessera_log/. TESSERA_UPDATE=1 rewrites the baseline (only after an intended
+#                   change of what they play). tests/gen_test.c: each generator alone (gen.c without the firmware).
 # Change baseline entries only for reviewed, intentional differences in sound or cost;
 # retain every unaffected golden / CPU / target entry. VERBOSE=1: every render.
 export AC79_SDK="${AC79_SDK:-$HOME/fw-AC79_AIoT_SDK}"
@@ -298,6 +299,8 @@ if core && [ $TABLES = 1 ]; then
     mkdir -p build/tessera_log
     t "TESSERA generators: notes per scenario against tests/tessera_baseline.txt, stops clean, saved block" tessera_test \
         -O2 $FW -- "$OUT/tessera_test" tests/tessera_baseline.txt build/tessera_log
+    t "GEN: each generator on its own (gen.c alone): ranges, rests, draws per step, determinism, mutation, sections" \
+        gen_test -O2 $FW
     t "double-tap layers, SCREEN OFF, LFO 2 SYNC / TRIG / POL" layer_screen_test \
         -O1 -DMELODEE_USB_AUDIO=1 $FW
     t "DRUM EDITOR: synthesized 909, sound controls, individual pitch/length, undo and storage" drum_editor_test -O2 $FW
