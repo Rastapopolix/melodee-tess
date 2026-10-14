@@ -1,32 +1,61 @@
 # Tessera generators: what they play, per scenario of tests/tessera_test.c: hash of the note log, notes.
 # Rewrite (TESSERA_UPDATE=1) only after an intended change of what they play.
 turing 0x49680ea4 65
+turing.state 0x7f0e0845
 turing_len8_prob30_oct3 0xc0faef27 69
+turing_len8_prob30_oct3.state 0xcd31e216
 euclid 0x1b1a694b 16
+euclid.state 0x8065862f
 euclid_13_5_rot3_roll 0x19bac061 49
+euclid_13_5_rot3_roll.state 0xedc9babb
 markov 0x3f74e113 129
+markov.state 0x7399cc13
 markov_tension81_density60_oct3 0xe079af21 83
+markov_tension81_density60_oct3.state 0x8aea6192
 morph 0x476b28aa 32
+morph.state 0x9e6cce6a
 morph_64_son_rumba 0xbb5d1717 44
+morph_64_son_rumba.state 0x857a59db
 evolve_turing_lock90_every1_amount50 0xac00a426 138
+evolve_turing_lock90_every1_amount50.state 0x70bea1c5
 evolve_euclid_every1_amount80 0x9f5c04e9 75
+evolve_euclid_every1_amount80.state 0xe56468a2
 evolve_markov_lock60_every2 0x3851e19a 257
+evolve_markov_lock60_every2.state 0xd09e85a5
 evolve_morph_lock100_every1 0x2e39e616 146
+evolve_morph_lock100_every1.state 0x987681a9
 form_turing_abac_contrast80_flourish5 0x3a2417a7 157
+form_turing_abac_contrast80_flourish5.state 0x9e7cdd5c
 form_markov_aaba_lock50 0xb59a022d 385
+form_markov_aaba_lock50.state 0x088ee470
 form_euclid_abcb_morph_aabc 0x403a1ae6 219
+form_euclid_abcb_morph_aabc.state 0x30c139e4
 tweak_shift_drop_human_follow 0x94dff827 152
+tweak_shift_drop_human_follow.state 0xf47b7e6f
 scale_root_transpose 0x70debcf5 103
+scale_root_transpose.state 0xcc024ab5
 division_gate_length 0x437cb520 119
+division_gate_length.state 0x538131f4
 all_four_tracks 0x3550521c 1088
+all_four_tracks.state 0xfa423ce9
 transport_stop_start 0x946e7a1b 286
+transport_stop_start.state 0xb9bdf1b0
 mute_and_unmute 0xdbaeb96c 65
+mute_and_unmute.state 0x9e7e298e
 knobs_while_playing 0x7d925608 75
+knobs_while_playing.state 0x8f9774df
 midi_clock_start_stop_continue 0x208b6ef7 159
+midi_clock_start_stop_continue.state 0x5464b957
 swing_track40_global30 0x1829426d 105
+swing_track40_global30.state 0x1a56cc4e
 track_len_shorter_than_loop 0xfc24d42e 105
+track_len_shorter_than_loop.state 0x1a56cc4e
 pattern_switch_while_playing 0x1fcf1117 97
+pattern_switch_while_playing.state 0xf80827fb
 song_chain_two_banks 0xc0bda8d9 63
+song_chain_two_banks.state 0xdf896dbd
 glo_mute_and_unmute 0x7648fed9 57
+glo_mute_and_unmute.state 0x9e7e298e
 follow_step_melody_third 0xfb9742d4 65
+follow_step_melody_third.state 0x9685f97f
 saved_block 0xaf90c7b2 180

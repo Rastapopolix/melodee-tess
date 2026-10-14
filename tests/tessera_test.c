@@ -10,6 +10,8 @@
  * samples) it starts in, the track, the note, the velocity and its length in blocks (until the sequencer has let
  * it go). The log's hash and note count must equal tests/tessera_baseline.txt. LOGDIR gets each log as text, to
  * diff against a log of the old code when a hash changes.
+ * Each scenario's whole generator state after the stop is hashed too (NAME.state in the baseline), for what the
+ * notes do not show.
  * Also: the same scenario twice gives the same notes; stopping leaves no generator note held; the saved block
  * (tessera_pack) has the same hash, survives a round trip, and a damaged one is refused with nothing changed.
  * TESSERA_UPDATE=1 rewrites the baseline: only after an intended change of what the generators play. */
@@ -61,6 +63,15 @@ static uint32_t tt_hash(void)
         h = fnv(h, (uint32_t)e->tr | (uint32_t)e->note << 8 | (uint32_t)e->vel << 16);
         h = fnv(h, e->len);
     }
+    return h;
+}
+/* every byte of the generators' state (tessera.h tessera_state_t) after the stop: what the notes do not show
+ * (a register, a section's phrase, the record flags of another engine) must stay as it was too */
+static uint32_t tt_state_hash(void)
+{
+    const uint8_t *p = (const uint8_t *)&tessera;
+    uint32_t h = 2166136261u;
+    for (uint32_t i = 0; i < sizeof tessera; i++) h = fnv(h, p[i]);
     return h;
 }
 
@@ -444,7 +455,7 @@ static void scen_run(const scen_t *sc, const char *logdir, char *res, size_t cap
             fclose(fp);
         }
     }
-    snprintf(res, cap, "%u 0x%08x %u %u", tt_n, tt_hash(), held, tt_lost);
+    snprintf(res, cap, "%u 0x%08x %u %u 0x%08x", tt_n, tt_hash(), held, tt_lost, tt_state_hash());
 }
 
 /* the scenario in a child process (power-on state each time): its result line */
@@ -580,8 +591,9 @@ int main(int argc, char **argv)
         fprintf(out, "# Tessera generators: what they play, per scenario of tests/tessera_test.c: hash of the note log, "
                      "notes.\n# Rewrite (TESSERA_UPDATE=1) only after an intended change of what they play.\n");
     for (i = 0; i < NSCEN; i++) {
-        unsigned n = 0, h = 0, held = 1, lost = 1;
-        if (scen_fork(&SCEN[i], logdir, res, sizeof res) || sscanf(res, "%u 0x%x %u %u", &n, &h, &held, &lost) != 4) {
+        unsigned n = 0, h = 0, held = 1, lost = 1, st = 0;
+        char key[96], stg[16];
+        if (scen_fork(&SCEN[i], logdir, res, sizeof res) || sscanf(res, "%u 0x%x %u %u 0x%x", &n, &h, &held, &lost, &st) != 5) {
             snprintf(line, sizeof line, "%s: runs", SCEN[i].name);
             bad += check(line, 0);
             continue;
@@ -589,8 +601,11 @@ int main(int argc, char **argv)
         snprintf(got, sizeof got, "0x%08x %u", h, n);
         snprintf(line, sizeof line, "%s: no note held after the stop, log complete", SCEN[i].name);
         bad += check(line, !held && !lost && n > 0);
+        snprintf(key, sizeof key, "%s.state", SCEN[i].name);
+        snprintf(stg, sizeof stg, "0x%08x", st);
         if (out) {
             fprintf(out, "%s %s\n", SCEN[i].name, got);
+            fprintf(out, "%s %s\n", key, stg);
         } else {
             int have = base_get(base, SCEN[i].name, want, sizeof want);
             snprintf(line, sizeof line, "%s: %u notes, %s", SCEN[i].name, n,
@@ -598,6 +613,12 @@ int main(int argc, char **argv)
             bad += check(line, have && !strcmp(want, got));
             if (have && strcmp(want, got))
                 printf("tessera:   baseline %s, now %s\n", want, got);
+            have = base_get(base, key, want, sizeof want);
+            snprintf(line, sizeof line, "%s: the state after the stop %s", SCEN[i].name,
+                     !have ? "not in the baseline (TESSERA_UPDATE=1)" : strcmp(want, stg) ? "CHANGED" : "as the baseline");
+            bad += check(line, have && !strcmp(want, stg));
+            if (have && strcmp(want, stg))
+                printf("tessera:   baseline %s, now %s\n", want, stg);
         }
     }
     for (i = 0; i < NSCEN && strcmp(SCEN[i].name, "transport_stop_start"); i++)
