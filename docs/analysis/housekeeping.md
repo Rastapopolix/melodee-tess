@@ -1,6 +1,6 @@
 # Housekeeping: backup files and stray branches
 
-Checked 2026-10-14. Nothing has been deleted; the commands at the end are for Theo to approve.
+Checked 2026-10-14. **Done the same day** (Theo: "do the housekeeping"): the commands below were run.
 
 ## Backup files (32, none tracked by git)
 
