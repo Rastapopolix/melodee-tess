@@ -41,3 +41,15 @@ upstream (5); FORM development (6) in phase 6; Markov's default (7) at the next 
    by Gravity)? Recommendation: develop, with Gravity, in phase 6.
 7. **Markov's DENSITY defaults to 100** (a note on every step, forever). Lower the default (say 70)
    when the baseline is next rewritten on purpose?
+
+## Found 2026-10-14, checks while waiting for the device test
+
+8. **Backups leave out the generators.** The full backup (web editor > backup, `editor_backup.c`, `web/fm1backup.js`)
+   is a fixed list of objects, without `OBJ_TESSERA`. Restored onto the same FM-1 the generators come back (their
+   block is still there and still matches); onto a fresh or another FM-1, every project loads with Tessera OFF.
+   Recommendation: add `OBJ_TESSERA` to the backup list (firmware, web page and its test) before a release.
+9. **Turing ignores the track's LEN**, Euclid follows it (`track_len_shorter_than_loop` in the baseline). Should a
+   track's LEN bound every generator? Recommendation: decide with the phase 1 interface (`gen_clock_t`).
+10. **The live simulator's demo** set EVOLVE's AMOUNT to 0 % (track 1 never evolved); fixed on `web-sim` (`73805aa`,
+   "the demo's EVOLVE AMOUNT stays at 30 %"), not yet on the site. Rebuild `docs/webapp/sim/` on `main` and push?
+
