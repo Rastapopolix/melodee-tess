@@ -6,6 +6,15 @@
 
 tessera_state_t tessera;
 
+/* The knob handlers (main loop) change several fields the sequencer reads in the audio interrupt (an engine change
+ * releases the old note then clears the gate; ROLL flips bits one at a time): each runs whole, with the interrupt
+ * held off, like project.c's loads. The sequencer runs in CPU0's audio interrupt, so this is enough. The host
+ * build has no interrupt (hostsim.c defines these empty). */
+#ifndef TESS_IRQ_OFF
+#define TESS_IRQ_OFF() fm1_irq_off()
+#define TESS_IRQ_ON() fm1_irq_on()
+#endif
+
 void tessera_markov_recalc(uint32_t tr) { (void)tr; }   /* matrix is derived per step now */
 
 void tessera_init(void)
@@ -244,7 +253,7 @@ static void tess_form_advance(uint32_t tr)
 }
 
 /* FORM page encoders: 0 FORM, 1 CONTRAST, 2 CLEAR */
-void tessera_form_knob(uint32_t k, int32_t s)
+static void tess_form_knob_body(uint32_t k, int32_t s)
 {
     tessera_ensure_init();
     uint32_t tr = song.sel;
@@ -268,6 +277,12 @@ void tessera_form_knob(uint32_t k, int32_t s)
     } else if (k == 2u) {
         if (ev->form) tess_form_restart(tr);                 /* forget B and C: this phrase is A again */
     }
+}
+void tessera_form_knob(uint32_t k, int32_t s)
+{
+    TESS_IRQ_OFF();
+    tess_form_knob_body(k, s);
+    TESS_IRQ_ON();
 }
 
 /* Once per sequencer step, before the engine runs: counts bars, mutates on the boundary, and
@@ -355,7 +370,7 @@ void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash)
 }
 
 /* EVOLVE page encoders: 0 LOCK, 1 EVERY, 2 AMOUNT, 3 ROLL */
-void tessera_evolve_knob(uint32_t k, int32_t s)
+static void tess_evolve_knob_body(uint32_t k, int32_t s)
 {
     tessera_ensure_init();
     uint32_t tr = song.sel;
@@ -389,9 +404,15 @@ void tessera_evolve_knob(uint32_t k, int32_t s)
         }
     }
 }
+void tessera_evolve_knob(uint32_t k, int32_t s)
+{
+    TESS_IRQ_OFF();
+    tess_evolve_knob_body(k, s);
+    TESS_IRQ_ON();
+}
 
 /* TWEAK page encoders: 0 SHIFT, 1 DROP, 2 HUMAN, 3 FOLLOW */
-void tessera_tweak_knob(uint32_t k, int32_t s)
+static void tess_tweak_knob_body(uint32_t k, int32_t s)
 {
     tessera_ensure_init();
     uint32_t tr = song.sel;
@@ -415,6 +436,12 @@ void tessera_tweak_knob(uint32_t k, int32_t s)
         if (f == (int32_t)tr + 1) f = 0;
         ev->follow = (uint8_t)f;
     }
+}
+void tessera_tweak_knob(uint32_t k, int32_t s)
+{
+    TESS_IRQ_OFF();
+    tess_tweak_knob_body(k, s);
+    TESS_IRQ_ON();
 }
 
 static int32_t tess_scale_steps(const track_t *t, int32_t n, int32_t k);
@@ -514,7 +541,7 @@ void tessera_clock_step(track_t *t)
     }
 }
 
-void tessera_knob(uint32_t k, int32_t s)
+static void tess_knob_body(uint32_t k, int32_t s)
 {
     tessera_ensure_init();
     uint32_t tr = song.sel;
@@ -619,6 +646,12 @@ void tessera_knob(uint32_t k, int32_t s)
         }
     }
     tess_rearm(tr);
+}
+void tessera_knob(uint32_t k, int32_t s)
+{
+    TESS_IRQ_OFF();
+    tess_knob_body(k, s);
+    TESS_IRQ_ON();
 }
 
 void tessera_ensure_init(void)

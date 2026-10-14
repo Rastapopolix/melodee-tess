@@ -65,6 +65,8 @@ static void fm1_delay_ms(uint32_t ms) { (void)ms; }
 static void TESSERA_NOTE_HOOK(track_t *t, uint32_t note, uint32_t vel);
 #define trk_note_on(t, n, v) (TESSERA_NOTE_HOOK((t), (n), (v)), trk_note_on((t), (n), (v)))
 #endif
+#define TESS_IRQ_OFF() ((void)0)                  /* (no audio interrupt on the host) */
+#define TESS_IRQ_ON() ((void)0)
 #include "../firmware/src/tessera.c"
 #ifdef TESSERA_NOTE_HOOK
 #undef trk_note_on
