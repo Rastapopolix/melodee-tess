@@ -13,14 +13,15 @@ command -v emcc >/dev/null 2>&1 || { echo "emcc not found: install Emscripten (e
 OUT=build/sim
 mkdir -p "$OUT"
 # as Felucca's web/emu/build.sh: no fused multiply-adds (as the host build), a 1 MiB stack, no file system
-emcc -O2 -ffp-contract=off -w -DMELODEE_USB_AUDIO=1 '-DMELODEE_VERSION="v1.1.0 web"' -Ibuild/gen -Ifirmware/src -Itests \
+VERSION=$(sed -n 's/^#define MELODEE_VERSION "\([^"]*\)".*/\1/p' firmware/src/melodee.c)   # upstream's, shown in the menu
+emcc -O2 -ffp-contract=off -w -DMELODEE_USB_AUDIO=1 "-DMELODEE_VERSION=\"$VERSION web\"" -Ibuild/gen -Ifirmware/src -Itests \
     --no-entry -sSTANDALONE_WASM -sSTACK_SIZE=1048576 -sINITIAL_MEMORY=33554432 -sFILESYSTEM=0 \
     -o "$OUT/melodee.wasm" web/sim/sim.c
 cp web/sim/worklet.js "$OUT/"
 {   # index.html is written as a page body (it also publishes as is): the document around it for a plain server
     printf '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
     printf '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n</head>\n<body>\n'
-    cat web/sim/index.html
+    sed "s/@BASE@/$VERSION/" web/sim/index.html
     printf '</body>\n</html>\n'
 } > "$OUT/index.html"
 echo "sim      $OUT/melodee.wasm  $(wc -c < "$OUT/melodee.wasm") B   (serve $OUT/ and open index.html)"
