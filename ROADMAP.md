@@ -400,9 +400,17 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [x] Baseline of what the generators play today: `tests/tessera_test.c`, 22 scenarios and the saved
       block against `tests/tessera_baseline.txt` (`TESSERA_UPDATE=1` rewrites it)
 - [x] Widen the baseline: swing, MIDI clock, pattern switches, SONG chains, short `P_SLEN`, GLO mute (28 scenarios)
-- [ ] Define `gen_tick(state, input_phrase, clock)` and its output (gate stream + CV)
-- [ ] Move Turing, Euclid, Markov and Morph behind it, out of seq.c / project.c / UI coupling
-- [ ] Host tests per generator: output identical to before, deterministic for a seed, CPU cost
+- [x] Define the generator interface and its output (gate, note, velocity + CV): `gen.h` (2026-10-15). One
+      `gen_<name>_tick(state, clock, out)` per generator instead of one `gen_tick`; the input phrase joins with
+      STEP as seed (`docs/analysis/phase1-plan.md`, Outcome)
+- [x] Move Turing, Euclid, Markov and Morph behind it: `gen.c` (steps, mutation, FORM sections), `tessera.c`
+      the adapter; the UI reads through `tessera_turing()` .. `tessera_morph()`; knob handlers guarded
+      against the audio interrupt. Branch `phase1-gen`, not merged yet
+- [x] Host tests per generator: output identical to before (`tessera_test`, now with the state after the
+      stop), `tests/gen_test.c` (gen.c alone: ranges, draws per step, determinism, cost), generator UI renders
+- [ ] Play test of `phase1-gen` on the device (engine changes and ROLL while playing: no stuck note), then
+      merge into `tessera-dev`
+- [ ] Seeded random generator per track (an intended change of what the generators play: new baseline)
 
 ### 2. Signal bus and parameter IDs
 - [ ] Central parameter IDs and ranges

@@ -130,3 +130,49 @@ separately. Doing it inside the extraction would make the "identical output" che
 About two or three sessions: one for steps 0–3, one for the four generators (step 4), one for steps 5–10.
 The generators are small (Turing, Euclid, Markov and Morph are about 25 lines each in `tessera_clock_step`);
 most of the time goes into keeping the adapter's behaviour exact and into the tests.
+
+## Outcome (2026-10-15, branch `phase1-gen`)
+
+Steps 2–10 done, one commit each (`7ad437f` .. `ae0072c`). After every step: both core variants
+build, `tests/run_tests.sh` passes but for the CZ-1 knob test (upstream, keremimo/melodee#47), and the
+generators play note for note what `tessera-dev` plays.
+
+**Where the generators live now:** `gen.h` (their state, `gen_clock_t`, `gen_out_t`, `gen_sec_t`,
+the phrase types) and `gen.c` (tables, helpers, `gen_<name>_tick`, `_mutate`, `_save`, `_load`).
+`gen.c` calls nothing of the firmware but `rng()`; `tests/gen_test.c` builds it alone.
+`tessera.c` is the adapter (see `codebase-map.md`, "Where Tessera hooks in").
+
+**Different from the plan:**
+- No `gen_t` union and no single `gen_tick(g, in, clk, out)`: one function per generator, called from
+  the adapter's `switch` (which the plan's risks table recommends for flash anyway). The state stays four
+  arrays of per-generator structs in `tessera_state_t`, so the saved block, the RAM layout and the UI
+  are unchanged. A union per track (less RAM: one generator's state a track) belongs with the project
+  format of phase 4, which rewrites the saved block anyway.
+- No `gen_phrase_t` argument yet: no generator reads one in phase 1. It joins the `_tick` signature with
+  STEP as seed.
+- Turing's "a section remembers the phrase's start register" (`ev->base_reg` while LOCK replays) stays
+  in the adapter: it is LOCK's state, not Turing's.
+- Step 7 needed no code: the state layout did not change; the `saved_block` baseline and the round
+  trip pass on every commit.
+- Step 8: every `tessera_*_knob` handler runs whole with the interrupt held off (`TESS_IRQ_OFF`), rather
+  than posting requests to the audio side; the bodies are short and bounded.
+
+**Added on the way:**
+- `tests/tessera_test.c` hashes each scenario's whole generator state after the stop
+  (`NAME.state`; written on `tessera-dev`). The note hashes alone missed a slip in the first version of
+  the Euclid step (an edit that also made a Euclid track run Turing's phrase capture, changing no note);
+  the state hash catches it in 13 scenarios.
+- `tests/ui_render.c`: the generator pages (`gen_turing` .. `gen_morph`, `gen_evolve`). No render
+  showed one before; all 702 frames equal `tessera-dev`'s.
+
+**Figures** (dual core / single core; `tessera-dev` → `phase1-gen`):
+
+| | `tessera-dev` | `phase1-gen` |
+| --- | --- | --- |
+| `melodee.bin` | 498,144 / 495,980 B | 498,192 / 496,028 B (+48 B: the interrupt guard, the clock struct) |
+| RAM `.data + .bss` | 93,348 / 92,356 B of 98,304 | unchanged |
+| Host cost per step (`gen_test`, x86) | | Turing ~10 ns, Euclid ~15 ns, Markov ~55 ns, Morph ~8 ns |
+
+**Still to do on the device:** the interrupt guard is the one change the host cannot check; a short
+play test (engine changes and ROLL while playing, no stuck note) before the branch is merged.
+**Next, as its own intended change:** the seeded random generator per track (end of this plan).

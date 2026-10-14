@@ -46,7 +46,7 @@ The strict platform layer is `firmware/hal/` (headers only). The `.c` files abov
 | Modulation | `mod.c`: per track four slots, SRC → DST by AMT, added to the fixed parameters at control rate; read by `voice.c` and `fx.c` |
 | Effects | `fx.c` (DIST insert, chorus/delay/reverb sends), `delay.c`, `perform.c` (FX hold layer), `slicer.c` |
 | Sequencer | `seq.c` (1208): keyboard, scales, arpeggiator, step sequencer, transport; `song_chain.c`, `pattern.c`, `recording.c`, `motion.c`, `chord.c`, `seq_edit/notes/undo/erase.c` |
-| Generators | `tessera.c` (923), `tessera.h` (131) |
+| Generators | `gen.c` (215), `gen.h` (75): the four generators alone (since phase 1, 2026-10-15); `tessera.c` (850), `tessera.h` (108): the adapter to the sequencer, EVOLVE, FORM, TWEAK, the saved block |
 | Parameters | `params.c`: parameter descriptors (`P_*` track, `G_*` global), formatting, the page table `PAGES[]` |
 | UI | `ui.c` (state, pages), `ui_input.c` (2144: knobs, buttons, keys, LEDs), `ui_layer.c` (hold layers), `ui_draw.c` (header, knob cards, footer), `ui_graph.c` (the picture between cards and footer), `ui_pages.c`, `ui_stage.c`, `ui_menu.c`, `ui_popup.c`, `ui_list.c`, `ui_name.c`, `ui_new.c`, `ui_patterns.c`, `ui_scales.c`, `ui_sections.c`, `ui_slots.c`, `ui_motion.c`, `icons.c` |
 | Storage formats | `project.c` (1675: four project slots, each 32 pattern banks), `pattern_store.c`, `settings_persist.c`, `upreset.c`, `favorites.c`, `*_store.c`, `*_bank.c` |
@@ -75,6 +75,12 @@ Tessera adds about 1,500 lines; 923 in `tessera.c` and about 600 spread over sha
 - Tessera calls into the sequencer and voices: `trk_note_on/off`, `seq_release`, `seq_div_samples`,
   `scale_mask`, `trk_index`, `rng`, and writes `t->seq_notes`, `t->seq_n`, `t->seq_off` so the
   sequencer's gate timer ends the note.
+- Since phase 1, `tessera_clock_step` is an adapter: it builds a `gen_clock_t` (the step's loop
+  position, steps per bar, the track's root), calls `gen_<name>_tick` (`gen.c`), which fills a
+  `gen_out_t` (gate, raw note, velocity; `cv` for phase 2), then applies LOCK's replay, DROP, HUMAN,
+  FOLLOW, FLOURISH, the scale snap, transpose and SHIFT, and plays the note. EVOLVE's and ROLL's
+  mutation go through `gen_<name>_mutate`, FORM's sections through `gen_<name>_save` / `_load`.
+  `gen.c`'s only outside call is `rng()` (through `gen_rnd`).
 
 ### UI
 
@@ -88,7 +94,8 @@ Tessera adds about 1,500 lines; 923 in `tessera.c` and about 600 spread over sha
   Tessera note.
 - `ui_draw.c`: the knob cards for the Tessera pages. `ui_graph.c`: `graph_tessera_viz` (register
   bits, Euclid ring, Markov states, Morph A/B) and the phrase / form bars. `ui_pages.c`: the panel
-  picture and its playhead; redraw signatures include `tessera_sig`.
+  picture and its playhead; redraw signatures include `tessera_sig`. Since phase 1 these three read
+  the generators through `tessera_turing(tr)` .. `tessera_morph(tr)` (read-only `const gen_*_t *`).
 - `ui_menu.c`: the About text and credits.
 
 ### Storage
@@ -108,8 +115,10 @@ Tessera adds about 1,500 lines; 923 in `tessera.c` and about 600 spread over sha
 
 ### Tests
 
-- `tests/hostsim.c` includes `tessera.h` and `tessera.c`, so every host test builds them, but no
-  test exercised a generator before tonight (see `tests/tessera_test.c`).
+- `tests/hostsim.c` includes `tessera.h`, `gen.c` and `tessera.c`, so every host test builds them.
+  `tests/tessera_test.c` plays the generators through the real sequencer against
+  `tests/tessera_baseline.txt` (notes and the state after the stop); `tests/gen_test.c` tests `gen.c`
+  alone; `tests/ui_render.c` renders the generator pages (`gen_*` screens).
 
 ### Things noticed while mapping
 
@@ -119,7 +128,8 @@ Tessera adds about 1,500 lines; 923 in `tessera.c` and about 600 spread over sha
 - Knob handlers (main loop) change generator state that the audio ISR is using, with no IRQ guard.
   Most writes are single bytes, but `tessera_knob` mode changes, `tessera_mutate` (ROLL) and
   `tess_form_restart` change several fields at once: a step can see half an update. Usually
-  harmless (one odd note), but worth fixing in the extraction.
+  harmless (one odd note), but worth fixing in the extraction. Fixed in phase 1 (`b89586a`): the
+  four `tessera_*_knob` handlers run with the interrupt held off.
 - `seq.c` and `ui_layer.c` declare `extern` functions inside function bodies.
 
 ## Removing Prophet, FM6, CZ, SLICE and samples
