@@ -108,7 +108,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
     int32_t y_base = is_panel ? 38 : 14;
 
     if (mode == TESS_ENG_TURING) {
-        const tessera_turing_t *tur = &tessera.turing[tr];
+        const gen_turing_t *tur = tessera_turing(tr);
         uint32_t len = tur->len ? tur->len : 16u;
         int step_w = is_panel ? 10 : 11;
         int h = is_panel ? 14 : 18;
@@ -141,7 +141,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             }
         }
     } else if (mode == TESS_ENG_EUCLID) {
-        const tessera_euclid_t *euc = &tessera.euclid[tr];
+        const gen_euclid_t *euc = tessera_euclid(tr);
         uint32_t len = euc->steps ? euc->steps : 16u;
         uint32_t max_vis = len > 16 ? 32 : 16;
         int h = is_panel ? 14 : 18;
@@ -176,7 +176,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             }
         }
     } else if (mode == TESS_ENG_MARKOV) {
-        const tessera_markov_t *mk = &tessera.markov[tr];
+        const gen_markov_t *mk = tessera_markov(tr);
         int h = is_panel ? 14 : 18;
         int step_w = is_panel ? 16 : 18;
         int col = is_panel ? 25 : 27;
@@ -205,7 +205,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rect(sx, y_base + h + 2, step_w, is_cur && !rest ? 2 : 1, is_cur && !rest ? c : dim);
         }
     } else if (mode == TESS_ENG_MORPH) {
-        const tessera_morph_t *mo = &tessera.morph[tr];
+        const gen_morph_t *mo = tessera_morph(tr);
         int h = is_panel ? 14 : 18;
         int step_w = is_panel ? 10 : 11;
         int lane = (h - 2) / 2;

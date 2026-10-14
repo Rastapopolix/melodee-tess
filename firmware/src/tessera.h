@@ -99,5 +99,10 @@ const char *tessera_form_name(uint32_t form);
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
 void tessera_reset(void);                           /* every track OFF, defaults */
+/* the UI's view of a track's generators (read only; tr < TESSERA_TRACKS) */
+const gen_turing_t *tessera_turing(uint32_t tr);
+const gen_euclid_t *tessera_euclid(uint32_t tr);
+const gen_markov_t *tessera_markov(uint32_t tr);
+const gen_morph_t *tessera_morph(uint32_t tr);
 
 #endif

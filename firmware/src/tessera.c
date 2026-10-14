@@ -809,3 +809,9 @@ void tessera_reset(void)
     tessera_ensure_init();
     tessera_init();
 }
+
+/* ------------------------------------------------------------ the UI's view --- */
+const gen_turing_t *tessera_turing(uint32_t tr) { return &tessera.turing[tr % TESSERA_TRACKS]; }
+const gen_euclid_t *tessera_euclid(uint32_t tr) { return &tessera.euclid[tr % TESSERA_TRACKS]; }
+const gen_markov_t *tessera_markov(uint32_t tr) { return &tessera.markov[tr % TESSERA_TRACKS]; }
+const gen_morph_t *tessera_morph(uint32_t tr) { return &tessera.morph[tr % TESSERA_TRACKS]; }

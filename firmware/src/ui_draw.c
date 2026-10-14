@@ -804,7 +804,7 @@ static void draw_columns(void)
                 }
                 return;
             } else if (m == TESS_ENG_TURING) {
-                const tessera_turing_t *tur = &tessera.turing[tr];
+                const gen_turing_t *tur = tessera_turing(tr);
                 uint8_t tlen = tur->len ? tur->len : 16;
                 draw_column(0, "MODE", "TURING", "", VAL(0u), 1 * 1000 / 4, ICON_AUTO);
                 fmt_int(v1, tlen);
@@ -819,7 +819,7 @@ static void draw_columns(void)
                 fmt_int(v3, tur->oct_span);
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(tur->oct_span > 1 ? tur->oct_span - 1 : 0) * 1000 / 2, ICON_AUTO);
             } else if (m == TESS_ENG_EUCLID) {
-                const tessera_euclid_t *euc = &tessera.euclid[tr];
+                const gen_euclid_t *euc = tessera_euclid(tr);
                 uint32_t esteps = euc->steps ? euc->steps : 16;
                 draw_column(0, "MODE", "EUCLID", "", VAL(0u), 2 * 1000 / 4, ICON_AUTO);
                 fmt_int(v1, esteps);
@@ -829,7 +829,7 @@ static void draw_columns(void)
                 fmt_int(v3, euc->rot);
                 draw_column(3, "ROT", v3, "", VAL(3u), (int32_t)euc->rot * 1000 / 31, ICON_AUTO);
             } else if (m == TESS_ENG_MARKOV) {
-                const tessera_markov_t *mk = &tessera.markov[tr];
+                const gen_markov_t *mk = tessera_markov(tr);
                 uint32_t moct = mk->oct_span ? mk->oct_span : 1;
                 uint32_t dens = (mk->density >= 5 && mk->density <= 100) ? mk->density : 100;
                 draw_column(0, "MODE", "MARKOV", "", VAL(0u), 3 * 1000 / 4, ICON_AUTO);
@@ -840,7 +840,7 @@ static void draw_columns(void)
                 fmt_int(v3, moct);
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(moct - 1u) * 1000 / 2, ICON_AUTO);
             } else {
-                const tessera_morph_t *mo = &tessera.morph[tr];
+                const gen_morph_t *mo = tessera_morph(tr);
                 int32_t pa = (int32_t)(mo->step_idx >> 4) & 7;
                 int32_t pb = (int32_t)mo->oct_span & 7;
                 draw_column(0, "MODE", "MORPH", "", VAL(0u), 4 * 1000 / 4, ICON_AUTO);

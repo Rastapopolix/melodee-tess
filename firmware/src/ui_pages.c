@@ -744,10 +744,10 @@ static void pv_picture(void)
         uint32_t tr = trk_index(TSEL);
         if (tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF) {
             uint32_t m = tessera.mode[tr];
-            if (m == TESS_ENG_TURING) pp = tessera.turing[tr].step_idx;
-            else if (m == TESS_ENG_EUCLID) pp = tessera.euclid[tr].step_idx;
-            else if (m == TESS_ENG_MARKOV) pp = tessera.markov[tr].cur_state;
-            else if (m == TESS_ENG_MORPH) pp = tessera.morph[tr].step_idx;
+            if (m == TESS_ENG_TURING) pp = tessera_turing(tr)->step_idx;
+            else if (m == TESS_ENG_EUCLID) pp = tessera_euclid(tr)->step_idx;
+            else if (m == TESS_ENG_MARKOV) pp = tessera_markov(tr)->cur_state;
+            else if (m == TESS_ENG_MORPH) pp = tessera_morph(tr)->step_idx;
         } else {
             pp = (int32_t)(TSEL->seq_idx % (uint32_t)clamp(TSEL->p[P_SLEN], 1, NSTEP));
         }
