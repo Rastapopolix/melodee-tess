@@ -369,10 +369,15 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [x] Storage test: no two live flash objects share a sector (guards the free pair at upstream merges)
 - [x] Merge upstream v1.3.1 before phase 1 (decided 2026-10-14; `1b4c9e9`): both builds pass, the
       Tessera baseline is unchanged, FORM's labels shortened to CONTR / FLRSH for the new fonts
-- [ ] Check the merged build on the device: play, stop (no hanging notes), GLO mute, MIDI Start/Stop,
+- [x] Check the merged build on the device: play, stop (no hanging notes), GLO mute, MIDI Start/Stop,
       save and load, a project saved before the merge, autosave of generator edits. Host-checked
       2026-10-14: old projects load with every Tessera setting (`tests/upgrade_check.sh`), MIDI clock
-      Start/Stop/Continue, GLO mute and stop leave no note held (Tessera baseline)
+      Start/Stop/Continue, GLO mute and stop leave no note held (Tessera baseline). Passed on the device
+      2026-10-15 (the `follow-step` firmware, standard profile); USB MIDI out of the keys reaches Ableton
+      (sequenced notes are not sent yet: External MIDI task)
+- [ ] `MELODEE_RAM_AUDIO=1` (upstream's resident audio profile) no longer links: "audio working arena below
+      worst-case budget", the Tessera generators leave too little SRAM. Standard profile until then; revisit
+      when phase 4 frees RAM
 - [x] Autosave lost generator-only edits (their state is not in the project record): fixed `38e9950`
 - [x] Backups include the generators: objects 28 (saved slots) and 29 (live); the site's editor and installer
       must be rebuilt with the merged firmware (`web/fm1backup.js` knows 30 objects)
@@ -382,7 +387,8 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
 - [x] Perform test and regress HEALTH: one bug, `tessera_kill` cleared the note list before releasing
       it, so stopping left step-sequencer notes hanging. Fixed in `279f08c` (branch `overnight-analysis`)
 - [ ] CZ-1 knob test fails the same way on upstream v1.1.0 (GCC 15 / Linux): two identical renders
-      differ from sample 11; report upstream or skip (QUESTIONS.md 5)
+      differ from sample 11; report upstream or skip (QUESTIONS.md 5). Reported as keremimo/melodee#47;
+      our reply (2026-10-15) gives the audio suite with the fix: 335 golden renders, 0 changed. Waiting upstream
 - [ ] `tests/run_tests.sh` passes end to end
 - [x] Delete the backup files in `firmware/src` and `tools/` once nothing in them is needed (checked:
       `docs/analysis/housekeeping.md`): deleted 2026-10-14, the older save format kept in `docs/analysis/attic/`
