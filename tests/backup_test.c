@@ -290,16 +290,41 @@ static int tessera_archive(void)
     bad += check("... and the saved slot's: loading it brings its generators back",
                  tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF);
     memcpy(bad_obj, obj, sizeof bad_obj);
-    bad_obj[4u + 4u + 1u * 45u] = TESS_ENG_COUNT;     /* slot 1's block: track 2's engine out of range */
+    bad_obj[4u + 4u + 1u * (TESSERA_PK_BYTES / TESSERA_TRACKS)] = TESS_ENG_COUNT;   /* slot 1's block: track 2's engine out of range */
     before = erases; tessera_pack(live);
     ok = put_all(28, bad_obj, sizeof bad_obj, st_crc32(bad_obj, sizeof bad_obj)) == 2 && erases == before;
     tessera_pack(now);
     bad += check("a damaged slot block is refused before any erase, the live state kept", ok && !memcmp(now, live, sizeof live));
-    memcpy(now, live, sizeof now); now[1u * 45u] = TESS_ENG_COUNT;
+    memcpy(now, live, sizeof now); now[1u * (TESSERA_PK_BYTES / TESSERA_TRACKS)] = TESS_ENG_COUNT;
     ok = put_all(29, now, sizeof now, st_crc32(now, sizeof now)) == 2;
     tessera_pack(now);
     bad += check("a damaged live state is refused, nothing changed", ok && !memcmp(now, live, sizeof live));
     bad += check("a wrong size is refused at the start", put_begin(28, 100, 0) == 1 && put_begin(29, 100, 0) == 1);
+    {   /* an archive of an older build: blocks of version 1 (before SEED; each track 2 bytes shorter, "TSR1") */
+        static uint8_t obj1[TESS_OBJ_BYTES_V1], live1[TESSERA_PK_BYTES_V1];
+        const uint32_t n2 = TESSERA_PK_BYTES / TESSERA_TRACKS, n1 = TESSERA_PK_BYTES_V1 / TESSERA_TRACKS, m1 = 0x31525354u;
+        uint32_t slot, tr;
+        memcpy(obj1, &m1, 4);
+        for (slot = 0; slot < 4u; slot++) {
+            memcpy(obj1 + 4u + slot * TESS_SLOT_BYTES_V1, obj + 4u + slot * TESS_SLOT_BYTES, 4);   /* the tag */
+            for (tr = 0; tr < TESSERA_TRACKS; tr++)
+                memcpy(obj1 + 4u + slot * TESS_SLOT_BYTES_V1 + 4u + tr * n1, obj + 4u + slot * TESS_SLOT_BYTES + 4u + tr * n2, n1);
+        }
+        for (tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(live1 + tr * n1, live + tr * n2, n1);
+        memset(nor + 0x9D000, 0xFF, 2u * ST_SECTOR);
+        tessera_reset();
+        ok = !put_all(28, obj1, sizeof obj1, st_crc32(obj1, sizeof obj1)) && !put_all(29, live1, sizeof live1, st_crc32(live1, sizeof live1));
+        ok &= tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF;
+        ok &= tessera.seed[0] >= 1 && tessera.seed[0] <= 9999 && tessera.seed[1] >= 1 && tessera.seed[1] <= 9999;
+        ok &= tessera.seed[2] == 0;                      /* (an OFF track: a fresh seed when a generator is first used) */
+        tessera_pack(now);
+        for (tr = 0; tr < TESSERA_TRACKS; tr++) ok &= !memcmp(now + tr * n2, live + tr * n2, n1);   /* every version 1 setting */
+        bad += check("an older archive (version 1: 28 \"TSR1\", 29 of 180 bytes) restores, each track given a seed", ok);
+        tessera_reset(); project_load(0);
+        ok = tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF;
+        ok &= !list(28, &len28, &crc28) && len28 == TESS_OBJ_BYTES;   /* stored as version 2 */
+        bad += check("... its saved slot loads with its generators, and the object is stored as version 2", ok);
+    }
     bad += check("an empty 29 (no live generators in the archive): all OFF",
                  !put_all(29, 0, 0, 0) && tessera.mode[0] == TESS_ENG_OFF && tessera.mode[1] == TESS_ENG_OFF);
     return bad;

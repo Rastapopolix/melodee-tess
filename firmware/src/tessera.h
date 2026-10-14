@@ -97,9 +97,12 @@ void tessera_tweak_knob(uint32_t k, int32_t s);
 void tessera_form_knob(uint32_t k, int32_t s);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 180u                       /* the saved state (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES 188u                       /* the saved state, version 2 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED): older projects and backups */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
+int tessera_unpack_v1(const uint8_t *in);           /* the same for a version 1 block */
+void tessera_v1_track(const uint8_t *in, uint8_t *out);   /* one track's record, version 1 -> 2 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* the UI's view of a track's generators (read only; tr < TESSERA_TRACKS) */
 const gen_turing_t *tessera_turing(uint32_t tr);

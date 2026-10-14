@@ -543,10 +543,27 @@ static void pack_run(char *res, size_t cap)
     tessera_pack(b);
     ok &= !memcmp(a, b, sizeof a);
     memcpy(c, a, sizeof c);
-    c[1u * 45u + 0u] = TESS_ENG_COUNT;               /* track 2's engine out of range */
+    c[1u * (TESSERA_PK_BYTES / TESSERA_TRACKS) + 0u] = TESS_ENG_COUNT;   /* track 2's engine out of range */
     ok &= tessera_unpack(c) == 0;
     tessera_pack(b);
     ok &= !memcmp(a, b, sizeof a);                   /* refused whole: nothing changed */
+    {   /* a version 1 block (before SEED: each track 2 bytes shorter) loads every setting, with a seed of its own */
+        static uint8_t v1[TESSERA_PK_BYTES_V1], v1b[TESSERA_PK_BYTES_V1];
+        const uint32_t n2 = TESSERA_PK_BYTES / TESSERA_TRACKS, n1 = TESSERA_PK_BYTES_V1 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v1 + tr * n1, a + tr * n2, n1);
+        tessera_reset();
+        ok &= tessera_unpack_v1(v1) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            memcpy(v1b + tr * n1, b + tr * n2, n1);
+            ok &= tessera.mode[tr] == TESS_ENG_OFF ? tessera.seed[tr] == 0 : tessera.seed[tr] >= 1 && tessera.seed[tr] <= 9999;
+        }
+        ok &= !memcmp(v1, v1b, sizeof v1);            /* every version 1 setting as it was */
+        tessera_reset();
+        ok &= tessera_unpack_v1(v1) == 1;
+        tessera_pack(c);
+        ok &= !memcmp(b, c, sizeof c);                /* the same block: the same seeds */
+    }
     snprintf(res, cap, "0x%08x %u", ha, ok);
 }
 

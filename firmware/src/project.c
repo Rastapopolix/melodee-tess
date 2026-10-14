@@ -486,19 +486,48 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
  * (no room in it). A slot's block is valid only while its tag equals the project record's hash (proj_saved_hash):
  * any other write to the slot (an archive, a failed or interrupted save) loads the project with Tessera OFF. */
 #if MELODEE_FLASH
-#define TESS_OBJ_MAGIC 0x31525354u                    /* "TSR1" */
+#define TESS_OBJ_MAGIC 0x32525354u                    /* "TSR2": blocks of version 2 (with SEED) */
 #define TESS_SLOT_BYTES (4u + TESSERA_PK_BYTES)
 #define TESS_OBJ_BYTES (4u + 4u * TESS_SLOT_BYTES)
+#define TESS_OBJ_MAGIC_V1 0x31525354u                 /* "TSR1": version 1, read and converted (tess_obj_v1) */
+#define TESS_SLOT_BYTES_V1 (4u + TESSERA_PK_BYTES_V1)
+#define TESS_OBJ_BYTES_V1 (4u + 4u * TESS_SLOT_BYTES_V1)
 _Static_assert(TESS_OBJ_BYTES <= ST_SECTOR - 256u - sizeof(st_hdr_t), "Tessera object: one sector");
 static uint8_t tess_blob[TESS_OBJ_BYTES] __attribute__((section(".pool")));
 
-/* the stored object -> tess_blob; 0 = none / damaged (tess_blob then empty, ready to fill) */
+/* tess_blob holding a version 1 object (TESS_OBJ_BYTES_V1 at its start) -> version 2 in place: each slot's tag
+ * kept, each track given its seed (tessera_v1_track). From the end down, so nothing is overwritten before it is
+ * read (every record moves up) */
+static void tess_obj_v1(void)
+{
+    uint32_t m = TESS_OBJ_MAGIC;
+    for (int slot = 3; slot >= 0; slot--) {
+        uint8_t *src = tess_blob + 4u + (uint32_t)slot * TESS_SLOT_BYTES_V1, *dst = tess_blob + 4u + (uint32_t)slot * TESS_SLOT_BYTES;
+        for (int tr = TESSERA_TRACKS - 1; tr >= 0; tr--) {
+            uint8_t rec[TESSERA_PK_BYTES / TESSERA_TRACKS];
+            tessera_v1_track(src + 4u + (uint32_t)tr * (TESSERA_PK_BYTES_V1 / TESSERA_TRACKS), rec);
+            memcpy(dst + 4u + (uint32_t)tr * sizeof rec, rec, sizeof rec);
+        }
+        {
+            uint32_t tg;                                  /* (slot 0: the same place) */
+            memcpy(&tg, src, 4);
+            memcpy(dst, &tg, 4);
+        }
+    }
+    memcpy(tess_blob, &m, 4);
+}
+
+/* the stored object -> tess_blob (version 1 converted); 0 = none / damaged (tess_blob then empty, ready to fill) */
 static int tess_obj_read(void)
 {
     uint32_t m = TESS_OBJ_MAGIC, got;
     int n = st_load(OBJ_TESSERA, tess_blob, sizeof tess_blob);
     memcpy(&got, tess_blob, 4);
     if (n == (int)sizeof tess_blob && got == m) return 1;
+    if (n == (int)TESS_OBJ_BYTES_V1 && got == TESS_OBJ_MAGIC_V1) {
+        tess_obj_v1();
+        return 1;
+    }
     memset(tess_blob, 0, sizeof tess_blob);
     memcpy(tess_blob, &m, 4);
     return 0;
@@ -569,16 +598,19 @@ static uint32_t tessera_store_restore(const uint8_t *raw, uint32_t len)
     uint8_t live[TESSERA_PK_BYTES];
     uint32_t m = TESS_OBJ_MAGIC, got, tag, slot, ok = 1;
     if (len) {
+        int v1 = len == TESS_OBJ_BYTES_V1;              /* (an older backup: converted below) */
+        uint32_t sb = v1 ? TESS_SLOT_BYTES_V1 : TESS_SLOT_BYTES;
         memcpy(&got, raw, 4);
-        if (len != TESS_OBJ_BYTES || got != m) return 2;
+        if (v1 ? got != TESS_OBJ_MAGIC_V1 : len != TESS_OBJ_BYTES || got != m) return 2;
         tessera_pack(live);
         for (slot = 0; slot < 4u && ok; slot++) {
-            memcpy(&tag, raw + 4u + slot * TESS_SLOT_BYTES, 4);
-            if (tag) ok = tessera_unpack(raw + 4u + slot * TESS_SLOT_BYTES + 4u) == 1;
+            memcpy(&tag, raw + 4u + slot * sb, 4);
+            if (tag) ok = (v1 ? tessera_unpack_v1 : tessera_unpack)(raw + 4u + slot * sb + 4u) == 1;
         }
         tessera_unpack(live);
         if (!ok) return 2;
-        memcpy(tess_blob, raw, TESS_OBJ_BYTES);
+        memcpy(tess_blob, raw, len);
+        if (v1) tess_obj_v1();
     } else {
         memset(tess_blob, 0, sizeof tess_blob);
         memcpy(tess_blob, &m, 4);

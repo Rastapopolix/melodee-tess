@@ -98,6 +98,40 @@ static void music(void)
 
 static uint8_t want[TESSERA_PK_BYTES], got[TESSERA_PK_BYTES];
 
+/* PATH.tess: the block as the saving build packed it (its own version and size), for the load side to compare with:
+ * the generators' defaults differ between builds (since SEED: a seed's register and pitches) */
+static int tess_side(const char *path, const uint8_t *b, uint32_t n)
+{
+    char p[512];
+    FILE *f;
+    snprintf(p, sizeof p, "%s.tess", path);
+    if (!(f = fopen(p, "wb")) || fwrite(b, 1, n, f) != n) return 1;
+    fclose(f);
+    return 0;
+}
+/* PATH.tess -> want, in this build's version (a version 1 block converted as the firmware converts it); 0 = read */
+static int tess_side_read(const char *path)
+{
+    char p[512];
+    uint8_t b[2u * TESSERA_PK_BYTES];
+    size_t n;
+    FILE *f;
+    snprintf(p, sizeof p, "%s.tess", path);
+    if (!(f = fopen(p, "rb"))) return 1;
+    n = fread(b, 1, sizeof b, f);
+    fclose(f);
+    if (n == TESSERA_PK_BYTES) { memcpy(want, b, n); return 0; }
+#ifdef TESSERA_PK_BYTES_V1
+    if (n == TESSERA_PK_BYTES_V1) {
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
+            tessera_v1_track(b + tr * (TESSERA_PK_BYTES_V1 / TESSERA_TRACKS), want + tr * (TESSERA_PK_BYTES / TESSERA_TRACKS));
+        printf("upgrade: the older build saved a version 1 block (%u bytes): compared as converted\n", (unsigned)n);
+        return 0;
+    }
+#endif
+    return 1;
+}
+
 static int save(const char *path)
 {
     FILE *f;
@@ -108,6 +142,7 @@ static int save(const char *path)
     if (project_save_as(0, "UPGRADE")) { printf("upgrade: the save failed\n"); return 1; }
     if (!(f = fopen(path, "wb")) || fwrite(nor, 1, sizeof nor, f) != sizeof nor) { printf("upgrade: cannot write %s\n", path); return 1; }
     fclose(f);
+    if (tess_side(path, want, TESSERA_PK_BYTES)) { printf("upgrade: cannot write %s.tess\n", path); return 1; }
     printf("upgrade: saved slot 1 (a generator on each track) to %s\n", path);
     return 0;
 }
@@ -116,13 +151,14 @@ static int load(const char *path)
 {
     FILE *f;
     uint32_t i, same = 1;
-    power_on();                                   /* what the older build saved: the same music, packed here */
+    power_on();                                   /* the same music packed here (from a file: PATH.tess replaces it) */
     music();
     tessera_pack(want);
     power_on();
     if (path) {
         if (!(f = fopen(path, "rb")) || fread(nor, 1, sizeof nor, f) != sizeof nor) { printf("upgrade: cannot read %s\n", path); return 1; }
         fclose(f);
+        if (tess_side_read(path)) { printf("upgrade: cannot read %s.tess\n", path); return 1; }
     }
     memset(proj_slot, 0, sizeof proj_slot);       /* the power-off: only the flash is left */
     persist_boot();

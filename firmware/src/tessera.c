@@ -770,8 +770,10 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
  * EVOLVE / FORM / TWEAK settings and the settings of the remembered sections (A, B, C). Not stored: the recorded
  * Markov / Morph phrases (a loaded project records them again on its first pass: RAM is the limit, see
  * project.c), the playheads and the counters. A block that fails any range check is refused whole. */
-#define TESS_PK_TRACK 45u
+#define TESS_PK_TRACK 47u                            /* version 2: version 1's 45 bytes, then SEED (2) */
+#define TESS_PK_TRACK_V1 45u
 _Static_assert(TESSERA_PK_BYTES == TESSERA_TRACKS * TESS_PK_TRACK, "TESSERA_PK_BYTES (tessera.h)");
+_Static_assert(TESSERA_PK_BYTES_V1 == TESSERA_TRACKS * TESS_PK_TRACK_V1, "TESSERA_PK_BYTES_V1 (tessera.h)");
 
 static uint8_t *tess_put16(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); return p + 2; }
 static uint32_t tess_get16(const uint8_t *p) { return (uint32_t)p[0] | ((uint32_t)p[1] << 8); }
@@ -798,6 +800,7 @@ uint32_t tessera_pack(uint8_t *o)
             const tessera_sec_t *sc = &tessera.sec[tr][s];
             o = tess_put16(o, sc->reg); *o++ = sc->p0; *o++ = sc->p1;
         }
+        o = tess_put16(o, tessera.seed[tr]);
     }
     return TESSERA_PK_BYTES;
 }
@@ -828,8 +831,9 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     int32_t  v_flour = (int8_t)*in++;
     uint32_t v_base = tess_get16(in); in += 2;
     uint32_t v_visited = *in++;
+    uint32_t v_seed = tess_get16(rec + TESS_PK_TRACK_V1);
 
-    if (mode >= TESS_ENG_COUNT) return 0;
+    if (mode >= TESS_ENG_COUNT || v_seed > TESS_SEED_MAX) return 0;
     if (t_len < 2u || t_len > 16u || t_prob > 100u || t_oct > 3u) return 0;
     if (e_steps < 1u || e_steps > 32u || e_pulses > e_steps || e_rot >= e_steps) return 0;
     if (k_tens > 100u || k_dens > 100u || k_oct > 3u) return 0;
@@ -862,9 +866,18 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
         tessera_sec_t *sc = &tessera.sec[tr][s];
         sc->reg = (uint16_t)tess_get16(in); in += 2; sc->p0 = *in++; sc->p1 = *in++;
     }
-    tessera.seed[tr] = mode ? tess_seed_of(rec, TESS_PK_TRACK) : 0u;   /* (an OFF track: a fresh one when first used) */
+    tessera.seed[tr] = (uint16_t)tess_get16(in);
     tessera.rnd[tr] = gen_stream(tessera.seed[tr]);       /* the stream from the top; the material is the block's */
     return 1;
+}
+
+/* A version 1 track record (45 bytes, before SEED) -> version 2 (47): its seed from its own bytes, so the same
+ * project always gets the same one; an OFF track 0 (a fresh one when a generator is first used). out may not
+ * overlap in */
+void tessera_v1_track(const uint8_t *in, uint8_t *out)
+{
+    memcpy(out, in, TESS_PK_TRACK_V1);
+    tess_put16(out + TESS_PK_TRACK_V1, in[0] ? tess_seed_of(in, TESS_PK_TRACK_V1) : 0u);
 }
 
 /* 1 = loaded; 0 = refused, `tessera` untouched */
@@ -877,6 +890,15 @@ int tessera_unpack(const uint8_t *in)
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         tess_pk_track(in + tr * TESS_PK_TRACK, tr, 1);
     return 1;
+}
+/* a version 1 block (TESSERA_PK_BYTES_V1: an older project's, an older backup's): as tessera_unpack, each track
+ * given its seed by tessera_v1_track */
+int tessera_unpack_v1(const uint8_t *in)
+{
+    uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
+    for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
+        tessera_v1_track(in + tr * TESS_PK_TRACK_V1, b + tr * TESS_PK_TRACK);
+    return tessera_unpack(b);
 }
 
 /* every track back to OFF and its settings to their defaults (a project load starts from this) */
