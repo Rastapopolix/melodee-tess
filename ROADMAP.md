@@ -555,5 +555,7 @@ at the next intended baseline change.
   across tracks) under LFO, beside each track's 4 MOD routes; PIECE and ABOUT under GLO; help is the
   function key held while turning a knob (the knobs cannot sense touch). Upstream 1.3.6 made EDIT
   held undo and SAVE held save; ARP held is still free.
+  Mock screens for review (2026-10-16): `docs/design/phase2/` (GEN family, help, CORDS, NORMALS,
+  PIECE, ABOUT; `make_mocks.py` draws them), branch `phase2-mocks`.
 - How the modifier convention fits Melodee's existing layers (FX, GLO, SCL, EDIT, SEQ held):
   keep them as they are, or fold them into the function key.
