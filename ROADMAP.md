@@ -377,10 +377,9 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
       option removed, stock V15 power startup, startup checks of foreign settings and projects, MIDI
       channel ranges, EDIT held undoes. Whole release merged, nothing left out: picking parts would
       diverge more. Both builds pass, the Tessera baseline, gen_test and upgrade check are unchanged
-- [ ] Check the 1.3.6 merge on the device. Risky (boot, flash layout, install): the first install of a
-      build with the boot stub is not yet protected, so keep USB connected and do not switch off.
-      Then: power-on and the start sound, EDIT held undo, SAVE held save, MIDI in, a project saved
-      by 1.1.8
+- [x] Check the 1.3.6 merge on the device (build 1.1.9): installed, power-on and the start sound, EDIT
+      held undo, SAVE held save, MIDI in, a project saved by 1.1.8. Passed 2026-10-16 (Theo: "All tests
+      check out"); merged into `tessera-dev`
       2026-10-14: old projects load with every Tessera setting (`tests/upgrade_check.sh`), MIDI clock
       Start/Stop/Continue, GLO mute and stop leave no note held (Tessera baseline). Passed on the device
       2026-10-15 (the `follow-step` firmware, standard profile); USB MIDI out of the keys reaches Ableton
@@ -437,24 +436,22 @@ Plan: `docs/analysis/phase1-plan.md`.
       (it reached 0: silent bars), Turing's active bits never all 0 or all 1 (silence, or a note every step,
       for good when locked), and Markov's TENSION (LEAP) turns back at 0 and 100 instead of sitting there. The
       same draws: only a phrase at a bound plays otherwise (baseline: midi_clock_start_stop_continue). Morph's
-      rhythm A and the drift itself (Gravity, phase 6) still open. Branch `mutation-bounds` (on `roll-range`);
-      device check pending (build 1.1.7), then merge
+      rhythm A and the drift itself (Gravity, phase 6) still open. Passed on the device in build 1.1.9
+      (2026-10-16); merged into `tessera-dev`
 - [x] A start for testing the generators (Theo 2026-10-15, "a matter of convenience for testing"): at power-on and
       NEW, track 1 CZ-1 VIBRAPHONE (was PROPHET FUNK BASS II), 85 BPM, the melodic parts in minor pentatonic.
       `TRK_START_TESS` (engines.c); the host tests keep Melodee's start (hostsim.c sets it 0), and format 1
-      projects their power-on sounds (TRK_DEF_V1). Revisit before a public release. On `mutation-bounds`
+      projects their power-on sounds (TRK_DEF_V1). Revisit before a public release. Passed on the device (1.1.9), merged
 - [x] ROLL stops at 1 and 128 instead of wrapping (Theo 2026-10-15); a seed over 128 from 1.1.3-1.1.5 goes to
-      128. On `mutation-bounds`, for the build after 1.1.7
+      128. Passed on the device (1.1.9), merged
 - [x] ROLL's range 1..128, with the knobs' acceleration (Theo 2026-10-15: 9999 too many to turn through): a quick
       half turn across it. Seeds saved by 1.1.3-1.1.5 (up to 9999) load and play as they were; ROLL from one lands
-      in 1..128 (turning back does not return to it). Baseline rewritten (every fresh seed another). Branch
-      `roll-range` (on `markov-density`); device check pending (build 1.1.6, test installer
-      /test/1.1.6/webapp/installer/ on the site, also covering DENSITY 70), then merge both
+      in 1..128 (turning back does not return to it). Baseline rewritten (every fresh seed another). Passed on
+      the device (1.1.9), merged
 - [x] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
       done with SEED, to keep that change to one thing): 70 (2026-10-15), for a fresh track only; saved projects
       keep theirs. Baseline rewritten (the Markov scenarios' notes, every state and the saved block's hash).
-      Branch `markov-density`; device check pending (build 1.1.6, with `roll-range`; 1.1.5's
-      page replaced by 1.1.6's), then merge
+      Passed on the device (1.1.9), merged
 
 ### 2. Signal bus and parameter IDs
 - [ ] Central parameter IDs and ranges
