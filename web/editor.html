@@ -1989,10 +1989,10 @@ function makeMockDevice(opt = {}) {
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
-    { name: "DRUM", titles: ["KIT", "HIT"], edit: [D("KIT", F.ENUM, 4, 5, 4, ["808","909"]), D("TUNE", F.PCT, 0, 127, 64),
+    { name: "DRUM", titles: ["KIT", "HIT"], edit: [D("KIT", F.ENUM, 4, 6, 4, ["808","909","SID"]), D("TUNE", F.PCT, 0, 127, 64),
         D("TONE", F.PCT, 0, 127, 64), D("DECY", F.PCT, 0, 127, 64), D("SNAP", F.PCT, 0, 127, 64), D("ACC", F.PCT, 0, 127, 100),
         E("KICK", ["PUNCH", "ROUND"], 0), D("DRV", F.PCT, 0, 127, 0)],
-      presets: [P("808 KIT", [4, 64, 64, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0),P("909 KIT", [5, 64, 64, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0)] },
+      presets: [P("808 KIT", [4, 64, 64, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0),P("909 KIT", [5, 64, 64, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0),P("SID KIT", [6, 64, 80, 64, 64, 100, 1, 0], [0, 100, 127, 100], 0)] },
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},   /* 11: retired NOISE; stored ID reserved */
     { name: "FM6", titles: ["OPS", "PATCH"], edit: [D("ALG", F.INT, 0, 32, 0), D("FB", F.INT, -7, 7, 0), D("MLVL", F.BIPCT, -64, 63, 0),
         D("MRAT", F.INT, -16, 16, 0), D("MEG", F.BIPCT, -64, 63, 0), D("VMOD", F.INT, -7, 7, 0), D("DTUN", F.PCT, 0, 127, 0),
