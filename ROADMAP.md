@@ -275,7 +275,7 @@ HOME, SAVE, ARP, SEQ, PLAY, REC, OCT-, OCT+).
 | Gesture | What it does |
 | --- | --- |
 | Keys alone | Play notes; on STEP, write the cursor step (live at the play head while recording) |
-| FX held + keys | White keys hold performance effects, black keys 1–4 mute tracks 1–4; KNOB 1–4 macros |
+| FX held + keys | Nothing now: upstream removed this layer (performance effects, mutes on black keys 1–4, KNOB macros) |
 | GLO held + keys | Black keys 1–4 latch mutes, F3–B3 solo while held, C4 unmute all, F4 tap tempo; KNOB 1–4 levels |
 | SCL held + keys | The key pressed sets the root; KNOB 1–4 root, scale, chord, voicing |
 | EDIT held + keys | White keys jump to sound sections, black keys to FM6 operators, Init, Favourite, Undo, Store |
@@ -286,9 +286,8 @@ HOME, SAVE, ARP, SEQ, PLAY, REC, OCT-, OCT+).
 | Button pairs | REC + PLAY: record now. SAVE + REC: quick save. GLO + PLAY: restart. SAVE + OCT-/+: undo/redo. OCT- + OCT+: octave reset; held 5 s: update mode; at power-on: panel calibration |
 | Grid pages (drums) | White keys toggle the lane's steps; black keys select lanes and pages |
 
-Free today: **ARP held** (no gesture at all), **ENV held off STEP**, and keys with **ARP, ENV or
-LFO held** (they still play notes). The FX layer's four unassigned white keys are free too, but
-upstream has since removed the performance effects. Melodee's quick layers are the model to keep:
+Free today: **ARP held** (no gesture at all), **FX held** (its layer removed upstream), **ENV held
+off STEP**, and keys with **ARP, ENV or LFO held** (they still play notes). Melodee's quick layers are the model to keep:
 hold a button, keys and knobs become its shortcuts, the map shows over the page, letting go
 restores.
 
@@ -451,7 +450,8 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] Fixed destination table; about 16 cords (source, destination, amount, offset) at control
       rate, extending `mod.c`
 - [ ] Generators and a first set of mod sources (LFO, envelope, S&H) on the bus
-- [ ] UI page map drafted before the phase ends; review it with the rendered UI PNGs
+- [ ] UI page map drafted before the phase ends; review it with the rendered UI PNGs (first draft in
+      words 2026-10-16, linked under Open questions; mock renders after Theo's four decisions)
 - [ ] Help text field in the central parameter table, filled for every parameter
 - [ ] Generate the online parameter reference from the table
 - [ ] Choose the function key and draft the key map alongside the page map
@@ -539,6 +539,9 @@ at the next intended baseline change.
 - Exact voice and FX budget numbers.
 - Gravity and Energy curves.
 - Which physical button is the function key. The FM-1 has none labelled FN. Candidates: ARP (its
-  hold is unused) or FX (its effects layer would then move into performance mode).
+  hold never used upstream) or FX (its hold free since upstream removed its layer). Draft 2026-10-16
+  recommends ARP, pending a reach check on the device: "Tessera: function key and page map (draft)",
+  https://claude.ai/artifact/3zcUFMPB6EhtJ93qxgtjLf (also proposes a GEN family under ARP's tap, CORDS
+  under LFO, and help as the function key held while turning a knob: the knobs cannot sense touch).
 - How the modifier convention fits Melodee's existing layers (FX, GLO, SCL, EDIT, SEQ held):
   keep them as they are, or fold them into the function key.
