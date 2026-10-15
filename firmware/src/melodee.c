@@ -91,6 +91,7 @@
 #include "song_chain.c"
 #include "seq.c"
 #include "tessera.c"
+#include "pid.c"                 /* the central parameter ids (pid.h) */
 #include "audio.c"
 
 /* -------------------------------------------------------------- UI --- */

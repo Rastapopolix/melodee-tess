@@ -316,6 +316,8 @@ if core && [ $TABLES = 1 ]; then
         -O2 $FW -- "$OUT/tessera_test" tests/tessera_baseline.txt build/tessera_log
     t "GEN: each generator on its own (gen.c alone): ranges, rests, draws per step, determinism, mutation, sections" \
         gen_test -O2 $FW
+    t "PARAMETER IDS: every setting numbered, ranges, get/set, frozen against tests/pid_ids.txt" pid_test \
+        -O1 $FW -- "$OUT/pid_test" tests/pid_ids.txt
     t "double-tap layers, SCREEN OFF, LFO 2 SYNC / TRIG / POL" layer_screen_test \
         -O1 -DMELODEE_USB_AUDIO=1 $FW
     t "DRUM EDITOR: synthesized 909, sound controls, individual pitch/length, undo and storage" drum_editor_test -O2 $FW
