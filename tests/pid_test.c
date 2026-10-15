@@ -31,6 +31,65 @@ static void line_of(const pid_entry_t *e, char *out, size_t cap)
              e->flags & PID_F_DEVICE ? " device" : "", d ? d->min : 0, d ? d->max : 0, d ? d->def : 0);
 }
 
+/* the reference (docs/PARAMETERS.md): one table per scope, from the ids, names, ranges and help */
+static void range_text(const param_desc_t *d, char *out, size_t cap)
+{
+    size_t used = 0;
+    int32_t v;
+    if (d->fmt == F_ENUM && d->names) {
+        for (v = d->min; v <= d->max && used + 2 < cap; v++)
+            if (d->names[v][0])
+                used += (size_t)snprintf(out + used, cap - used, "%s%s", used ? ", " : "", d->names[v]);
+        return;
+    }
+    snprintf(out, cap, "%d to %d%s%s", d->min, d->max, d->unit ? " " : d->fmt == F_PCT && d->max == 100 ? " %" :
+             d->fmt == F_SEMI ? " semitones" : "", d->unit ? d->unit : "");
+}
+static int reference(FILE *f)
+{
+    static const char *const PART[3] = {"Track settings (one value per track)", "Global settings", "Tessera (one value per track)"};
+    uint32_t part, i;
+    char r[512], df[64];
+    fprintf(f, "# Parameters\n\nEvery setting of melodee-tess with its number, generated from `firmware/src/pid.c` by "
+               "`tests/pid_test.c` (`PID_UPDATE=1 sh tests/run_tests.sh` rewrites it; the suite fails when it is out of "
+               "date). The numbers are fixed: cords and saved projects keep them.\n\nThe engine's eight (ENGINE 1 to 8) "
+               "are named by the track's engine; their ranges here are the first track's default engine's.\n");
+    for (part = 0; part < 3u; part++) {
+        fprintf(f, "\n## %s\n\n| ID | Name | Range | Default | What it does |\n| --- | --- | --- | --- | --- |\n", PART[part]);
+        for (i = 0; i < pid_count(); i++) {
+            const pid_entry_t *e = pid_at(i);
+            const param_desc_t *d = pid_desc(e->pid, 0);
+            uint32_t p = e->pid >= PID_TESS(0) ? 2u : e->pid >= PID_GLOBAL(0) ? 1u : 0u;
+            if (p != part) continue;
+            range_text(d, r, sizeof r);
+            if (d->fmt == F_ENUM && d->names) snprintf(df, sizeof df, "%s", d->names[d->def]);
+            else snprintf(df, sizeof df, "%d", d->def);
+            fprintf(f, "| 0x%03X | %s | %s | %s | %s%s%s |\n", e->pid, e->name, e->flags & PID_F_ACTION ? "(a button)" : r,
+                    e->flags & PID_F_ACTION ? "" : df, e->help, e->flags & PID_F_DEVICE ? " (The device's, not the project's.)" : "",
+                    "");
+        }
+    }
+    {                                                   /* the cords' (firmware/src/cord.c) */
+        static const char *const KIND[] = {"each voice", "the audio block", "the LFO's depth", "the generator's step"};
+        static const char *const SRC_HELP[CS_N] = {"", "the track's LFO", "the envelope of the track's latest note",
+            "the latest note's velocity", "the latest note's pitch (C4 = 0)", "a new random value at each note",
+            "MIDI mod wheel (CC1)", "MIDI channel aftertouch", "MIDI expression (CC11)",
+            "a random value held for each cycle of the track's LFO", "S&H, gliding from one value to the next",
+            "1 while the track's generator plays a note", "the generator's last note (C4 = 0)"};
+        fprintf(f, "\n## Cords\n\nA cord moves a destination on any track by a source on any track: by its AMOUNT "
+                   "(-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. "
+                   "Room for %u, %u in use.\n\n| Source | |\n| --- | --- |\n", CORD_MAX, CORD_LIVE);
+        for (i = 1; i < CS_N; i++)
+            fprintf(f, "| %s | %s |\n", cord_src_name(i), SRC_HELP[i]);
+        fprintf(f, "\n| Destination | Moved at | What it moves |\n| --- | --- | --- |\n");
+        for (i = 1; i < CD_N; i++) {
+            const cord_dest_t *d = cord_dest(i);
+            if (d) fprintf(f, "| %s | %s | %s |\n", d->name, KIND[d->kind], d->full);
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     const char *golden = argc > 1 ? argv[1] : "tests/pid_ids.txt";
@@ -159,6 +218,27 @@ int main(int argc, char **argv)
             snprintf(what, sizeof what, "the %u ids as tests/pid_ids.txt froze them", lines);
             check(what, !diffs);
         }
+    }
+    {                                                   /* the reference, as the list: rewritten, or checked */
+        const char *ref = argc > 2 ? argv[2] : "docs/PARAMETERS.md";
+        char tmp[600];
+        FILE *f, *g;
+        int same = 0;
+        snprintf(tmp, sizeof tmp, "%s.new", ref);
+        if ((f = fopen(update ? ref : tmp, "w"))) {
+            reference(f);
+            fclose(f);
+        }
+        if (update) printf("pid: wrote %s\n", ref);
+        else if ((f = fopen(ref, "r")) && (g = fopen(tmp, "r"))) {
+            int a, b;
+            do { a = fgetc(f); b = fgetc(g); } while (a == b && a != EOF);
+            same = a == b;
+            fclose(f); fclose(g);
+            remove(tmp);
+            check("docs/PARAMETERS.md up to date (PID_UPDATE=1 rewrites it)", same);
+        } else
+            check("docs/PARAMETERS.md opens", 0);
     }
     printf("pid: %u ids\n", n);
     if (bad) printf("pid: %d FAILED\n", bad);
