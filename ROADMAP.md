@@ -51,7 +51,7 @@ These are repeated in short form in CLAUDE.md.
 - **Project format of our own.** Drop the `OBJ_TESSERA` side object.
 - **Generator interface:** `gen_tick(state, input_phrase, clock)`; the input phrase may be empty.
 - **Signal bus.** Every source outputs a gate stream and a CV value. A fixed destination table.
-  N cords (about 16), each with source, destination, amount and offset. Extend Melodee's existing
+  N cords (room for 32, 16 in use at first), each with source, destination, amount and offset. Extend Melodee's existing
   mod matrix (`mod.c`) rather than writing a parallel one.
 - **Normalled default patch** that sounds good with no patching; cords override the normals.
 - **Tracks:** 4 audio tracks, plus 2–4 sequencer-only tracks (MIDI out / modulation only).
@@ -455,8 +455,11 @@ Plan: `docs/analysis/phase1-plan.md`.
 
 ### 2. Signal bus and parameter IDs
 - [ ] Central parameter IDs and ranges
-- [ ] Fixed destination table; about 16 cords (source, destination, amount, offset) at control
-      rate, extending `mod.c`
+- [ ] Fixed destination table; cords (source, destination, amount, offset) at control rate,
+      extending `mod.c`. Decided 2026-10-16 (Theo): room for 32 cords (the fixed maximum: the save
+      format and the worst-case cost are sized for it), 16 in use at first; raising the number in use
+      later changes a number, not the format. Estimate, to measure: about 6 B a cord, 1-2 % of the CPU
+      at 64 cords reaching every voice, so the screen (4 cords a page) sets the limit, not the CPU
 - [ ] Generators and a first set of mod sources (LFO, envelope, S&H) on the bus
 - [x] UI page map drafted before the phase ends; review it with the rendered UI PNGs (draft and
       decisions 2026-10-16, linked under Open questions; mocks in `docs/design/phase2/`, "look good")
@@ -555,7 +558,7 @@ at the next intended baseline change.
 - ~~Which physical button is the function key.~~ Decided 2026-10-16, all as the draft recommends
   ("Tessera: function key and page map", https://claude.ai/artifact/3zcUFMPB6EhtJ93qxgtjLf):
   ARP held is the function key (a reach check on the device still to do); a GEN family under ARP's
-  tap holds the generator pages, EVOLVE, FORM, TWEAK and ARP, taken out of SEQ; CORDS (about 16,
+  tap holds the generator pages, EVOLVE, FORM, TWEAK and ARP, taken out of SEQ; CORDS (room for 32, 16 in use,
   across tracks) under LFO, beside each track's 4 MOD routes; PIECE and ABOUT under GLO; help is the
   function key held while turning a knob (the knobs cannot sense touch). Upstream 1.3.6 made EDIT
   held undo and SAVE held save; ARP held is still free.
