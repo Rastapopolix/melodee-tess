@@ -418,7 +418,8 @@ Plan: `docs/analysis/phase1-plan.md`.
       pitches, Markov's first state; PLAY restarts the stream; a fresh track a random seed (all generators,
       superseding the Turing-only start). Saved: block version 2 ("TSR2", 47 bytes a track), version 1 projects
       and backups converted on reading. Branch `track-seed` (on `turing-random-start`); device check pending
-      (build 1.1.3), then merge both
+      (build 1.1.3), then merge both. Knob 4 is labelled ROLL, the seed in small grey under it (Theo 2026-10-15:
+      the number is only a marker, to find a line again; no coarse steps or acceleration, which would skip lines)
 - [ ] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
       done with SEED, to keep that change to one thing)
 

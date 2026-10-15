@@ -47,8 +47,8 @@ On the **PATTERN** page, the **MODE** knob switches a track between the original
   * `LOCK`: Deja vu control determining how much of the phrase repeats.
   * `EVERY`: Mutates the phrase every (`OFF`, `1`, `2`, `4`, `8`, or `16` bars).
   * `AMOUNT`: Degree of change per mutation.
-  * `SEED`: The track's random seed (1–9999). Each step of the knob is a new line; turning back brings the
-    last one again, note for note. A seed sets the track's random choices and its starting material (Turing's
+  * `ROLL`: Each step of the knob is a new line; turning back brings the last one again, note for note. The
+    small number is the track's seed (1–9999), a marker to find a line again. A seed sets the track's random choices and its starting material (Turing's
     register, Euclid's pitches, Markov's first state); PLAY starts its random choices from the top, so with
     EVERY off a seed always plays the same line. A new track gets a random seed when a generator is first
     selected or played, so each power-on starts somewhere new; a saved project keeps its seeds.
