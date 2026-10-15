@@ -429,6 +429,8 @@ Plan: `docs/analysis/phase1-plan.md`.
       same draws: only a phrase at a bound plays otherwise (baseline: midi_clock_start_stop_continue). Morph's
       rhythm A and the drift itself (Gravity, phase 6) still open. Branch `mutation-bounds` (on `roll-range`);
       device check pending (build 1.1.7), then merge
+- [x] ROLL stops at 1 and 128 instead of wrapping (Theo 2026-10-15); a seed over 128 from 1.1.3-1.1.5 goes to
+      128. On `mutation-bounds`, for the build after 1.1.7
 - [x] ROLL's range 1..128, with the knobs' acceleration (Theo 2026-10-15: 9999 too many to turn through): a quick
       half turn across it. Seeds saved by 1.1.3-1.1.5 (up to 9999) load and play as they were; ROLL from one lands
       in 1..128 (turning back does not return to it). Baseline rewritten (every fresh seed another). Branch
