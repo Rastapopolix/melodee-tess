@@ -2,7 +2,8 @@
 /* SID (src/eng_sid.c) against the chip as reSID documents it: the noise register, waveforms, ring modulation, hard
  * sync, the R-2R DACs of both revisions, the envelope generator cycle for cycle (rates, the exponential counter,
  * sustain, the zero freeze, the ADSR delay), the 16-bit frequency register, the cutoff curves and resonance laws,
- * the filter's sum, the 6581's DC thump through the C64's output stage, band-limited edges, and the 32 presets. */
+ * the filter's sum, the 6581's DC thump through the C64's output stage, band-limited edges, MODEL C64 (one voice,
+ * the registers written at PAL frames), and the 32 presets. */
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
@@ -368,6 +369,53 @@ int main(void)
         for (uint32_t i = 0; i < 300u * FS / 1000u / CTL; i++)
             track_render(T, out, CTL);
         check("REL 0: the voice sounds out its release and its output stage, then ends", still && !T->v[0].active);
+    }
+    /* MODEL C64 6581 / 8580: one voice, the registers written at the player's frames */
+    {
+        static int32_t a[FS], b[FS];
+        uint32_t k, n, live[2], same = 1, steps[2], lo[2], hi[2];
+        for (k = 0; k < 2u; k++) {                     /* nothing modulated: the same chip, sample for sample */
+            fresh(0); T->p[P_E0] = (int16_t)k; n = play(a, 400, 60, 250);
+            fresh(0); T->p[P_E0] = (int16_t)(2u + k); play(b, 400, 60, 250);
+            same &= !memcmp(a, b, n * sizeof a[0]);
+        }
+        check("C64 6581 / C64 8580, nothing modulated: the 6581 / 8580 sample for sample", same);
+        for (k = 0; k < 2u; k++) {
+            fresh(0); T->p[P_E0] = (int16_t)(k ? 2 : 0);
+            trk_note_on(T, 60, 100); trk_note_on(T, 64, 100); trk_note_on(T, 67, 100);
+            track_render(T, out, CTL);
+            live[k] = 0;
+            for (uint32_t i = 0; i < NVOICE; i++)
+                live[k] += T->v[i].active && T->v[i].gate;
+        }
+        check("C64: one voice per track (a chord's last note has it); 6581: up to four", live[0] == 3u && live[1] == 1u);
+        for (k = 0; k < 2u; k++) {                     /* a 4-octave glide: when voice 1's frequency changes */
+            uint32_t i, last = 0, prev, inc;
+            voice_t *g = 0;
+            fresh(0); T->p[P_E0] = (int16_t)(k ? 2 : 0); T->p[P_VOICE] = V_MONO;
+            T->p[P_GLIDE] = 127; T->p[P_GLMODE] = 1;
+            trk_note_on(T, 36, 100); track_render(T, out, CTL);
+            trk_note_on(T, 84, 100);
+            for (i = 0; i < NVOICE; i++)
+                if (T->v[i].active && T->v[i].gate) g = &T->v[i];
+            prev = g ? sid_voice(T, g)->inc_cache[0] : 0;
+            steps[k] = 0; lo[k] = ~0u; hi[k] = 0;
+            for (i = 1; g && i <= FS / 2u / CTL; i++) {
+                track_render(T, out, CTL);
+                if ((inc = sid_voice(T, g)->inc_cache[0]) == prev)
+                    continue;
+                if (steps[k]++) {
+                    lo[k] = i - last < lo[k] ? i - last : lo[k];
+                    hi[k] = i - last > hi[k] ? i - last : hi[k];
+                }
+                last = i; prev = inc;
+            }
+        }
+        printf("SID:   glide over 0.5 s: 6581 %u frequency writes (every %u..%u blocks), C64 %u (every %u..%u)\n",
+               steps[0], lo[0], hi[0], steps[1], lo[1], hi[1]);
+        check("6581: the glide rewrites the frequency every block (0.73 ms)", steps[0] > 600u && hi[0] == 1u);
+        check("C64: only at PAL frames (19656 cycles = 27.5 blocks): 50 writes a second", steps[1] >= 24u &&
+              steps[1] <= 26u && lo[1] == 27u && hi[1] == 28u);
     }
     /* every preset: deterministic, sounding, bounded, and over after its release */
     {

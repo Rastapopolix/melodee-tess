@@ -30,20 +30,28 @@
  * 1's triangle ring-modulated by a silent voice; on the chip voice 3); there SHP modulation sweeps voice 2's
  * interval (the synced voice, the ring modulator) instead of the pulse width.
  *
+ * MODEL C64 6581 / C64 8580: the track is one channel of a C64 tune. One voice (a new note takes it over), and
+ * the registers a player routine writes once a PAL frame (19656 cycles, 50.12 Hz) change only then: frequency
+ * (glide, bend, vibrato step), pulse width, cutoff and resonance. A note writes them with its gate and starts
+ * the frames, so it keeps the sequencer's timing. The chip in between is the same.
+ *
  * Engine ID 3 was LOFI: its projects keep the ID and load as SID. */
 
-static const char *const N_SID_MODEL[] = {"6581", "8580"};
+static const char *const N_SID_MODEL[] = {"6581", "8580", "C64 6581", "C64 8580"};
 static const char *const N_SID_WAVE[] = {"TRI", "SAW", "PULSE", "NOISE", "TRI+SAW", "TRI+PLS", "SAW+PLS", "T+S+P"};
 static const char *const N_SID_STACK[] = {"ONE", "DETUNE", "OCT", "FIFTH", "MAJOR", "SYNC", "RING", "SUB"};
 static const char *const N_SID_MODE[] = {"LP", "BP", "HP", "NOTCH", "LP+BP", "BP+HP", "ALL", "OFF"};
 
-enum { SID_6581, SID_8580 };
+enum { SID_6581, SID_8580 };                 /* MODEL: the revision (bit 0); 2, 3: the same on a C64 (sid_c64) */
 enum { SID_TRI, SID_SAW, SID_PULSE, SID_NOISE, SID_TRI_SAW, SID_TRI_PULSE, SID_SAW_PULSE, SID_TRI_SAW_PULSE };
 enum { SID_ONE, SID_DETUNE, SID_OCT, SID_FIFTH, SID_MAJOR, SID_SYNC, SID_RING, SID_SUB };
 enum { SID_LP, SID_BP, SID_HP, SID_NOTCH, SID_LP_BP, SID_BP_HP, SID_ALL, SID_OFF };
 enum { SID_ATTACK, SID_DECAY_SUSTAIN, SID_RELEASE };
 
 #define SID_POLY 4
+#define SID_FRAME_Q16 (19656u << 16)          /* a PAL frame, 312 lines of 63 cycles (50.12 Hz), Q16 */
+static uint32_t sid_model(const int16_t *p) { return (uint32_t)p[P_E0] & 1u; }
+static int sid_c64(const int16_t *p) { return p[P_E0] >= 2; }   /* a C64: one voice, registers at its frames */
 /* cycles per envelope step of each 4-bit rate (reSID: the rate counter's comparison values) */
 static const uint16_t SID_RATE[16] = {9, 32, 63, 95, 149, 220, 267, 313, 392, 977, 1954, 3126, 3907, 11720, 19532, 31251};
 static const uint8_t SID_MODE_BITS[8] = {1, 2, 4, 5, 3, 6, 7, 0};   /* MODE -> $D418 bits 4..6: LP 1, BP 2, HP 4 */
@@ -73,6 +81,9 @@ typedef struct {
     uint32_t inc_cache[3], rcp_cache[3], rsh_cache[3], tune_key, stack_key, edge_key;
     tsvf_t filter_cache;int32_t fc_key, kd_key;uint8_t freq_valid, filter_valid;
     uint8_t quiet;                           /* the filter and output stage have settled (the voice may end) */
+    uint8_t latch;                           /* C64: write the registers this block (a frame began, a note) */
+    int32_t frame;                           /* C64: cycles to the player's next frame (Q16) */
+    uint32_t pt_held;                        /* the pulse width register as last written (<< 20) */
 } sid_voice_t;
 typedef struct {
     sid_voice_t v[SID_POLY];
@@ -260,6 +271,8 @@ static void sid_note_on(track_t *t, voice_t *v)
     s->hold_zero = 0;
     s->rate_counter = 0;
     s->quiet = 0;
+    s->latch = 1;                                      /* C64: the note's registers go in with the gate, its */
+    s->frame = (int32_t)SID_FRAME_Q16;                 /* frames count from it (the note keeps its timing) */
 }
 
 /* once per control tick before the render (engine_t.done): this tick's cycles of the envelope, then the gate
@@ -272,6 +285,12 @@ static int sid_done(track_t *t, voice_t *v)
     s->env_prev = s->env;
     s->cycle_frac = (uint16_t)c;
     sid_env_clock(s, t->p, c >> 16);
+    if (!sid_c64(t->p))
+        s->frame = 0;                                  /* (a switch to C64 writes the registers at once) */
+    else if ((s->frame -= (int32_t)SID_CYC_Q16) <= 0) {   /* C64: a frame began in this tick: the player */
+        s->frame += (int32_t)SID_FRAME_Q16;            /* writes frequency, pulse width, cutoff, resonance */
+        s->latch = 1;
+    }
     if (!v->gate && s->state != SID_RELEASE)
         s->state = SID_RELEASE;
     return s->state == SID_RELEASE && !s->env && !s->env_prev && s->quiet;
@@ -288,7 +307,7 @@ static int32_t sid_env_q15(track_t *t, voice_t *v)
 static void sid_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m,const int16_t *p)
 {
     sid_voice_t *s = sid_voice(t, v);
-    uint32_t model = p[P_E0] == SID_8580, wave = (uint32_t)p[P_E1] & 7u, stack = (uint32_t)p[P_E2] & 7u;
+    uint32_t model = sid_model(p), wave = (uint32_t)p[P_E1] & 7u, stack = (uint32_t)p[P_E2] & 7u;
     const sid_stack_t *st = &SID_STACKS[stack];
     const int16_t (*dac)[64] = SID_WDAC[model];
     const uint16_t *gt = SID_FC_G[model];
@@ -312,8 +331,11 @@ static void sid_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const 
             hl[nh++] = k;                              /* the voices mixed */
     }
     uint32_t edge=blep||sync;
-    if(!s->freq_valid || s->pitch_key!=m->pitch16 || s->fine_key!=m->fine || s->shape_key!=shp ||
-       s->tune_key!=tuning_a4 || s->stack_key!=stack || s->edge_key!=edge){
+    /* C64: between the player's frames the registers hold what it wrote (a new STACK or edge set-up: at once) */
+    uint32_t hold=sid_c64(p) && !s->latch && s->freq_valid && s->filter_valid && s->stack_key==stack && s->edge_key==edge;
+    s->latch=0;
+    if(!hold && (!s->freq_valid || s->pitch_key!=m->pitch16 || s->fine_key!=m->fine || s->shape_key!=shp ||
+       s->tune_key!=tuning_a4 || s->stack_key!=stack || s->edge_key!=edge)){
     for (k = 0; k < nosc; k++) {
         int32_t c = st->cents[k] + (k == 1u && (sync || ring) ? (shp * 75) >> 10 : 0);   /* SHP: +-24 st */
         uint32_t fn = (uint32_t)(((uint64_t)cents_inc(m->pitch16, c, m->fine) * SID_FREQ_R32 + 0x80000000u) >> 32);
@@ -328,13 +350,17 @@ static void sid_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const 
     s->pitch_key=m->pitch16;s->fine_key=m->fine;s->shape_key=shp;s->tune_key=tuning_a4;
     s->stack_key=stack;s->edge_key=edge;s->freq_valid=1;
     }else for(k=0;k<nosc;k++){inc[k]=s->inc_cache[k];rcp[k]=s->rcp_cache[k];rsh[k]=s->rsh_cache[k];}
-    pt = (uint32_t)clamp(p[P_E3] * 32 + (sync || ring ? 0 : shp / 32), 0, 4095) << 20;
-    fcr = clamp(p[P_E4] * 16 + (p[P_E4] >> 3) + (m->cutoff >> 4), 0, 2047);
-    g = gt[fcr >> 4] + (((gt[(fcr >> 4) + 1] - gt[fcr >> 4]) * (fcr & 15)) >> 4);
-    kd = SID_RES_K[model][clamp(p[P_E5], 0, 15)];
-    if(!s->filter_valid || s->fc_key!=g || s->kd_key!=kd){
-        tsvf_coef_gk(&s->filter_cache,g,kd);s->fc_key=g;s->kd_key=kd;s->filter_valid=1;
+    if (!hold) {
+        s->pt_held = (uint32_t)clamp(p[P_E3] * 32 + (sync || ring ? 0 : shp / 32), 0, 4095) << 20;
+        fcr = clamp(p[P_E4] * 16 + (p[P_E4] >> 3) + (m->cutoff >> 4), 0, 2047);
+        g = gt[fcr >> 4] + (((gt[(fcr >> 4) + 1] - gt[fcr >> 4]) * (fcr & 15)) >> 4);
+        kd = SID_RES_K[model][clamp(p[P_E5], 0, 15)];
+        if(!s->filter_valid || s->fc_key!=g || s->kd_key!=kd){
+            tsvf_coef_gk(&s->filter_cache,g,kd);s->fc_key=g;s->kd_key=kd;s->filter_valid=1;
+        }
     }
+    pt = s->pt_held;
+    kd = s->kd_key;
     fc=s->filter_cache;
     sl = bits & 1u ? 1 : 0;                            /* the chip's sum: LP and HP against BP */
     sb = bits & 2u ? -1 : 0;
@@ -409,7 +435,9 @@ static void sid_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const 
 static void sid_render(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m)
 { sid_render_into(t,v,out,n,m,t->p); }
 static void sid_block(track_t *t)
-{ (void)sid_table(t,t->p[P_E0]==SID_8580,SID_WAVE_BITS[t->p[P_E1]&7u]); }
+{ (void)sid_table(t,sid_model(t->p),SID_WAVE_BITS[t->p[P_E1]&7u]); }
+/* a C64 has one voice for the track's notes (POLY: a new note takes it) */
+static uint32_t sid_cap(const track_t *t) { return sid_c64(t->p) ? 1u : SID_POLY; }
 
 /* name, MODEL WAVE STACK PW CUT RES MODE DRIVE, ATK DEC SUS REL (the track's: SID_ADSR_RATE), ENV -> FILTER,
  * mono, sends */
@@ -456,7 +484,7 @@ static const engine_t ENG_SID = {
     .name = "SID",
     .page_title = {"CHIP", "FILTER"},
     .edit = {
-        {"MODEL", F_ENUM, 0, 1, 0, N_SID_MODEL, 0},
+        {"MODEL", F_ENUM, 0, 3, 0, N_SID_MODEL, 0},
         {"WAVE", F_ENUM, 0, 7, 1, N_SID_WAVE, 0},
         {"STACK", F_ENUM, 0, 7, 0, N_SID_STACK, 0},
         {"PW", F_PCT, 0, 127, 64, 0, 0},
@@ -471,6 +499,7 @@ static const engine_t ENG_SID = {
     .render = sid_render, .block = sid_block,
     .knob = {P_E1, P_E3, P_E4, P_E5},
     .poly = SID_POLY,
-    .ownenv = 1,                 /* the chip's envelope generator: it ends the voice (sid_done) */
+    .cap = sid_cap,
+    .ownenv = 1,                /* the chip's envelope generator: it ends the voice (sid_done) */
     .done = sid_done,
 };

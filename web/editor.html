@@ -1963,7 +1963,7 @@ function makeMockDevice(opt = {}) {
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},   /* 0: retired ANALOG; stored ID reserved */
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},   /* 1: retired DIGITAL; stored ID reserved (the editor converts its sounds: FM4 above) */
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},   /* 2: retired PHASE; stored ID reserved */
-    { name: "SID", titles: ["CHIP", "FILTER"], edit: [E("MODEL", ["6581", "8580"], 0), E("WAVE", ["TRI", "SAW", "PULSE", "NOISE", "TRI+SAW", "TRI+PLS", "SAW+PLS", "T+S+P"], 1),
+    { name: "SID", titles: ["CHIP", "FILTER"], edit: [E("MODEL", ["6581", "8580", "C64 6581", "C64 8580"], 0), E("WAVE", ["TRI", "SAW", "PULSE", "NOISE", "TRI+SAW", "TRI+PLS", "SAW+PLS", "T+S+P"], 1),
         E("STACK", ["ONE", "DETUNE", "OCT", "FIFTH", "MAJOR", "SYNC", "RING", "SUB"], 0), D("PW", F.PCT, 0, 127, 64), D("CUT", F.PCT, 0, 127, 127),
         D("RES", F.INT, 0, 15, 0), E("MODE", ["LP", "BP", "HP", "NOTCH", "LP+BP", "BP+HP", "ALL", "OFF"], 0), D("DRIVE", F.PCT, 0, 127, 0)],
       presets: [
