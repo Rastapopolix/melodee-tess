@@ -109,6 +109,21 @@ static void turing_tests(void)
         }
         check("turing: mutation changes only the register (AMOUNT 0: nothing)", ok);
     }
+    {   /* from all active bits 0 or all 1, and over a long run: never all alike after a mutation */
+        int ok = 1;
+        for (uint32_t len = 2; len <= 16; len++) {
+            uint16_t m = len >= 16u ? 0xFFFFu : (uint16_t)((1u << len) - 1u);
+            for (uint32_t amt = 10; amt <= 100; amt += 10)
+                for (uint32_t start = 0; start < 2u; start++) {
+                    gen_turing_t g = {start ? m : 0u, (uint8_t)len, 0, 0, 0, 2};
+                    for (uint32_t n = 0; n < 200; n++) {
+                        gen_turing_mutate(&g, amt, &rng_state);
+                        ok &= (g.reg & m) != 0u && (g.reg & m) != m;
+                    }
+                }
+        }
+        check("turing: after a mutation the active bits are never all 0 (silence) nor all 1 (LEN 2..16)", ok);
+    }
 }
 
 /* ------------------------------------------------------------------ Euclid --- */

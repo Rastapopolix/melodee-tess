@@ -190,12 +190,16 @@ static uint8_t gen_new_seed(uint8_t old, uint32_t *rnd)
     return n;
 }
 
-/* Turing: AMOUNT% of the register's active bits flip, at least one */
+/* Turing: AMOUNT% of the register's active bits flip, at least one. Never all its active bits alike: all 0 is
+ * silence, all 1 one note on every step, and locked (PROB 0) it would stay so; one more flips then */
 static void gen_turing_mutate(gen_turing_t *g, uint32_t amt, uint32_t *rnd)
 {
     uint32_t len = g->len ? g->len : 16u;
     uint32_t n = (amt * len + 99u) / 100u;
+    uint16_t m = len >= 16u ? 0xFFFFu : (uint16_t)((1u << len) - 1u);
     while (n--) g->reg ^= (uint16_t)(1u << gen_rnd(rnd, len));
+    if (amt && ((g->reg & m) == 0u || (g->reg & m) == m))
+        g->reg ^= (uint16_t)(1u << gen_rnd(rnd, len));
 }
 
 /* Euclid: the rotation nudged by one, less often a pulse more or fewer, and the pitches re-rolled */
