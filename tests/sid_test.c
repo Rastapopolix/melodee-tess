@@ -3,7 +3,7 @@
  * sync, the R-2R DACs of both revisions, the envelope generator cycle for cycle (rates, the exponential counter,
  * sustain, the zero freeze, the ADSR delay), the 16-bit frequency register, the cutoff curves and resonance laws,
  * the filter's sum, the 6581's DC thump through the C64's output stage, band-limited edges, MODEL C64 (one voice,
- * the registers written at PAL frames), and the 32 presets. */
+ * the registers written at PAL frames, a held chord arpeggiated a note a frame), and the 32 presets. */
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
@@ -129,6 +129,16 @@ static uint32_t play(int32_t *buf, uint32_t ms, uint32_t note, uint32_t release_
         track_render(T, buf + i, CTL);
     }
     return n;
+}
+/* a C64 chord's next note: the next held note up from cur, past the top the lowest */
+static uint32_t chord_up(const uint8_t *c, uint32_t n, uint32_t cur)
+{
+    uint32_t i, up = 128u, low = 128u;
+    for (i = 0; i < n; i++) {
+        low = c[i] < low ? c[i] : low;
+        up = c[i] > cur && c[i] < up ? c[i] : up;
+    }
+    return up < 128u ? up : low;
 }
 static void fresh(uint32_t preset)
 {
@@ -416,6 +426,98 @@ int main(void)
         check("6581: the glide rewrites the frequency every block (0.73 ms)", steps[0] > 600u && hi[0] == 1u);
         check("C64: only at PAL frames (19656 cycles = 27.5 blocks): 50 writes a second", steps[1] >= 24u &&
               steps[1] <= 26u && lo[1] == 27u && hi[1] == 28u);
+    }
+    /* MODEL C64 in POLY: the keys held are a chord on the one voice, a note a frame, one gate and envelope */
+    {
+        uint8_t ch[4] = {60, 64, 67, 72};
+        voice_t *g = &T->v[0];
+        sid_voice_t *s;
+        uint32_t i, k, cur, inc, notes = 0, incs = 0, order = 1, sync = 1, lo = ~0u, hi = 0, last = 0, attacks = 0;
+        uint32_t state, first, added, gated, seen = 0, in = 1, held[3], released, tail = 0, tail_ok = 1;
+        fresh(0); T->p[P_E0] = 2; T->p[P_REL] = 80;
+        T->p[P_SUS] = 100;                               /* (below 0xFF: a gate there wraps to 0 and freezes) */
+        trk_note_on(T, 60, 100); trk_note_on(T, 64, 100); trk_note_on(T, 67, 100);
+        track_render(T, out, CTL);
+        s = sid_voice(T, g);
+        gated = 0;
+        for (i = 0; i < NVOICE; i++)
+            gated += T->v[i].active && T->v[i].gate;
+        first = g->note == 67 && gated == 1u;
+        cur = g->note; inc = s->inc_cache[0]; state = s->state;
+        for (i = 1; i <= FS / CTL; i++) {                /* 1 s */
+            track_render(T, out, CTL);
+            attacks += s->state == SID_ATTACK && state != SID_ATTACK;
+            state = s->state;
+            sync &= (g->note != cur) == (s->inc_cache[0] != inc);   /* the frequency moves with the note alone */
+            inc = s->inc_cache[0];
+            if (g->note == cur)
+                continue;
+            order &= g->note == chord_up(ch, 3, cur);
+            if (notes++) {
+                lo = i - last < lo ? i - last : lo;
+                hi = i - last > hi ? i - last : hi;
+            }
+            last = i; cur = g->note; incs++;
+        }
+        printf("SID:   C64 chord 60 64 67 over 1 s: %u notes (every %u..%u blocks), %u attacks after the first\n",
+               notes, lo, hi, attacks);
+        check("C64 POLY chord: one voice, the last key first", first);
+        check("C64 POLY chord: the next held note up at each PAL frame (27..28 blocks), past the top the lowest",
+              order && notes >= 49u && notes <= 51u && lo == 27u && hi == 28u);
+        check("C64 POLY chord: only the frequency changes, one gate and attack for the chord",
+              sync && incs == notes && !attacks && g->gate);
+        trk_note_on(T, 72, 100);                         /* a key into the sounding chord: heard at once */
+        added = g->note == 72 && s->state == SID_ATTACK && s->frame == (int32_t)SID_FRAME_Q16;
+        cur = 72;
+        for (i = 0; i < 5u * 28u; i++) {
+            track_render(T, out, CTL);
+            if (g->note != cur) {
+                order &= g->note == chord_up(ch, 4, cur);
+                cur = g->note; seen++;
+            }
+            added &= s->env != 0 || i < 2u;
+        }
+        check("C64 POLY chord: a new key sounds first (its gate restarts the attack), then joins the arpeggio",
+              added && order && seen >= 4u);
+        /* key up on the sounding note: the chord goes on over the others; the gate ends with the last key */
+        k = g->note;
+        trk_note_off(T, k);
+        for (i = 0, k = 0; i < 4u; i++)
+            if (ch[i] != cur)
+                held[k++] = ch[i];
+        released = g->gate;
+        for (i = 0, seen = 0; i < 2u * 28u; i++) {
+            track_render(T, out, CTL);
+            in &= g->note == cur || g->note == held[0] || g->note == held[1] || g->note == held[2];
+            seen += g->note != cur;
+            cur = g->note;
+        }
+        trk_note_off(T, held[0]); trk_note_off(T, held[1]);
+        released &= g->gate;
+        trk_note_off(T, held[2]);
+        released &= !g->gate && T->v[0].stage == 3;
+        track_render(T, out, CTL);
+        released &= s->state == SID_RELEASE;
+        for (i = 0; i < FS / 4u / CTL && g->active; i++) {   /* the release: the arpeggio over the chord last held */
+            track_render(T, out, CTL);
+            if (g->note != cur) {
+                tail_ok &= g->note == held[0] || g->note == held[1] || g->note == held[2];
+                cur = g->note; tail++;
+            }
+        }
+        check("C64 POLY chord: a key up keeps the gate while any is held, the voice moves to the others",
+              in && seen >= 2u && released);
+        check("C64 POLY chord: the arpeggio goes on in the release", tail >= 5u && tail_ok);
+        /* MONO: one note by PRIO; the 6581: a voice per note, neither arpeggiates */
+        for (k = 0, seen = 0; k < 2u; k++) {
+            fresh(0); T->p[P_E0] = (int16_t)(k ? 0 : 2); T->p[P_VOICE] = (int16_t)(k ? V_POLY : V_MONO);
+            trk_note_on(T, 60, 100); trk_note_on(T, 64, 100); trk_note_on(T, 67, 100);
+            for (i = 0; i < FS / 2u / CTL; i++) {
+                track_render(T, out, CTL);
+                seen += T->v[0].note != (k ? 60u : 67u) || (k && (T->v[1].note != 64u || T->v[2].note != 67u));
+            }
+        }
+        check("C64 MONO: the last key alone; 6581 POLY: a voice per note, no arpeggio", !seen);
     }
     /* every preset: deterministic, sounding, bounded, and over after its release */
     {

@@ -33,7 +33,11 @@
  * MODEL C64 6581 / C64 8580: the track is one channel of a C64 tune. One voice (a new note takes it over), and
  * the registers a player routine writes once a PAL frame (19656 cycles, 50.12 Hz) change only then: frequency
  * (glide, bend, vibrato step), pulse width, cutoff and resonance. A note writes them with its gate and starts
- * the frames, so it keeps the sequencer's timing. The chip in between is the same.
+ * the frames, so it keeps the sequencer's timing. The chip in between is the same. In POLY the keys held are a
+ * chord on that voice, played as a player's arpeggio plays one: each frame the next held note up from the one
+ * sounding (past the top, the lowest), its frequency alone; the gate and the envelope run once for the chord (it
+ * ends with its last key), the arpeggio goes on in the release over the chord last held. A new note is heard at
+ * once (its gate restarts the attack, as before). MONO / LEGATO: one note, by PRIO.
  *
  * Engine ID 3 was LOFI: its projects keep the ID and load as SID. */
 
@@ -88,12 +92,41 @@ typedef struct {
 typedef struct {
     sid_voice_t v[SID_POLY];
     uint32_t wave_key;                       /* the combined waveform unpacked in wave[] (0: none yet) */
+    uint8_t chord[NVOICE], nchord;           /* C64 POLY: the keys held at the last note or frame of the gate */
     uint8_t wave[4096];                      /* its top 8 output bits by accumulator >> 12 (sid_table) */
 } sid_part_t;
 static sid_part_t *sid_part(uint32_t part);   /* engines.c: shared runtime pool */
 static sid_voice_t *sid_voice(track_t *t, voice_t *v)
 {
     return &sid_part((uint32_t)(t - trk) % NPART)->v[(uint32_t)(v - t->v) % SID_POLY];
+}
+
+/* C64 in POLY: the chord on the one voice (voice.c keeps its keys in the mono stack), a note a frame */
+static void voice_scale_pitch(const track_t *t, voice_t *v, uint32_t note);   /* voice.c */
+static int sid_chord(const track_t *t) { return sid_c64(t->p) && t->p[P_VOICE] == V_POLY; }
+static void sid_chord_take(track_t *t)
+{
+    sid_part_t *sp = sid_part((uint32_t)(t - trk) % NPART);
+    memcpy(sp->chord, t->mono_stack, t->nmono);
+    sp->nchord = t->nmono;
+}
+/* the next held note up from the one sounding (past the top: the lowest); a jump, a glide under it goes on */
+static void sid_arp(track_t *t, voice_t *v)
+{
+    const sid_part_t *sp = sid_part((uint32_t)(t - trk) % NPART);
+    uint32_t i, n, up = 128u, low = 128u;
+    int32_t was = v->pitch16;
+    for (i = 0; i < sp->nchord; i++) {
+        n = sp->chord[i];
+        low = n < low ? n : low;
+        up = n > v->note && n < up ? n : up;
+    }
+    n = up < 128u ? up : low;
+    if (n >= 128u || n == v->note)
+        return;
+    v->note = (uint8_t)n;
+    voice_scale_pitch(t, v, n);
+    v->pitch_cur += v->pitch16 - was;
 }
 
 static uint32_t sid_noise_clock(uint32_t sr)
@@ -273,6 +306,8 @@ static void sid_note_on(track_t *t, voice_t *v)
     s->quiet = 0;
     s->latch = 1;                                      /* C64: the note's registers go in with the gate, its */
     s->frame = (int32_t)SID_FRAME_Q16;                 /* frames count from it (the note keeps its timing) */
+    if (sid_chord(t))
+        sid_chord_take(t);                             /* (the chord with this note in it) */
 }
 
 /* once per control tick before the render (engine_t.done): this tick's cycles of the envelope, then the gate
@@ -290,6 +325,11 @@ static int sid_done(track_t *t, voice_t *v)
     else if ((s->frame -= (int32_t)SID_CYC_Q16) <= 0) {   /* C64: a frame began in this tick: the player */
         s->frame += (int32_t)SID_FRAME_Q16;            /* writes frequency, pulse width, cutoff, resonance */
         s->latch = 1;
+        if (v == t->v && sid_chord(t)) {               /* POLY: the chord's next note (in the release too) */
+            if (v->gate)
+                sid_chord_take(t);
+            sid_arp(t, v);
+        }
     }
     if (!v->gate && s->state != SID_RELEASE)
         s->state = SID_RELEASE;
@@ -436,7 +476,7 @@ static void sid_render(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_
 { sid_render_into(t,v,out,n,m,t->p); }
 static void sid_block(track_t *t)
 { (void)sid_table(t,sid_model(t->p),SID_WAVE_BITS[t->p[P_E1]&7u]); }
-/* a C64 has one voice for the track's notes (POLY: a new note takes it) */
+/* a C64 has one voice for the track's notes (POLY: a new note takes it, the keys still held arpeggiate with it) */
 static uint32_t sid_cap(const track_t *t) { return sid_c64(t->p) ? 1u : SID_POLY; }
 
 /* name, MODEL WAVE STACK PW CUT RES MODE DRIVE, ATK DEC SUS REL (the track's: SID_ADSR_RATE), ENV -> FILTER,
