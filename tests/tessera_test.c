@@ -643,6 +643,19 @@ static void pack_run(char *res, size_t cap)
     ok &= tessera_unpack(c) == 0;
     tessera_pack(b);
     ok &= !memcmp(a, b, sizeof a);                   /* refused whole: nothing changed */
+    {   /* a seed of 1.1.3 to 1.1.5 (up to 9999) loads as it was, ROLL from it lands in 1..128; over 9999 refused */
+        const uint32_t at = 0u * (TESSERA_PK_BYTES / TESSERA_TRACKS) + TESSERA_PK_BYTES / TESSERA_TRACKS - 2u;
+        memcpy(c, a, sizeof c);
+        c[at] = 9999u & 0xFFu, c[at + 1u] = 9999u >> 8;
+        ok &= tessera_unpack(c) == 1 && tessera.seed[0] == 9999u;
+        sel(0);
+        song.playing = 0;
+        tessera_seed_turn(0, 1);
+        ok &= tessera.seed[0] >= 1u && tessera.seed[0] <= TESS_SEED_MAX;
+        c[at] = 10000u & 0xFFu, c[at + 1u] = 10000u >> 8;
+        ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+    }
     {   /* a version 1 block (before SEED: each track 2 bytes shorter) loads every setting, with a seed of its own */
         static uint8_t v1[TESSERA_PK_BYTES_V1], v1b[TESSERA_PK_BYTES_V1];
         const uint32_t n2 = TESSERA_PK_BYTES / TESSERA_TRACKS, n1 = TESSERA_PK_BYTES_V1 / TESSERA_TRACKS;
@@ -652,7 +665,7 @@ static void pack_run(char *res, size_t cap)
         tessera_pack(b);
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
             memcpy(v1b + tr * n1, b + tr * n2, n1);
-            ok &= tessera.mode[tr] == TESS_ENG_OFF ? tessera.seed[tr] == 0 : tessera.seed[tr] >= 1 && tessera.seed[tr] <= 9999;
+            ok &= tessera.mode[tr] == TESS_ENG_OFF ? tessera.seed[tr] == 0 : tessera.seed[tr] >= 1 && tessera.seed[tr] <= TESS_SEED_MAX;
         }
         ok &= !memcmp(v1, v1b, sizeof v1);            /* every version 1 setting as it was */
         tessera_reset();

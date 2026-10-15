@@ -789,8 +789,8 @@ static void edit_param(uint32_t slot, int32_t steps)
         0)) {
         ui_message("STOP TO EDIT"); return;
     }
-    if (pg->graph == GR_EVOLVE) {
-        tessera_evolve_knob(slot, steps);
+    if (pg->graph == GR_EVOLVE) {                   /* (ROLL: 128 seeds, a quick turn across them) */
+        tessera_evolve_knob(slot, slot == 3u ? accel(EN_K1 + slot, steps, 128) : steps);
         ui.force = 1;
         return;
     }

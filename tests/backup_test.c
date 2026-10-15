@@ -315,7 +315,7 @@ static int tessera_archive(void)
         tessera_reset();
         ok = !put_all(28, obj1, sizeof obj1, st_crc32(obj1, sizeof obj1)) && !put_all(29, live1, sizeof live1, st_crc32(live1, sizeof live1));
         ok &= tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF;
-        ok &= tessera.seed[0] >= 1 && tessera.seed[0] <= 9999 && tessera.seed[1] >= 1 && tessera.seed[1] <= 9999;
+        ok &= tessera.seed[0] >= 1 && tessera.seed[0] <= TESS_SEED_MAX && tessera.seed[1] >= 1 && tessera.seed[1] <= TESS_SEED_MAX;
         ok &= tessera.seed[2] == 0;                      /* (an OFF track: a fresh seed when a generator is first used) */
         tessera_pack(now);
         for (tr = 0; tr < TESSERA_TRACKS; tr++) ok &= !memcmp(now + tr * n2, live + tr * n2, n1);   /* every version 1 setting */

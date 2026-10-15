@@ -20,9 +20,12 @@ tessera_state_t tessera;
 #define TESS_ENTROPY() (fm1_ticks() ^ fm1_ms * 2654435761u)
 #endif
 
-/* SEED (EVOLVE page): 1..TESS_SEED_MAX per track, 0 = not picked yet (the defaults). A seed decides the track's random
- * stream and its generators' starting material: Turing's register, Euclid's pitch pattern, Markov's first state */
-#define TESS_SEED_MAX 9999u
+/* SEED (EVOLVE page, ROLL): 1..TESS_SEED_MAX per track, 0 = not picked yet (the defaults). A seed decides the track's
+ * random stream and its generators' starting material: Turing's register, Euclid's pitch pattern, Markov's first state.
+ * A knob's range, a quick turn across it (ui_input.c accel). Builds 1.1.3 to 1.1.5 picked up to TESS_SEED_LOAD_MAX: a
+ * project saved by them keeps its seed and its line, and ROLL from it lands in 1..TESS_SEED_MAX */
+#define TESS_SEED_MAX 128u
+#define TESS_SEED_LOAD_MAX 9999u
 static void tess_seed_apply(uint32_t tr)
 {
     uint32_t sd = tessera.seed[tr];
@@ -861,7 +864,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     uint32_t v_visited = *in++;
     uint32_t v_seed = tess_get16(rec + TESS_PK_TRACK_V1);
 
-    if (mode >= TESS_ENG_COUNT || v_seed > TESS_SEED_MAX) return 0;
+    if (mode >= TESS_ENG_COUNT || v_seed > TESS_SEED_LOAD_MAX) return 0;
     if (t_len < 2u || t_len > 16u || t_prob > 100u || t_oct > 3u) return 0;
     if (e_steps < 1u || e_steps > 32u || e_pulses > e_steps || e_rot >= e_steps) return 0;
     if (k_tens > 100u || k_dens > 100u || k_oct > 3u) return 0;
