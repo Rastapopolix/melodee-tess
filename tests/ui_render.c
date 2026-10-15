@@ -1094,7 +1094,7 @@ static void setup(int s)
             tessera_evolve_knob(1, 1);
             tessera_evolve_knob(1, 1);              /* EVERY 2 bars */
         }
-        go_title(s == S_GEN_EVOLVE ? "EVOLVE" : "PATTERN");
+        go_title(s == S_GEN_EVOLVE ? "EVOLVE" : "GEN");    /* (GEN: ARP's tap) */
         break;
     case S_FX_BUS1: case S_FX_BUS2: case S_FX_BUS3:
         go_title(s==S_FX_BUS1?"SEND FX 1":s==S_FX_BUS2?"SEND FX 2":"SEND FX 3");

@@ -32,7 +32,7 @@ The sound engines, effects, and core infrastructure are unchanged. The build out
 
 ## Engines & Workflow
 
-On the **PATTERN** page, the **MODE** knob switches a track between the original step sequencer (`STEP`) inherited from upstream Melodee and one of four new generative engines:
+Tap **ARP** for the **GEN** pages: GEN, EVOLVE, FORM, TWEAK, then the arpeggiator's ARP and ARP 2. On the **GEN** page (and on SEQ's **PATTERN**, which shows the same), the **MODE** knob switches a track between the original step sequencer (`STEP`) inherited from upstream Melodee and one of four new generative engines:
 
 * **Turing**: A looping shift register in the style of a Turing Machine (`LEN`, `PROB`, `SPAN`).
 * **Euclid**: Euclidean rhythms (`STEPS`, `PULSE`, `ROT`) using track-saved seed pitches.

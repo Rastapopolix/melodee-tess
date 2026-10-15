@@ -441,6 +441,40 @@ static int test_no_phrases(void)
     return bad;
 }
 
+static void go_title(const char *title);
+/* GEN (Tessera, ARP's tap): the generator page, EVOLVE, FORM, TWEAK, then the arpeggiator; SEQ keeps the step pages */
+static int test_gen_family(void)
+{
+    static const char *const WANT[] = {"GEN", "EVOLVE", "FORM", "TWEAK", "ARP", "ARP 2", "GEN"};
+    char got[96] = "";
+    int bad = 0, in_seq = 0, pattern_seq = 0;
+    uint32_t k, n = 0, used = 0;
+    ui_power_on();
+    for (k = 0; k < sizeof WANT / sizeof WANT[0]; k++) {
+        press(B_ARP);
+        if (!ui.home && str_eq(cur_page()->title, WANT[k]))
+            n++;
+        used += (uint32_t)snprintf(got + used, sizeof got - used, "%s%s", k ? " " : "", ui.home ? "HOME" : cur_page()->title);
+        if (used >= sizeof got) used = sizeof got - 1u;
+    }
+    bad += check("ARP's taps: GEN EVOLVE FORM TWEAK ARP ARP 2, then GEN again", n == k);
+    if (n != k) printf("    got: %s\n", got);
+    for (k = 0; k < NPAGES; k++)
+        if (PAGES[k].fam == FAM_SEQ && (PAGES[k].graph == GR_EVOLVE || PAGES[k].graph == GR_FORM || PAGES[k].graph == GR_TWEAK))
+            in_seq++;
+        else if (PAGES[k].fam == FAM_SEQ && str_eq(PAGES[k].title, "PATTERN"))
+            pattern_seq = 1;
+    bad += check("SEQ no longer holds EVOLVE, FORM or TWEAK; PATTERN stays there", !in_seq && pattern_seq);
+    ui_power_on();
+    go_title("GEN");
+    k = tessera.mode[song.sel];
+    turn(EN_K1, 1);
+    bad += check("GEN: KNOB 1 is MODE, as on PATTERN (one step on from STEP)", k == TESS_ENG_OFF && tessera.mode[song.sel] != k);
+    go_title("EVOLVE");
+    bad += check("GEN's pages are not step pages: the keys play, they write no step", !song.seq_mode);
+    return bad;
+}
+
 static int test_rec(void)
 {
     static const uint8_t FAMS[3] = {FAM_TRK, FAM_SEQ, FAM_ARP};
@@ -4542,6 +4576,7 @@ int main(void)
     bad += test_sound_loads();
     bad += test_no_phrases();
     bad += test_rec();
+    bad += test_gen_family();
     bad += test_midi();
     bad += test_save();
     bad += test_actions();

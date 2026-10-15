@@ -692,7 +692,7 @@ static uint32_t pv_pic(int32_t *cut, int32_t *res)
     if(pg->fam==FAM_FX)return 9u;
     if (pg->graph == GR_ARP || pg->graph == GR_STEPS)
         return pg->graph == GR_ARP ? 5u : 6u;
-    if (pg->fam == FAM_ARP)                             /* ARP 2: the notes it plays too */
+    if (pg->fam == FAM_ARP && pg->graph == GR_NONE)     /* ARP 2: the notes it plays too (not GEN's other pages) */
         return 5u;
     if (pg->graph == GR_CHORD)                          /* CHORD: its name, its notes (ui_graph.c) */
         return 8u;
