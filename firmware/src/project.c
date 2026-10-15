@@ -875,7 +875,7 @@ static int project_restore_runtime(const project_t *input)
         track_t *t = &trk[k];
         int16_t keep[P_COUNT];
         if (p->t[k].preset == PROJ_DEF_SOUND) {
-            apply_preset_to(t, TRK_DEF[k][1]);
+            apply_preset_to(t, TRK_DEF_V1[k]);
             track_defaults_steps(t);
         } else if (p->t[k].preset == PROJ_DEF_KEEP) {   /* the steps, LEVEL PAN MUTE, LEN DIV SWING GATE kept */
             memcpy(keep, t->p, sizeof keep);
@@ -1159,12 +1159,15 @@ static void project_new_blank(void)
         song.g[i] = GP[i].def;
     for (k = 0; k < 4u; k++)
         song.g[GLO_KEPT[k]] = kept[k];
+    song.g[G_BPM] = TRK_DEF_BPM;
     undo_depth++;
     for (k = 0; k < NTRK; k++) {
         track_t *t = &trk[k];
         track_defaults(t);
         set_engine_of(t, TRK_DEF[k][0]);
         apply_preset_to(t, TRK_DEF[k][1]);
+        if (TRK_DEF[k][0] != ENGI_DRUM)
+            t->p[P_SCALE] = TRK_DEF_SCALE;
         track_defaults_steps(t);
         pat_last[k] = 0;
         pat_sig[k] = steps_sig(t);

@@ -184,6 +184,7 @@ static void melodee_init(void)
     pattern_init();
     for (i = 0; i < G_COUNT; i++)
         song.g[i] = GP[i].def;
+    song.g[G_BPM] = TRK_DEF_BPM;
     undo_depth++;                             /* (no undo copy of the power-on loads) */
     fm6_init();                               /* every track's FM6 patch: the init voice */
     cz_init();
@@ -192,6 +193,8 @@ static void melodee_init(void)
         track_defaults(t);
         set_engine_of(t, TRK_DEF[i][0]);
         apply_preset_to(t, TRK_DEF[i][1]);    /* with its sends */
+        if (TRK_DEF[i][0] != ENGI_DRUM)
+            t->p[P_SCALE] = TRK_DEF_SCALE;
         t->engine = t->eng_req;
         track_defaults_steps(t);              /* (a sound load never touches them) */
         pat_sig[i] = steps_sig(t);            /* (empty: not the user's) */

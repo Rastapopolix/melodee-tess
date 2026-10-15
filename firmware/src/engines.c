@@ -216,7 +216,27 @@ static uint32_t eng_step(uint32_t e, int32_t dir)
     return eng_vis((eng_rank(e % NENGINES) + (dir > 0 ? 1u : NENG_SHOWN - 1u)) % NENG_SHOWN);
 }
 
-/* the parts at power-on (engine, preset; the steps empty): bass, pad, lead, drums */
-static const uint8_t TRK_DEF[NPART][2] = {{ENGI_PROPHET, 4}, {ENGI_FM6, 4}, {3, 0}, {ENGI_DRUM, 0}}; /* PROPHET FUNK
-                                                    * BASS II (was ANALOG ACID), FM6 PAD (was DIGITAL PAD), SID INIT SID, DRUM KIT */
+/* The start for testing the generators on the device (Theo 2026-10-15): track 1 CZ-1 VIBRAPHONE, and the project at
+ * power-on and NEW (melodee_init, project_new_blank) at 85 BPM, the melodic parts in minor pentatonic. 0: Melodee's
+ * (track 1 PROPHET FUNK BASS II, the parameters' defaults), which the host tests are written for (hostsim.c) */
+#ifndef TRK_START_TESS
+#define TRK_START_TESS 1
+#endif
+/* the parts at power-on (engine, preset; the steps empty): bass (TRK_START_TESS: mallet), pad, lead, drums */
+static const uint8_t TRK_DEF[NPART][2] = {
+#if TRK_START_TESS
+    {ENGI_CZ, 42},                                  /* CZ-1 VIBRAPHONE */
+#else
+    {ENGI_PROPHET, 4},                              /* PROPHET FUNK BASS II (was ANALOG ACID) */
+#endif
+    {ENGI_FM6, 4}, {3, 0}, {ENGI_DRUM, 0}};         /* FM6 PAD (was DIGITAL PAD), SID INIT SID, DRUM KIT */
+/* the power-on presets when project format 1 was written (project.c PROJ_DEF_SOUND): fixed, whatever TRK_DEF becomes */
+static const uint8_t TRK_DEF_V1[NPART] = {4, 4, 0, 0};
+#if TRK_START_TESS
+#define TRK_DEF_BPM 85
+#define TRK_DEF_SCALE 6                             /* MPEN (scales.h N_SCALE) */
+#else
+#define TRK_DEF_BPM GP[G_BPM].def
+#define TRK_DEF_SCALE TP[P_SCALE].def
+#endif
 static uint32_t trk_def_engine(uint32_t i) { return TRK_DEF[i % NPART][0]; }
