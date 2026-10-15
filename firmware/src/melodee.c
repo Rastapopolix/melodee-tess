@@ -92,6 +92,7 @@
 #include "seq.c"
 #include "tessera.c"
 #include "pid.c"                 /* the central parameter ids (pid.h) */
+#include "cord.c"                /* cords: the signal bus (cord.h) */
 #include "audio.c"
 
 /* -------------------------------------------------------------- UI --- */

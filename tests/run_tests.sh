@@ -318,6 +318,8 @@ if core && [ $TABLES = 1 ]; then
         gen_test -O2 $FW
     t "PARAMETER IDS: every setting numbered, ranges, get/set, frozen against tests/pid_ids.txt" pid_test \
         -O1 $FW -- "$OUT/pid_test" tests/pid_ids.txt
+    t "CORDS: the destination table, frozen against tests/cord_dests.txt" cord_test \
+        -O1 $FW -- "$OUT/cord_test" tests/cord_dests.txt
     t "double-tap layers, SCREEN OFF, LFO 2 SYNC / TRIG / POL" layer_screen_test \
         -O1 -DMELODEE_USB_AUDIO=1 $FW
     t "DRUM EDITOR: synthesized 909, sound controls, individual pitch/length, undo and storage" drum_editor_test -O2 $FW
