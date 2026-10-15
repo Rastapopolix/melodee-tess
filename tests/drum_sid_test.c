@@ -112,8 +112,10 @@ int main(int argc, char **argv)
             }
         }
         check("16 frame programs: TRI, PULSE or NOISE a step, steps and loops in range, a gate", ok);
-        check("KIT 6 is SID, the third factory kit", ENG_DRUM.edit[0].max == DK_SID && !strcmp(N_DRUM_KIT[DK_SID], "SID") &&
-              ENG_DRUM.npresets == 3u && !strcmp(ENG_DRUM.presets[2].name, "SID KIT") && ENG_DRUM.presets[2].e[0] == DK_SID);
+        check("KIT 6 is SID: factory kits SID KIT (DIGI OFF) and SID DIGI (DIGI ON)", ENG_DRUM.edit[0].max == DK_SID &&
+              !strcmp(N_DRUM_KIT[DK_SID], "SID") && ENG_DRUM.npresets == 4u && !strcmp(ENG_DRUM.presets[2].name, "SID KIT") &&
+              ENG_DRUM.presets[2].e[0] == DK_SID && !ENG_DRUM.presets[2].e[6] && !strcmp(ENG_DRUM.presets[3].name, "SID DIGI") &&
+              ENG_DRUM.presets[3].e[0] == DK_SID && ENG_DRUM.presets[3].e[6] == 1);
     }
     {   /* every drum alone, DIGI OFF: sounds, bounded, deterministic, over */
         int sound = 1, bounded = 1, det = 1, ends = 1, mapped = 1;
@@ -151,7 +153,7 @@ int main(int argc, char **argv)
         trk_note_on(&trk[0], 41, 110); run(0, 1);   /* TOM L, HAT C, CLAP, then RIM: the tom's voice */
         trk_note_on(&trk[0], 42, 110); run(0, 1);
         trk_note_on(&trk[0], 39, 110); run(0, 1);
-        trk_note_on(&trk[0], 37, 110); run(0, 1);
+        trk_note_on(&trk[0], 37, 110); run(0, 2);   /* (a block of hard restart, then the rim) */
         held = (ch_with(D9_CH) < DSK_NCH) + (ch_with(D9_CP) < DSK_NCH) + (ch_with(D9_RS) < DSK_NCH);
         check("the kit plays on one voice; a fourth drum takes the oldest hit's SID voice", one == 1u && held == 3u &&
               ch_with(D9_LT) == DSK_NCH && ch_with(D9_RS) == 0u);
@@ -161,9 +163,21 @@ int main(int argc, char **argv)
         kit(2, 0);
         trk_note_on(&trk[0], 46, 110); run(0, 4);
         ho = ch_with(D9_OH);
-        trk_note_on(&trk[0], 42, 110); run(0, 1);
+        trk_note_on(&trk[0], 42, 110); run(0, 2);
         check("a closed hat takes the open hat's SID voice (the choke)", ho < DSK_NCH && ch_with(D9_CH) == ho &&
               ch_with(D9_OH) == DSK_NCH);
+    }
+    {   /* a hit on a voice still sounding: faded out over a block first (the hard restart), no step */
+        int32_t step = 0, before = 0;
+        kit(2, 0);
+        trk_note_on(&trk[0], 64, 127); run(a, 5);   /* CONGL: a smooth triangle, loud */
+        for (i = 1; i < 5u * CTL; i++)
+            before = abs(a[i] - a[i - 1]) > before ? abs(a[i] - a[i - 1]) : before;
+        trk_note_on(&trk[0], 64, 127); run(a, 3);
+        for (i = 1; i < 3u * CTL; i++)
+            step = abs(a[i] - a[i - 1]) > step ? abs(a[i] - a[i - 1]) : step;
+        printf("SID KIT:   CONGL struck again while ringing: largest step %d (while ringing %d)\n", (int)step, (int)before);
+        check("a ringing voice struck again fades out, then restarts: no click", step < 3 * before + 600);
     }
     {   /* the frame programs: the kick's frequency changes only at PAL frames from the hit */
         uint32_t last = 0, steps = 0, lo = ~0u, hi = 0, prev, f;

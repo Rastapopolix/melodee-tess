@@ -325,7 +325,7 @@ SID_DIGI_RATE = SID_CLOCK / 125                     # a C64 digi player's NMI ti
 def sid_digi(kind):
     """drum_sid.c's $D418 drums, synthesized here (no recording): a kick (a sine sweeping 170 -> 46 Hz, a noise
     click) or a snare (188 and 333 Hz tones, high-passed noise), soft-saturated, made at 4 x the digi rate and
-    averaged down; as 4-bit volume register values (8 = rest), cut where they stay within one step of rest"""
+    averaged down; as 4-bit volume register values (8 = rest), cut at rest where they stay within one step of it"""
     os, n_os = 4, int(SID_DIGI_RATE * 4 * (0.30 if kind == "kick" else 0.22))
     seed, ph, hp_x, hp_y, out = 0x1234567, 0.0, 0.0, 0.0, []
     a_hp = 1 / (1 + 2 * math.pi * 900 / (SID_DIGI_RATE * os))
@@ -348,7 +348,9 @@ def sid_digi(kind):
     pk = max(abs(v) for v in y)
     q = [max(0, min(15, 8 + math.floor(7.5 * v / pk + 0.5))) for v in y]
     end = max(i for i, v in enumerate(q) if abs(v - 8) >= 2) + 1
-    return q[:end]
+    while end < len(q) and q[end - 1] != 8:         # (on to rest: the volume steps back to 8 without a click)
+        end += 1
+    return q[:end] + ([8] if q[end - 1] != 8 else [])
 
 
 def sid_kit_tables():

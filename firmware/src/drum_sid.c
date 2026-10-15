@@ -4,8 +4,9 @@
  * (eng_sid.c's model of it: oscillators, the noise register, the DACs, the envelope generator, the cutoff curve
  * and resonance, the C64's output stage).
  *  - The chip's three voices take the hits: the voice of the same lane (the two hats share one: a closed hat
- *    chokes the open one), else a silent voice, else the one struck longest ago. A hit restarts its oscillator
- *    (the test bit) and its envelope from zero (as a hard restart leaves it).
+ *    chokes the open one), else a silent voice, else the one struck longest ago. A voice still sounding fades
+ *    out over a control tick first (0.73 ms: a player's hard restart, without its two frames); the hit then
+ *    restarts its oscillator (the test bit) and its envelope from zero.
  *  - Each drum is a frame program as trackers write them: a PAL frame (19656 cycles, 50.12 Hz) at a time a
  *    waveform, a frequency and its slide each frame, the gate; frames count from the hit. Its ADSR runs on the
  *    chip's envelope generator; the gate closes after the drum's frames (or a recorded hit's length).
@@ -15,7 +16,8 @@
  *    NMI timer), from the samples tools/gen_tables.py synthesizes (no recording). The volume rests at 8; the
  *    6581's DC offset under it makes the sound (reSID 0.16: each voice's 0x800 * 0xFF and the mixer's
  *    -0xFFF * 0xFF / 18), so the voices ringing meanwhile follow the same volume, as on a C64.
- * Velocity, ACC, the lane levels and LEVEL scale a drum's envelope (a digi's steps, still in 4 bits). */
+ * Velocity, ACC, the lane levels and LEVEL scale a drum's envelope (a digi's steps, still in 4 bits). The chip
+ * runs at half scale (three voices and a digi fit under its clamps) and leaves through a soft knee. */
 #define DSK_NCH 3
 #define DSK_STEPS 5
 #define DSK_GATE 0x01u
@@ -73,6 +75,10 @@ static const dsk_drum_t DSK_DRUMS[16] = {
     {{24, 42, 0, 34}, 1, 0, 1, D_HOLD, 0, 0x800, {{D_NOI, 0, 0xFFFF, 0}}},
 };
 
+typedef struct {                               /* a hit: its drum at the hit's pitch, level, ADSR, SNAP, length */
+    int32_t tune, gain, length;
+    uint8_t adsr[4], sound, level, snap;
+} dsk_next_t;
 typedef struct {
     sid_voice_t e;                             /* its envelope generator (sid_env_clock); e.env_prev: a tick ago */
     uint32_t ph, inc, noise, nb, pt, age;      /* accumulator (<< 8), its step, the noise register, its bits */
@@ -81,6 +87,8 @@ typedef struct {
     uint16_t freq;                             /* the frequency register */
     int16_t slide;
     uint8_t adsr[4], ctrl, sound, lane, step, left, gate_left, snap, level;
+    uint8_t restart;                           /* a hit waits: 1 the next block fades the voice out, 2 it does */
+    dsk_next_t next;
 } dsk_ch_t;
 struct dsk_part {                              /* (dsk_part_t: eng_drum.c) */
     dsk_ch_t ch[DSK_NCH];
@@ -163,6 +171,7 @@ static void dsk_frame(dsk_ch_t *c)
         dsk_freq(c, c->freq + c->slide);
 }
 
+static void dsk_start(dsk_ch_t *c);
 /* a hit on note at velocity vel: DIGI's KICK and SNARE on $D418, any other drum on a voice */
 static void dsk_hit(track_t *t, uint32_t note, uint32_t vel)
 {
@@ -200,21 +209,41 @@ static void dsk_hit(track_t *t, uint32_t note, uint32_t vel)
             if (K->ch[k].age < K->ch[best].age)
                 best = k;
     dsk_ch_t *c = &K->ch[best];
+    dsk_next_t *h = &c->next;
     const dsk_drum_t *d = &DSK_DRUMS[sound];
     int32_t dec = (t->p[P_E3] - 64) / 2 + pc[1] / 2, snap = clamp(t->p[P_E4] + pc[2], 0, 191);
-    c->sound = (uint8_t)sound;
+    h->sound = (uint8_t)sound;
+    h->tune = tune ? (int32_t)dr_pow2(tune) : 65536;   /* (untuned: the program's registers exactly) */
+    h->gain = dr8_level(vel, t->p[P_E5]);
+    h->level = (uint8_t)(127 - pc[3]);
+    h->adsr[0] = d->adsr[0];
+    h->adsr[1] = (uint8_t)clamp(d->adsr[1] + dec, 0, 127);
+    h->adsr[2] = d->adsr[2];
+    h->adsr[3] = (uint8_t)clamp(d->adsr[3] + dec, 0, 127);
+    h->snap = (uint8_t)((snap + 32) / 64);
+    h->length = (int32_t)drum_event_length;
     c->lane = (uint8_t)lane;
     c->age = ++K->age;
-    c->tune = tune ? (int32_t)dr_pow2(tune) : 65536;   /* (untuned: the program's registers exactly) */
-    c->gain = dr8_level(vel, t->p[P_E5]);
-    c->level = (uint8_t)(127 - pc[3]);
-    c->adsr[0] = d->adsr[0];
-    c->adsr[1] = (uint8_t)clamp(d->adsr[1] + dec, 0, 127);
-    c->adsr[2] = d->adsr[2];
-    c->adsr[3] = (uint8_t)clamp(d->adsr[3] + dec, 0, 127);
-    c->snap = (uint8_t)((snap + 32) / 64);
+    if (dsk_done(c) && !c->e.env_prev && !c->restart)
+        dsk_start(c);                          /* silent: at once */
+    else
+        c->restart = 1;                        /* sounding: a hard restart first */
+}
+
+/* the voice's waiting hit starts */
+static void dsk_start(dsk_ch_t *c)
+{
+    const dsk_next_t *h = &c->next;
+    const dsk_drum_t *d = &DSK_DRUMS[h->sound];
+    c->sound = h->sound;
+    c->tune = h->tune;
+    c->gain = h->gain;
+    c->level = h->level;
+    memcpy(c->adsr, h->adsr, sizeof c->adsr);
+    c->snap = h->snap;
+    c->length = h->length;
+    c->restart = 0;
     c->gate_left = d->gate;
-    c->length = (int32_t)drum_event_length;
     c->ph = 0;                                 /* the test bit: the accumulator from 0 */
     c->e.env = c->e.env_prev = 0;              /* the envelope from zero, as a hard restart leaves it */
     c->e.exp_counter = 0;
@@ -239,7 +268,11 @@ static __attribute__((noinline)) int dsk_tick(track_t *t)
     for (k = 0; k < DSK_NCH; k++) {
         dsk_ch_t *v = &K->ch[k];
         v->e.env_prev = v->e.env;
-        if (dsk_done(v))
+        if (v->restart == 1)                   /* this block fades the voice out (dsk_render), */
+            v->restart = 2;
+        else if (v->restart == 2)              /* the next one starts the hit */
+            dsk_start(v);
+        if (dsk_done(v) && !v->restart)
             continue;
         if (v->length > 0 && (v->length -= CTL) <= 0) {   /* a recorded hit's length: the release */
             v->gate_left = 0;
@@ -255,7 +288,7 @@ static __attribute__((noinline)) int dsk_tick(track_t *t)
         q[P_SUS] = v->adsr[2];
         q[P_REL] = v->adsr[3];
         sid_env_clock(&v->e, q, cycles);
-        busy |= !dsk_done(v) || v->e.env_prev;
+        busy |= !dsk_done(v) || v->e.env_prev || v->restart;
     }
     return busy || K->digi || !K->quiet;
 }
@@ -283,11 +316,11 @@ static __attribute__((noinline)) void dsk_render(track_t *t, int32_t *out, uint3
     for (k = 0; k < DSK_NCH; k++) {
         const dsk_ch_t *c = &K->ch[k];
         int32_t lv;
-        if (dsk_done(c) && !c->e.env_prev)
+        if (dsk_done(c) && !c->e.env_prev && !c->restart)
             continue;
-        lv = mulq15(c->gain, dsk_level(p, c->lane, c->level));
+        lv = mulq15(c->gain, dsk_level(p, c->lane, c->level)) >> 1;   /* (half scale) */
         a0[k] = mulq15(sid_edac(SID_6581, c->e.env_prev), lv);
-        a1[k] = mulq15(sid_edac(SID_6581, c->e.env), lv);
+        a1[k] = c->restart ? 0 : mulq15(sid_edac(SID_6581, c->e.env), lv);   /* (a hard restart: to 0) */
         live |= 1u << k;
         route |= (uint32_t)DSK_DRUMS[c->sound].route << k;
     }
@@ -339,15 +372,15 @@ static __attribute__((noinline)) void dsk_render(track_t *t, int32_t *out, uint3
         if (K->digi) {                             /* $D418: the sample's step, the DC riding on it */
             uint32_t at = dpos >> 16, nib = (DSK_DIGI[DSK_DIGI_AT[K->dsmp] + (at >> 1)] >> ((at & 1u) << 2)) & 15u;
             int32_t vol = clamp(rest + ((((int32_t)nib - 8) * dg + 16384) >> 15), 0, 15);
-            s = (int32_t)(((int64_t)(s * vol + DSK_DC * (vol - rest)) * rcp) >> 16);
+            s = (int32_t)(((int64_t)(s * vol + (DSK_DC >> 2) * (vol - rest)) * rcp) >> 16);   /* (the DC at
+                                                                       * half of half scale: a digi as loud as a drum) */
             if ((dpos += K->dstep) >= dend)
                 K->digi = 0;
         }
         xlp += (int32_t)(((int64_t)(clamp(s, -131071, 131071) - xlp) * SID_XLP_A) >> 15);
         xhp += (int32_t)(((int64_t)((xlp << 8) - xhp) * SID_XHP_A) >> 16);
         o = clamp(xlp - (xhp >> 8), -32767, 32767);
-        out[i] += voice_amp(soft_knee(o + (o >> 1), 24000) << 1, m, i);   /* (x1.5: the kits' level; the knee:
-                                                                               * a digi on three voices) */
+        out[i] += voice_amp(soft_knee(o * 3, 24000) << 1, m, i);   /* (x3: the kits' level from half scale) */
     }
     K->ic1 = ic1; K->ic2 = ic2; K->xlp = xlp; K->xhp = xhp;
     K->dpos = dpos;
