@@ -278,12 +278,12 @@ HOME, SAVE, ARP, SEQ, PLAY, REC, OCT-, OCT+).
 | FX held + keys | Nothing now: upstream removed this layer (performance effects, mutes on black keys 1–4, KNOB macros) |
 | GLO held + keys | Black keys 1–4 latch mutes, F3–B3 solo while held, C4 unmute all, F4 tap tempo; KNOB 1–4 levels |
 | SCL held + keys | The key pressed sets the root; KNOB 1–4 root, scale, chord, voicing |
-| EDIT held + keys | White keys jump to sound sections, black keys to FM6 operators, Init, Favourite, Undo, Store |
+| EDIT held | Undo (since upstream 1.3.6, which removed the EDIT quick layer); EDIT + OCT-/+ undo/redo |
 | SEQ held + keys | Eight white keys (F3–C5) select patterns; hold one and press another to copy |
 | ENV / SCL / EDIT held on STEP | Note gestures: SELECT lengthens or moves the note; EDIT tapped deletes; EDIT + OCT-/+ undo/redo |
 | LFO held + knob | Momentary tweak: the value springs back on release; OCT+ keeps it |
-| Taps / holds | HOME hold: menu. REC hold: Capture. SEQ hold: PATTERNS. SAVE hold: undo. OCT+ hold: the page's sheet |
-| Button pairs | REC + PLAY: record now. SAVE + REC: quick save. GLO + PLAY: restart. SAVE + OCT-/+: undo/redo. OCT- + OCT+: octave reset; held 5 s: update mode; at power-on: panel calibration |
+| Taps / holds | HOME hold: menu. REC hold: Capture. SEQ hold: PATTERNS. SAVE hold: save the project. OCT+ hold: the page's sheet |
+| Button pairs | REC + PLAY: record now. SAVE + REC: quick save. GLO + PLAY: restart. OCT- + OCT+: octave reset; held 5 s: update mode; at power-on: panel calibration |
 | Grid pages (drums) | White keys toggle the lane's steps; black keys select lanes and pages |
 
 Free today: **ARP held** (no gesture at all), **FX held** (its layer removed upstream), **ENV held
@@ -328,7 +328,9 @@ tests and on the device, which stays essential.
 ## Upstream sync
 
 - Remote `upstream` = `https://github.com/keremimo/melodee.git` (fetched with tags).
-- **Synced upstream version: `v1.3.1`** (`757b65b`, 2026-10-13), merged 2026-10-14 in `1b4c9e9`.
+- **Synced upstream version: `v1.3.6`** (`a4e6f22`, 2026-10-15), merged 2026-10-16 on branch
+  `merge-upstream-1.3.6` (`e725e23`). Before it: `v1.3.1`, merged 2026-10-14 in `1b4c9e9`.
+  The `v1.4.0-rc` tags are release candidates: wait for 1.4.0.
   The fork's history is connected to upstream's by `4621fa4` (a no-change "ours" merge of `0bc95e8`,
   the fork's real base), so git finds the merge base by itself. Not rebased: `main` is already on GitHub.
 - Upstream retired ANALOG, DIGITAL and all external effects (`perform.c`, `delay.c`, `slicer.c`),
@@ -370,6 +372,15 @@ mod sources, visual feedback. Release it, gather feedback from FM-1 users, then 
       Tessera baseline is unchanged, FORM's labels shortened to CONTR / FLRSH for the new fonts
 - [x] Check the merged build on the device: play, stop (no hanging notes), GLO mute, MIDI Start/Stop,
       save and load, a project saved before the merge, autosave of generator edits. Host-checked
+- [x] Merge upstream v1.3.6 (Theo 2026-10-16: "work in any sensible changes"): the boot stub
+      (an interrupted update falls back to update mode), 360 MHz boot without a PLL write, the 320 MHz
+      option removed, stock V15 power startup, startup checks of foreign settings and projects, MIDI
+      channel ranges, EDIT held undoes. Whole release merged, nothing left out: picking parts would
+      diverge more. Both builds pass, the Tessera baseline, gen_test and upgrade check are unchanged
+- [ ] Check the 1.3.6 merge on the device. Risky (boot, flash layout, install): the first install of a
+      build with the boot stub is not yet protected, so keep USB connected and do not switch off.
+      Then: power-on and the start sound, EDIT held undo, SAVE held save, MIDI in, a project saved
+      by 1.1.8
       2026-10-14: old projects load with every Tessera setting (`tests/upgrade_check.sh`), MIDI clock
       Start/Stop/Continue, GLO mute and stop leave no note held (Tessera baseline). Passed on the device
       2026-10-15 (the `follow-step` firmware, standard profile); USB MIDI out of the keys reaches Ableton
@@ -507,6 +518,8 @@ Plan: `docs/analysis/phase1-plan.md`.
 
 AC79 at 360 MHz, 44.1 kHz audio, the audio working arena above the build's minimum (142,336 B since
 v1.3.1; see CLAUDE.md).
+Headroom after the v1.3.6 merge (2026-10-16, dual core): static RAM 4,908 B free, audio arena
+5,440 B above the minimum, `melodee.bin` 503,340 B.
 Headroom after the v1.3.1 merge (2026-10-14, dual core): static RAM (`.data + .bss`) 5,200 B free,
 audio arena 5,472 B above the minimum, `melodee.bin` 496,896 B (about 84 KB below the 579,832 B the
 fork had before). Before the merge: 36 B, 608 B, about 1.7 KB.
@@ -538,10 +551,12 @@ at the next intended baseline change.
 - Performance page: the assignment gesture and the number of banks.
 - Exact voice and FX budget numbers.
 - Gravity and Energy curves.
-- Which physical button is the function key. The FM-1 has none labelled FN. Candidates: ARP (its
-  hold never used upstream) or FX (its hold free since upstream removed its layer). Draft 2026-10-16
-  recommends ARP, pending a reach check on the device: "Tessera: function key and page map (draft)",
-  https://claude.ai/artifact/3zcUFMPB6EhtJ93qxgtjLf (also proposes a GEN family under ARP's tap, CORDS
-  under LFO, and help as the function key held while turning a knob: the knobs cannot sense touch).
+- ~~Which physical button is the function key.~~ Decided 2026-10-16, all as the draft recommends
+  ("Tessera: function key and page map", https://claude.ai/artifact/3zcUFMPB6EhtJ93qxgtjLf):
+  ARP held is the function key (a reach check on the device still to do); a GEN family under ARP's
+  tap holds the generator pages, EVOLVE, FORM, TWEAK and ARP, taken out of SEQ; CORDS (about 16,
+  across tracks) under LFO, beside each track's 4 MOD routes; PIECE and ABOUT under GLO; help is the
+  function key held while turning a knob (the knobs cannot sense touch). Upstream 1.3.6 made EDIT
+  held undo and SAVE held save; ARP held is still free.
 - How the modifier convention fits Melodee's existing layers (FX, GLO, SCL, EDIT, SEQ held):
   keep them as they are, or fold them into the function key.
