@@ -652,6 +652,12 @@ static void pack_run(char *res, size_t cap)
         song.playing = 0;
         tessera_seed_turn(0, 1);
         ok &= tessera.seed[0] >= 1u && tessera.seed[0] <= TESS_SEED_MAX;
+        tessera_seed_turn(0, -500);                  /* ROLL stops at its ends, no wrapping */
+        tessera_seed_turn(0, -1);
+        ok &= tessera.seed[0] == 1u;
+        tessera_seed_turn(0, 500);
+        tessera_seed_turn(0, 1);
+        ok &= tessera.seed[0] == TESS_SEED_MAX;
         c[at] = 10000u & 0xFFu, c[at + 1u] = 10000u >> 8;
         ok &= tessera_unpack(c) == 0;
         tessera_unpack(a);

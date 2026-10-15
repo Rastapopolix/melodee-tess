@@ -56,7 +56,7 @@ static void tess_roll_apply(uint32_t tr)
     tess_realign(tr);
     tessera.evolve[tr].flash = 4;
 }
-/* ROLL turned by s (seeds 1..TESS_SEED_MAX, wrapping). Playing, the seed waits for the track's next bar line
+/* ROLL turned by s (seeds 1..TESS_SEED_MAX, stopping at both ends: no jump from one end to the other). Playing, the seed waits for the track's next bar line
  * (tessera_evolve_tick; the knob shows it blinking): the new line starts in time, and a quick turn plays only the
  * seed it stops on; turned back to the seed playing, nothing waits. Stopped: at once */
 void tessera_seed_turn(uint32_t tr, int32_t s)
@@ -64,9 +64,10 @@ void tessera_seed_turn(uint32_t tr, int32_t s)
     int32_t n;
     if (tr >= TESSERA_TRACKS || !s) return;
     tess_seed_fresh(tr);
-    n = ((int32_t)(tessera.roll[tr] ? tessera.roll[tr] : tessera.seed[tr]) - 1 + s) % (int32_t)TESS_SEED_MAX;
-    if (n < 0) n += (int32_t)TESS_SEED_MAX;
-    tessera.roll[tr] = (uint32_t)n + 1u == tessera.seed[tr] ? 0u : (uint16_t)(n + 1);
+    n = (int32_t)(tessera.roll[tr] ? tessera.roll[tr] : tessera.seed[tr]) + s;
+    if (n < 1) n = 1;
+    if (n > (int32_t)TESS_SEED_MAX) n = (int32_t)TESS_SEED_MAX;   /* (a seed over it, saved by 1.1.3-1.1.5: here) */
+    tessera.roll[tr] = (uint32_t)n == tessera.seed[tr] ? 0u : (uint16_t)n;
     if (!song.playing) tess_roll_apply(tr);
 }
 
