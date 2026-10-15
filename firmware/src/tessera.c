@@ -41,20 +41,30 @@ static void tess_seed_fresh(uint32_t tr)
 }
 static void tess_realign(uint32_t tr);
 static void tess_form_restart(uint32_t tr);
-/* SEED turned by s (1..TESS_SEED_MAX, wrapping): that seed's line from its start. The playheads back on step 1; a
- * FORM begins again at A (its sections were the old line's) */
+/* The seed ROLL left waiting (tessera_seed_turn): its line from its start. The playheads back on step 1; a FORM
+ * begins again at A (its sections were the old line's) */
+static void tess_roll_apply(uint32_t tr)
+{
+    if (!tessera.roll[tr]) return;
+    tessera.seed[tr] = tessera.roll[tr];
+    tessera.roll[tr] = 0;
+    tess_seed_apply(tr);
+    if (tessera.evolve[tr].form) tess_form_restart(tr);
+    tess_realign(tr);
+    tessera.evolve[tr].flash = 4;
+}
+/* ROLL turned by s (seeds 1..TESS_SEED_MAX, wrapping). Playing, the seed waits for the track's next bar line
+ * (tessera_evolve_tick; the knob shows it blinking): the new line starts in time, and a quick turn plays only the
+ * seed it stops on; turned back to the seed playing, nothing waits. Stopped: at once */
 void tessera_seed_turn(uint32_t tr, int32_t s)
 {
     int32_t n;
     if (tr >= TESSERA_TRACKS || !s) return;
     tess_seed_fresh(tr);
-    n = ((int32_t)tessera.seed[tr] - 1 + s) % (int32_t)TESS_SEED_MAX;
+    n = ((int32_t)(tessera.roll[tr] ? tessera.roll[tr] : tessera.seed[tr]) - 1 + s) % (int32_t)TESS_SEED_MAX;
     if (n < 0) n += (int32_t)TESS_SEED_MAX;
-    tessera.seed[tr] = (uint16_t)(n + 1);
-    tess_seed_apply(tr);
-    if (tessera.evolve[tr].form) tess_form_restart(tr);
-    tess_realign(tr);
-    tessera.evolve[tr].flash = 4;
+    tessera.roll[tr] = (uint32_t)n + 1u == tessera.seed[tr] ? 0u : (uint16_t)(n + 1);
+    if (!song.playing) tess_roll_apply(tr);
 }
 
 void tessera_markov_recalc(uint32_t tr) { (void)tr; }   /* matrix is derived per step now */
@@ -117,6 +127,7 @@ void tessera_stop_all(void)
 {
     for (uint32_t i = 0; i < TESSERA_TRACKS; i++) {
         tessera_kill(&trk[i]);
+        tess_roll_apply(i);                                   /* (a seed still waiting: the next PLAY's) */
         tessera.evolve[i].bar_cnt = 0;
         tessera.evolve[i].step_cnt = 0;
         tessera.evolve[i].flash = 0;
@@ -342,11 +353,16 @@ static void tessera_evolve_tick(const track_t *t, uint32_t tr)
     if (ev->flash) ev->flash--;
     if (ev->step_cnt >= tess_steps_per_bar(t)) {
         ev->step_cnt = 0;
-        if (ev->every && ++ev->bar_cnt >= tessera_every_bars(ev->every)) {
+        if (tessera.roll[tr]) {
+            tess_roll_apply(tr);             /* ROLL's seed on the bar line; EVERY counts from its line */
+            ev->bar_cnt = 0;
+        } else if (ev->every && ++ev->bar_cnt >= tessera_every_bars(ev->every)) {
             ev->bar_cnt = 0;
             if (ev->form) tess_form_advance(tr);
             else tessera_mutate(tr);         /* also puts the loop back on step 1 and rearms it */
         }
+    } else if (!ev->step_cnt && tessera.roll[tr]) {
+        tess_roll_apply(tr);                 /* (PLAY's first step: a bar line too) */
     }
     ev->step_cnt++;
     pos = ev->lp_pos;
@@ -415,7 +431,7 @@ void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash)
     *flash = ev->flash != 0;
 }
 
-/* EVOLVE page encoders: 0 LOCK, 1 EVERY, 2 AMOUNT, 3 SEED */
+/* EVOLVE page encoders: 0 LOCK, 1 EVERY, 2 AMOUNT, 3 ROLL */
 static void tess_evolve_knob_body(uint32_t k, int32_t s)
 {
     tessera_ensure_init();
@@ -442,7 +458,7 @@ static void tess_evolve_knob_body(uint32_t k, int32_t s)
         int32_t a = (int32_t)ev->amount + s * 2;
         ev->amount = (uint8_t)(a < 0 ? 0 : a > 100 ? 100 : a);
     } else if (k == 3u) {
-        if (tessera.mode[tr] != TESS_ENG_OFF) tessera_seed_turn(tr, s);   /* SEED: each step a new line, back = the last */
+        if (tessera.mode[tr] != TESS_ENG_OFF) tessera_seed_turn(tr, s);   /* ROLL: each step a new line, back = the last */
     }
 }
 void tessera_evolve_knob(uint32_t k, int32_t s)

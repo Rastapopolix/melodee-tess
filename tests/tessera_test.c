@@ -375,8 +375,9 @@ typedef struct {
     void (*bar)(uint32_t bar);
     void (*blk)(uint32_t n);                         /* before each block (n from 0): it runs the transport too */
 } scen_t;
-/* SEED: turned away at bar 2 and back at bar 4 (track 1 Markov, track 2 Turing at PROB 30): bars 4-5 play what
- * bars 0-1 played, note for note. seed_check compares */
+/* ROLL: turned away just after bar 2's line and back after bar 4's (track 1 Markov, track 2 Turing at PROB 30):
+ * each waits for the next bar line, so bar 2 plays on the first line, bars 3-4 another, bars 5-6 what bars 0-1
+ * played, note for note. seed_check and roll_wait_check compare (s_seed_back alone: the line never turned) */
 static void s_seed_back(void)
 {
     gen(0, TESS_ENG_MARKOV);
@@ -385,12 +386,14 @@ static void s_seed_back(void)
 }
 static void b_seed_back(uint32_t bar)
 {
+    if (bar == 3u || bar == 5u)                      /* the seed's line from this bar's line (its step: a block or two
+                                                      * before, a bar being 2756.25 blocks; a step 172) */
+        tt_mark[bar == 3u ? 0 : 1] = tt_blk - 2u;
     if (bar != 2u && bar != 4u) return;
     for (uint32_t tr = 0; tr < 2u; tr++) {
         sel(tr);
         knob(tessera_evolve_knob, 3, bar == 2u ? 1 : -1);
     }
-    tt_mark[bar == 2u ? 0 : 1] = tt_blk;             /* (the step on the bar line was in the block before) */
 }
 /* PLAY again (stopped at bar 2, EVOLVE off): bars 2-3 play what bars 0-1 played */
 static void s_replay(void) { gen(0, TESS_ENG_MARKOV); }
@@ -436,7 +439,8 @@ static const scen_t SCEN[] = {
     {"song_chain_two_banks", 6, 0x101Bu, s_song_chain, 0},
     {"glo_mute_and_unmute", 6, 0x101Cu, s_glo_mute, b_glo_mute},
     {"follow_step_melody_third", 4, 0x101Du, s_follow_step, 0},
-    {"seed_back_markov_turing", 6, 0x101Eu, s_seed_back, b_seed_back},
+    {"seed_back_markov_turing", 8, 0x101Eu, s_seed_back, b_seed_back},
+    {"seed_none_markov_turing", 4, 0x101Eu, s_seed_back, 0},
     {"replay_markov", 4, 0x101Fu, s_replay, b_replay},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
@@ -573,6 +577,32 @@ static void seed_check(const char *name, uint32_t ntr, int mid, char *res, size_
         if (mid) differ |= tt_from(tr, tt_mark[0], c, k) != k || memcmp(a, c, k * sizeof a[0]) != 0;
     }
     snprintf(res, cap, "%u %u", same, differ);
+}
+
+/* ROLL waits for the bar line: tracks 0..1's notes of bar 2 (from its line to bar 3's) as they are with the line
+ * never turned: "same n" */
+static void roll_wait_check(char *res, size_t cap)
+{
+    static uint32_t a[2][256], b[256];
+    uint32_t i, n[2], same = 1, lo, hi, tr;
+    const scen_t *none = 0, *back = 0;
+    for (i = 0; i < NSCEN; i++) {
+        if (!strcmp(SCEN[i].name, "seed_none_markov_turing")) none = &SCEN[i];
+        if (!strcmp(SCEN[i].name, "seed_back_markov_turing")) back = &SCEN[i];
+    }
+    for (int run = 0; run < 2; run++) {
+        tt_n = tt_blk = 0;
+        scen_run(run ? back : none, 0, res, cap);
+        lo = tt_bar_blk[2] - 2u, hi = tt_bar_blk[3] - 2u;   /* (a bar line's step: a block or two before the bar's) */
+        for (tr = 0; tr < 2u; tr++) {
+            uint32_t k = 0, *o = run ? b : a[tr];
+            for (i = 0; i < tt_n && k < 256u; i++)
+                if (tt_ev[i].tr == tr && tt_ev[i].blk >= lo && tt_ev[i].blk < hi) o[k++] = tt_ev[i].note | (uint32_t)tt_ev[i].vel << 8;
+            if (!run) n[tr] = k;
+            else same &= k == n[tr] && k > 0 && !memcmp(a[tr], b, k * sizeof b[0]);
+        }
+    }
+    snprintf(res, cap, "%u %u", same, n[0] + n[1]);
 }
 
 /* --------------------------------------------------------- saved block --- */
@@ -745,9 +775,27 @@ int main(int argc, char **argv)
             close(fd[0]);
             waitpid(pid, 0, 0);
         }
-        bad += check(which == 0 ? "SEED turned away and back: the same line again, note for note (Markov, Turing PROB 30)"
+        bad += check(which == 0 ? "ROLL turned away and back: the same line again, note for note (Markov, Turing PROB 30)"
                                 : "PLAY again (EVOLVE off): the same line from the top, note for note (Markov)", same && differ);
         if (which == 0) bad += check("... and the other seed played another line meanwhile", differ);
+    }
+    {   /* ROLL mid-bar: the line playing until the bar line */
+        unsigned same = 0, n = 0;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                roll_wait_check(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u %u", &same, &n);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        bad += check("ROLL turned mid-bar: the line playing goes on to the bar line, note for note", same && n > 0u);
     }
     {
         unsigned h = 0, ok = 0;

@@ -74,6 +74,8 @@ typedef struct {
     uint8_t          active_gate[TESSERA_TRACKS];
     uint16_t         seed[TESSERA_TRACKS];    /* SEED 1..9999, 0 = not picked yet (tessera.c tess_seed_fresh) */
     uint32_t         rnd[TESSERA_TRACKS];     /* each track's random stream, from its seed (gen.c gen_stream) */
+    uint16_t         roll[TESSERA_TRACKS];    /* ROLL turned while playing: the seed for the next bar line, 0 none
+                                               * (tessera.c tessera_seed_turn; not saved) */
 } tessera_state_t;
 
 extern tessera_state_t tessera;
@@ -88,7 +90,7 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step);
 uint32_t tessera_sig(uint32_t tr);
 void tessera_kill(track_t *t);
 void tessera_mutate(uint32_t tr);
-void tessera_seed_turn(uint32_t tr, int32_t s);    /* SEED (EVOLVE page): that seed's line from its start */
+void tessera_seed_turn(uint32_t tr, int32_t s);    /* ROLL (EVOLVE page): the next seed, on the bar line */
 void tessera_evolve_knob(uint32_t k, int32_t s);
 uint32_t tessera_every_bars(uint32_t every);
 int  tessera_lock_get(uint32_t tr);            /* 0..100, or -1 when LOCK is not available for the mode */

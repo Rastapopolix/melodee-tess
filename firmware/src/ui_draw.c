@@ -788,6 +788,8 @@ static void draw_columns(void)
         draw_column(1, "EVERY", e1, e1u, VAL(1u), (int32_t)ev->every * 1000 / 5, ICON_AUTO);
         draw_column(2, "AMOUNT", e2, e2u, VAL(2u), (int32_t)ev->amount * 10, ICON_AUTO);
         if (tr >= TESSERA_TRACKS || tessera.mode[tr] == TESS_ENG_OFF || !tessera.seed[tr]) str_cpy(e3, "--", sizeof e3);
+        else if (tessera.roll[tr] && ((fm1_ms / 250u) & 1u)) e3[0] = 0;   /* a seed waiting for the bar line: blinking */
+        else if (tessera.roll[tr]) fmt_int(e3, tessera.roll[tr]);
         else fmt_int(e3, tessera.seed[tr]);           /* (picked when a generator is first selected or played) */
         col_quiet = 1;                                  /* ROLL: each step a new line; the seed small, to find one again */
         draw_column(3, "ROLL", e3, "", VAL(3u), -1, ICON_AUTO);
