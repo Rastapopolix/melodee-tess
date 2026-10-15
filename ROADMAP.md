@@ -426,12 +426,13 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [x] ROLL's range 1..128, with the knobs' acceleration (Theo 2026-10-15: 9999 too many to turn through): a quick
       half turn across it. Seeds saved by 1.1.3-1.1.5 (up to 9999) load and play as they were; ROLL from one lands
       in 1..128 (turning back does not return to it). Baseline rewritten (every fresh seed another). Branch
-      `roll-range` (on `markov-density`); device check pending, then merge
+      `roll-range` (on `markov-density`); device check pending (build 1.1.6, test installer
+      /test/1.1.6/webapp/installer/ on the site, also covering DENSITY 70), then merge both
 - [x] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
       done with SEED, to keep that change to one thing): 70 (2026-10-15), for a fresh track only; saved projects
       keep theirs. Baseline rewritten (the Markov scenarios' notes, every state and the saved block's hash).
-      Branch `markov-density`; device check pending (build 1.1.5, test installer /test/1.1.5/webapp/installer/
-      on the site), then merge
+      Branch `markov-density`; device check pending (build 1.1.6, with `roll-range`; 1.1.5's
+      page replaced by 1.1.6's), then merge
 
 ### 2. Signal bus and parameter IDs
 - [ ] Central parameter IDs and ranges
