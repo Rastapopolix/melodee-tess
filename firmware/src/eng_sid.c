@@ -25,7 +25,8 @@
  *
  * The track's ADSR picks the nearest of the chip's 16 rates (SID_ADSR_RATE) and 16 sustain levels; ENV DEST
  * reads the envelope counter as a player routine reads ENV3 (voice.c). A new note restarts the attack from the
- * current level with the rate counter cleared, as a player's hard restart leaves it. Velocity scales the voice.
+ * current level with the rate counter cleared, as a player's hard restart leaves it; at the top (0xFF) it goes on to
+ * the decay (the chip's attack would wrap the counter to 0 and freeze it there). Velocity scales the voice.
  * STACK sets up the three voices: unison stacks, or SYNC (voice 2 synced to a silent voice 1) and RING (voice
  * 1's triangle ring-modulated by a silent voice; on the chip voice 3); there SHP modulation sweeps voice 2's
  * interval (the synced voice, the ring modulator) instead of the pulse width.
@@ -33,11 +34,13 @@
  * MODEL C64 6581 / C64 8580: the track is one channel of a C64 tune. One voice (a new note takes it over), and
  * the registers a player routine writes once a PAL frame (19656 cycles, 50.12 Hz) change only then: frequency
  * (glide, bend, vibrato step), pulse width, cutoff and resonance. A note writes them with its gate and starts
- * the frames, so it keeps the sequencer's timing. The chip in between is the same. In POLY the keys held are a
- * chord on that voice, played as a player's arpeggio plays one: each frame the next held note up from the one
- * sounding (past the top, the lowest), its frequency alone; the gate and the envelope run once for the chord (it
- * ends with its last key), the arpeggio goes on in the release over the chord last held. A new note is heard at
- * once (its gate restarts the attack, as before). MONO / LEGATO: one note, by PRIO.
+ * the frames, so it keeps the sequencer's timing. A note on the sounding voice first does a player's hard restart:
+ * gate off with ADSR 0, the last note fading out on its registers at release rate 0 (6.9 ms from the top), then
+ * the gate from zero. The chip in between is the same. In POLY the keys held are a chord on that voice, played as
+ * a player's arpeggio plays one: each frame the next held note up from the one sounding (past the top, the
+ * lowest), its frequency alone; the gate and the envelope run once for the chord (it ends with its last key), the
+ * arpeggio goes on in the release over the chord last held. A new note is heard first (its gate, after the hard
+ * restart). MONO / LEGATO: one note, by PRIO.
  *
  * Engine ID 3 was LOFI: its projects keep the ID and load as SID. */
 
@@ -81,6 +84,7 @@ typedef struct {
     int32_t held;                            /* the oscillator mix one sample late (an edge corrects both sides) */
     uint16_t rate_counter, cycle_frac;       /* envelope: the 15-bit rate counter; SID cycles left over (Q16) */
     uint8_t env, env_prev, state, exp_counter, exp_period, hold_zero;
+    uint8_t hr;                              /* C64: a hard restart's release under way (the gate at zero) */
     int32_t pitch_key, fine_key, shape_key;
     uint32_t inc_cache[3], rcp_cache[3], rsh_cache[3], tune_key, stack_key, edge_key;
     tsvf_t filter_cache;int32_t fc_key, kd_key;uint8_t freq_valid, filter_valid;
@@ -240,7 +244,7 @@ static uint32_t sid_sustain(const int16_t *p)   /* the 4-bit sustain as the coun
 /* delta cycles of the envelope generator (reSID 0.16 EnvelopeGenerator::clock) */
 static void sid_env_clock(sid_voice_t *s, const int16_t *p, uint32_t delta)
 {
-    uint32_t period = sid_period(p, s->state), sustain = sid_sustain(p);
+    uint32_t period = s->hr ? SID_RATE[0] : sid_period(p, s->state), sustain = sid_sustain(p);
     int32_t step = (int32_t)period - (int32_t)s->rate_counter;
     if (step <= 0)                                     /* the ADSR delay: the counter is past the period, it */
         step += 0x7fff;                                /* counts on to its wrap first */
@@ -282,6 +286,11 @@ static void sid_env_clock(sid_voice_t *s, const int16_t *p, uint32_t delta)
         case 0x00: s->exp_period = 1; s->hold_zero = 1; break;
         default: break;
         }
+        if (s->hr && !s->env) {                        /* C64: the hard restart reached zero: the note's gate */
+            s->hr = s->hold_zero = 0;
+            s->state = SID_ATTACK;
+            step = (int32_t)(period = sid_period(p, SID_ATTACK));
+        }
     }
 }
 
@@ -300,12 +309,15 @@ static void sid_note_on(track_t *t, voice_t *v)
         s->exp_period = 1;
         s->cycle_frac = 0;
     }                                                  /* sounding: the attack goes on from the current level */
-    s->state = SID_ATTACK;                             /* the gate, after a hard restart's cleared rate counter */
-    s->hold_zero = 0;
-    s->rate_counter = 0;
+    s->hr = (uint8_t)(sid_c64(t->p) && s->env);        /* C64: a hard restart's release first (sid_env_clock) */
+    s->state = s->hr ? SID_RELEASE : s->env == 0xffu ? SID_DECAY_SUSTAIN : SID_ATTACK;
+    s->hold_zero = 0;                                  /* the gate, after a hard restart's cleared rate counter; */
+    s->rate_counter = 0;                               /* at 0xFF the attack is over (the chip's would wrap to 0) */
     s->quiet = 0;
-    s->latch = 1;                                      /* C64: the note's registers go in with the gate, its */
-    s->frame = (int32_t)SID_FRAME_Q16;                 /* frames count from it (the note keeps its timing) */
+    if (!s->hr) {
+        s->latch = 1;                                  /* C64: the note's registers go in with the gate, its */
+        s->frame = (int32_t)SID_FRAME_Q16;             /* frames count from it (the note keeps its timing) */
+    }
     if (sid_chord(t))
         sid_chord_take(t);                             /* (the chord with this note in it) */
 }
@@ -316,23 +328,31 @@ static void sid_note_on(track_t *t, voice_t *v)
 static int sid_done(track_t *t, voice_t *v)
 {
     sid_voice_t *s = sid_voice(t, v);
-    uint32_t c = s->cycle_frac + SID_CYC_Q16;
+    uint32_t c = s->cycle_frac + SID_CYC_Q16, hr = s->hr;
     s->env_prev = s->env;
     s->cycle_frac = (uint16_t)c;
     sid_env_clock(s, t->p, c >> 16);
+    if (hr && !s->hr) {                                /* C64: the hard restart is over: the note's registers go */
+        s->latch = 1;                                  /* in with its gate, its frames count from it */
+        s->frame = (int32_t)SID_FRAME_Q16;
+    }
     if (!sid_c64(t->p))
         s->frame = 0;                                  /* (a switch to C64 writes the registers at once) */
     else if ((s->frame -= (int32_t)SID_CYC_Q16) <= 0) {   /* C64: a frame began in this tick: the player */
         s->frame += (int32_t)SID_FRAME_Q16;            /* writes frequency, pulse width, cutoff, resonance */
-        s->latch = 1;
-        if (v == t->v && sid_chord(t)) {               /* POLY: the chord's next note (in the release too) */
-            if (v->gate)
-                sid_chord_take(t);
-            sid_arp(t, v);
+        if (!s->hr) {                                  /* (not in a hard restart: the last note fades out) */
+            s->latch = 1;
+            if (v == t->v && sid_chord(t)) {           /* POLY: the chord's next note (in the release too) */
+                if (v->gate)
+                    sid_chord_take(t);
+                sid_arp(t, v);
+            }
         }
     }
-    if (!v->gate && s->state != SID_RELEASE)
+    if (!v->gate) {                                    /* (a note released in its hard restart: from there) */
         s->state = SID_RELEASE;
+        s->hr = 0;
+    }
     return s->state == SID_RELEASE && !s->env && !s->env_prev && s->quiet;
 }
 
