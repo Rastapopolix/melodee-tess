@@ -412,17 +412,17 @@ Plan: `docs/analysis/phase1-plan.md`.
       2026-10-15 (build 1.1.1), merged into `tessera-dev`
 - [x] Turing's fresh register random (Theo 2026-10-15): picked from the hardware timer when TURING is first
       selected or played; saved projects keep theirs. Branch `turing-random-start` (baseline rewritten: the 14
-      Turing scenarios); device check pending (build 1.1.2), then merge
+      Turing scenarios); device check passed with `track-seed` (build 1.1.4), merged into `tessera-dev`
 - [x] Seeded random generator per track (Theo 2026-10-15: shown and editable): each track's own stream from its
       SEED (1..9999, knob 4 of EVOLVE, in place of ROLL); a seed sets the stream, Turing's register, Euclid's
       pitches, Markov's first state; PLAY restarts the stream; a fresh track a random seed (all generators,
       superseding the Turing-only start). Saved: block version 2 ("TSR2", 47 bytes a track), version 1 projects
-      and backups converted on reading. Branch `track-seed` (on `turing-random-start`); device check pending
-      (build 1.1.3), then merge both. Knob 4 is labelled ROLL, the seed in small grey under it (Theo 2026-10-15:
+      and backups converted on reading. Branch `track-seed` (on `turing-random-start`); device check passed
+      2026-10-15 (build 1.1.4), merged into `tessera-dev`. Knob 4 is labelled ROLL, the seed in small grey under it (Theo 2026-10-15:
       the number is only a marker, to find a line again; no coarse steps or acceleration, which would skip lines).
       ROLL waits for the track's next bar line while playing (Theo 2026-10-15): a click restarted the line mid-bar
       and a quick turn stuttered; stopped, at once. Not saved: a seed still waiting when saved is not kept.
-      Device check: build 1.1.4 (test installer /test/1.1.4/webapp/installer/ on the site, as 1.1.3's)
+      Device check passed on build 1.1.4 (test installer /test/1.1.4/webapp/installer/ on the site, as 1.1.3's)
 - [ ] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
       done with SEED, to keep that change to one thing)
 
