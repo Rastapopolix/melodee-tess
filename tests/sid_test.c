@@ -519,6 +519,39 @@ int main(void)
         }
         check("C64 MONO: the last key alone; 6581 POLY: a voice per note, no arpeggio", !seen);
     }
+    /* a new gate on a voice whose envelope sits at 0xFF (INIT SID: SUS 127, held to its top). On the chip the
+     * attack wraps the counter to 0 and freezes it (reSID; tested above); a player's hard restart never lets a
+     * gate meet 0xFF. 6581 MONO 60 -> 62, 6581 POLY the same note off and on in one block, C64 a new key */
+    {
+        uint32_t k, top[3], peak[3], last[3];
+        for (k = 0; k < 3u; k++) {
+            uint32_t i, j;
+            voice_t *g = 0;
+            fresh(0); T->p[P_E0] = (int16_t)(k == 2u ? 2 : 0); T->p[P_VOICE] = k ? V_POLY : V_MONO;
+            trk_note_on(T, 60, 100);
+            for (i = 0; i < 300u; i++)
+                track_render(T, out, CTL);
+            for (j = 0; j < NVOICE; j++)
+                if (T->v[j].active && T->v[j].gate) g = &T->v[j];
+            top[k] = g ? sid_voice(T, g)->env : 0;
+            if (k == 1u)
+                trk_note_off(T, 60);
+            trk_note_on(T, k == 0u ? 62 : k == 1u ? 60 : 64, 100);
+            peak[k] = last[k] = 0;
+            for (i = 0; i < 300u; i++) {
+                track_render(T, out, CTL);
+                for (g = 0, j = 0; j < NVOICE; j++)
+                    if (T->v[j].active && T->v[j].gate) g = &T->v[j];
+                last[k] = g ? sid_voice(T, g)->env : 0;
+                peak[k] = last[k] > peak[k] ? last[k] : peak[k];
+            }
+        }
+        printf("SID:   new gate at env 0xFF, then 300 blocks (peak/end): MONO %u/%u, POLY same note %u/%u, C64 %u/%u\n",
+               peak[0], last[0], peak[1], last[1], peak[2], last[2]);
+        check("a new gate at env 0xFF (MONO, POLY same note, C64 key): the voice sounds on at its sustain",
+              top[0] == 0xffu && top[1] == 0xffu && top[2] == 0xffu &&
+              last[0] == 0xffu && last[1] == 0xffu && last[2] == 0xffu);
+    }
     /* every preset: deterministic, sounding, bounded, and over after its release */
     {
         int sound = 1, bounded = 1, ends = 1, det = 1;
