@@ -423,6 +423,10 @@ Plan: `docs/analysis/phase1-plan.md`.
       ROLL waits for the track's next bar line while playing (Theo 2026-10-15): a click restarted the line mid-bar
       and a quick turn stuttered; stopped, at once. Not saved: a seed still waiting when saved is not kept.
       Device check passed on build 1.1.4 (test installer /test/1.1.4/webapp/installer/ on the site, as 1.1.3's)
+- [x] ROLL's range 1..128, with the knobs' acceleration (Theo 2026-10-15: 9999 too many to turn through): a quick
+      half turn across it. Seeds saved by 1.1.3-1.1.5 (up to 9999) load and play as they were; ROLL from one lands
+      in 1..128 (turning back does not return to it). Baseline rewritten (every fresh seed another). Branch
+      `roll-range` (on `markov-density`); device check pending, then merge
 - [x] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
       done with SEED, to keep that change to one thing): 70 (2026-10-15), for a fresh track only; saved projects
       keep theirs. Baseline rewritten (the Markov scenarios' notes, every state and the saved block's hash).

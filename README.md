@@ -50,7 +50,7 @@ On the **PATTERN** page, the **MODE** knob switches a track between the original
   * `ROLL`: Each step of the knob is a new line; turning back brings the last one again, note for note. While
     playing, the new line starts on the track's next bar line (the number blinks while it waits), so it starts in
     time and a quick turn plays only where it stops; stopped, it changes at once. The small number is the track's
-    seed (1–9999), a marker to find a line again. A seed sets the track's random choices and its starting material (Turing's
+    seed (1–128), a marker to find a line again. A seed sets the track's random choices and its starting material (Turing's
     register, Euclid's pitches, Markov's first state); PLAY starts its random choices from the top, so with
     EVERY off a seed always plays the same line. A new track gets a random seed when a generator is first
     selected or played, so each power-on starts somewhere new; a saved project keeps its seeds.
