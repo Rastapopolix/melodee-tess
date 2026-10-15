@@ -423,8 +423,10 @@ Plan: `docs/analysis/phase1-plan.md`.
       ROLL waits for the track's next bar line while playing (Theo 2026-10-15): a click restarted the line mid-bar
       and a quick turn stuttered; stopped, at once. Not saved: a seed still waiting when saved is not kept.
       Device check passed on build 1.1.4 (test installer /test/1.1.4/webapp/installer/ on the site, as 1.1.3's)
-- [ ] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
-      done with SEED, to keep that change to one thing)
+- [x] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
+      done with SEED, to keep that change to one thing): 70 (2026-10-15), for a fresh track only; saved projects
+      keep theirs. Baseline rewritten (the Markov scenarios' notes, every state and the saved block's hash).
+      Branch `markov-density`; device check pending, then merge
 
 ### 2. Signal bus and parameter IDs
 - [ ] Central parameter IDs and ranges

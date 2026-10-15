@@ -47,7 +47,8 @@ All randomness comes from `rng()`, the one random generator the whole firmware s
   leaps of three or more more likely.
 - The note is the track's root + **two semitones per state** (a whole-tone ladder, not the scale's
   degrees) from C2, plus a random octave within the span, snapped down to the scale. Velocity 95–114.
-- **DENSITY** is the chance a step plays at all. Its default is 100: every step plays.
+- **DENSITY** is the chance a step plays at all. Its default was 100 (every step plays); 70 since
+  2026-10-15 (risk 5).
 
 ### Morph (crossfade between two rhythms)
 
@@ -116,7 +117,7 @@ Two hours per setting (the `longform` probe; windows of 4 bars):
    long stretches because it is clamped), Morph's rhythm A. Over hours the music wanders anywhere in
    the parameter space and never returns to the opening idea, the opposite of the ROADMAP's "A is home".
 5. **Monotony: Markov plays every step.** DENSITY defaults to 100 and nothing varies it: 16 notes a bar
-   forever, an unbroken run of sixteenths.
+   forever, an unbroken run of sixteenths. (Eased 2026-10-15: the default is 70.)
 6. **Not reproducible from a seed.** `rng()` is shared with the arpeggiator, step chance, LFO S&H on
    tracks 1–3 and some engines' noise, so a generator's choices depend on what else is playing. The
    same project does not replay the same music.
