@@ -125,12 +125,53 @@ int cord_set(uint32_t i, const cord_t *c)
     return 1;
 }
 const cord_t *cord_get(uint32_t i) { return i < CORD_MAX ? &cords[i] : 0; }
+/* every cord off, the interrupt left as it is (tessera_reset: a project load, NEW, a restore). The masks first: the
+ * audio interrupt never finds a cord it was told of half cleared */
+static void cord_reset(void)
+{
+    uint32_t t;
+    for (t = 0; t < NTRK; t++) cord_mask[t] = cord_smask[t] = 0;
+    cord_envsrc = 0;
+    memset(cords, 0, sizeof cords);
+}
 void cord_clear(void)
 {
     TESS_IRQ_OFF();
-    memset(cords, 0, sizeof cords);
+    cord_reset();
+    TESS_IRQ_ON();
+}
+
+/* ------------------------------------------------------------ saved (project.c, the Tessera object) --- */
+/* the cords as saved: CORD_MAX x 6 bytes, src src_trk dst dst_trk amount offset (CORD_LIVE in use, the rest kept 0) */
+#define CORD_PK_BYTES (CORD_MAX * 6u)
+static void cord_pack(uint8_t *out)
+{
+    uint32_t i;
+    for (i = 0; i < CORD_MAX; i++, out += 6) {
+        const cord_t *c = &cords[i];
+        out[0] = c->src; out[1] = c->src_trk; out[2] = c->dst; out[3] = c->dst_trk;
+        out[4] = (uint8_t)c->amount; out[5] = (uint8_t)c->offset;
+    }
+}
+/* a saved block -> the cords: every cord checked first (a code, a track, a percentage out of range: refused whole,
+ * nothing changed); 1 loaded, 0 refused. Main loop */
+static int cord_unpack(const uint8_t *in)
+{
+    cord_t got[CORD_MAX];
+    uint32_t i;
+    for (i = 0; i < CORD_MAX; i++, in += 6) {
+        cord_t *c = &got[i];
+        c->src = in[0]; c->src_trk = in[1]; c->dst = in[2]; c->dst_trk = in[3];
+        c->amount = (int8_t)in[4]; c->offset = (int8_t)in[5];
+        if (c->src >= CS_N || c->src_trk >= NTRK || c->dst >= CD_N || !cord_dest(c->dst) || c->dst_trk >= NTRK ||
+            c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100)
+            return 0;
+    }
+    TESS_IRQ_OFF();
+    memcpy(cords, got, sizeof cords);
     cord_masks();
     TESS_IRQ_ON();
+    return 1;
 }
 uint32_t cord_count(void)
 {

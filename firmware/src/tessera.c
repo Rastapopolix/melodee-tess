@@ -947,10 +947,12 @@ int tessera_unpack_v1(const uint8_t *in)
 }
 
 /* every track back to OFF and its settings to their defaults (a project load starts from this) */
+static void cord_reset(void);                           /* (cord.c) */
 void tessera_reset(void)
 {
     tessera_ensure_init();
     tessera_init();
+    cord_reset();                                       /* the cords are the project's too: none */
 }
 
 /* ------------------------------------------------------------ the UI's view --- */

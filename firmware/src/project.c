@@ -496,8 +496,20 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
 #define TESS_OBJ_MAGIC_V1 0x31525354u                 /* "TSR1": version 1, read and converted (tess_obj_v1) */
 #define TESS_SLOT_BYTES_V1 (4u + TESSERA_PK_BYTES_V1)
 #define TESS_OBJ_BYTES_V1 (4u + 4u * TESS_SLOT_BYTES_V1)
-_Static_assert(TESS_OBJ_BYTES <= ST_SECTOR - 256u - sizeof(st_hdr_t), "Tessera object: one sector");
-static uint8_t tess_blob[TESS_OBJ_BYTES] __attribute__((section(".pool")));
+/* the cords (cord.c), after the blocks: "CRD1", then per slot a tag (as the slot's block's) and its cords. An object
+ * without them (TESS_OBJ_BYTES: saved before cords) reads as every slot without cords */
+#define TESS_CRD_MAGIC 0x31445243u                    /* "CRD1" */
+#define TESS_CRD_SLOT (4u + CORD_PK_BYTES)
+#define TESS_OBJ_BYTES_CRD (TESS_OBJ_BYTES + 4u + 4u * TESS_CRD_SLOT)
+_Static_assert(TESS_OBJ_BYTES_CRD <= ST_SECTOR - 256u - sizeof(st_hdr_t), "Tessera object: one sector");
+static uint8_t tess_blob[TESS_OBJ_BYTES_CRD] __attribute__((section(".pool")));
+static uint8_t *tess_crd(uint32_t slot) { return tess_blob + TESS_OBJ_BYTES + 4u + (slot & 3u) * TESS_CRD_SLOT; }
+static void tess_crd_empty(void)                      /* the cords' part: its magic, no slot's */
+{
+    uint32_t m = TESS_CRD_MAGIC;
+    memset(tess_blob + TESS_OBJ_BYTES, 0, 4u + 4u * TESS_CRD_SLOT);
+    memcpy(tess_blob + TESS_OBJ_BYTES, &m, 4);
+}
 
 /* tess_blob holding a version 1 object (TESS_OBJ_BYTES_V1 at its start) -> version 2 in place: each slot's tag
  * kept, each track given its seed (tessera_v1_track). From the end down, so nothing is overwritten before it is
@@ -524,16 +536,23 @@ static void tess_obj_v1(void)
 /* the stored object -> tess_blob (version 1 converted); 0 = none / damaged (tess_blob then empty, ready to fill) */
 static int tess_obj_read(void)
 {
-    uint32_t m = TESS_OBJ_MAGIC, got;
+    uint32_t m = TESS_OBJ_MAGIC, got, crd;
     int n = st_load(OBJ_TESSERA, tess_blob, sizeof tess_blob);
     memcpy(&got, tess_blob, 4);
-    if (n == (int)sizeof tess_blob && got == m) return 1;
+    memcpy(&crd, tess_blob + TESS_OBJ_BYTES, 4);
+    if (n == (int)sizeof tess_blob && got == m && crd == TESS_CRD_MAGIC) return 1;
+    if (n == (int)TESS_OBJ_BYTES && got == m) {        /* (saved before cords) */
+        tess_crd_empty();
+        return 1;
+    }
     if (n == (int)TESS_OBJ_BYTES_V1 && got == TESS_OBJ_MAGIC_V1) {
         tess_obj_v1();
+        tess_crd_empty();
         return 1;
     }
     memset(tess_blob, 0, sizeof tess_blob);
     memcpy(tess_blob, &m, 4);
+    tess_crd_empty();
     return 0;
 }
 static uint8_t *tess_slot(uint32_t slot) { return tess_blob + 4u + (slot & 3u) * TESS_SLOT_BYTES; }
@@ -544,8 +563,9 @@ static uint8_t *tess_slot(uint32_t slot) { return tess_blob + 4u + (slot & 3u) *
 static uint32_t tess_saved_hash[4];
 static uint32_t tessera_live_hash(void)
 {
-    uint8_t b[TESSERA_PK_BYTES];                      /* (main loop: on the stack) */
+    uint8_t b[TESSERA_PK_BYTES + CORD_PK_BYTES];      /* (main loop: on the stack; the cords too) */
     tessera_pack(b);
+    cord_pack(b + TESSERA_PK_BYTES);
     return proj_hash(b, sizeof b);
 }
 
@@ -559,6 +579,8 @@ static int tessera_store_save(uint32_t slot)
     tess_obj_read();
     memcpy(tess_slot(slot), &tag, 4);
     tessera_pack(tess_slot(slot) + 4u);
+    memcpy(tess_crd(slot), &tag, 4);
+    cord_pack(tess_crd(slot) + 4u);
     return st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob) ? 1 : 0;
 #else
     (void)slot; return 0;
@@ -573,6 +595,8 @@ static void tessera_store_load(uint32_t slot)
     if (!flash_ok || !want || !tess_obj_read()) return;
     memcpy(&tag, tess_slot(slot), 4);
     if (tag == want) tessera_unpack(tess_slot(slot) + 4u);
+    memcpy(&tag, tess_crd(slot), 4);
+    if (tag == want) (void)cord_unpack(tess_crd(slot) + 4u);   /* (else none: tessera_reset cleared them) */
 #else
     (void)slot;
 #endif
@@ -587,6 +611,8 @@ static void tessera_store_retag(uint32_t slot, uint32_t old_tag)
     memcpy(&tag, tess_slot(slot), 4);
     if (tag != old_tag) return;
     memcpy(tess_slot(slot), &now, 4);
+    memcpy(&tag, tess_crd(slot), 4);
+    if (tag == old_tag) memcpy(tess_crd(slot), &now, 4);
     (void)st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob);
 #else
     (void)slot; (void)old_tag;
@@ -602,22 +628,33 @@ static uint32_t tessera_store_restore(const uint8_t *raw, uint32_t len)
     uint8_t live[TESSERA_PK_BYTES];
     uint32_t m = TESS_OBJ_MAGIC, got, tag, slot, ok = 1;
     if (len) {
-        int v1 = len == TESS_OBJ_BYTES_V1;              /* (an older backup: converted below) */
-        uint32_t sb = v1 ? TESS_SLOT_BYTES_V1 : TESS_SLOT_BYTES;
+        int v1 = len == TESS_OBJ_BYTES_V1, crd = len == TESS_OBJ_BYTES_CRD;   /* (v1, before cords: converted below) */
+        uint32_t sb = v1 ? TESS_SLOT_BYTES_V1 : TESS_SLOT_BYTES, cm = 0;
+        uint8_t live_c[CORD_PK_BYTES];
         memcpy(&got, raw, 4);
-        if (v1 ? got != TESS_OBJ_MAGIC_V1 : len != TESS_OBJ_BYTES || got != m) return 2;
+        if (crd) memcpy(&cm, raw + TESS_OBJ_BYTES, 4);
+        if (v1 ? got != TESS_OBJ_MAGIC_V1 : (len != TESS_OBJ_BYTES && !crd) || got != m || (crd && cm != TESS_CRD_MAGIC))
+            return 2;
         tessera_pack(live);
+        cord_pack(live_c);
         for (slot = 0; slot < 4u && ok; slot++) {
             memcpy(&tag, raw + 4u + slot * sb, 4);
             if (tag) ok = (v1 ? tessera_unpack_v1 : tessera_unpack)(raw + 4u + slot * sb + 4u) == 1;
+            if (crd && ok) {
+                memcpy(&tag, raw + TESS_OBJ_BYTES + 4u + slot * TESS_CRD_SLOT, 4);
+                if (tag) ok = cord_unpack(raw + TESS_OBJ_BYTES + 4u + slot * TESS_CRD_SLOT + 4u);
+            }
         }
         tessera_unpack(live);
+        (void)cord_unpack(live_c);
         if (!ok) return 2;
         memcpy(tess_blob, raw, len);
         if (v1) tess_obj_v1();
+        if (!crd) tess_crd_empty();
     } else {
         memset(tess_blob, 0, sizeof tess_blob);
         memcpy(tess_blob, &m, 4);
+        tess_crd_empty();
     }
     return flash_ok && !st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob) ? 0u : 4u;
 }

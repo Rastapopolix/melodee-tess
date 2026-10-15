@@ -268,17 +268,21 @@ static uint32_t get_all(uint32_t id, uint8_t *out, uint32_t len)   /* 0 read */
 }
 static int tessera_archive(void)
 {
-    static uint8_t obj[TESS_OBJ_BYTES], live[TESSERA_PK_BYTES], now[TESSERA_PK_BYTES], bad_obj[TESS_OBJ_BYTES];
+    static uint8_t obj[TESS_OBJ_BYTES_CRD], live[TESSERA_PK_BYTES], now[TESSERA_PK_BYTES], bad_obj[TESS_OBJ_BYTES_CRD];
     uint32_t len28 = 0, crc28 = 0, len29 = 0, crc29 = 0, before;
     int bad = 0, ok;
     reset();
     flash_ok = 1;
     song.sel = 0; tessera_knob(0, TESS_ENG_TURING);
     song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
+    {
+        cord_t c = {CS_LFO, 0, CD_CUTOFF, 1, 40, 0};   /* a cord, saved with the slot (the cords' part) */
+        cord_set(2, &c);
+    }
     project_save_as(0, "GENERATORS");                 /* slot 1's block, tagged */
     song.sel = 2; tessera_knob(0, TESS_ENG_MARKOV);   /* the live state: one more than the saved one */
     tessera_pack(live);
-    ok = !list(28, &len28, &crc28) && !list(29, &len29, &crc29) && len28 == TESS_OBJ_BYTES && len29 == TESSERA_PK_BYTES;
+    ok = !list(28, &len28, &crc28) && !list(29, &len29, &crc29) && len28 == TESS_OBJ_BYTES_CRD && len29 == TESSERA_PK_BYTES;
     ok &= !get_all(28, obj, len28) && !get_all(29, now, len29) && st_crc32(obj, len28) == crc28 && !memcmp(now, live, sizeof live);
     bad += check("LIST / GET: the generators (28: the saved slots', 29: the live ones)", ok);
     memset(nor + 0x9D000, 0xFF, 2u * ST_SECTOR);      /* a fresh FM-1: no generators stored, none live */
@@ -287,8 +291,26 @@ static int tessera_archive(void)
     tessera_pack(now);
     bad += check("PUT 28 and 29 restore the live generators", ok && !memcmp(now, live, sizeof live));
     tessera_reset(); project_load(0);
-    bad += check("... and the saved slot's: loading it brings its generators back",
-                 tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF);
+    bad += check("... and the saved slot's: loading it brings its generators back, and its cord",
+                 tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF &&
+                 cord_get(2)->dst == CD_CUTOFF && cord_get(2)->amount == 40 && cord_count() == 1u);
+    memcpy(bad_obj, obj, sizeof bad_obj);
+    bad_obj[TESS_OBJ_BYTES + 4u + 4u + 2u * 6u + 2u] = CD_N;   /* slot 1's cords: cord 3's destination out of range */
+    before = erases;
+    ok = put_all(28, bad_obj, sizeof bad_obj, st_crc32(bad_obj, sizeof bad_obj)) == 2 && erases == before;
+    bad += check("a damaged cord in a slot is refused before any erase", ok);
+    {   /* an archive from before cords: the object without its cords' part ("TSR2" alone) */
+        memset(nor + 0x9D000, 0xFF, 2u * ST_SECTOR);
+        tessera_reset();
+        ok = !put_all(28, obj, TESS_OBJ_BYTES, st_crc32(obj, TESS_OBJ_BYTES));
+        tessera_reset(); project_load(0);
+        ok &= tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && cord_count() == 0u;
+        ok &= !list(28, &len28, &crc28) && len28 == TESS_OBJ_BYTES_CRD;
+        bad += check("an archive from before cords restores: the generators, no cords, stored with the cords' part", ok);
+        ok = !put_all(28, obj, sizeof obj, st_crc32(obj, sizeof obj));   /* (back as it was, for the checks below) */
+        tessera_reset(); project_load(0);
+        bad += check("... and the whole object again: the cord back", ok && cord_count() == 1u);
+    }
     memcpy(bad_obj, obj, sizeof bad_obj);
     bad_obj[4u + 4u + 1u * (TESSERA_PK_BYTES / TESSERA_TRACKS)] = TESS_ENG_COUNT;   /* slot 1's block: track 2's engine out of range */
     before = erases; tessera_pack(live);
@@ -322,7 +344,7 @@ static int tessera_archive(void)
         bad += check("an older archive (version 1: 28 \"TSR1\", 29 of 180 bytes) restores, each track given a seed", ok);
         tessera_reset(); project_load(0);
         ok = tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF;
-        ok &= !list(28, &len28, &crc28) && len28 == TESS_OBJ_BYTES;   /* stored as version 2 */
+        ok &= !list(28, &len28, &crc28) && len28 == TESS_OBJ_BYTES_CRD;   /* stored as version 2, with the cords' part */
         bad += check("... its saved slot loads with its generators, and the object is stored as version 2", ok);
     }
     bad += check("an empty 29 (no live generators in the archive): all OFF",
