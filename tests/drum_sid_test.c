@@ -293,6 +293,26 @@ int main(int argc, char **argv)
         check("KIT 808 -> SID while ringing: the 808's voices end, SID plays on one", before == 8u && !after &&
               one == 1u && pk > 1000);
     }
+    {   /* kick, tom and closed hat together, loud, DIGI off and on: never a wrapped sample (a sign-flip spike) */
+        static const uint8_t TOMS[4] = {50, 48, 45, 41};
+        uint32_t wraps[2] = {0, 0};
+        int32_t pk = 0;
+        for (int digi = 0; digi < 2; digi++) {
+            kit(2, digi);
+            trk[0].p[P_E2] = 78; trk[0].p[P_E4] = 81; trk[0].p[P_E5] = 37;
+            for (k = 0; k < 8u; k++) {
+                trk_note_on(&trk[0], 36, 127); trk_note_on(&trk[0], 42, 127); trk_note_on(&trk[0], TOMS[k % 4u], 127);
+                run(a, 86);
+                for (i = 0; i < 86u * CTL; i++) {
+                    wraps[digi] += i && abs(a[i] - a[i - 1]) > 60000;
+                    pk = abs(a[i]) > pk ? abs(a[i]) : pk;
+                }
+            }
+        }
+        printf("SID KIT:   kick + tom + hat, 8 times: wrapped samples DIGI off %u, on %u; peak %d\n", wraps[0], wraps[1], (int)pk);
+        check("kick, tom and hat together: no sample wraps (voice_amp's 16 bits), under the part's scale",
+              !wraps[0] && !wraps[1] && pk < 60000);
+    }
     {   /* levels next to the 808; the kit at its corners does not clip */
         int32_t p8[3], ps[3], pd[2], pk = 0;
         static const uint8_t N[3] = {36, 38, 42};
