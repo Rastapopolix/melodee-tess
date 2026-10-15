@@ -502,6 +502,41 @@ static int test_cords_page(void)
     return bad;
 }
 
+/* help (ui_help.c): ARP held, a knob turned shows its help and changes nothing; letting ARP go opens no page */
+static int test_help_gesture(void)
+{
+    int bad = 0;
+    int32_t was;
+    ui_power_on();
+    tessera_param_set(0, TX_MODE, TESS_ENG_MARKOV);
+    go_title("EVOLVE");
+    frame();
+    was = tessera_param_get(0, TX_EV_AMOUNT);
+    fm1_in.buttons |= 1u << panel.btn[B_ARP];
+    frame();
+    turn(EN_K1 + 2u, 3);
+    bad += check("ARP held, KNOB 3 on EVOLVE: AMOUNT's help, AMOUNT itself unchanged",
+                 help.on && help.pid == PID_TESS(TX_EV_AMOUNT) && tessera_param_get(0, TX_EV_AMOUNT) == was);
+    turn(EN_K1, 1);
+    bad += check("...another knob while held: its help instead (LOCK)", help.on && help.pid == PID_TESS(TX_EV_LOCK));
+    fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
+    frame();
+    frame();
+    bad += check("ARP let go: the help closes, and no page opens (still EVOLVE)", !help.on && str_eq(cur_page()->title, "EVOLVE"));
+    go_title("LFO");
+    fm1_in.buttons |= 1u << panel.btn[B_ARP];
+    frame();
+    turn(EN_K1, 1);
+    bad += check("a Melodee page (LFO, KNOB 1): found by where the value lives (LFO RATE)",
+                 help.on && help.pid == PID_TRACK(P_LRATE) && pid_find(help.pid)->help[0]);
+    fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
+    frame();
+    frame();
+    press(B_ARP);
+    bad += check("ARP tapped alone still opens GEN", !ui.home && str_eq(cur_page()->title, "GEN"));
+    return bad;
+}
+
 static int test_rec(void)
 {
     static const uint8_t FAMS[3] = {FAM_TRK, FAM_SEQ, FAM_ARP};
@@ -4605,6 +4640,7 @@ int main(void)
     bad += test_rec();
     bad += test_gen_family();
     bad += test_cords_page();
+    bad += test_help_gesture();
     bad += test_midi();
     bad += test_save();
     bad += test_actions();

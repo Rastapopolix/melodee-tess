@@ -1535,6 +1535,8 @@ static void page_knob(uint32_t k, int32_t s)
 {
     const page_t *pg = cur_page();
     int16_t *hv;
+    if (!pop.on && help_knob(k))                       /* ARP held: the knob's help, the value left (ui_help.c) */
+        return;
     if (ui.home || pg->scope == SC_STEP || pg->scope == SC_TRK || ((pg->scope==SC_DRUM || pg->scope==SC_DRUMHIT) && pg->id[k]!=255) || page_desc(pg, k, &hv) ||
         (pg->graph == GR_USER && k == 0u) || (pg->graph == GR_MOD && k == 1u)
         || pg->graph == GR_SONG || pg->graph == GR_PATGRID || pg->graph == GR_SCALE_PICKER || (scale_settings_page(pg) && k == 1u)
@@ -1974,6 +1976,13 @@ static void ui_input(void)
         }
     }
     if(momentary.active)ui.pg_down&=(uint16_t)~(1u<<panel.btn[B_LFO]);
+    if (help.on) {                                      /* (ARP held for help: its release opens no page) */
+        ui.pg_down &= (uint16_t)~(1u << panel.btn[B_ARP]);
+        if (!(fm1_in.buttons & (1u << panel.btn[B_ARP]))) {
+            help.on = 0;
+            ui.force = 1;
+        }
+    }
     b = ui.pg_down & ~fm1_in.buttons;
     ui.pg_down &= (uint16_t)~b;
     for (id = 0; b; id++, b >>= 1)

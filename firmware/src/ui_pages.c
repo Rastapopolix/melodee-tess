@@ -73,6 +73,7 @@ static uint32_t pv_kind(void)
 }
 
 #include "ui_cords.c"                                  /* CORDS (Tessera) */
+#include "ui_help.c"                                   /* ARP held + a knob: its help (Tessera) */
 
 /* MOD (docs/design: mock/r6_pages MOD): the matrix's four routes as rows, "1  LFO -> Cutoff  +62 %" over the amount's
  * bar (from the middle); the route KNOB 2 is on: a card in the track's colour; unused routes dim. The knobs' chips

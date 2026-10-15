@@ -1270,6 +1270,18 @@ static void ui_draw_frame(void)
         draw_head();                                    /* recording remains visible over confirmations */
         return;
     }
+    if (help.on) {                                      /* ARP held + a knob: its help over the page, dimmed (ui_help.c) */
+        if (ui.force) {
+            cv_dim = cv_under = 1;
+            draw_page();
+            cv_dim = cv_under = 0;
+            ui.force = 1;
+            help_draw();
+            ui.force = 0;
+        }
+        draw_head();
+        return;
+    }
     if (smap.on && (ui.home || cur_page()->fam != FAM_EDIT || ui.layer))
         smap.on = 0;
     if (smap.on) {                                      /* an engine's map (ui_sections.c) */
