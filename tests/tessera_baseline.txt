@@ -44,8 +44,8 @@ mute_and_unmute 0x6a71f62b 52
 mute_and_unmute.state 0x05737014
 knobs_while_playing 0xd56f14d2 54
 knobs_while_playing.state 0x02958812
-midi_clock_start_stop_continue 0xca888c2c 126
-midi_clock_start_stop_continue.state 0x579100d4
+midi_clock_start_stop_continue 0xf271d3c2 126
+midi_clock_start_stop_continue.state 0xdb35d75a
 swing_track40_global30 0x504aa185 80
 swing_track40_global30.state 0x25f05595
 track_len_shorter_than_loop 0x17251102 80

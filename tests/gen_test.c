@@ -252,6 +252,16 @@ static void markov_tests(void)
     check("markov: four draws a step, in the order degree, octave, velocity, density", draws);
     check("markov: the same seed gives the same steps", same);
     check("markov: mutation keeps TENSION 0..100 and changes nothing else", mut);
+    {   /* turning back at 0 and 100: at AMOUNT 100, 4000 mutations rest on a bound only about 2 % of the time */
+        gen_markov_t g = {3, 0, 100, 80, 2};
+        uint32_t at = 0;
+        for (uint32_t n = 0; n < 4000; n++) {
+            gen_markov_mutate(&g, 100, &rng_state);
+            at += g.tension == 0 || g.tension == 100;
+        }
+        check("markov: mutation turns TENSION back at 0 and 100, never sitting there (AMOUNT 100: under 5 % of 4000)",
+              at < 200u);
+    }
 }
 
 /* ------------------------------------------------------------------ Morph --- */

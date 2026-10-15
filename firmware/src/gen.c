@@ -228,6 +228,8 @@ static void gen_markov_mutate(gen_markov_t *g, uint32_t amt, uint32_t *rnd)
 {
     int32_t j = (int32_t)gen_rnd(rnd, amt + 1u) - (int32_t)(amt / 2u);
     int32_t v = (int32_t)g->tension + j;
+    if (v < 0) v = -v;
+    if (v > 100) v = 200 - v;
     g->tension = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
 }
 
