@@ -756,6 +756,10 @@ static void edit_param(uint32_t slot, int32_t steps)
         patgrid_edit(slot, steps);
         return;
     }
+    if (pg->graph == GR_CORDS) {                        /* CORDS (ui_cords.c) */
+        cu_knob(slot, steps);
+        return;
+    }
     if (pg->graph == GR_SONG) {                       /* KNOB 1 the section, 2 the track, 3 its pattern there, 4 the
                                                        * section's repeats (TAKE JAM: REC held) */
         if (slot == 0u) {
@@ -1561,7 +1565,7 @@ static void page_knob(uint32_t k, int32_t s)
     } else {
         edit_param(k, s);
         pg = cur_page();
-        if (!(pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_TWEAK ||   /* Tessera's own pages: no picker */
+        if (!(pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_TWEAK || pg->graph == GR_CORDS ||   /* Tessera's own pages: no picker */
               (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF))))
             pick_touch(k);                              /* a name from a long list: its picker (ui_popup.c) */
     }

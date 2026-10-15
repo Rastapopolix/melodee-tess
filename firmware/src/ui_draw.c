@@ -341,6 +341,7 @@ static uint8_t col_style;                               /* (ui_pages.c pv_column
 static uint8_t col_quiet;                               /* the next card's value is an aside (ROLL's seed): 9 px, mid */
 static void pv_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc, int32_t ratio,
                       int hot);
+static void cu_columns(void);                           /* CORDS (ui_cords.c) */
 static void draw_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc,
                         int32_t ratio, uint32_t icon)
 {
@@ -848,6 +849,10 @@ static void draw_columns(void)
             }
             return;
         }
+    }
+    if (cur_page()->graph == GR_CORDS) {                 /* (ui_cords.c) */
+        cu_columns();
+        return;
     }
     if (cur_page()->graph == GR_MOD) {                   /* the route's SRC, the route, its DST AMT */
         const track_t *t = TSEL;

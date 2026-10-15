@@ -15,7 +15,7 @@
  * the selected track's lifted, the knob just turned (its control) in text.
  * Each part remembers what it drew. draw_column draws the knobs in the style col_style asks (pv_column). Included by
  * ui_draw.c */
-enum { PV_NONE, PV_CURVE, PV_RINGS, PV_FADERS, PV_MIXER, PV_NOTES, PV_MOD, PV_GRID };
+enum { PV_NONE, PV_CURVE, PV_RINGS, PV_FADERS, PV_MIXER, PV_NOTES, PV_MOD, PV_GRID, PV_CORDS };
 #define PV_GRID_Y 22                                    /* the drum grid: its panel, rows 22 .. 195 */
 #define PV_GRID_H 174
 static void list_words(char *d, const char *label, uint32_t n);   /* ui_list.c */
@@ -67,8 +67,12 @@ static uint32_t pv_kind(void)
         return PV_NOTES;
     if (pg->graph == GR_MOD)
         return PV_MOD;
+    if (pg->graph == GR_CORDS)
+        return PV_CORDS;
     return PV_NONE;
 }
+
+#include "ui_cords.c"                                  /* CORDS (Tessera) */
 
 /* MOD (docs/design: mock/r6_pages MOD): the matrix's four routes as rows, "1  LFO -> Cutoff  +62 %" over the amount's
  * bar (from the middle); the route KNOB 2 is on: a card in the track's colour; unused routes dim. The knobs' chips
@@ -952,6 +956,18 @@ static void pv_draw(void)
             pv.gplay = px;
             pv_panel(PV_GRID_Y, PV_GRID_H, pv_grid);
         }
+        return;
+    }
+    if (kind == PV_CORDS) {                             /* (as MOD: the rows, the chips under them) */
+        if (ui.force)
+            lcd_fill(0, H_HEAD, 240, 240 - H_HEAD, T_BG);
+        draw_head();
+        cu_rows();
+        col_style = CS_CHIP;
+        pv_chip_y = 220;
+        draw_columns();
+        pv_chip_y = PV_CHIP_Y;
+        col_style = CS_CARD;
         return;
     }
     if (kind == PV_MOD) {
