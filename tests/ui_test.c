@@ -475,6 +475,33 @@ static int test_gen_family(void)
     return bad;
 }
 
+/* CORDS (ui_cords.c): KNOB 2 the cord, 1 its source, 3 its destination, 4 the move (a fixed cord's: its OFFSET) */
+static int test_cords_page(void)
+{
+    int bad = 0;
+    const cord_t *c;
+    ui_power_on();
+    cord_clear();
+    go_title("CORDS");
+    turn(EN_K1 + 1u, 1);
+    bad += check("CORDS: KNOB 2 picks the cord (2 of 16)", cord_ui_sel == 1u);
+    c = cord_get(1);
+    turn(EN_K1 + 2u, 1);
+    bad += check("KNOB 3 from --: track 1's first destination (PITCH), a fixed 25 % at once",
+                 c->dst == CD_PITCH && c->dst_trk == 0u && c->offset == 25 && !c->amount && cord_count() == 1u);
+    turn(EN_K1, 1);
+    bad += check("KNOB 1 from --: track 1's LFO, the fixed move become its amount", c->src == CS_LFO && c->src_trk == 0u &&
+                 c->amount == 25 && !c->offset);
+    turn(EN_K1 + 3u, -3);
+    bad += check("KNOB 4: the amount down by 3 (22 %)", c->amount == 22);
+    turn(EN_K1, -1);
+    bad += check("KNOB 1 back to --: the move kept as its OFFSET", c->src == CS_OFF && c->offset == 22 && !c->amount);
+    turn(EN_K1 + 1u, -5);
+    bad += check("KNOB 2 stops at cord 1", cord_ui_sel == 0u);
+    cord_clear();
+    return bad;
+}
+
 static int test_rec(void)
 {
     static const uint8_t FAMS[3] = {FAM_TRK, FAM_SEQ, FAM_ARP};
@@ -4577,6 +4604,7 @@ int main(void)
     bad += test_no_phrases();
     bad += test_rec();
     bad += test_gen_family();
+    bad += test_cords_page();
     bad += test_midi();
     bad += test_save();
     bad += test_actions();
