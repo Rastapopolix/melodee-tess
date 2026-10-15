@@ -941,6 +941,137 @@ void tessera_reset(void)
 }
 
 /* ------------------------------------------------------------ the UI's view --- */
+/* ------------------------------------------------------------ parameters by number (pid.c) --- */
+static int32_t tess_clampi(int32_t v, int32_t lo, int32_t hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+int32_t tessera_param_get(uint32_t tr, uint32_t x)
+{
+    const tessera_evolve_t *ev;
+    if (tr >= TESSERA_TRACKS) return 0;
+    ev = &tessera.evolve[tr];
+    switch (x) {
+    case TX_MODE: return tessera.mode[tr];
+    case TX_TUR_LEN: return tessera.turing[tr].len;
+    case TX_TUR_PROB: return tessera.turing[tr].prob;
+    case TX_TUR_SPAN: return tessera.turing[tr].oct_span;
+    case TX_EUC_STEPS: return tessera.euclid[tr].steps;
+    case TX_EUC_PULSES: return tessera.euclid[tr].pulses;
+    case TX_EUC_ROT: return tessera.euclid[tr].rot;
+    case TX_MKV_LEAP: return tessera.markov[tr].tension;
+    case TX_MKV_DENS: return tessera.markov[tr].density < 5u ? 100 : tessera.markov[tr].density;   /* (0 = 100) */
+    case TX_MKV_SPAN: return tessera.markov[tr].oct_span;
+    case TX_MRP_POS: return tessera.morph[tr].morph_pos;
+    case TX_MRP_SNPA: return (tessera.morph[tr].step_idx >> 4) & 7u;
+    case TX_MRP_SNPB: return tessera.morph[tr].oct_span & 7u;
+    case TX_EV_LOCK: return tessera.mode[tr] == TESS_ENG_TURING ? 100 - tessera.turing[tr].prob : ev->lock;
+    case TX_EV_EVERY: return ev->every;
+    case TX_EV_AMOUNT: return ev->amount;
+    case TX_EV_SEED: return tessera.roll[tr] ? tessera.roll[tr] : tessera.seed[tr];   /* (ROLL's, while it waits) */
+    case TX_FM_FORM: return ev->form;
+    case TX_FM_CONTRAST: return ev->contrast;
+    case TX_FM_FLOURISH: return ev->flourish;
+    case TX_TW_SHIFT: return ev->shift;
+    case TX_TW_DROP: return ev->drop;
+    case TX_TW_HUMAN: return ev->human;
+    case TX_TW_FOLLOW: return ev->follow;
+    }
+    return 0;
+}
+
+/* the knobs' edits (tess_knob_body and the page bodies), by value instead of by a turn, on any track; a generator's
+ * settings apply whatever its MODE, as a project load sets them */
+static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
+{
+    tessera_evolve_t *ev = &tessera.evolve[tr];
+    tessera_euclid_t *euc = &tessera.euclid[tr];
+    tessera_morph_t *m = &tessera.morph[tr];
+    uint32_t eng = 0;
+    switch (x) {
+    case TX_MODE:
+        v = tess_clampi(v, 0, TESS_ENG_COUNT - 1);
+        if ((uint8_t)v == tessera.mode[tr]) return;
+        seq_release(&trk[tr]);
+        tessera.active_gate[tr] = 0;
+        tessera.mode[tr] = (uint8_t)v;
+        if (v != TESS_ENG_OFF) tess_seed_fresh(tr);
+        if (ev->form) tess_form_restart(tr);
+        tess_rearm(tr);
+        return;
+    case TX_TUR_LEN:
+        tessera.turing[tr].len = (uint8_t)tess_clampi(v, 2, 16);
+        if (tessera.turing[tr].step_idx >= tessera.turing[tr].len) tessera.turing[tr].step_idx = 0;
+        eng = TESS_ENG_TURING; break;
+    case TX_TUR_PROB: tessera.turing[tr].prob = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_TURING; break;
+    case TX_TUR_SPAN: tessera.turing[tr].oct_span = (uint8_t)tess_clampi(v, 1, 3); eng = TESS_ENG_TURING; break;
+    case TX_EUC_STEPS:
+        euc->steps = (uint8_t)tess_clampi(v, 1, 32);
+        if (euc->pulses > euc->steps) euc->pulses = euc->steps;
+        if (euc->rot >= euc->steps) euc->rot = euc->steps > 1 ? (euc->steps - 1) : 0;
+        eng = TESS_ENG_EUCLID; break;
+    case TX_EUC_PULSES: euc->pulses = (uint8_t)tess_clampi(v, 0, euc->steps); eng = TESS_ENG_EUCLID; break;
+    case TX_EUC_ROT: euc->rot = (uint8_t)tess_clampi(v, 0, euc->steps > 1 ? euc->steps - 1 : 0); eng = TESS_ENG_EUCLID; break;
+    case TX_MKV_LEAP: tessera.markov[tr].tension = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_MARKOV; break;
+    case TX_MKV_DENS: tessera.markov[tr].density = (uint8_t)tess_clampi(v, 5, 100); eng = TESS_ENG_MARKOV; break;
+    case TX_MKV_SPAN: tessera.markov[tr].oct_span = (uint8_t)tess_clampi(v, 1, 3); eng = TESS_ENG_MARKOV; break;
+    case TX_MRP_POS: m->morph_pos = (uint8_t)tess_clampi(v, 0, 127); eng = TESS_ENG_MORPH; break;
+    case TX_MRP_SNPA:
+        v = tess_clampi(v, 0, 7);
+        m->step_idx = (uint8_t)((m->step_idx & 0x0Fu) | ((uint32_t)v << 4));
+        m->snap_a = GEN_MORPH_PRESETS[v];
+        eng = TESS_ENG_MORPH; break;
+    case TX_MRP_SNPB:
+        v = tess_clampi(v, 0, 7);
+        m->oct_span = (uint8_t)v;
+        m->snap_b = GEN_MORPH_PRESETS[v];
+        eng = TESS_ENG_MORPH; break;
+    case TX_EV_LOCK:
+        v = tess_clampi(v, 0, 100);
+        if (tessera.mode[tr] == TESS_ENG_TURING) {
+            tessera.turing[tr].prob = (uint8_t)(100 - v);   /* (Turing's LOCK is its PROB turned round) */
+        } else if (tessera.mode[tr] != TESS_ENG_EUCLID) {   /* (Euclid has no LOCK) */
+            uint8_t was = ev->lock;
+            ev->lock = (uint8_t)v;
+            if (!was && ev->lock) tess_rearm(tr);
+        }
+        return;
+    case TX_EV_EVERY: ev->every = (uint8_t)tess_clampi(v, 0, 5); ev->bar_cnt = 0; return;
+    case TX_EV_AMOUNT: ev->amount = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_EV_SEED:
+        tess_seed_fresh(tr);
+        v = tess_clampi(v, 1, (int32_t)TESS_SEED_MAX);
+        tessera.roll[tr] = (uint32_t)v == tessera.seed[tr] ? 0u : (uint16_t)v;   /* (as ROLL: on the bar line) */
+        if (!song.playing) tess_roll_apply(tr);
+        return;
+    case TX_FM_FORM:
+        v = tess_clampi(v, 0, 6);
+        if ((uint8_t)v == ev->form) return;
+        ev->form = (uint8_t)v;
+        if (v && !ev->every) ev->every = 3;
+        tess_form_restart(tr);
+        return;
+    case TX_FM_CONTRAST: ev->contrast = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_FM_FLOURISH: ev->flourish = (int8_t)tess_clampi(v, -12, 12); return;
+    case TX_TW_SHIFT: ev->shift = (int8_t)tess_clampi(v, -24, 24); return;
+    case TX_TW_DROP: ev->drop = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_TW_HUMAN: ev->human = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_TW_FOLLOW:
+        v = tess_clampi(v, 0, TESSERA_TRACKS);
+        ev->follow = (uint8_t)(v == (int32_t)tr + 1 ? 0 : v);   /* (not itself) */
+        return;
+    default:
+        return;
+    }
+    if (tessera.mode[tr] == eng) tess_rearm(tr);
+}
+void tessera_param_set(uint32_t tr, uint32_t x, int32_t v)
+{
+    if (tr >= TESSERA_TRACKS || x >= TX_COUNT) return;
+    tessera_ensure_init();
+    TESS_IRQ_OFF();
+    tess_param_set_body(tr, x, v);
+    TESS_IRQ_ON();
+}
+
 const gen_turing_t *tessera_turing(uint32_t tr) { return &tessera.turing[tr % TESSERA_TRACKS]; }
 const gen_euclid_t *tessera_euclid(uint32_t tr) { return &tessera.euclid[tr % TESSERA_TRACKS]; }
 const gen_markov_t *tessera_markov(uint32_t tr) { return &tessera.markov[tr % TESSERA_TRACKS]; }

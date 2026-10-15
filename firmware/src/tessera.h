@@ -108,6 +108,22 @@ int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (rang
 int tessera_unpack_v1(const uint8_t *in);           /* the same for a version 1 block */
 void tessera_v1_track(const uint8_t *in, uint8_t *out);   /* one track's record, version 1 -> 2 */
 void tessera_reset(void);                           /* every track OFF, defaults */
+/* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
+ * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
+enum {
+    TX_MODE,                                        /* STEP (off) or a generator */
+    TX_TUR_LEN, TX_TUR_PROB, TX_TUR_SPAN,
+    TX_EUC_STEPS, TX_EUC_PULSES, TX_EUC_ROT,
+    TX_MKV_LEAP, TX_MKV_DENS, TX_MKV_SPAN,
+    TX_MRP_POS, TX_MRP_SNPA, TX_MRP_SNPB,
+    TX_EV_LOCK, TX_EV_EVERY, TX_EV_AMOUNT, TX_EV_SEED,
+    TX_FM_FORM, TX_FM_CONTRAST, TX_FM_FLOURISH,
+    TX_TW_SHIFT, TX_TW_DROP, TX_TW_HUMAN, TX_TW_FOLLOW,
+    TX_COUNT
+};
+int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
+void tessera_param_set(uint32_t tr, uint32_t x, int32_t v);  /* clamped, with what its knob does besides (a MODE
+                                                               * change releases the notes, STEPS keeps PULSES ..) */
 /* the UI's view of a track's generators (read only; tr < TESSERA_TRACKS) */
 const gen_turing_t *tessera_turing(uint32_t tr);
 const gen_euclid_t *tessera_euclid(uint32_t tr);
