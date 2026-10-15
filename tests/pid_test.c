@@ -71,8 +71,8 @@ int main(int argc, char **argv)
     check("every live P_*, G_* (but the CPU meter) and TX_* has an id", !missing);
     check("pid_find: nothing for a gap (a reserved id, past the end)",
           !pid_find(PID_TRACK(P_RESERVED33)) && !pid_find(PID_GLOBAL(G_COUNT)) && !pid_find(PID_TESS(TX_COUNT)));
-    snprintf(what, sizeof what, "help: every Tessera parameter has its text (%u of %u in all so far)", helped, n);
-    check(what, helped_x == TX_COUNT);
+    snprintf(what, sizeof what, "help: every one of the %u has its text (Tessera's %u among them)", n, helped_x);
+    check(what, helped == n && helped_x == TX_COUNT);
 
     /* get and set: both ends, and past them clamped (every track: PULSES and ROT need STEPS 32 first) */
     pid_set(PID_TESS(TX_MODE), 1, TESS_ENG_MARKOV);           /* (LOCK: Markov's own) */

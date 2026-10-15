@@ -25,7 +25,7 @@ typedef struct {
     uint16_t pid;
     uint8_t flags;
     const char *name;                               /* "TURING LEN", "LFO RATE", "FX 2 MIX" */
-    const char *help;                               /* one or two sentences; "" until written (ROADMAP phase 2) */
+    const char *help;                               /* one or two sentences (the help gesture, the reference) */
 } pid_entry_t;
 
 uint32_t pid_count(void);
