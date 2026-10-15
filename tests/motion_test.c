@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
  * Real sequencer/project/UI sources: motion lifecycle and compact migration. */
 #define UI_TEST_NO_MAIN 1
 #include "ui_test.c"
@@ -110,7 +111,7 @@ static void pack_np(project_store_t *out, const project_t *q, const motion_store
     uint8_t *b = out->raw; uint32_t pos = 68u, t, i, sum;
     proj_pack(out, q);
     memset(b + 68, 0, PROJ_FM6_OFF - 68u);
-    uint32_t magic=0x46554E43u;memcpy(b,&magic,4);memcpy(b+8,q->g,sizeof q->g);
+    uint32_t magic=0x46554E43u;memcpy(b,&magic,4);memcpy(b+8,q->g,2u*PROJ_GLOBALS);
     b[66] = (uint8_t)np;
     for (t = 0; t < NTRK; t++) {
         for (i = 0; i < np; i++) b[pos++] = (uint8_t)(q->t[t].p[i < np - 8u ? i : i - (np - 8u) + P_E0] + 64);

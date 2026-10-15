@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Projects: four slots in NOR, each holding 32 independent pattern banks.
  * FBKK (pattern_store.c) contains the FUN20 sound/current-pattern record below.
  * Hardware retains only slot names/occupancy in RAM; full records use one
@@ -113,8 +114,9 @@ static uint32_t proj_sum(const project_t *p) { return proj_hash(p, sizeof *p - 4
 static int proj_ok(const project_t *q)
 {
     if (q->magic != PROJ_MAGIC || q->size != sizeof *q || q->sum != proj_sum(q) ||
+        q->sel >= NTRK || (q->parts != 0u && q->parts != NPART) || q->phys > PROJ_PHYS ||
         !chain_valid(&q->chain) || !motion_valid(&q->motion)) return 0;
-    for (uint32_t k = 0; k < NTRK; k++) if (q->pattern[k] >= NPAT || !drum_patch_valid(&q->drum[k]) || !p5_patch_valid(&q->p5[k])) return 0;
+    for (uint32_t k = 0; k < NTRK; k++) if (q->t[k].engine >= NENGINES || q->pattern[k] >= NPAT || !drum_patch_valid(&q->drum[k]) || !p5_patch_valid(&q->p5[k])) return 0;
     for (uint32_t i = 0; i < RECORD_MAX; i++) if (!recording_valid(&q->recording[i])) return 0;
     return 1;
 }
@@ -286,7 +288,8 @@ static int proj_unpack(project_t *q, const uint8_t *b)
                          NTRK * FM6_PACKED - PROJ_CZ_BYTES;
     memcpy(&magic, b, 4); memcpy(&size, b + 4, 4); memcpy(&sum, b + PROJ_STORE_SIZE - 4u, 4);
     if ((magic != PROJ_MAGIC && magic != 0x46554E46u && magic != 0x46554E45u && magic != 0x46554E44u && magic != 0x46554E43u) || size != PROJ_STORE_SIZE || sum != proj_hash(b, PROJ_STORE_SIZE - 4u) ||
-        np < 8u || np > P_COUNT || (magic==PROJ_MAGIC && np!=P_COUNT) || (magic==0x46554E46u && np!=117u) || (magic==0x46554E45u && np!=116u) || (magic==0x46554E44u && np!=108u) ||
+        np < 8u || np > P_COUNT || (magic==PROJ_MAGIC && np!=P_COUNT) || (magic==0x46554E46u && np!=117u) || (magic==0x46554E45u && np!=116u) || (magic==0x46554E44u && np!=108u) || (magic==0x46554E43u && np!=104u) ||
+        b[62] >= NTRK || (b[63] != 0u && b[63] != NPART) || b[64] > PROJ_PHYS ||
         68u + NTRK * (np - (magic==0x46554E44u?PROJ_FX_FIELDS:0u) + 2u + NSTEP * ((magic==PROJ_MAGIC || magic==0x46554E46u || magic==0x46554E45u)?8u:9u)) + sizeof q->chain + sizeof q->motion > end)
         return 0;
     memset(q, 0, sizeof *q); q->magic = PROJ_MAGIC; q->size = sizeof *q;
@@ -316,6 +319,7 @@ static int proj_unpack(project_t *q, const uint8_t *b)
             }else {if(b[pos]>191u)return 0;values[i]=(int16_t)b[pos++]-64;}
         }
         q->t[t].engine = b[pos++]; q->t[t].preset = b[pos++];
+        if (q->t[t].engine >= NENGINES) return 0;  /* a fork's engine ID must not wrap into ours */
         for (i = 0; i < P_COUNT; i++) def[i] = param_desc_of(q->t[t].engine % NENGINES, i)->def;
         params_by_count(q->t[t].p, values, np, def);
         for (i = 0; i < NSTEP; i++) {
@@ -686,7 +690,7 @@ static int project_save_as(uint32_t slot, const char *name)
 }
 static int project_save(uint32_t slot) { return project_save_as(slot, 0); }
 
-/* SAVE + REC (ui_input.c, stopped): the music back to the slot it was loaded from or last saved to, at once ("SAVED
+/* Hold SAVE or SAVE + REC (ui_input.c, stopped): the music back to the slot it was loaded from or last saved to, at once ("SAVED
  * B"); a new one (the template, the power-on sounds) has none yet: PROJECT opens on a free slot, SAVE picked */
 static uint32_t project_free_slot(void);
 static void project_quick_save(void)
@@ -968,13 +972,19 @@ static uint32_t tmpl_param_count(uint32_t len)
 {
     return len==sizeof(tmpl_t)?P_COUNT:len==sizeof(tmpl_t)-16u?117u:len==sizeof(tmpl_t)-40u?116u:len==sizeof(tmpl_fx_single_t)?108u:len==sizeof(tmpl_fx_legacy_t)?104u:0u;
 }
-static int tmpl_blob_valid(const uint8_t *b,uint32_t len)
+static uint32_t tmpl_blob_schema(const uint8_t *b,uint32_t len)
 {
     uint32_t np=tmpl_param_count(len),size,magic;if(!np)return 0;
     memcpy(&size,b+len-8u,4);memcpy(&magic,b+len-4u,4);
-    if(size!=len || magic!=(np==P_COUNT?TMPL_MAGIC:np==117u?0x494C5054u:np==116u?0x484C5054u:np==108u?0x474C5054u:0x464C5054u))return 0;
+    return size==len && magic==(np==P_COUNT?TMPL_MAGIC:np==117u?0x494C5054u:np==116u?0x484C5054u:np==108u?0x474C5054u:0x464C5054u) ? np : 0u;
+}
+static int tmpl_blob_valid(const uint8_t *b,uint32_t len)
+{
+    uint32_t np=tmpl_blob_schema(b,len);
+    if(!np || b[2u*PROJ_GLOBALS]>=NTRK)return 0;
     uint32_t delta=NTRK*2u*(P_COUNT-np);
     for(uint32_t k=0;k<NTRK;k++){
+        if(b[2u*PROJ_GLOBALS+2u+k*(2u+2u*np)]>=NENGINES)return 0;
         p5_patch_t p;memcpy(&p,b+__builtin_offsetof(tmpl_t,p5)-delta+k*sizeof p,sizeof p);
         if(!cz_patch_valid(b+__builtin_offsetof(tmpl_t,cz)-delta+k*sizeof(cz_patch_t)) || !p5_patch_valid(&p) ||
             !drum_patch_valid((const drum_patch_t *)(b+__builtin_offsetof(tmpl_t,drum)-delta+k*sizeof(drum_patch_t))))return 0;
@@ -1223,6 +1233,7 @@ static void project_boot(void)
 #if MELODEE_FLASH
 static persist_t persist_saved;
 static uint8_t persist_pending;                 /* 1 requested, 2 waiting after a flash error */
+static uint8_t persist_repair;                  /* boot repair must retry even when RAM equals defaults */
 static uint32_t persist_retry_ms;
 #endif
 
@@ -1230,6 +1241,7 @@ static void persist_boot(void)                    /* before settings_init / pane
 {
 #if MELODEE_FLASH
     persist_t p;
+    boot_work.state = 0;
     uint32_t f = irq_save();
     flash_ok = FL_FAR(fl_jedec_ram)() == 0x856014u;       /* the expected 1 MiB part, else stay RAM-only */
     irq_restore(f);
@@ -1241,20 +1253,58 @@ static void persist_boot(void)                    /* before settings_init / pane
     slc_store_boot();                              /* (the scans read each slot's stored slices) */
 #endif
     {   /* the settings, then a template if one follows them */
-        int n = st_load(OBJ_SETTINGS, &proj_wire_u, sizeof proj_wire_u), ns = n;
-        persist_old = tmpl_old = 0;
-        if (n > (int)sizeof set_rec.p) {
-            tmpl_old = (uint8_t)!tmpl_take((const uint8_t *)&proj_wire_u + sizeof set_rec.p, (uint32_t)n - sizeof set_rec.p);
-            ns = (int)sizeof set_rec.p;
-        }
+        int n = st_load(OBJ_SETTINGS, &proj_wire_u, sizeof proj_wire_u);
+        int tail_ok = n == (int)sizeof p || (n > (int)sizeof p &&
+            tmpl_blob_schema((const uint8_t *)&proj_wire_u + sizeof p, (uint32_t)n - sizeof p));
+        int owned = 0, foreign, future_owner;
+        persist_t original;
         memset(&p, 0, sizeof p);
-        if (ns > 0)
-            memcpy(&p, &proj_wire_u, (uint32_t)ns < sizeof p ? (uint32_t)ns : sizeof p);
-        uint32_t palette = p.palette;
-        if (settings_import(&p, ns)) {
-            persist_saved = p;
-            persist_old = (uint8_t)(!palette_stored_ok(palette));
-        } else persist_old = (uint8_t)st_exists(OBJ_SETTINGS);
+        if (n >= (int)sizeof p) memcpy(&p, &proj_wire_u, sizeof p);
+        original = p;
+        owned = p.magic == PERSIST_MAGIC && n >= (int)sizeof p && settings_owned(&p);
+        future_owner = p.magic == PERSIST_MAGIC && n >= (int)sizeof p &&
+            !memcmp(p.favorites.factory[1] + 28, SETTINGS_OWNER, 3) && !owned;
+        /* Never truncate a foreign extension into our ext block. Legacy PER5
+         * is shared with forks, so both settings and the whole tail must match. */
+        foreign = future_owner || (!owned && !(settings_legacy_valid(&p) && tail_ok));
+        persist_old = tmpl_old = 0;
+        persist_pending = persist_repair = 0;
+        memset(&tmpl, 0, sizeof tmpl);
+        if (!foreign && n > (int)sizeof set_rec.p) {
+            tmpl_old = (uint8_t)!tmpl_take((const uint8_t *)&proj_wire_u + sizeof set_rec.p, (uint32_t)n - sizeof set_rec.p);
+        }
+        if (foreign) {
+            memset(&p, 0, sizeof p);
+            p.magic = PERSIST_MAGIC;
+            p.palette = palette_to_stored(UI_DEFAULT_INDEX);
+            p.panel = PANEL_DEFAULT;
+            for (uint32_t k = 0; k < 4u; k++) p.ext.glo[k] = GP[GLO_KEPT[k]].def;
+        }
+        settings_import(&p, sizeof p);            /* replaces retained RAM too, before USB enumeration */
+        panel_init(); settings_init();
+        for (uint32_t k = 0; k < 4u; k++) {
+            const param_desc_t *d = &GP[GLO_KEPT[k]];
+            if (settings_glo[k] < d->min || settings_glo[k] > d->max) settings_glo[k] = d->def;
+        }
+        settings_export(&p);
+        persist_saved = p;
+        persist_old = (uint8_t)future_owner;       /* an unknown Melodee schema is protected, not foreign */
+        /* Unknown owned templates stay protected. Otherwise commit defaults
+         * or the ownership/normalization repair once through settings' A/B save. */
+        if (!template_old() && (foreign || memcmp(&p, &original, sizeof p))) {
+            BOOT_WORK_BEGIN(foreign ? "RESETTING SETTINGS" : "CHECKING SETTINGS", 1);
+            set_rec.p = p;
+            if (st_save(OBJ_SETTINGS, &set_rec, sizeof p + (template_used() ? sizeof tmpl : 0u))) {
+                persist_repair = 1;
+                persist_pending = 2;
+                persist_retry_ms = fm1_ms;
+                BOOT_WORK_END(1);
+            } else {
+                tmpl_dirty = 0;
+                BOOT_WORK_PROGRESS(1);
+                BOOT_WORK_END(0);
+            }
+        }
     }
     {   /* projects: fill empty RAM slots from flash, so the slot list is right after power-on */
         uint32_t i;
@@ -1262,6 +1312,7 @@ static void persist_boot(void)                    /* before settings_init / pane
             if (!project_used(i))
                 proj_fetch(i);
     }
+    settings_init();                               /* maintenance uses the saved palette */
     up_boot();                                     /* user presets */
 #endif
 }
@@ -1314,18 +1365,23 @@ static void settings_poll(void)
     }
     p = persist_saved;
     settings_export(&p);
-    if (!memcmp(&p, &persist_saved, sizeof p) && !tmpl_dirty) {
+    if (!persist_repair && !memcmp(&p, &persist_saved, sizeof p) && !tmpl_dirty) {
         persist_pending = 0;
         return;                                    /* unchanged: no erase cycle */
     }
     set_rec.p = p;                                 /* the record: the settings, the template (tmpl) after them */
+    uint8_t repairing = persist_repair;
+    if (repairing) BOOT_WORK_BEGIN("RESETTING SETTINGS", 1);
     if (st_save(OBJ_SETTINGS, &set_rec, sizeof set_rec.p + (template_used() ? sizeof set_rec.t : 0u)) == 0) {
         persist_saved = p;
         persist_pending = 0;
+        persist_repair = 0;
         tmpl_dirty = 0;
+        if (repairing) { BOOT_WORK_PROGRESS(1); BOOT_WORK_END(0); }
     } else {
         persist_pending = 2;
         persist_retry_ms = fm1_ms;
+        if (repairing) BOOT_WORK_END(1);
     }
 #endif
 }

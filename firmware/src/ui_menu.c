@@ -4,7 +4,6 @@
  * glow: ui_input.c ui_leds), KNOB ACCEL (ui_input.c accel_by), USB AUDIO (IN+OUT, IN, OUT or OFF; usb.c ua_off_set),
  * USB INPUT (stereo master or four track stems; usb.c ua_tracks_set),
  * AUTOSAVE (automatic project saves after five seconds stopped and untouched),
- * OVERCLOCK (the boot clock: overclock.c; closing with a new clock asks to restart),
  * CALIBRATION (the setup screen: HARDWARE CALIBRATION), ABOUT.
  * PRESETS scrolls from ABOUT through all credits. ui.menu: 1 list, 2 information. */
 /* ------------------------------------------------------------ menu --- */
@@ -13,14 +12,14 @@ enum { MI_COLOR, MI_HOLD, MI_LIGHTS,
 #if MELODEE_USB_AUDIO
        MI_USB, MI_USB_INPUT,
 #endif
-       MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_ACCEL, MI_SCREEN, MI_CLOCK, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
+       MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_ACCEL, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
                                               "USB AUDIO", "USB INPUT",
 #endif
                                               "AUDIO CLICK", "CLICK LEVEL", "COUNT-IN", "NOTE PREVIEW", "CHORD ENTRY",
-                                              "AUTOSAVE", "KNOB ACCEL", "SCREEN OFF", "OVERCLOCK", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
+                                              "AUTOSAVE", "KNOB ACCEL", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
 /* USB AUDIO's four settings, as ua_off_want (UA_OFF_OUT | UA_OFF_IN) */
 static const char *const MI_USB_NAME[4] = {"IN+OUT", "IN", "OUT", "OFF"};
@@ -229,7 +228,7 @@ static void menu_words(char *d, const char *s, uint32_t n)
 static void draw_menu(void)
 {
     uint32_t i, pass, sig = ui.menu * 7u + ui.menu_sel * 131u + settings.palette * 1009u + settings.lowcut * 7919u +
-                            settings_hold * 3511u + settings_lights * 6151u + settings_autosave * 15485863u + oc_get() * 104729u +
+                            settings_hold * 3511u + settings_lights * 6151u + settings_autosave * 15485863u +
 #if MELODEE_USB_AUDIO
                             ua_off_want * 92821u + ua_tracks_want * 324161u +
 #endif
@@ -283,7 +282,6 @@ static void draw_menu(void)
             if (i == MI_ACCEL) value = PREF_BITS & PREF_ACCEL_OFF ? "OFF" : "ON";
             if (i == MI_AUTOSAVE) value = settings_autosave ? "ON" : "OFF";
             if (i == MI_SCREEN) value = (const char *const[]){"NEVER", "5 MIN", "15 MIN", "30 MIN", "60 MIN"}[scr_get()];
-            if (i == MI_CLOCK) value = OC_NAME[oc_get()];
             if (i == MI_LIGHTS) value = LIGHTS_NAME[settings_lights % LIGHTS_N];
 #if MELODEE_USB_AUDIO
             if (i == MI_USB_INPUT) value = ua_tracks_want ? "4 TRACKS" : "STEREO";
@@ -306,10 +304,7 @@ static void draw_menu(void)
                              ux.mono ? ux_mix(T_BG, T_TEXT, 40 * k) : UI_PALETTES[k].bg, on ? T_THEME : T_MID);
                 }
             } else if (value) {
-                if (i == MI_CLOCK)
-                    str_cpy(w, value, sizeof w);        /* "396 MHz" as written */
-                else
-                    menu_words(w, value, sizeof w);
+                menu_words(w, value, sizeof w);
                 cv_text_r(228, yt, &AF_S, w, val, bg);
             }
         }
@@ -336,8 +331,6 @@ static void menu_close(void)
     ui.menu = 0;
     ui.force = 1;
     go_home();
-    if (oc_get() != oc_boot_mode)                      /* OVERCLOCK changed: it runs from the next start */
-        confirm_open(CF_RESTART, 0);
 }
 
 /* menu: PRESETS moves, OCT+ confirms, OCT- cancels (ABOUT -> list -> close) */
@@ -412,12 +405,6 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         uint32_t value=scr_get(), top=4u;
         value=s>0?(value<top?value+1u:value):s<0?(value?value-1u:0u):(value+1u)%(top+1u);
         scr_put(value);
-        ui.force=1; ok=0;
-    }
-    if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_CLOCK) {   /* KNOB 1 right 360, left 320; OCT+ toggles */
-        uint32_t value=oc_get(), top=OC_N-1u;
-        value=s>0?(value<top?value+1u:value):s<0?(value?value-1u:0u):(value+1u)%(top+1u);
-        oc_put(value);
         ui.force=1; ok=0;
     }
     if (ok && ui.menu == 1) {

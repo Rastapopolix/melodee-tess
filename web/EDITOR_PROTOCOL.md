@@ -333,8 +333,7 @@ grid lives in the steps themselves, so every engine has it:
   SAMPLE engine's PERC set and the DRUM engine on any part: the first C key is the kick (C2 = 36), notes are GM numbers.
 - Global ids 24..26 are retired format padding, as are 4..11. `G_COUNT` stays 27.
   Their descriptors have empty labels and no page; loading a song clears their runtime values.
-  MIDI channel 10 is no longer special (channels 1..4 play tracks 1..4, every other
-  channel the selected track; with ROUT SEL every channel the selected track).
+  MIDI input follows the ROUT range filter described below, with the DRUM override only inside that range.
 - Selecting a track with `TRACK` does not push `RELOAD` (the editor re-reads `DUMP`, the steps and the
   engine `DESC` itself); selecting one on the device does (`RELOAD` with the new track).
 - Pushes are about the selected track only: `CHANGED` (scope 0) and `STEP_CHANGED` refer to it, and
@@ -372,10 +371,13 @@ grid lives in the steps themselves, so every engine has it:
   44.1 kHz stereo; bcdDevice 3.11); the MIDI port and this protocol are unchanged, and both
   work while the computer records.
 - **Global ids.** `G_ROUTE` (id 14, label "ROUT", GLO > SYSTEM) was a placeholder ("--", range 0..0);
-  since 1.0 it is the MIDI IN routing: 0 "CH1-4" (channels 1..4 → tracks 1..4, every other channel
-  → the selected track; what projects stored before), 1 "SEL" (every channel → the selected track). The
-  id, `G_COUNT` (27) and the project format are unchanged; it is saved and loaded with the project like
-  the other globals. The editor shows it under GLOBAL > SYSTEM.
+  it is the MIDI IN routing: 0 "CH1-4", 1 "SEL", 2 "CH5-8", 3 "CH9-12", 4 "CH13-16".
+  Each range maps only its four channels to tracks 1..4 in order; other channels are ignored. SEL receives every channel on the selected track. DRUM redirects its channel to the
+  first DRUM track only within the selected range (or in SEL); without a DRUM track, normal routing applies.
+  Note-offs and sustain release still reach their original owners after changing ROUT. Earlier firmware
+  sent out-of-range channels to the selected track; this fallback is removed. Stored values 0 and 1,
+  global id 14, the global count and the project layout are unchanged. ROUT persists between starts and
+  is saved with projects/templates. The editor shows it under GLOBAL > SYSTEM.
 - **Sound loads and undo.** A load that changes a track's sound (`PRESET`, `SET` of `G_ENGSEL`, `UP_LOAD`,
   and the same on the device) changes the sound only: the engine and the parameters of the sound. It
   never changes the steps, nor the track's own parameters: `P_LEVEL`, `P_PAN`, `P_MUTE` (0, 39, 40), the

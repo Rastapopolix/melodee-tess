@@ -1,6 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
-# Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+# Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+# Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 # Host tests of the Melodee sources (no hardware). Run from the repo root after ./build.sh:
 #   tests/run_tests.sh               everything
 #   SOUND=0 tests/run_tests.sh       everything but the sound tests
@@ -30,7 +31,7 @@
 #                   every frame of the rolling digits (lint, MONO), their filmstrips in build/ui_slot.
 # UI (tests/ui_test.c): the UI sources against stub display / buttons / knobs: sound loads keep the steps and
 #                   the track's ARP / SCL / SLICER, the SEQ > PATTERNS loader and its REPLACE? dialog, the
-#                   one-step undo of both (SAVE held), REC on TRACKS / SEQ / ARP, STEP and ARP while recording,
+#                   one-step undo of both (EDIT held), REC on TRACKS / SEQ / ARP, STEP and ARP while recording,
 #                   MIDI IN ROUT, saves refused while playing and the OVERWRITE? dialog, MUTE on TRACKS KNOB 1,
 #                   the DRUM grid (keys, knobs, LEDs, pages, live recording into it, BEAT from PATTERNS).
 # Audio / persistence / editor: the real C paths against simulated DMA and NOR flash: bounded overload
@@ -45,7 +46,7 @@
 # LEGACY FX (tests/no_effects_test.c): legacy values/automation do not process audio or allocate,
 #                   old notes survive, retired MIDI sends are inert, FX opens only the new knob page.
 # MOD / SPREAD (tests/mod_spread_test.c): the matrix's S&H / SLEW sources and DEPTH destination, SPREAD's sides.
-# LAYERS / SCREEN (tests/layer_screen_test.c): GLO/SCL/EDIT double-tapped layers, SCREEN OFF, LFO 2.
+# LAYERS / SCREEN (tests/layer_screen_test.c): GLO/SCL double-tapped layers, SCREEN OFF, LFO 2.
 # INPUT (tests/input_test.c): the key / button debounce of hal/fm1_input.h against the TIMER5 scan and bouncing
 #                   contacts: a press within 2 scans (<= 2.3 ms), one note per bouncy press, no early or hanging
 #                   release, stray samples ignored, fast repeats, the encoders' detents.
@@ -169,6 +170,12 @@ old_to_new() {                                    # a package of another app (th
         python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null &&
         "$OUT/ldr_test" "$OUT/old.fwsc" build/melodee-tess.fwsc
 }
+powercut_tests() {
+    python3 tests/boot_fixtures.py &&
+        "$OUT/loader_powercut_test" build/host/boot-fixtures/legacy.fwsc build/melodee-tess.fwsc \
+        build/host/boot-fixtures/same-stub.fwsc build/host/boot-fixtures/other-legacy.fwsc \
+        build/host/boot-fixtures/old-stub.fwsc
+}
 ui_renders() {
     build ui_render ui_render -O1 -w -DMELODEE_USB_AUDIO=1 -Ibuild/gen -Ifirmware/src -Itests || return
     mkdir -p build/ui_new/ppm build/ui_slot
@@ -223,7 +230,8 @@ if core; then
     t "resource lifetimes, cache eviction, tails and capacity" resources_test -O2 $FW
     t "audio worker: stalled jobs and wrapping deadlines" audio_worker_test
     t "cache RAM startup, memory faults and safe fallback" cache_ram_test
-    t "system clock retune and rollback" clock_test -O1
+    t "system clock: read only, never written" clock_test -O1
+    t "stock V15 supply startup, timeouts and read-back faults" power_test -O1
     job step "nightly and synth-only site preserve release and editor" python3 tests/nightly_site_test.py
     run "audio diagnostics schema compatibility" python3 tests/usb_audio_stats_test.py
     run "target budget: natural loops and FPU decoding" python3 tests/target_budget_test.py
@@ -242,11 +250,16 @@ if core; then
     t "resident audio: four-track resource budget and removed buses" ram_audio_test -O2 $FW
     t "resident audio: expanded voice budget and CPU1 fallback" ram_voice_budget_test -O2 $FW
     t "USB audio: four isolated track stems through the real mixer" usb_audio_tracks_test -O2 $FW
+    t "boot stub: CRCs, rescue keys, damaged staging and retry fallback" boot_stub_test -O2
+    run "boot packages: constant entry sector and valid directory CRCs" python3 tests/boot_stub_pkg_test.py
+    t "power cuts: every erase/page, resume and unchanged boot sector" loader_powercut_test -O2 -- powercut_tests
     t "M-UPGRADE entry (own loader)" ota_test -DOWN_PKG=1 -- "$OUT/ota_test" build/melodee-tess.fwsc
     t "update loader: other app -> this build" ldr_test -- old_to_new
     run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/install_test.py
     run "ROM USB recovery: backup, protected regions, interrupted writes and transport failures" python3 tests/recovery_test.py
+    run "recovery diagnostics: legacy and boot-protected retained RAM" python3 tests/retained_ram_test.py
     run "release assets: firmware identity, application bytes, native provenance and ZIP integrity" python3 tests/release_assets_test.py
+    run "recovery correction: preserve signed firmware and verify public replacement assets" python3 tests/recovery_correction_test.py
 fi
 
 if core && [ $TABLES = 1 ]; then
@@ -289,6 +302,8 @@ if core && [ $TABLES = 1 ]; then
     t "audio: silent bench keeps synthesis running and silences physical output" audio_silent_test:audio_test \
         -DMELODEE_BENCH_SILENT=1 $FW
     t "persistence: deferred settings, retry and failed-save rollback" persistence_test $FW
+    t "first boot: foreign settings, safe defaults, ownership and interrupted cleanup" settings_origin_test $FW
+    t "first boot: reset unsupported preset banks, preserve good entries and retry cuts" preset_boot_reset_test $FW
     t "storage safety: protect unreadable records until confirmed replacement" storage_safety_test $FW
     t "full backup: CRC before writes, stale runtime, USB reset / timeout, malformed objects, older projects" backup_test $FW
     t "editor: real C protocol, malformed transfers and queue recovery" editor_test $FW

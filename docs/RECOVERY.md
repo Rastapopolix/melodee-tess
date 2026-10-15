@@ -5,7 +5,13 @@ data cable. It does not force a running device into recovery. USB identity must 
 `4c4a:8057`, with inquiry `WL82 / UBOOT1.00`. If you see a **Melodee Update** MIDI
 port, resume installation with the web installer instead.
 
-Download the archive for your computer from the Melodee 1.3.1 release and extract it.
+On Melodee 1.3.5 and later, hold **OCT− alone** while switching on to request
+the retained MIDI update loader. Three short key-light flashes signal the loader
+handover; reconnect USB and install the same package again. If the loader is
+unavailable or handover fails, the stub requests ROM UBOOT instead. Stock V15
+and Melodee through 1.3.4 do not have this rescue gesture.
+
+Download the archive for your computer from the Melodee 1.3.5 release and extract it.
 Windows and Linux builds are x64; macOS has separate Intel/x64 and Apple Silicon/arm64
 downloads. The executable includes Python, PyUSB, libusb and the RAM recovery helper.
 It does not require a Python installation or the JieLi SDK. These are unsigned CLI
@@ -18,6 +24,18 @@ need a udev rule or `sudo`. On macOS, USB access denial may require `sudo`.
 Choose a `.fwsc` firmware package from the release downloads. The recovery tool
 does not select or download firmware for you. To investigate a startup regression,
 use a previously working version. Compare the file with the release's `SHA256SUMS`.
+
+The corrected tool also supports the unmodified **official M-VAVE V15 `FM-1.fwsc`**
+(identity `FM-1_015`). Download it from M-VAVE; it is not included in the recovery
+archive. The complete file must have SHA-256
+`db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`.
+Modified V15 packages are refused before USB access. The recovery archives on the
+1.3.1 release were corrected on 2026-10-13 to accept V15's metadata layout. If an
+older download rejects V15, download the archive again.
+
+For official recovery, substitute `FM-1.fwsc` in the commands below. Keep the full
+backup: recovery retains the bootloader and saved-data bytes, but official firmware
+may overwrite Melodee's songs, sounds or settings after it boots.
 
 On macOS/Linux:
 
@@ -64,8 +82,8 @@ library. `--loader PATH` can override the RAM helper with the same verified SDK 
 The direct-USB protocol has prior successful macOS recovery evidence. Each executable
 is built and smoke-tested on its native OS; automated tests model interruptions and
 protected flash regions. Those checks do not establish physical USB recovery on
-every OS or prove that removing bank relocation fixes the 1.3.0 reports.
+every OS.
 
-Source: https://github.com/keremimo/melodee (tag v1.3.1).
+Source: https://github.com/keremimo/melodee (tag v1.3.5).
 Protocol reference: https://github.com/kurogedelic/FM-1-transporter.
 Licences and corresponding libusb source are included in the archive.

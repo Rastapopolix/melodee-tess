@@ -19,6 +19,9 @@ from fm1_recover import APP_LO, Package, sha256
 from fm1pkg_make import sfc, ufw
 from recovery_test import make_package
 
+MAJOR, MINOR, PATCH = A.VERSION.split(".")
+PRODUCT = f"FM-1_9{MAJOR}{int(MINOR):02d}{PATCH}"
+
 
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
@@ -31,9 +34,9 @@ class ReleaseTests(unittest.TestCase):
             if suffix:
                 flash = bytearray(Package(package).flash)
                 flash[APP_LO + 0x120] ^= 1
-                package.write_bytes(ufw(bytes(flash), b"loader", "FM-1_91031"))
+                package.write_bytes(ufw(bytes(flash), b"loader", PRODUCT))
             else:
-                package.write_bytes(ufw(Package(package).flash, b"loader", "FM-1_91031"))
+                package.write_bytes(ufw(Package(package).flash, b"loader", PRODUCT))
             obj = Package(package)
             decoded = bytearray(obj.flash[APP_LO:])
             sfc(decoded, 0, len(decoded), 0, obj.key)
@@ -59,7 +62,7 @@ class ReleaseTests(unittest.TestCase):
     def test_complete_release_and_padded_firmware_identity(self):
         self.prepare()
         info = json.loads((self.folder / "BUILD_INFO.json").read_text())
-        self.assertEqual(info["product"], "FM-1_91031")
+        self.assertEqual(info["product"], PRODUCT)
         self.assertEqual(info["commit"], self.commit)
         self.assertEqual(len(info["recovery_builds"]), 4)
         for line in (self.folder / "SHA256SUMS").read_text().splitlines():

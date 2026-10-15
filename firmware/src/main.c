@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* MELODEE boot and main loop. Boot order: WDT first, boot-loop guard, fatal vectors,
  * guards; then LCD, input (TIMER5 IRQ, 10 kHz), audio (ALNK0 IRQ). */
 extern uint32_t _data_start[], _data_end[], _data_load[], _bss_start[], _bss_end[];
@@ -83,61 +84,12 @@ static void timer5_start(void)                 /* OSC /4 = 6 MHz, PRD 600 -> 10 
     fm1_timer5_start(isr_timer5, 4);   /* above ALNK0 (3): the scan nests into the render (see fm1_timer5_irq) */
 }
 
-int fm1_clock_undo;                            /* unfamiliar boot clock or settled rollback from the OVERCLOCK retune */
-
-/* OVERCLOCK (overclock.c): the saved mode's clock, before CPU1, the audio ISR and the LCD (it reads the new LSB at
- * fm1_lcd_baud). The supply rails are never touched. A session above 320 MHz that ended without an intended reset (a crash, the watchdog, a switch
- * that never returned: oc_guard.live) comes back at 320, saved by oc_poll. The switch runs from .ram_text (the
- * system clock wobbles while the PLL restarts), through its function pointer; a failed rollback stays in SRAM on
- * RC16M for watchdog recovery and never returns here with an unverified PLL. */
-static void oc_boot(void)
+/* The voices CPU1 + CPU0 carry at the clock running: the SPL's 360 MHz, or a 320 that a soft reset kept from a
+ * 1.3.x / 1.4 rc session until power-off (hal/fm1_clock.h: Melodee never writes the PLL) */
+static void clock_boot(void)
 {
-    static const uint16_t mult[OC_N] = { FCLK_MULT_320, FCLK_MULT_360 };
-    uint32_t mode, m;
-    if (oc_guard.magic != OC_GUARD_MAGIC) {
-        oc_guard.magic = OC_GUARD_MAGIC;
-        oc_guard.live = 0;
-    }
-    mode = oc_boot_choose(oc_guard.live != 0);
-    oc_guard.live = mode != OC_OFF;             /* before anything that can fail at the new clock */
-    fm1_clock_undo = fm1_clock_set(mult[mode]) != 0;
-    m = fm1_clock_mult();
-    vbudget_cpu1 = VBUDGET * (m ? fm1_clock_mhz_of(m) : 360u) / 360u;   /* the voices CPU1 + CPU0 carry there */
-}
-
-/* main loop: a CPU1 retired above 320 MHz sets 320 for the next start; a reverted mode is saved and said; the
- * restart question answered Yes stops the transport, saves the settings and restarts */
-static void oc_poll(void)
-{
-#if MELODEE_DUAL_CORE
-    static int8_t had_core1 = -1;
-    if (had_core1 < 0)
-        had_core1 = (int8_t)audio_worker_online;
-    if (had_core1 && !audio_worker_online) {
-        had_core1 = 0;
-        oc_core1_lost();
-    }
-#endif
-    if (oc_reverted == 1) {
-        oc_reverted = 2;
-        settings_save();                        /* (the settings poll retries until it is written) */
-        ui_message("CPU FAULT: 320 MHZ");
-    }
-    if (oc_restart) {
-        if (transport_busy()) {
-            transport_req = 2;
-            return;
-        }
-        settings_save();
-#if MELODEE_FLASH
-        if (persist_pending)
-            return;
-#endif
-        oc_restart = 0;
-        fm1_audio_stop();
-        reset_intended();
-        fm1_reboot();
-    }
+    uint32_t m = fm1_clock_mult();
+    vbudget_cpu1 = VBUDGET * (m ? fm1_clock_mhz_of(m) : 360u) / 360u;
 }
 
 static void hexs(char *b, uint32_t v)
@@ -210,20 +162,26 @@ static void melodee_init(void)
 static void fm1_main(void)
 {
     int32_t knob = 512 * 16;
-    fm1__pc_out(6,0);                         /* codec held quiet before flash, PLL and splash */
+    fm1__pc_out(6,0);                         /* codec held quiet before flash and splash */
+    settings_init();                           /* a readable default palette before loading flash */
+    lcd_init();                                /* maintenance must be visible before any boot writes */
+    lcd_fill(0, 0, 240, 240, T_BG);
+    draw_text_box(0, 94, 240, &AF_L, "MELODEE", T_THEME, 1);
+    draw_text_box(0, 134, 240, &AF_S, "STARTING UP", T_MID, 1);
+    lcd_sync();
     dsp_tables_init();                        /* the RAM lookup tables (FM6), before anything renders */
     persist_boot();
 #if MELODEE_OTA
-    if (flash_ok)
+    if (flash_ok && boot_work.state != 2u)
         ota_boot_cleanup();                             /* staging area left by an update */
 #endif
     settings_init();
-    oc_boot();                                /* the OVERCLOCK clock: an unfamiliar boot clock or a settled rollback
-                                               * raises the undo flag in editor command 79 */
-    lcd_init();
-    lcd_fill(0, 0, 240, 240, T_BG);
-    draw_text_box(0, 94, 240, &AF_L, "MELODEE", T_THEME, 1);
-    draw_text_box(0, 134, 240, &AF_S, "MULTI-ENGINE SYNTH", T_MID, 1);
+    clock_boot();                             /* the voice budget at the clock found (never changed) */
+    if (boot_work.state != 2u) {
+        lcd_fill(0, 0, 240, 240, T_BG);
+        draw_text_box(0, 94, 240, &AF_L, "MELODEE", T_THEME, 1);
+        draw_text_box(0, 134, 240, &AF_S, "MULTI-ENGINE SYNTH", T_MID, 1);
+    }
     if (melodee_dbg.magic != DBG_MAGIC) {
         memset(&melodee_dbg, 0, sizeof melodee_dbg);
         melodee_dbg.magic = DBG_MAGIC;
@@ -242,9 +200,9 @@ static void fm1_main(void)
     panel_init();
     melodee_init();
 #if MELODEE_DUAL_CORE
-    /* One core after a crash in the first 30 s (a second would enter UBOOT),
+    /* One core if stock supply setup failed, after a crash in the first 30 s (a second would enter UBOOT),
      * and until power-off once CPU1 was retired or CPU0 crashed beside it. */
-    if (!bootguard.failed && !fm1_core1_barred())
+    if (fm1_power_ready && !bootguard.failed && !fm1_core1_barred())
         fm1_multicore_start();              /* bounded handshake; failure keeps serial rendering */
     /* CPU1 starts through mask-ROM before it reaches our RAM worker. Restrict
      * instruction fetch only after that bootstrap has returned, or stopped
@@ -268,7 +226,8 @@ static void fm1_main(void)
     glo_restore();                            /* CLK TUNE MIDI ROUT as last used, */
     project_boot();                           /* then the BOOT project or the template (theirs win) */
     fm1_delay_ms(400);
-    lcd_fill(0, 0, 240, 240, T_BG);
+    if (boot_work.state != 2u)
+        lcd_fill(0, 0, 240, 240, T_BG);
 
     for (;;) {
         uint32_t m = fm1_ms;
@@ -361,10 +320,6 @@ static void fm1_main(void)
         ui_input();
         glo_poll();                                     /* a kept GLO value changed: the settings, later */
         settings_poll();                              /* queued settings save: only while stopped */
-#if MELODEE_DUAL_CORE
-        fm1_core1_poll();                             /* a retired CPU1 sits out until power-off */
-#endif
-        oc_poll();                                    /* OVERCLOCK: back to 320 MHz after a fault, the restart */
         melodee_dbg.stage = 2;
         ui_leds();
         ui_draw();
@@ -417,6 +372,7 @@ void fm1_cstart(void)
     for (s = _audio_load, d = _audio_start; d < _audio_end; s++, d++)
         *d = *s;                                /* resident audio profile: executable ordinary SRAM */
     fm1_mailbox_clear();
+    fm1_power_ready = (uint8_t)fm1_power_init(); /* stock V15 supplies before cache, peripherals or CPU1 */
 #if MELODEE_CACHE_RAM
     {   /* XIP-to-SRAM exceeds the direct-call range on pi32v2. */
         void (*volatile init)(uint32_t) = fm1_cache_init;

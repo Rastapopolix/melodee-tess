@@ -399,15 +399,15 @@ static void test_midi(void)
     pkt(0xB0, 1, 100);                           /* ch 1 CC1 */
     pkt(0xB2, 11, 40);                           /* ch 3 CC11 */
     pkt(0xD3, 77, 0);                            /* ch 4 aftertouch */
-    pkt(0xB6, 1, 55);                            /* ch 7: the selected track (2) */
+    pkt(0xB6, 1, 55);                            /* ch 7: filtered in CH1-4 */
     pkt(0xB0, 7, 10);                            /* other CCs: ignored */
     blocks(1);
     check("USB: CC1 ch 1 -> part 1, CC11 ch 3 -> part 3, AT ch 4 -> part 4",
           trk[0].mw == 100 && trk[2].ex_off == 127 - 40 && trk[3].at == 77 && trk[0].at == 0 && trk[0].ex_off == 0);
-    check("USB: CC1 on ch 7 -> the selected track (2)", trk[1].mw == 55 && trk[2].mw == 0);
+    check("USB: CC1 on ch 7 is filtered in CH1-4", trk[1].mw == 0 && trk[2].mw == 0);
     pkt(0xB0, 121, 0);                           /* reset all controllers */
     blocks(1);
-    check("CC121 resets MODW / AT / EXPR of the channel's track", trk[0].mw == 0 && trk[1].mw == 55);
+    check("CC121 resets MODW / AT / EXPR of the channel's track", trk[0].mw == 0 && trk[1].mw == 0);
     fresh(HOST_SYNTH, 0);
     song.sel = 1;
     for (i = 0; i < sizeof TRS; i++)
@@ -415,7 +415,10 @@ static void test_midi(void)
     blocks(1);
     check("TRS: CC1, running status, realtime between, CC11, AT (1 data byte, running status) -> parts",
           trk[0].mw == 0x7F && trk[0].ex_off == 127 - 0x20 && trk[2].at == 0x34 && trk[0].at == 0);
-    check("TRS: ch 5 -> the selected track (2)", trk[1].mw == 9);
+    check("TRS: ch 5 is filtered in CH1-4", trk[1].mw == 0);
+    song.g[G_ROUTE] = 1;
+    um_byte(0xB4); um_byte(1); um_byte(9); blocks(1);
+    check("TRS: SEL sends ch 5 CC1 to the selected track (2)", trk[1].mw == 9);
     check("MODW -> PAN +63 through MIDI: the part is on the right (dry mixer)", in_child(pan_e2e));
 }
 /* ------------------------------------------------------------------ 4 --- */

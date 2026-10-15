@@ -1169,7 +1169,7 @@ static int32_t kc_tag(const char *s, uint32_t *len)
     }
     return -1;
 }
-/* free text (S) that may start with a keycap, "[SAVE] HOLD TO UNDO", or have one after its first word,
+/* free text (S) that may start with a keycap, "[EDIT] HOLD TO UNDO", or have one after its first word,
  * "HOLD [GLO] QUICK": the word, the keycap, then the rest, cut to maxw */
 static int32_t cv_free_hint(int32_t x, int32_t y, const char *s, uint16_t fg, uint16_t bg, int32_t maxw)
 {

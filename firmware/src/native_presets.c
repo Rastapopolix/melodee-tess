@@ -1,4 +1,5 @@
-/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio) */
 /* Native user presets: DX7 VMEM bytes and Casio CZ-1 tone bytes, without
  * Felucca parameters or patterns. Storage grouping is invisible to the player.
  * CZ keeps all 128 existing tones. FM6 gets 64 independent slots. */
@@ -132,18 +133,35 @@ static int native_save_bank(uint32_t e,uint32_t b)
  * written once: FM6 empty, CZ-1 BANK A..D Casio's tones, E..H empty */
 static void native_boot(void)
 {
+    if (boot_work.state == 2u) return;            /* retain an earlier settings-repair failure on screen */
+    uint32_t pending = 0, total = 0, done = 0;
     for (uint32_t b = 0; b < 4u; b++) {
-        if (native_fm_valid(native_fm_bank(b)) || native_old(ENGI_FM6, b * 16u)) continue;
-        native_fm_empty(b);
-        if (native_save_bank(ENGI_FM6, b) == 2) { ui_message("PRESET SAVE ERROR"); return; }
+        if (native_fm_valid(native_fm_bank(b))) continue;
+        pending |= 1u << b;
+        total++;
     }
     for (uint32_t b = 0; b < 8u; b++) {
+        if (cz_bank_valid(native_cz_bank(b))) continue;
+        pending |= 1u << (b + 4u);
+        total++;
+    }
+    if (!total) return;
+    BOOT_WORK_BEGIN("INITIALIZING PRESETS", total);
+    for (uint32_t b = 0; b < 4u; b++) {
+        if (!(pending & (1u << b))) continue;
+        native_fm_empty(b);
+        if (native_save_bank(ENGI_FM6, b) == 2) { BOOT_WORK_END(1); return; }
+        BOOT_WORK_PROGRESS(++done);
+    }
+    for (uint32_t b = 0; b < 8u; b++) {
+        if (!(pending & (1u << (b + 4u)))) continue;
         cz_bank_t *c = native_cz_bank(b);
-        if (cz_bank_valid(c) || native_old(ENGI_CZ, b * 16u)) continue;
         cz_bank_empty(c, b);
         c->ver = 2;
-        if (native_save_bank(ENGI_CZ, b) == 2) { ui_message("PRESET SAVE ERROR"); return; }
+        if (native_save_bank(ENGI_CZ, b) == 2) { BOOT_WORK_END(1); return; }
+        BOOT_WORK_PROGRESS(++done);
     }
+    BOOT_WORK_END(0);
 }
 /* Mutations keep the last committed tone in RAM if flash fails. */
 static int native_put(uint32_t e,uint32_t k,const uint8_t *raw)

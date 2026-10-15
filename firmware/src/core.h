@@ -17,7 +17,7 @@
 #endif
 #ifndef VBUDGET
 #define VBUDGET (MELODEE_RAM_AUDIO ? 18u : 16u) /* shared weighted voices; RAM profile uses 18 with CPU1 online
-                                                 * at 360 MHz (voice.c voice_budget: scaled with the clock) */
+                                                 * at 360 MHz (voice.c voice_budget: scaled with a kept 320) */
 #endif
 #define NTRK NPART               /* tracks (the formats and the protocol count these): every track is a part */
 #define NSTEP 64
@@ -116,7 +116,7 @@ enum {                          /* global parameters */
     G_BPM, G_SWING, G_CLOCK, G_TUNE,
     G_RESERVED4, G_RESERVED5, G_RESERVED6, G_RESERVED7,
     G_RESERVED8, G_RESERVED9, G_RESERVED10, G_RESERVED11,
-    G_MIDI, G_DRUMCH, G_ROUTE, G_INFO, /* G_ROUTE: MIDI IN, 0 CH1-4 (channels 1..4 -> parts 1..4), 1 SEL (seq.c);
+    G_MIDI, G_DRUMCH, G_ROUTE, G_INFO, /* G_ROUTE: MIDI IN, 0 CH1-4 (channels 1..4 -> parts 1..4), 1 SEL, 2 CH5-8, 3 CH9-12, 4 CH13-16 (seq.c);
                                         * G_DRUMCH (was G_SYNC, unused): a device setting (settings_drumch) */
     G_SLOT, G_BOOT, G_LOAD, G_SAVE,   /* G_BOOT (was G_NAME, unused): a device setting (settings_boot), not song.g */
     G_ENGSEL, G_A4,            /* the editor switches the engine with a SET of G_ENGSEL; G_A4 reuses the unused
@@ -450,14 +450,9 @@ static volatile uint32_t fm1_ms;  /* milliseconds since boot (TIMER4-based, TIME
 /* boot-loop guard (main.c): two boots in a row that die in the first 30 s -> UBOOT */
 #define BOOTGUARD_MAGIC 0x42475244u
 struct { uint32_t magic, failed, pending; } bootguard __attribute__((section(".noinit")));
-/* OVERCLOCK (main.c oc_boot): live, a session above OFF that has not ended in an intended reset (a crash, the
- * watchdog or a failed clock switch leave it set: the next boot goes back to OFF). Gone at power-off. */
-#define OC_GUARD_MAGIC 0x4F43474Bu
-struct { uint32_t magic, live; } oc_guard __attribute__((section(".noinit")));
 static inline void reset_intended(void)         /* a reset on purpose (UBOOT, an update): not a failed boot */
 {
     bootguard.pending = 0;
-    oc_guard.live = 0;
 }
 
 /* GLO solo belongs to the mixer, independently of quick-layer effects. */

@@ -1,8 +1,10 @@
 #include "recording_preferences.h"
-/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Shared PER5 layout: each feature updates only its own fields, preserving
  * the other feature's saved preferences when either is built independently.
- * Only PER5 is read (1.2; older records are protected until replacement). Its ext block:
+ * PER5 keeps the compatible layout; boot validates the complete object before import. Its ext block:
  * usb_off (the USB audio devices left out, USB AUDIO in the menu), boot (BOOT: 0 OFF, 1..4 the project power-on
  * loads), glo (CLK TUNE MIDI ROUT as last used, GLO_KEPT: restored at power-on, a project's own win), drumch
  * (GLO > SYSTEM DRUM: 0 channel 10, 1..16, 17 OFF), lights (the menu's LIGHTS: 0 MID, else OFF..FULL + 1); every
@@ -28,12 +30,29 @@ static int16_t settings_glo[4];                     /* ext.glo: project.c GLO_KE
 #define RECORD_PREF_TAG 0x52500000u /* RP, high half of the old zoom word */
 #define A4_TAG 0x41340000u                          /* "A4": old spare contents are not tuning */
 #define AUTOSAVE_OFF_TAG 0xA1u                     /* CZ row byte 28: only this tag disables autosave */
+/* Retired DIGITAL row, outside all live preset/settings bits. Kept by older
+ * Melodee builds along with the other favorites; no layout or magic change. */
+static const uint8_t SETTINGS_OWNER[4] = {'M', 'D', 'S', 1};
+static int settings_owned(const persist_t *p)
+{
+    return !memcmp(p->favorites.factory[1] + 28, SETTINGS_OWNER, sizeof SETTINGS_OWNER);
+}
+/* Legacy Melodee has no owner tag. Require its tagged palette and complete
+ * schema, then check the optional template in project.c before accepting it. */
+static int settings_legacy_valid(const persist_t *p)
+{
+    return p->magic == PERSIST_MAGIC && palette_stored_ok(p->palette) &&
+        p->panel.magic == PANEL_MAGIC && p->lowcut <= 2u && (p->zoom & 0xFFu) <= 1u &&
+        (p->zoom <= 0xFFu || (p->zoom & 0xFFFF0000u) == RECORD_PREF_TAG) &&
+        hold_stored_ok(p->bold) && p->favorites.filter <= 1u && p->ext.usb_off <= 3u &&
+        p->ext.boot <= 4u && p->ext.drumch <= 17u && p->ext.lights <= LIGHTS_N;
+}
 
 /* Normalize in place; 1 = read, 0 = invalid. */
 static int settings_import(persist_t *p, int n)
 {
     if (n != (int)sizeof *p || p->magic != PERSIST_MAGIC) return 0;
-    p->ext.usb_off &= 3u;
+    if (p->ext.usb_off > 3u) p->ext.usb_off = 0;
     if (p->ext.boot > 4u)
         p->ext.boot = 0;
     settings_boot = (uint8_t)p->ext.boot;
@@ -59,7 +78,7 @@ static int settings_import(persist_t *p, int n)
     settings.magic = SETTINGS_MAGIC;
     settings.palette = palette_from_stored(p->palette);
     settings.lowcut = 0;
-    settings.zoom = p->zoom & 0xFFu;
+    settings.zoom = (p->zoom & 0xFFu) == 1u;
     uint32_t rp = (p->zoom & 0xFFFF0000u) == RECORD_PREF_TAG ? (p->zoom >> 8) & 0xFFu : 0u;
     settings_click = (uint8_t)((rp & 3u) < 3u ? rp & 3u : 0u);
     uint32_t level = (rp >> 2) & 3u;
@@ -73,12 +92,12 @@ static int settings_import(persist_t *p, int n)
     favorites_user_hi = p->ext.spare[0];
     favorites.filter = favorites.filter == 1u;
 #endif
-    if (p->panel.magic == PANEL_MAGIC) panel = p->panel;
+    panel = p->panel.magic == PANEL_MAGIC ? p->panel : PANEL_DEFAULT;
     return 1;
 }
 
 /* Start with the last imported/saved object, including fields owned by a
- * feature absent from this build. No save-on-boot or extra flash writes. */
+ * feature absent from this build. Boot only writes for initialization or repair. */
 static void settings_export(persist_t *p)
 {
     p->magic = PERSIST_MAGIC;
@@ -93,6 +112,7 @@ static void settings_export(persist_t *p)
     memcpy(&p->favorites, &favorites, sizeof favorites);
     p->ext.spare[0] = favorites_user_hi;
 #endif
+    memcpy(p->favorites.factory[1] + 28, SETTINGS_OWNER, sizeof SETTINGS_OWNER);
 #if MELODEE_USB_AUDIO
     p->ext.usb_off = ua_off;
     p->favorites.factory[15][26] = ua_tracks ? 0xA1u : 0u; /* tagged; old/unknown bytes default to stereo */

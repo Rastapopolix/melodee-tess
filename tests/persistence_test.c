@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Firmware save flows against NOR flash: deferred settings, retries, and failed-save rollback. */
 #define main hostsim_main
 #include "hostsim.c"
@@ -16,7 +17,8 @@ static void fm1_irq_off(void)
     }
 }
 static void fm1_irq_on(void) {}
-static void lcd_sync(void) {}
+static uint32_t boot_syncs, boot_trace, boot_trace_bad;
+static void lcd_sync(void) { boot_syncs++; }
 static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c) { (void)x; (void)y; (void)w; (void)h; (void)c; }
 static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *p)
 { (void)x; (void)y; (void)w; (void)h; (void)p; }
@@ -33,6 +35,7 @@ static int st_read(uint32_t off, void *dst, uint32_t n) { preset_reads++; memcpy
 static int st_erase(uint32_t off)
 {
     erases++;
+    if (boot_trace && (!boot_syncs || boot_work.state != 1u || boot_work.done >= boot_work.total)) boot_trace_bad++;
     if (erase_error) return -8;
     memset(nor + off, 0xFF, 4096);
     return 0;
@@ -80,18 +83,20 @@ static void reset(void)
     memset(&persist_saved, 0, sizeof persist_saved);
     memset(&settings, 0, sizeof settings);
     memset(&ui, 0, sizeof ui);
+    memset(&boot_work, 0, sizeof boot_work);
     memset(&favorites, 0, sizeof favorites);
     panel = PANEL_DEFAULT;
     host_tracks_init();
     fm1_ms = 0;
     transport_req = 0;
-    persist_pending = 0;
+    persist_pending = persist_repair = 0;
     persist_old = tmpl_old = preset_old_write = 0;
     persist_retry_ms = 0;
     flash_ok = 1;
     erase_error = 0;
     fail_after = -1;
     up_gen = erases = 0;
+    boot_syncs = boot_trace = boot_trace_bad = 0;
     irq_start_race = irq_races = 0;
 }
 
@@ -120,9 +125,37 @@ static int staged_import_persistence(void)
     bad+=check("retry starts after committed prefix and unlocks the receive buffer",!sx_import.count&&!fm6_rx_ready&&native_used(ENGI_FM6,35)&&native_raw(ENGI_FM6,5)[118]=='B'&&native_raw(ENGI_FM6,4)[118]=='A');
     return bad;
 }
+static int test_boot_maintenance_writes(void)
+{
+    int bad = 0;
+    reset(); boot_trace = 1;
+    persist_boot();
+    bad += check("first boot flushes warning before settings and 12 bank erases",
+                 erases == 13u && !boot_trace_bad && boot_syncs >= 17u &&
+                 !boot_work.state && boot_work.total == 12u && boot_work.done == 12u);
+    uint32_t before = erases, flushed = boot_syncs;
+    persist_boot();
+    bad += check("completed first boot needs no more bank writes or progress screen",
+                 erases == before && boot_syncs == flushed && !boot_work.state);
+    reset(); persist_t prefs = {0}; settings_init(); settings_export(&prefs);
+    st_save(OBJ_SETTINGS, &prefs, sizeof prefs); erases = 0;
+    boot_trace = 1; fail_after = 30;               /* first three FM6 banks commit, the fourth fails */
+    persist_boot();
+    bad += check("failed first-boot write preserves completed banks and visible failure",
+                 boot_work.state == 2u && boot_work.done == 3u && !boot_trace_bad &&
+                 native_fm_valid(native_fm_bank(0)) && native_fm_valid(native_fm_bank(2)));
+    fail_after = -1; before = erases; boot_syncs = 0;
+    persist_boot();
+    bad += check("restart retries only the nine unfinished banks",
+                 !boot_work.state && boot_work.total == 9u && boot_work.done == 9u &&
+                 erases == before + 9u && !boot_trace_bad && boot_syncs >= 11u);
+    reset();
+    return bad;
+}
+
 int main(void)
 {
-    int bad = 0, ok;
+    int bad = test_boot_maintenance_writes(), ok;
     uint32_t before;
     persist_t p;
     project_store_t old;

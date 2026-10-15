@@ -52,6 +52,15 @@ int main(void)
     bad += check("project_t: as stored (a matrix slot, engine 8, a DRUM step with notes and hits)",
                  proj_import(&q2, &q, (int)sizeof q) && !memcmp(&q, &q2, sizeof q) && q2.t[1].engine == 8 &&
                  q2.t[2].p[P_M2AMT] == -17 && q2.t[0].step[0].n == 2u && q2.t[0].step[0].hit == 1u << DV_SNARE);
+    {   /* New ranges use the existing global slot in the unchanged project record. */
+        static project_store_t stored;
+        uint32_t ranges_ok = 1;
+        for (uint32_t route = 0; route <= 4; route++) {
+            q.g[G_ROUTE] = (int16_t)route; q.sum = proj_sum(&q);
+            ranges_ok &= proj_pack(&stored, &q) && proj_import(&q2, &stored, sizeof stored) && q2.g[G_ROUTE] == route;
+        }
+        bad += check("FUN16: every ROUT value survives pack/import", ranges_ok);
+    }
     q.chain.count = 2;
     q.chain.row[0] = (chain_row_t){0, 4};
     q.chain.row[1] = (chain_row_t){3, 16};

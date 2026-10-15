@@ -43,7 +43,7 @@ int main(void)
     assert(voice_budget()==16u && voice_units(&trk[0])==3u);
     trk_note_on(&trk[3],67,100);
     assert(voices_busy()<=16u && voice_kills);
-    /* OVERCLOCK (main.c oc_boot): the CPU1 budget follows the clock; one core keeps 16 */
+    /* main.c clock_boot: the CPU1 budget follows the clock running (a 320 a soft reset kept); one core keeps 16 */
     audio_worker_online=1;
     vbudget_cpu1=VBUDGET*320u/360u; assert(voice_budget()==16u);
     audio_worker_online=0; assert(voice_budget()==16u);

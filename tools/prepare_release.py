@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Kerem Kilic (Ellic Studio)
 """Validate a complete release's firmware and native recovery archives; write provenance/checksums."""
 import argparse
 from datetime import datetime, timezone
@@ -60,7 +61,7 @@ def main():
     with zipfile.ZipFile(out / f"melodee-{VERSION}-licenses.zip", "w", zipfile.ZIP_DEFLATED) as archive:
         for file in (ROOT / "LICENSE", ROOT / "LICENSING.md", *(ROOT / "LICENSES").glob("*.txt")):
             archive.write(file, str(file.relative_to(ROOT)))
-    info = {"version": VERSION, "product": expected, "branch": "next", "commit": commit,
+    info = {"version": VERSION, "product": expected, "branch": "main", "commit": commit,
             "builtAt": datetime.now(timezone.utc).isoformat(), "core_builds": packages, "recovery_builds": recovery}
     (out / "BUILD_INFO.json").write_text(json.dumps(info, indent=2) + "\n")
     (out / "SHA256SUMS").write_text("".join(f"{sha256(p.read_bytes())}  {p.name}\n"

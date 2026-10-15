@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* MELODEE: one compilation unit (the HAL is header-only). Each file uses what the files above it
  * define, so the order matters. */
 
@@ -40,7 +41,7 @@
 #define MELODEE_FORK "(tess)"       /* this fork: melodee(tess); the version below is upstream Melodee's */
 #endif
 #ifndef MELODEE_VERSION
-#define MELODEE_VERSION "v1.3.1" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
+#define MELODEE_VERSION "v1.3.6" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
 #endif
 #if MELODEE_OTA && !MELODEE_FLASH
 #error "MELODEE_OTA needs MELODEE_FLASH"
@@ -100,7 +101,7 @@
 #include "ui_draw.c"
 #include "ui_menu.c"
 #include "ui_input.c"
-#include "ui_layer.c"              /* the quick layers (GLO SCL EDIT held) */
+#include "ui_layer.c"              /* the quick layers (GLO SCL held) */
 
 /* --------------------------------------------- storage, update, editor --- */
 #if MELODEE_FLASH

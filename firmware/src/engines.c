@@ -163,7 +163,7 @@ static const preset_t *eng_preset(const engine_t *e, uint32_t k)
     return &made[turn];
 }
 
-/* the order the engines are shown in (PRESETS browsing and its ENG knob, the EDIT layer's keys, the editor's list):
+/* the order the engines are shown in (PRESETS browsing and its ENG knob, the editor's list):
  * engine indices, never a retired one. The indices stay as they are (the
  * stores and the protocol hold them); only this table orders them */
 static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {

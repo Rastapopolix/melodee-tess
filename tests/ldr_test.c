@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Host test of the Melodee update loader (firmware/loader/ldr_core.c): a fake
  * host serves a package over the SysEx protocol, the "device" flash starts as
  * another package's flash.bin (as if that firmware were installed).
@@ -16,6 +17,7 @@ static uint8_t nor[0x100000], *logical;
 static size_t logical_len;
 static uint8_t rx[1024];
 static uint32_t rx_len, rx_full, now_ms, requests, erases, bad_range, record_cleared, f0_asked;
+static int marker_erase_stuck;
 
 static uint32_t pack7(const uint8_t *in, uint32_t n, uint8_t *out)
 {
@@ -83,6 +85,7 @@ static int ldr_erase(uint32_t off)
     if (off < 0x4000u || off >= 0xFC000u || (off & 0xFFFu)) bad_range++;
     if (off < 0x4000u) { printf("ERASE IN THE HEAD %#x\n", off); exit(1); }
     erases++;
+    if (marker_erase_stuck && off == 0x91000u) return 0;
     memset(nor + off, 0xFF, 0x1000);
     return 0;
 }
@@ -205,6 +208,37 @@ int main(int argc, char **argv)
         rc = ldr_session();
         bad += check("foreign key / damaged app head refused, nothing erased", rc == -6 && erases == 0);
         logical[nfo + 0x4000 + 5] = save;
+    }
+    {   /* A stub package with damaged/invalid metadata must never fall back
+         * to the legacy write order. Keep the rest of the package untouched. */
+        uint32_t key;
+        uint8_t saved[32], plain[32];
+        ldr_chip_key(&key);
+        memcpy(saved, logical+nfo+LDR_MARK_OFF, sizeof saved);
+        for (uint32_t k=0;k<5u;k++) {
+            memcpy(plain,saved,sizeof plain);
+            ldr_sfc(plain,32,LDR_MARK_OFF-LDR_APP_LO,key);
+            if (!k) plain[0]^=1u;
+            else if (k==1u) plain[16]^=1u;
+            else {
+                ota_wr32(plain+8,k==2u?0u:k==3u?3u:0x8C004u);
+                ota_wr32(plain+16,ldr_crc32(plain,16));
+            }
+            ldr_sfc(plain,32,LDR_MARK_OFF-LDR_APP_LO,key);
+            memcpy(logical+nfo+LDR_MARK_OFF,plain,32);
+            erases=0;
+            rc=ldr_session();
+            bad += check("invalid stub marker refused before any erase",rc==-15 && !erases);
+        }
+        memcpy(logical+nfo+LDR_MARK_OFF,saved,sizeof saved);
+        static uint8_t before[0x8F000];
+        memcpy(nor+LDR_APP_LO,logical+nfo+LDR_APP_LO,sizeof before);
+        nor[0x5000]^=1u;
+        memcpy(before,nor+LDR_APP_LO,sizeof before);
+        marker_erase_stuck=1;
+        rc=ldr_session();
+        bad += check("marker must erase before changing any body byte",rc==-12 && !memcmp(before,nor+LDR_APP_LO,sizeof before));
+        marker_erase_stuck=0;
     }
     {   /* A valid UFW entry with an older, smaller flash partition (0x89000). */
         uint8_t saved[0x400];memcpy(saved,logical,sizeof saved);uint8_t *h=logical;

@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 2 * * *'
   push:
-    branches: [next]
+    branches: [nightly]
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: next
+          ref: nightly
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -83,7 +83,10 @@ jobs:
           path: .nightly-pages
           fetch-depth: 0
       - name: Publish installer and nightly packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          python web/import_releases.py .nightly-pages --repo "$GITHUB_REPOSITORY"
           commit=$(cat build/nightly-commit.txt)
           python web/publish_nightly.py .nightly-pages \
             --dual build/melodee-nightly.fwsc --single build/melodee-nightly-1core.fwsc \
@@ -92,9 +95,9 @@ jobs:
           cd .nightly-pages
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add webapp/installer/index.html firmware
+          git add webapp firmware
           if ! git diff --cached --quiet; then
-            git commit -m 'build: publish next nightly variants'
+            git commit -m 'build: publish nightly variants'
             git push origin HEAD:gh-pages
           fi
       - name: Request and verify Pages publication

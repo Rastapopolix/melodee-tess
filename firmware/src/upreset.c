@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* User presets (editor protocol v2, cmds 16-21; the SAVE > USER page): 64
  * slots in four storage objects (the first two at 0xDC000..0xDFFFF,
  * two more at 0xE5000..0xE8FFF), 16 records each. Only names and indexes
@@ -57,8 +58,9 @@ static up_bank_t *bank_up(void);
 static uint8_t up_cached = 255;
 static struct { uint8_t ready, used, engine, old; char name[13]; } up_meta[UP_SLOTS];
 /* Records this firmware does not read (written before 1.0: older record versions, a bank of another shape) stay as
- * they are: their slots show OLD FORMAT and a write there is refused (up_put) until the device's dialog lets it
- * (preset_old_write is scoped to that write). A bank of another shape is old as a whole. */
+ * protected during live access until an explicit replacement or the next boot.
+ * Startup resets unsupported banks and clears unreadable entries in readable banks.
+ * A bank of another shape is old as a whole. */
 static uint8_t up_bank_old;
 static up_bank_t *up_cache_bank(uint32_t b);
 static void up_cache_reset(void) { up_cached=255; memset(up_meta,0,sizeof up_meta); up_bank_old=0; }
@@ -313,9 +315,34 @@ static void up_boot(void)                      /* persist_boot: the banks from f
 {
 #if MELODEE_FLASH
     up_cache_reset();
-#endif
-#if MELODEE_FLASH
-    for (uint32_t b = 0; b < UP_SLOTS / UP_PER_BANK; b++) (void)up_cache_bank(b);
+    uint32_t pending = 0, total = 0, done = 0;
+    for (uint32_t b = 0; b < UP_SLOTS / UP_PER_BANK; b++) {
+        up_bank_t *bank = up_cache_bank(b);
+        int damaged = up_old_bank(b * UP_PER_BANK);
+        for (uint32_t j = 0; j < UP_PER_BANK; j++)
+            damaged |= bank->r[j].used && !up_valid(&bank->r[j]);
+        if (damaged) { pending |= 1u << b; total++; }
+    }
+    if (pending && boot_work.state != 2u) {
+        BOOT_WORK_BEGIN("RESETTING PRESETS", total);
+        for (uint32_t b = 0; b < UP_SLOTS / UP_PER_BANK; b++) {
+            if (!(pending >> b & 1u)) continue;
+            up_bank_t *bank = up_cache_bank(b);
+            if (up_old_bank(b * UP_PER_BANK)) memset(bank, 0, sizeof *bank);
+            else for (uint32_t j = 0; j < UP_PER_BANK; j++)
+                if (bank->r[j].used && !up_valid(&bank->r[j])) memset(&bank->r[j], 0, sizeof bank->r[j]);
+            bank->magic = UP_BANK_MAGIC; bank->rsize = sizeof(up_rec_t); bank->nslot = UP_PER_BANK;
+            if (up_save_bank(b)) {
+                up_cached = 255; (void)up_cache_bank(b); /* reload the previous committed copy on failure */
+                BOOT_WORK_END(1);
+                break;
+            }
+            up_bank_old &= (uint8_t)~(1u << b);
+            up_cache_index(b);
+            BOOT_WORK_PROGRESS(++done);
+        }
+        if (done == total) BOOT_WORK_END(0);
+    }
 #endif
     native_cache_reset();
     cz_bank_boot();
@@ -493,7 +520,7 @@ static int up_load(uint32_t k)
         return 1;
     rec = *up_rec(k);
     up_values(r, v);
-    load_begin(t, UNDO_SOUND);                          /* (ui.c: the copy for SAVE held = undo) */
+    load_begin(t, UNDO_SOUND);                          /* (ui.c: the copy for EDIT held = undo) */
     panic_req |= (uint8_t)(1u << song.sel);
     {
         fm1_irq_off();                                  /* the audio ISR must not see half a sound */

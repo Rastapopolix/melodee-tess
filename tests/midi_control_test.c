@@ -238,37 +238,118 @@ static int usb_burst_test(void)
     events_block(CTL);
     return bad;
 }
-/* GLO > SYSTEM DRUM: channel 10 plays the first DRUM track whatever ROUT says, its note-off there too; no DRUM track:
- * the selected one; OFF: as every other channel; another channel (2) wins over CH1-4 */
+/* Exercise the physical-byte parser and USB receiver before the shared event queue. */
+static void route_input(uint32_t source, uint32_t st, uint32_t d1, uint32_t d2)
+{
+    if (source == 2u) {
+        um_byte(st); um_byte(d1);
+        if ((st & 0xE0u) != 0xC0u) um_byte(d2);
+    } else
+        midi_in_event((st >> 4) | st << 8 | d1 << 16 | d2 << 24);
+    events_block(CTL);
+}
+
+static int routing_range_test(void)
+{
+    int bad = 0;
+    static const uint8_t routes[] = {0, 2, 3, 4};
+    for (uint32_t source = 1; source <= 2; source++) {
+        uint32_t ok = 1;
+        for (uint32_t r = 0; r < 4; r++) {
+            for (uint32_t ch = 0; ch < 16; ch++) {
+                midi_test_reset(); settings_drumch = 0;
+                for (uint32_t t = 0; t < NPART; t++) set_engine_of(&trk[t], HOST_SYNTH);
+                song.sel = 2; song.g[G_ROUTE] = routes[r];
+                route_input(source, 0x90u | ch, 60, 100);
+                int target = ch >= r * 4u && ch < r * 4u + 4u ? (int)(ch - r * 4u) : -1;
+                ok &= mn_get(ch, 60) == (uint32_t)(target + 1);
+                for (uint32_t t = 0; t < NPART; t++) ok &= gate_note(&trk[t], 60) == ((int)t == target);
+                if (target < 0) {
+                    int32_t level = trk[2].p[P_LEVEL];
+                    uint32_t mw = trk[2].mw, at = trk[2].at;
+                    route_input(source, 0xB0u | ch, 7, 0);
+                    route_input(source, 0xB0u | ch, 1, 100);
+                    route_input(source, 0xD0u | ch, 100, 0);
+                    route_input(source, 0xE0u | ch, 127, 127);
+                    route_input(source, 0xB0u | ch, 120, 0);
+                    ok &= trk[2].p[P_LEVEL] == level && trk[2].mw == mw && trk[2].at == at && !midi_bend_target[2];
+                }
+                /* Velocity-zero note-ons are releases too. */
+                route_input(source, 0x90u | ch, 60, 0);
+                ok &= !mn_get(ch, 60);
+                for (uint32_t t = 0; t < NPART; t++) ok &= !gate_note(&trk[t], 60);
+            }
+        }
+        bad += check(source == 1 ? "USB: every channel in all four ranges maps or is filtered, including controllers" :
+                                  "TRS: every channel in all four ranges maps or is filtered, including controllers", ok);
+        midi_test_reset(); settings_drumch = 0; song.g[G_ROUTE] = 1;
+        ok = 1;
+        for (uint32_t ch = 0; ch < 16; ch++) {
+            route_input(source, 0x90u | ch, 60, 100);
+            ok &= mn_get(ch, 60) == 1u && gate_note(&trk[0], 60);
+            route_input(source, 0x80u | ch, 60, 0);
+        }
+        bad += check("SEL still accepts every channel", ok && !gate_note(&trk[0], 60));
+
+        midi_test_reset(); settings_drumch = 0;
+        route_input(source, 0x90, 62, 100);
+        song.g[G_ROUTE] = 2; song.sel = 1;
+        route_input(source, 0x80, 62, 0);
+        bad += check("note-off follows its owner after switching to a range excluding its channel",
+                     !mn_get(0, 62) && !gate_note(&trk[0], 62));
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0x90, 64, 100); route_input(source, 0xB0, 64, 127); route_input(source, 0x80, 64, 0);
+        song.g[G_ROUTE] = 4;
+        route_input(source, 0x90, 65, 100); route_input(source, 0xB0, 64, 0);
+        bad += check("excluded channel cannot start new notes while pedal-up still releases its original note",
+                     !mn_get(0, 64) && !mn_get(0, 65) && !gate_note(&trk[0], 64));
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0x90, 67, 100); song.g[G_ROUTE] = 2;
+        route_input(source, 0xB0, 120, 0);
+        bad += check("excluded channel panic clears its original owner", !midi_owners[0] && !gate_note(&trk[0], 67));
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0xB0, 64, 127);
+        song.g[G_ROUTE] = 2; route_input(source, 0xB0, 64, 0);
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0x90, 69, 100); route_input(source, 0x80, 69, 0);
+        bad += check("pedal-up while excluded and without owners prevents stale sustain on re-entry",
+                     !mn_get(0, 69) && !gate_note(&trk[0], 69));
+        song.g[G_ROUTE] = 0; song.rec = 1u << 1;
+        route_input(source, 0x9D, 70, 100); route_input(source, 0x8D, 70, 0);
+        bad += check("channel 14 cannot start an armed take in CH1-4", !song.playing && !mn_get(13, 70) && !trk[1].step[0].n);
+    }
+    return bad;
+}
+
+/* DRUM overrides destinations only inside the selected range. Without a kit, normal routing applies. */
 static int drum_channel_test(void)
 {
     int bad = 0;
     midi_test_reset();
     settings_drumch = 10;
-    set_engine_of(&trk[3], HOST_SYNTH);                           /* (power-on: track 4 is a DRUM kit) */
+    set_engine_of(&trk[3], HOST_SYNTH);
     set_engine_of(&trk[2], ENGI_DRUM);
     song.g[G_ROUTE] = 0;
     queued(0x99, 36, 100, 1);
-    bad += check("DRUM 10: channel 10 plays the DRUM track (track 3), not the selected one",
-                 trk[2].v[0].active && !gate_note(&trk[0], 36));
-    song.sel = 1;
+    bad += check("DRUM 10 cannot bypass CH1-4", !midi_owners[2] && !midi_track(9));
+    song.g[G_ROUTE] = 3;
+    queued(0x99, 36, 100, 1);
+    bad += check("DRUM 10 within CH9-12 plays the first DRUM track", trk[2].v[0].active && mn_get(9, 36) == 3u);
+    song.sel = 1; song.g[G_ROUTE] = 0;
     queued(0x89, 36, 0, 1);
-    bad += check("  its note-off goes there too, the track selected meanwhile", !midi_owners[2]);
+    bad += check("DRUM note-off follows its owner after changing range", !midi_owners[2]);
     song.g[G_ROUTE] = 1;
-    queued(0x99, 38, 100, 1);
-    queued(0x89, 38, 0, 1);
-    bad += check("  ROUT SEL: channel 10 still the DRUM track", midi_track(9) == &trk[2] && midi_track(4) == &trk[1]);
+    bad += check("ROUT SEL: channel 10 still the DRUM track", midi_track(9) == &trk[2] && midi_track(4) == &trk[1]);
     set_engine_of(&trk[2], HOST_SYNTH);
-    bad += check("  no DRUM track: the selected one", midi_track(9) == &trk[1]);
+    bad += check("SEL without a DRUM track uses selection", midi_track(9) == &trk[1]);
+    song.g[G_ROUTE] = 3;
+    bad += check("range without a DRUM track uses its normal channel offset", midi_track(9) == &trk[1]);
     set_engine_of(&trk[3], ENGI_DRUM);
-    settings_drumch = 2;
-    song.g[G_ROUTE] = 0;
-    bad += check("DRUM 2: channel 2 the DRUM track (over CH1-4), channel 10 the selected", midi_track(1) == &trk[3] &&
-                 midi_track(9) == &trk[1] && midi_track(0) == &trk[0]);
+    settings_drumch = 2; song.g[G_ROUTE] = 0;
+    bad += check("DRUM 2 overrides track 2 inside CH1-4, channel 10 stays filtered",
+                 midi_track(1) == &trk[3] && !midi_track(9) && midi_track(0) == &trk[0]);
     settings_drumch = 0;
     bad += check("DRUM OFF: channel 2 track 2 again", midi_track(1) == &trk[1]);
-    settings_drumch = 10;
-    set_engine_of(&trk[3], HOST_SYNTH);
     return bad;
 }
 
@@ -276,7 +357,7 @@ static int drum_channel_test(void)
 int main(void)
 {
     int bad = controls_test() + sustain_test() + ownership_test() + clock_test(1) + clock_test(2) + clock_arp_and_boundaries() +
-              arp_ext_stop_test() + usb_burst_test() + drum_channel_test();
+              arp_ext_stop_test() + usb_burst_test() + routing_range_test() + drum_channel_test();
     printf("%s\n", bad ? "MIDI CONTROL/CLOCK TEST FAILED" : "MIDI control/clock integration tests passed"); return bad != 0;
 }
 #endif

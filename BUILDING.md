@@ -167,10 +167,10 @@ Or, to install your own build from the web installer, make a local copy of the s
 
 ```
 # Build both variants from the same source; release outputs are kept separately.
-MELODEE_RAM_AUDIO=1 ./build.sh --release 1.3.0
-MELODEE_RAM_AUDIO=1 MELODEE_DUAL_CORE=0 ./build.sh --release 1.3.0
-python3 web/make_site.py build/release-1.3.0/melodee-1.3.0.fwsc \
-  build/release-1.3.0-1core/melodee-1.3.0-1core.fwsc 1.3.0 /tmp/melodee-site
+MELODEE_RAM_AUDIO=1 ./build.sh --release 1.3.6
+MELODEE_RAM_AUDIO=1 MELODEE_DUAL_CORE=0 ./build.sh --release 1.3.6
+python3 web/make_site.py build/release-1.3.6/melodee-1.3.6.fwsc \
+  build/release-1.3.6-1core/melodee-1.3.6-1core.fwsc 1.3.6 /tmp/melodee-site
 cd /tmp/melodee-site && python3 -m http.server 8000
 # open http://localhost:8000/webapp/installer/
 ```
@@ -180,6 +180,16 @@ starts, identify its recovery mode using the steps below.
 
 ### Recover a black-screen FM-1
 
+Builds with the boot stub can recover an interrupted application write after power loss.
+Switch on again, or hold **OCT− alone** while switching on: three short key-light flashes
+mean the USB MIDI update loader is starting. Reconnect USB and install the same package
+again; already verified sectors are skipped. Both octave buttons at power-on still enter
+calibration. One long flash means ROM UBOOT; use the recovery steps below.
+
+The first install of the stub, an intentional stub change, and installing firmware without
+the stub still have an unprotected window. Keep the FM-1 charged and the computer awake.
+See [boot protection design and validation](docs/BOOT-SAFETY.md).
+
 If the device appears as **Melodee Update**, it is in the MIDI update loader:
 `python3 tools/fm1_install.py /path/to/working-firmware.fwsc --yes` resumes installation.
 
@@ -187,7 +197,7 @@ If it appears as USB **4c4a:8057**, with inquiry identity **WL82 / UBOOT1.00**, 
 already in mask-ROM UBOOT. `tools/fm1_recover.py` can recover it over a normal USB data
 cable, without an RP2040. It does not force a running device into UBOOT.
 
-The [1.3.1 release downloads](https://github.com/keremimo/melodee/releases/tag/v1.3.1)
+The [1.3.5 release downloads](https://github.com/keremimo/melodee/releases/tag/v1.3.5)
 include standalone recovery archives for Windows x64, Linux x64, macOS Intel/x64
 and Apple Silicon/arm64. Extract the matching archive and follow its `RECOVERY.md`,
 also available [here](docs/RECOVERY.md). Python, libusb and the RAM helper are bundled.
@@ -214,6 +224,14 @@ The tool uses the included file by default. `--loader` or `AC79_SDK` can overrid
 Choose a firmware package whose boot has been verified. For investigating 1.3 startup
 failures, use a previously working release rather than reinstalling the suspected build.
 Download the `.fwsc` and its `SHA256SUMS` from the corresponding release.
+
+The corrected recovery tool also accepts the unmodified official M-VAVE V15
+`FM-1.fwsc` (`FM-1_015`), with whole-file SHA-256
+`db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`.
+The recovery archives on the 1.3.1 release were corrected on 2026-10-13 to accept
+V15's metadata; download again if an older executable rejects it. Keep the backup:
+stock firmware may overwrite Melodee
+data after boot even though the recovery operation preserves it.
 
 ```sh
 # Identify ROM UBOOT; no loader or package needed.
@@ -380,49 +398,75 @@ sides of it:
   `0x03801494` (it looks like a packed stereo sample) while `rets` still held the
   right one. No software check can catch that.
 
-What the FM-1 runs, measured (editor command 79 in a test build, below): the AC79
+Earlier Melodee builds measured (editor command 79 in a test build, below): the AC79
 at 360 MHz (M-VAVE's `isd_config` SYS_CLK; our package carries no clock key, and
 the SDK SPL runs it as fast: 329 dependent adds a microsecond), above the SDK's
 320 MHz table, on the SPL's core
-rail: SYSVDD 11 (1.26 V), VDC14 3 (1.40 V) on its LDO. The stock firmware is
-single-core: its system library says `modified #define CPU_CORE_NUM 1` (the SDK
-default is 2), so no FM-1 was validated with both cores. JieLi's own profile
+rail: SYSVDD 11 (1.26 V), VDC14 3 (1.40 V) on its LDO. This was not the stock
+application's operating supply: V15 raises both rails and enables DCDC after the SPL (below).
+The stock firmware is single-core: its system library says
+`modified #define CPU_CORE_NUM 1` (the SDK default is 2), so stock behavior
+alone does not validate dual-core operation. JieLi's own profile
 above 320 MHz (`isd_config_rule.c`, `CONFIG_OVERCLOCKING_ENABLE`, 396 MHz) sets
 DVDD 14 (1.35 V) and DCDC14 4 (1.45 V), and its notes say to raise them on chips
 that run low. One healthy unit ran both cores under an eight-voice Prophet chord
 without a misread down to SYSVDD 6 (1.11 V): the margin varies from chip to chip.
-Melodee does not change a supply rail: what an FM-1 board and its regulators take
-at other levels is unknown, so the rails stay where the boot loader sets them.
+Melodee now applies the stock supply setup in both core variants. The earlier
+CPU1 measurements do not establish behavior at that setup; hardware validation
+must check cold/soft boots, CPU1 shared-memory errors and loaded audio separately.
 
-### OVERCLOCK: the boot clock
+### The stock supply setup
 
-The HOME-held menu's OVERCLOCK (`overclock.c`, `main.c` `oc_boot`) picks the SYS
-clock at boot, before CPU1, the audio ISR and the LCD start. The retune is PR #27's
-by [johnskiller](https://github.com/johnskiller) (`hal/fm1_clock.h`): PLL2_CON1's
-multiplier on the SPL's post-divider chain, 2 MHz a step and 2/3 of the VCO.
+`hal/fm1_power.h` applies the supply portion of stock V15's constant-folded
+`power_init` / `__hw_power_init` before cache setup, peripherals and CPU1, with
+interrupts off and CPU1 held. It uses Melodee's bounded P33 driver. No SDK power
+manager, sleep timers or RTOS services are linked in, and the PLL is not changed.
 
-| Setting | Multiplier | SYS / HSB / LSB / SFC (MHz) |
-| --- | --- | --- |
-| 320 MHz (default) | 240 | 320 / 160 / 53.3 / 80 |
-| 360 MHz | 270 (the SPL's) | 360 / 180 / 60 / 90 |
+The reference is the unmodified `FM-1_015` package with SHA-256
+`db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`.
+Its decoded boot config contains `SYS_CLK=360000000`, `HSB_DIV=1`, `LSB_DIV=2`
+and no `DVDD`, `DCDC14` or `VDDIO`. Its SPL's default branches at
+`0x01C03E7C..0x01C03EAC` select SYSVDD 11 / VDC14 3. The application task
+`app_core` (entry `0x02004CF2`) then executes the supply sequence at
+`0x02004F90..0x0200509A`:
 
-The rails stay at the boot levels. A 396 MHz test (multiplier 297, JieLi's
-overclock rails) crashed on a healthy unit and is not offered; the switch still
-recognises 297 at boot and moves away from it. TIMER4 (the 24 MHz crystal), the
-audio I2S (its own ALNK PLL) and USB/UART (PLL48M) do not move; the LCD SPI
-follows LSB (10.7 / 12 MHz). The switch accepts any of those multipliers at boot
-(a soft reset can keep the last one) and leaves an unfamiliar one untouched; it and its rollback each wait on RC16M for at least
-20 ms plus the cache handshake (not a PLL lock bit), bounded by 40 ms and a spin
-limit. A settled rollback or an unfamiliar clock raises the undo flag in editor
-command 79 (v[5]); a failed rollback waits in SRAM for the watchdog.
+- Enable LDO13, wait, enable DCDC13, wait, disable LDO13, wait. Each wait is
+  stock's 1,000-iteration `nop` / increment / branch loop, **not** 1,000 us.
+- Write P33 analog registers 1, 5, 6, 7, 8 with `20`, `40`, `0C`, `A5`, `96`
+  (hex), then set register 9 bit 4.
+- Select VDDIOM 4 (3.2 V), VDC14 7 (1.60 V), VDDIOW 3 (3.2 V). Retain the
+  stock reads of registers 6, 5, 5 in that order.
+- Set register 0 bit 7, clear register `16` bits 0..5, set register 2 bit 6,
+  clear register `17` bit 5 (register addresses in hex).
+- Select SYSVDD 15 (1.38 V) last. Stock calls its field helper at `0x01C0108C`
+  with `(6,0,3,7)` at `0x0200503A` and `(9,0,4,15)` at `0x0200509A`.
 
-The setting lives in `favorites.factory[15][30]` bits 2..3, beside KNOB ACCEL, so
-older firmware keeps it. A new clock applies at the next start; closing the menu
-with one asks to restart (the settings are saved first, the transport stopped).
-`oc_guard` (`.noinit`, gone at power-off) marks a session above 320 MHz as live
-until an intended reset (the restart, UBOOT, an update): a boot that finds it set
-(a crash, the watchdog, a switch that never returned) comes back at 320 MHz and
-saves that. A CPU1 retirement in such a session sets 320 MHz for the next start.
+The initializer stops on a P33 timeout, never writes a field from a failed read,
+and verifies the DCDC/LDO mode and voltage fields afterward. CPU1 starts only
+if those checks succeed; existing boot guards and worker retirement remain.
+`tests/power_test.c` checks the stock transaction trace from cold and warm states,
+every transfer timeout, and wrong final read-backs. Target disassembly checks
+the settling loops. These checks establish software behavior, not measured
+voltages or a guarantee that all instability is resolved.
+
+### The boot clock
+
+Melodee runs at the clock the boot loader sets, 360 MHz, and never writes the PLL
+(`hal/fm1_clock.h` only reads it). PR #27 by [johnskiller](https://github.com/johnskiller),
+with [charlesvestal](https://github.com/charlesvestal)'s register reads, found the SYS
+multiplier in PLL2_CON1 (0x119AC): the SPL's 268 means 24 MHz / 12 x 270 = 540 MHz, and
+CLK_CON2 selects 2/3, so SYS 360 / HSB 180 / LSB 60 / SFC 90 MHz.
+
+1.3.0 to 1.3.3 offered a boot-time retune to 320 MHz (OVERCLOCK; the default in
+1.3.0 and 1.3.1). On some FM-1s, the ones whose CPU1 also misbehaves, the retune failed
+before the LCD and USB came up: the watchdog reset, the next start retuned and failed
+again, and the boot guard entered UBOOT behind a black screen (a retained-RAM capture of
+a bricked 1.3.0 unit showed every start stopping between the clock code and the
+splash). 1.3.2 and 1.3.3 made 360 MHz the default and guarded the option; 1.3.4 removes
+it. Its setting bits in `favorites.factory[15][30]` (2..4) are left as saved and never
+read. A soft reset keeps the PLL, so after an update from a session at 320 MHz the
+FM-1 runs at 320 until its next power-off; `main.c` `clock_boot` reads the multiplier
+for the voice budget.
 With CPU1 the shared voice budget follows the clock (16 or 18 units in the
 resident profile); one core keeps 16.
 
@@ -477,11 +521,11 @@ entry on hardware before enabling this in a release. The eight-voice Prophet cap
 is enabled only in this experimental build; validate worst-case patches and
 release tails before adopting it in a release.
 
-## Nightly builds from `next`
+## Nightly builds from `nightly`
 
 The web installer keeps the released standard and single-core packages and
-adds two development builds from `next`: dual core and single core, both with
-`MELODEE_RAM_AUDIO=1`. The clock is chosen on the device (OVERCLOCK, above).
+adds two development builds from `nightly`: dual core and single core, both with
+`MELODEE_RAM_AUDIO=1`. Both run at the boot loader's clock (above).
 Save a complete backup in the editor before trying a nightly. Selecting
 Standard in the installer returns to the released firmware.
 
@@ -493,9 +537,9 @@ from the same commit; `MELODEE_DUAL_CORE=0 ./build.sh --nightly` produces
 build time, verifies the selected channel's identity, and locks all choices
 while installing.
 
-The Nightly builds workflow runs on pushes to `next`, manually, and daily at
+The Nightly builds workflow runs on pushes to `nightly`, manually, and daily at
 02:00 UTC. Its scheduled definition must also exist on GitHub's default branch.
-It checks out `next`, builds both variants, runs the host/web suite,
+It checks out `nightly`, builds both variants, runs the host/web suite,
 and publishes only after successful checks. Packages, checksums and source
 metadata are available as an Actions artifact and in `gh-pages/firmware`.
 `web/publish_nightly.py` updates the existing Pages checkout while keeping its

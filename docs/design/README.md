@@ -88,7 +88,7 @@ One way to move on every screen with something to move through (Kerem, 2026-10-1
   track's pattern's sheet (Copy to.., Delete pattern; Kerem 2026-10-11). Copy to: the place it goes framed in the
   theme's colour on the track's row (the first empty one first, an empty place a "+"), the header "copy 1 to 4"; any
   knob moves it, OCT+ copies (over a pattern in use: "Replace pattern 2?" first), OCT- leaves. Delete pattern asks,
-  then empties it (its notes and motion; SAVE held undoes it).
+  then empties it (its notes and motion; EDIT held undoes it).
 
 | Screen | KNOB 1 | KNOB 2 | KNOB 3 / 4 | OCT+ | OCT- |
 |---|---|---|---|---|---|
@@ -160,12 +160,12 @@ TAKE JAM: REC held on SONG (elsewhere REC held captures).
   pages (on across the sections). The sections as tabs under the header, the pages of one as the header's dots.
 - **The map**: EDIT pressed on an EDIT page: a row a section, a tile a page (FM6: operators x their pages); KNOB 1 / 2
   move, OCT+ opens, OCT- closes.
-- **EDIT held**: the sections on the white keys; Init, Favourite, Undo, Store on the black keys. The engine is chosen
-  in the browser only (KNOB 4; Kerem, 2026-10-10).
+- **EDIT held**: undo; EDIT + OCT- / OCT+ undo/redo. Hold SAVE to save the current project. The engine is chosen
+  in the browser (KNOB 4).
 - **Init sound** (Kerem 2026-10-11: sound design from scratch): the engine's own INIT, nothing changed and dry:
   INIT PROPHET, INIT TONE, INIT SID, FM6's INIT VOICE (the DX7 init voice, a preset after F24 so the stores keep the
   factory's numbers); DRUM its 808 kit. The browser's KNOB 4 (the engine) loads the engine's INIT, and each engine's
-  INIT comes first in its sounds there; Init sound (the sound's sheet, EDIT held's black key) the engine's own.
+  INIT comes first in its sounds there; Init sound (the sound's sheet) the engine's own.
 
 ## FX inserts (2026-10-12)
 

@@ -8,8 +8,13 @@ Melodee is free software, licensed under the GNU General Public License, version
 bundled or ported parts keep their own licences; they are listed below, and their licence
 texts are in `LICENSES/`.
 
-Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments\
-Modifications Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+Melodee code and modifications: Copyright (C) 2026 Kerem Kilic (Ellic Studio)\
+Retained Felucca portions: Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+
+Copyright notices follow the code's actual origin. Independently written Melodee files
+credit Kerem Kilic; mixed files also identify the retained Felucca portions. Unchanged
+upstream files and third-party ports retain their original notices. Sharing Felucca's
+GPL licence does not make new Melodee code Hügelton Instruments' work.
 
 ## What is GPL-3.0-only
 
@@ -30,15 +35,15 @@ You may use, study, change and share Melodee under the GPL. If you distribute Me
 firmware derived from it, you must also give your recipients its complete corresponding
 source under the same licence. That includes devices that ship with modified Melodee inside.
 
-## Hügelton Instruments' own work
+## Retained Hügelton Instruments material
 
-All by Hügelton Instruments (Leo Kuroshita), in this tree:
+The following original material is by Hügelton Instruments (Leo Kuroshita).
+Melodee's additions and modifications are credited separately in the source files:
 
 | What | Licence | Where |
 | --- | --- | --- |
-| Felucca: firmware, tools, web pages, tests | GPL-3.0-only | `LICENSE` |
+| Original Felucca portions retained in the firmware, tools, web pages and tests | GPL-3.0-only | Source notices; `LICENSE` |
 | The PHASE engine's waveforms: a C port of the oscillator of CrispyZebra (<https://github.com/hugelton/CrispyZebra>) | GPL-3.0 | `firmware/src/eng_phase.c` |
-| The synthesized 808 drum kit (TR-808 circuit models) | GPL-3.0-only | `firmware/src/drum_808.c`, `firmware/src/eng_drum.c` |
 | The panel picture | GPL-3.0-only | `docs/panel.jpg` |
 | The Fukiai icon font (<https://github.com/hugelton/Fukiai>): the web editor's icons (the firmware draws its own: `tools/gen_icons.py`, GPL-3.0-only; `tools/gen_aa_icons.py` still rasterises Fukiai for comparison) | MIT | `web/fukiai.ttf`, `LICENSES/MIT-Fukiai.txt`, `web/FUKIAI-LICENSE.txt` |
 
@@ -46,6 +51,7 @@ All by Hügelton Instruments (Leo Kuroshita), in this tree:
 
 | What | Licence | Where |
 | --- | --- | --- |
+| ChoralRoot FM-1 contributors (<https://github.com/Quixotic7/ChoralRootFM1>, v0.16, commit `9c7445cdd7b767c779741d28654fb59cca3acd97`): boot stub, interrupted-update write ordering, commit-marker/CRC compensation, and recovery tests, adapted for Melodee. The shared `CRSTUB` / `CRBM` format is retained. | GPL-3.0-only | `firmware/stub/`, `firmware/loader/ldr_core.c`, `tools/build.py`, `tools/fm1pkg_make.py`, `tests/boot_stub*`, `tests/loader_powercut_test.c` |
 | Rubik font by The Rubik Project Authors (<https://github.com/googlefonts/rubik>): the UI text and the keycap labels, rasterised into the firmware at build time (`tools/gen_aa_font.py`, `tools/gen_aa_keycaps.py`; the generated tables are not offered as a font, and the font declares no Reserved Font Name) | SIL OFL 1.1 | `assets/fonts/Rubik[wght].ttf`, `LICENSES/OFL-Rubik.txt` |
 | Inter Tight font by The Inter Project Authors: the panel diagram (`tools/gen_panel_diagram.py`, `docs/panel.jpg`) and the `inter-tight` preset of `tools/gen_aa_font.py` (the firmware's text was Inter Tight up to Melodee 0.13) | SIL OFL 1.1 | `assets/fonts/InterTight[wght].ttf`, `LICENSES/OFL-InterTight.txt` (also `assets/fonts/OFL.txt`) |
 | DaisySP by Electrosmith, Corp and Emilie Gillet (<https://github.com/electro-smith/DaisySP>): the PHYS engine's modal and string models and the resonator, ported to fixed point | MIT | `firmware/src/phys_dsp.c`, `LICENSES/MIT-DaisySP.txt` |

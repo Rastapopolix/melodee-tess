@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Melodee UI drawing: the header, the four knob cards, the footer (steps + engine / preset / page)
  * and the frame; the panel between the cards and the footer is ui_graph.c. The layout: SURF cards and panels on
  * BG, rounded corners, no rules, colours from the theme tokens only (gfx.c T_*); THEME is the selected track's
@@ -654,23 +655,7 @@ static void draw_foot(void)
     }
     cv_blit(0, Y_FOOT);
 }
-/* the EDIT layer's cards (ui_layer.c): ENG (the engine), No. (its sounds: KNOB 2's list), FAV, an empty card */
 #include "ui_sections.c"                                /* the EDIT pages in sections, the map */
-static void engine_columns(void)                        /* EDIT held: KNOB 1 the section, 2 the sound, 3 FAV */
-{
-    uint32_t total, cur = eng_list_pos(&total), k;
-    char val[8], u[8], sn[16];
-    fmt_int(val, (int32_t)cur + 1);
-    str_cpy(u, "/", 8);
-    fmt_int(u + 1, (int32_t)total);
-    sec_build();
-    k = !ui.home && cur_page()->fam == FAM_EDIT ? sec_of(ui.page) : 0u;
-    str_cpy(sn, sec.n ? sec.name[k] : "-", sizeof sn);
-    draw_column(0, "SECTION", sn, "", VAL(0u), sec.n > 1u ? (int32_t)(k * 1000u / (sec.n - 1u)) : -1, ICON_NONE);
-    draw_column(1, "No.", val, u, VAL(1u), total > 1u ? (int32_t)(cur * 1000u / (total - 1u)) : 0, ICON_NONE);
-    draw_column(2, "FAV", preset_favorite() ? "ON" : "OFF", "", VAL(2u), -1, ICON_X_STAR);
-    draw_column(3, "", "", "", T_THEME, -1, ICON_NONE);
-}
 #include "ui_stage.c"                                   /* Stage (HOME) */
 #include "ui_browser.c"                                 /* SAVE > PRESETS, the sound browser */
 #include "ui_patterns.c"                                /* SEQ > PATTERNS, SEQ > SONG */
@@ -1127,10 +1112,6 @@ static void confirm_text(char *a, char *b)
         str_cpy(a, "REPLACE OLD TEMPLATE?", 24);
         str_cpy(b, "Old settings/template replaced", 32);
         break;
-    case CF_RESTART:                                 /* the menu closed with another clock */
-        str_cpy(a, "RESTART NOW?", 24);
-        str_cpy(b, "Unsaved song changes are lost", 32);
-        break;
     default:
         str_cpy(a, "CLEAR T1 SEQUENCE?", 24);     /* the header (T1..T4) is hidden */
         a[7] = (char)('1' + k % NTRK);
@@ -1246,6 +1227,11 @@ static void ui_draw(void)                               /* (gfx.c: the fills wai
 }
 static void ui_draw_frame(void)
 {
+    if (boot_work.state) {
+        scrn.idle = fm1_ms;                          /* maintenance/errors never sleep or get covered */
+        if (ui.force) { boot_work_draw(); ui.force = 0; }
+        return;
+    }
     if (!scr_frame()) return;
     ui.frame++;
     if (palette_track(song.sel))                       /* THEME is the selected track's colour */

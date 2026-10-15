@@ -1,22 +1,24 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* MELODEE memory map.
- * Code + constants execute in place from XIP (app.bin offset 0 = 0x02000120).
+ * Code + constants execute in place from XIP (body offset 0 = 0x02001000; boot stub at 0x02000120).
  * 0x01C00000..0x01C07F00 holds .ram_text (code that must run while the flash
  * is busy: the flash driver). Unused RAMTEXT/debug space ends at 0x01C07F00:
- * crt0 still writes STATUS in the last 256 bytes. Linker-derived SRAM tails
+ * the boot stub writes STATUS in the last 256 bytes. Linker-derived SRAM tails
  * join the audio resource banks without changing retained state or stacks.
+ * 0x01C7C000..0x01C7C01F belongs to the boot stub, across warm resets.
  * RAM  : .data/.bss (96 KiB)
  * POOL : big zero-initialised buffers (FX lines, canvases), section .pool
  * STACKS with 256-byte guard bands; NOINIT survives resets and UBOOT entry.
  * 0x01C7FD50.. is reserved: boot_info, boot-state mailbox, vector table. */
 MEMORY
 {
-    XIP    (rx)  : ORIGIN = 0x02000120, LENGTH = 0x8DFBC   /* the app area to 0x93000 (fm1pkg_make.py APP_SLOT) */
+    XIP    (rx)  : ORIGIN = 0x02001000, LENGTH = 0x8C000   /* body ends before commit-marker sector 0x91000 */
     RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x7F00
     RAM    (rwx) : ORIGIN = 0x01C08000, LENGTH = 96K
     POOL   (rwx) : ORIGIN = 0x01C20000, LENGTH = 0x54000
-    NOINIT (rw)  : ORIGIN = 0x01C7C000, LENGTH = 0x3D50
+    NOINIT (rw)  : ORIGIN = 0x01C7C020, LENGTH = 0x3D30
     CACHE  (rw)  : ORIGIN = 0x01F28000, LENGTH = 28K
 }
 SECTIONS

@@ -5,9 +5,9 @@
  * ends in trk_note_on / trk_note_off: engines never see where a note came from.
  * Four tracks, one transport: every track's pattern loops on its own LEN / DIV /
  * SWING / GATE (polymeter). The keys play the selected track; MIDI IN by GLO > SYSTEM ROUT (G_ROUTE):
- * CH1-4 (0) channels 1..4 play parts 1..4, any other channel the selected track; SEL (1) every channel
- * the selected track. Their CC1 (mod wheel), CC11 (expression) and channel aftertouch go to the same
- * track's modulation matrix (mod.c; the selected track: the one selected then).
+ * CH1-4 (0), CH5-8 (2), CH9-12 (3), CH13-16 (4) map only their four channels to tracks 1..4;
+ * SEL (1) maps every channel to the selected track. Their CC1 (mod wheel), CC11 (expression) and
+ * channel aftertouch go to the same track's modulation matrix (mod.c; the selected track: the one selected then).
  * A note into an armed track (song.rec) while
  * the transport runs preserves its original onset and independent held length
  * (recording.c). The STEP overview uses nearby steps and ties; optional P_RECQ
@@ -1092,19 +1092,22 @@ static void seq_tick(track_t *t, uint32_t n)
     }
 }
 
-/* MIDI in: the track a channel plays (0..15): G_ROUTE CH1-4 (0) channels 1..4 their parts, SEL (1) none */
-/* the track MIDI channel ch (0..15) plays: the DRUM channel the first DRUM track (none: the selected one), then ROUT
- * CH1-4 channels 1..4 tracks 1..4, every other channel the selected track */
+/* A range is a strict input filter, including the DRUM override. SEL keeps its stored value 1.
+ * Return 0 for channels outside the range; releases keep their original owner. */
 static track_t *midi_track(uint32_t ch)
 {
-    uint32_t k;
+    uint32_t k, route = (uint32_t)song.g[G_ROUTE];
+    uint32_t first = route > 1u ? (route - 1u) * 4u : 0u;
+    if (route != 1u && (ch < first || ch - first >= 4u))
+        return 0;
     if (settings_drumch && ch + 1u == settings_drumch) {
         for (k = 0; k < NPART; k++)
             if (drum_track(&trk[k]))
                 return &trk[k];
-        return TSEL;
     }
-    return ch < NPART && !song.g[G_ROUTE] ? &trk[ch] : TSEL;
+    if (route == 1u)
+        return TSEL;
+    return ch - first < NPART ? &trk[ch - first] : 0;
 }
 
 #include "midi_control.c"
