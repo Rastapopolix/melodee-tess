@@ -426,7 +426,8 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [x] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
       done with SEED, to keep that change to one thing): 70 (2026-10-15), for a fresh track only; saved projects
       keep theirs. Baseline rewritten (the Markov scenarios' notes, every state and the saved block's hash).
-      Branch `markov-density`; device check pending, then merge
+      Branch `markov-density`; device check pending (build 1.1.5, test installer /test/1.1.5/webapp/installer/
+      on the site), then merge
 
 ### 2. Signal bus and parameter IDs
 - [ ] Central parameter IDs and ranges
