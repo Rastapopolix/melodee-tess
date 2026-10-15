@@ -421,7 +421,8 @@ Plan: `docs/analysis/phase1-plan.md`.
       (build 1.1.3), then merge both. Knob 4 is labelled ROLL, the seed in small grey under it (Theo 2026-10-15:
       the number is only a marker, to find a line again; no coarse steps or acceleration, which would skip lines).
       ROLL waits for the track's next bar line while playing (Theo 2026-10-15): a click restarted the line mid-bar
-      and a quick turn stuttered; stopped, at once. Not saved: a seed still waiting when saved is not kept
+      and a quick turn stuttered; stopped, at once. Not saved: a seed still waiting when saved is not kept.
+      Device check: build 1.1.4 (test installer /test/1.1.4/webapp/installer/ on the site, as 1.1.3's)
 - [ ] Markov's DENSITY default to about 70 (decided 2026-10-14 for "the next intended baseline change"; not
       done with SEED, to keep that change to one thing)
 
