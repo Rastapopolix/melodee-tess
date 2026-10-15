@@ -454,7 +454,10 @@ Plan: `docs/analysis/phase1-plan.md`.
       Passed on the device (1.1.9), merged
 
 ### 2. Signal bus and parameter IDs
-- [ ] Central parameter IDs and ranges
+- [x] Central parameter IDs and ranges (2026-10-16, branch `param-ids`): `firmware/src/pid.c`, 144 ids.
+      0x000 + P_*, 0x100 + G_*, 0x200 + Tessera's TX_* (tessera.h, frozen, append only); Melodee's
+      descriptors reused, Tessera's added with get/set by value. Frozen against `tests/pid_ids.txt`
+      (`tests/pid_test.c`). Not yet: a flag for which ids a cord may reach (the destination table, next)
 - [ ] Fixed destination table; cords (source, destination, amount, offset) at control rate,
       extending `mod.c`. Decided 2026-10-16 (Theo): room for 32 cords (the fixed maximum: the save
       format and the worst-case cost are sized for it), 16 in use at first; raising the number in use
@@ -467,7 +470,8 @@ Plan: `docs/analysis/phase1-plan.md`.
       GEN is a second page onto PATTERN's knobs (MODE and the engine's three); PATTERN stays in SEQ for
       the step sequencer, so upstream's page is untouched. `FAM_GEN` = `FAM_ARP` (no new family).
       Device check pending (build 1.2.0), with the ARP reach check
-- [ ] Help text field in the central parameter table, filled for every parameter
+- [ ] Help text field in the central parameter table, filled for every parameter (the field is there;
+      Tessera's 24 written, Melodee's 120 to write)
 - [ ] Generate the online parameter reference from the table
 - [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
