@@ -457,27 +457,49 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [x] Central parameter IDs and ranges (2026-10-16, branch `param-ids`): `firmware/src/pid.c`, 144 ids.
       0x000 + P_*, 0x100 + G_*, 0x200 + Tessera's TX_* (tessera.h, frozen, append only); Melodee's
       descriptors reused, Tessera's added with get/set by value. Frozen against `tests/pid_ids.txt`
-      (`tests/pid_test.c`). Not yet: a flag for which ids a cord may reach (the destination table, next)
-- [ ] Fixed destination table; cords (source, destination, amount, offset) at control rate,
-      extending `mod.c`. Decided 2026-10-16 (Theo): room for 32 cords (the fixed maximum: the save
-      format and the worst-case cost are sized for it), 16 in use at first; raising the number in use
-      later changes a number, not the format. Estimate, to measure: about 6 B a cord, 1-2 % of the CPU
-      at 64 cords reaching every voice, so the screen (4 cords a page) sets the limit, not the CPU
-- [ ] Generators and a first set of mod sources (LFO, envelope, S&H) on the bus
+      (`tests/pid_test.c`). Which ids a cord may reach: the destination table (`cord.c`)
+- [x] Fixed destination table; cords (source, destination, amount, offset) at control rate,
+      extending `mod.c` (2026-10-16, branch `cord-dests`). Room for 32 cords, 16 in use (Theo
+      2026-10-16: raising the number in use changes a number, not the format). 41 destinations, frozen
+      codes (`tests/cord_dests.txt`): per voice (pitch, cutoff, shape, gain), per block (level, pan,
+      spread, the envelope, ENV and LFO amounts, LFO rate and depth, FX send, E1..E8; each one checked
+      against where the firmware reads it), at the generator's step (Turing PROB, LEN; Euclid PULSES,
+      ROT; Markov LEAP, DENS; Morph POS; SHIFT, DROP, HUMAN; EVOLVE AMOUNT; FORM CONTRAST). Left out,
+      with the reason in `cord.c`: note-on parameters, FX SEND 2/3, the sequencer's, globals, choices.
+      Applied in `mod_begin` (out of line; no cords: the sound bit for bit as before) and around the
+      generator's step. Host cost with 16 cords on four playing tracks: about 3-6 % more (`cord_test`);
+      on the device still to measure
+- [x] Cords saved with the project: a "CRD1" part in the Tessera object (no new sector), tagged per
+      slot as the blocks; older objects and backups load without cords (`backup_test`)
+- [x] CORDS page (LFO family, after MOD), as the mock: KNOB 1 source, 2 the cord, 3 destination, 4
+      amount (a cord without a source: its OFFSET). Not yet: the activity dots of the mock
+- [x] Generators and a first set of mod sources (LFO, envelope, S&H) on the bus: sources LFO, ENV,
+      VEL, KEY, RAND, MODW, AT, EXPR, S&H, SLEW (mod.c's) and the generators' GATE, NOTE and CV
+      (gen.c: Turing its register, Euclid and Morph a ramp, Markov the degree; no draw of its own: the
+      notes unchanged, only the baseline's `.state` hashes rewritten)
 - [x] UI page map drafted before the phase ends; review it with the rendered UI PNGs (draft and
       decisions 2026-10-16, linked under Open questions; mocks in `docs/design/phase2/`, "look good")
 - [x] GEN family under ARP's tap: GEN, EVOLVE, FORM, TWEAK, ARP, ARP 2 (2026-10-16, branch `gen-family`).
       GEN is a second page onto PATTERN's knobs (MODE and the engine's three); PATTERN stays in SEQ for
       the step sequencer, so upstream's page is untouched. `FAM_GEN` = `FAM_ARP` (no new family).
       Device check pending (build 1.2.0), with the ARP reach check
-- [ ] Help text field in the central parameter table, filled for every parameter (the field is there;
-      Tessera's 24 written, Melodee's 120 to write)
-- [ ] Generate the online parameter reference from the table
+- [x] Help text field in the central parameter table, filled for every parameter (all 144; checked
+      against the code where a label said too little)
+- [x] Generate the online parameter reference from the table: `docs/PARAMETERS.md` (`pid_test`
+      writes it and fails when it is out of date), with the cords' sources and destinations
+- [x] Help gesture: ARP held + a knob turned shows the knob's help card, the value left as it is;
+      ARP's release then opens no page (`ui_help.c`). Engine panels (FM6, CZ-1, PROPHET): label only
+- [ ] Device check of phase 2 (build 1.2.1): GEN, the ARP reach, help, CORDS (a cord heard, saved,
+      loaded), and the cost of 16 cords on the device
 - [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
 ### 3. Normalled default patch
 - [ ] Default patch that sounds good with no cords; cords override the normals
 - [ ] Slow, gentle normals to filter cutoff, LPG decay and FX sends
+- Recommendation (2026-10-16, not started: it changes the sound of every project, so it waits for
+  Theo's ears): normals as cords in the cords' own table, marked as normals; a NORMALS switch per
+  project, ON for a new project and OFF for one saved before them, so old projects sound as saved
+  (CLAUDE.md: automation opt-in); a cord to the same place replaces its normal
 
 ### 4. Strip engines, new voices, FX
 - [ ] Hard fork: create the `tessera` repo, GPL-3.0 and attribution kept; rename identities
@@ -526,6 +548,9 @@ Plan: `docs/analysis/phase1-plan.md`.
 
 AC79 at 360 MHz, 44.1 kHz audio, the audio working arena above the build's minimum (142,336 B since
 v1.3.1; see CLAUDE.md).
+Headroom after phase 2's cords and help (2026-10-16, dual core): static RAM 4,444 B free, audio arena
+4,640 B above the minimum, `melodee.bin` 521,212 B of the 573,440 B the XIP region holds (about
+52 KB left; Melodee's help texts take about 7 KB of it). Phase 4's strip frees far more.
 Headroom after the v1.3.6 merge (2026-10-16, dual core): static RAM 4,908 B free, audio arena
 5,440 B above the minimum, `melodee.bin` 503,340 B.
 Headroom after the v1.3.1 merge (2026-10-14, dual core): static RAM (`.data + .bss`) 5,200 B free,
