@@ -508,11 +508,24 @@ void tessera_tweak_knob(uint32_t k, int32_t s)
 static int32_t tess_scale_steps(const track_t *t, int32_t n, int32_t k);
 static int32_t tess_follow_source(uint32_t src, uint32_t tr);
 
+static void tess_clock_step_body(track_t *t, uint32_t tr);
+static uint32_t cord_smask[NTRK];                       /* (cord.c: the cords on Tessera settings, per track) */
+static void cord_step_begin(uint32_t tr);
+static void cord_step_end(uint32_t tr);
 void tessera_clock_step(track_t *t)
 {
     uint32_t tr = trk_index(t);
     if (tr >= TESSERA_TRACKS) return;
-
+    if (!cord_smask[tr]) {
+        tess_clock_step_body(t, tr);
+        return;
+    }
+    cord_step_begin(tr);                                /* the cords on its settings, for this step only */
+    tess_clock_step_body(t, tr);
+    cord_step_end(tr);
+}
+static void tess_clock_step_body(track_t *t, uint32_t tr)
+{
     tess_seed_fresh(tr);                                    /* before EVOLVE captures the phrase's start */
     tessera_evolve_tick(t, tr);
 
@@ -1063,6 +1076,32 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     }
     if (tessera.mode[tr] == eng) tess_rearm(tr);
 }
+/* a setting written as it is, no side effect (cord.c, around the step): clamped to its range now (PULSES to STEPS,
+ * ROT below it), DENSITY's 0 kept as 100 */
+void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v)
+{
+    tessera_evolve_t *ev;
+    if (tr >= TESSERA_TRACKS) return;
+    ev = &tessera.evolve[tr];
+    switch (x) {
+    case TX_TUR_PROB: tessera.turing[tr].prob = (uint8_t)tess_clampi(v, 0, 100); break;
+    case TX_TUR_LEN: tessera.turing[tr].len = (uint8_t)tess_clampi(v, 2, 16); break;
+    case TX_EUC_PULSES: tessera.euclid[tr].pulses = (uint8_t)tess_clampi(v, 0, tessera.euclid[tr].steps); break;
+    case TX_EUC_ROT:
+        tessera.euclid[tr].rot = (uint8_t)tess_clampi(v, 0, tessera.euclid[tr].steps > 1 ? tessera.euclid[tr].steps - 1 : 0);
+        break;
+    case TX_MKV_LEAP: tessera.markov[tr].tension = (uint8_t)tess_clampi(v, 0, 100); break;
+    case TX_MKV_DENS: tessera.markov[tr].density = (uint8_t)tess_clampi(v, 5, 100); break;
+    case TX_MRP_POS: tessera.morph[tr].morph_pos = (uint8_t)tess_clampi(v, 0, 127); break;
+    case TX_TW_SHIFT: ev->shift = (int8_t)tess_clampi(v, -24, 24); break;
+    case TX_TW_DROP: ev->drop = (uint8_t)tess_clampi(v, 0, 100); break;
+    case TX_TW_HUMAN: ev->human = (uint8_t)tess_clampi(v, 0, 100); break;
+    case TX_EV_AMOUNT: ev->amount = (uint8_t)tess_clampi(v, 0, 100); break;
+    case TX_FM_CONTRAST: ev->contrast = (uint8_t)tess_clampi(v, 0, 100); break;
+    default: break;                                 /* (the others are no cord's: cord.c's destinations) */
+    }
+}
+
 void tessera_param_set(uint32_t tr, uint32_t x, int32_t v)
 {
     if (tr >= TESSERA_TRACKS || x >= TX_COUNT) return;

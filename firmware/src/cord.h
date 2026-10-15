@@ -47,4 +47,28 @@ typedef struct {
 
 const cord_dest_t *cord_dest(uint32_t code);        /* 0: no such destination (a gap, past the end) */
 
+/* Source codes. FROZEN as the destinations. A source is a track's (its LFO, its latest note ..): one value per
+ * track and block, so a cord crosses tracks. (Per voice, a voice's own envelope or velocity on its own pitch: the
+ * MOD matrix's per-voice routes.) Values Q15: bipolar -32768..32767 (LFO, KEY, RAND, S&H, SLEW, NOTE), else 0..32767 */
+enum {
+    CS_OFF,
+    CS_LFO, CS_ENV, CS_VEL, CS_KEY, CS_RAND, CS_MODW, CS_AT, CS_EXPR, CS_SH, CS_SLEW,   /* mod.c's MS_LFO .. MS_SLEW */
+    CS_GATE,                      /* the track's generator: 1 while its note sounds (Tessera) */
+    CS_NOTE,                      /* the generator's last note, as KEY (C4 = 0, an octave = 0.19) */
+    CS_N
+};
+
+typedef struct {                  /* one cord, as saved (6 bytes) */
+    uint8_t src, src_trk;         /* CS_*, 0..3 */
+    uint8_t dst, dst_trk;         /* CD_*, 0..3 */
+    int8_t amount;                /* -100..100 %: at a full source, the destination's whole range (pitch: an octave) */
+    int8_t offset;                /* -100..100 %: added whatever the source (CS_OFF: a fixed setting) */
+} cord_t;
+
+const char *cord_src_name(uint32_t code);           /* <= 7 characters; 0: no such source */
+int cord_set(uint32_t i, const cord_t *c);          /* i < CORD_LIVE; out of range: refused (0), nothing changed */
+const cord_t *cord_get(uint32_t i);
+void cord_clear(void);                              /* every cord off */
+uint32_t cord_count(void);                          /* cords doing something (a destination and an amount or offset) */
+
 #endif

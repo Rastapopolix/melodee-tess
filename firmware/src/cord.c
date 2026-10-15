@@ -64,3 +64,183 @@ const cord_dest_t *cord_dest(uint32_t code)
 {
     return code < CD_N && CORD_DESTS[code].name ? &CORD_DESTS[code] : 0;
 }
+
+/* ------------------------------------------------------------ sources --- */
+_Static_assert(CS_LFO == MS_LFO && CS_SLEW == MS_SLEW && CS_EXPR == MS_EXPR, "CS_LFO .. CS_SLEW == mod.c's MS_*");
+static const char *const CORD_SRC_NAME[CS_N] = {"--", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H",
+                                                "SLEW", "GATE", "NOTE"};
+const char *cord_src_name(uint32_t code) { return code < CS_N ? CORD_SRC_NAME[code] : 0; }
+
+/* track tr's source s now (Q15): mod.c's (ENV: the latest note's envelope, one block late; the LFO with its FADE),
+ * the generator's */
+static int32_t cord_src(uint32_t s, uint32_t tr)
+{
+    const track_t *t = &trk[tr % NTRK];
+    if (s == CS_GATE)
+        return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF && tessera.active_gate[tr] ? 32767 : 0;
+    if (s == CS_NOTE)
+        return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF ? mod_key(tessera.last_note[tr]) : 0;
+    return mod_tsrc(t, s, mulq15(t->lfo_val, t->lfo_fade));
+}
+/* as mod.c's MS_BIPOLAR (a UNI LFO: 0..1, as ENV) */
+static int cord_bipolar(uint32_t s, uint32_t tr)
+{
+    return s == CS_NOTE || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));
+}
+
+/* ------------------------------------------------------------ the cords --- */
+static cord_t cords[CORD_MAX];
+/* per destination track, the cords that reach it (bit i: cords[i]): mask in the audio block, smask at the step.
+ * envsrc: bit t, a cord reads track t's ENV (its voices report it only with mod.c active: mod_begin keeps it on) */
+static uint32_t cord_mask[NTRK], cord_smask[NTRK];
+static uint8_t cord_envsrc;
+
+static int cord_live(const cord_t *c)
+{
+    return c->dst != CD_OFF && (c->amount || c->offset) && cord_dest(c->dst);
+}
+static void cord_masks(void)
+{
+    uint32_t i, t;
+    for (t = 0; t < NTRK; t++) cord_mask[t] = cord_smask[t] = 0;
+    cord_envsrc = 0;
+    for (i = 0; i < CORD_LIVE; i++) {
+        const cord_t *c = &cords[i];
+        if (!cord_live(c)) continue;
+        if (cord_dest(c->dst)->kind == CK_STEP) cord_smask[c->dst_trk] |= 1u << i;
+        else cord_mask[c->dst_trk] |= 1u << i;
+        if (c->src == CS_ENV) cord_envsrc |= (uint8_t)(1u << c->src_trk);
+    }
+}
+
+int cord_set(uint32_t i, const cord_t *c)
+{
+    if (i >= CORD_LIVE || c->src >= CS_N || c->src_trk >= NTRK || !cord_dest(c->dst) || c->dst_trk >= NTRK ||
+        c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100)
+        return 0;
+    TESS_IRQ_OFF();
+    cords[i] = *c;
+    cord_masks();
+    TESS_IRQ_ON();
+    return 1;
+}
+const cord_t *cord_get(uint32_t i) { return i < CORD_MAX ? &cords[i] : 0; }
+void cord_clear(void)
+{
+    TESS_IRQ_OFF();
+    memset(cords, 0, sizeof cords);
+    cord_masks();
+    TESS_IRQ_ON();
+}
+uint32_t cord_count(void)
+{
+    uint32_t i, n = 0;
+    for (i = 0; i < CORD_LIVE; i++) n += cord_live(&cords[i]);
+    return n;
+}
+
+/* a cord's move, as a share of the destination's range (Q15, 32768 = all of it): amount x source + offset */
+static int32_t cord_share(const cord_t *c)
+{
+    int32_t x = c->src ? cord_src(c->src, c->src_trk) : 0;
+    return (x * c->amount) / 100 + (32768 * c->offset) / 100;
+}
+/* that share of a range of span steps, to the nearest (25 % of 0..32: 8) */
+static int32_t cord_steps(int32_t share, int32_t span) { return (share * span + 16384) >> 15; }
+/* mod.c's AMT (-64..64 = the whole of it) of a percentage */
+static int32_t cord_amt(int32_t pct) { return (pct * 64) / 100; }
+
+/* mod.c mod_begin, for track t (cord_mask: some cord reaches it): the LFO DEPTH cords on g (mod.c's DEPTH gain) */
+static __attribute__((noinline)) int32_t cord_depth(const track_t *t, int32_t g)
+{
+    uint32_t m = cord_mask[t - trk], i;
+    for (i = 0; m; i++, m >>= 1) {
+        const cord_t *c = &cords[i];
+        if (!(m & 1u) || c->dst != CD_LFO_DEPTH) continue;
+        if (c->src && c->amount)
+            g = mulq15(g, mod_gain(cord_bipolar(c->src, c->src_trk) ? MS_LFO : MS_ENV, cord_src(c->src, c->src_trk),
+                                   cord_amt(c->amount)));
+        if (c->offset)
+            g = mulq15(g, mod_gain(MS_ENV, 32768, cord_amt(c->offset)));   /* (32768: the whole) */
+    }
+    return g;
+}
+
+/* mod.c mod_begin, for track t: the voice cords into mod's per-track terms, the parameter cords into off[] (the
+ * offsets of mod.kid's parameters, as the MOD slots' are) */
+static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off)
+{
+    uint32_t m = cord_mask[t - trk], i, j;
+    for (i = 0; m; i++, m >>= 1) {
+        const cord_t *c = &cords[i];
+        const cord_dest_t *d;
+        if (!(m & 1u)) continue;
+        d = cord_dest(c->dst);
+        if (d->kind == CK_VOICE) {
+            mod.amp |= d->md == MD_AMP;
+            if (c->src && c->amount)
+                mod_voice_add(cord_bipolar(c->src, c->src_trk) ? MS_LFO : MS_ENV, d->md, cord_src(c->src, c->src_trk),
+                              cord_amt(c->amount), &mod.pit, &mod.cut, &mod.shp, &mod.gain);
+            if (c->offset)
+                mod_voice_add(MS_ENV, d->md, 32768, cord_amt(c->offset), &mod.pit, &mod.cut, &mod.shp, &mod.gain);
+        } else if (d->kind == CK_BLOCK) {
+            uint32_t id = d->pid;
+            const param_desc_t *pd = id >= P_E0 ? &ENGINES[t->engine]->edit[id - P_E0] : &TP[id];
+            for (j = 0; j < mod.nk && mod.kid[j] != id; j++)
+                ;
+            if (j == mod.nk) {
+                mod.kid[j] = (uint8_t)id;
+                mod.keep[j] = t->p[id];
+                off[j] = 0;
+                mod.nk++;
+            }
+            off[j] += cord_steps(cord_share(c), pd->max - pd->min);
+        }
+    }
+}
+
+/* ------------------------------------------------------------ at the generator's step --- */
+static struct { uint8_t n, x[CORD_MAX]; int16_t base[CORD_MAX], set[CORD_MAX]; } cord_held;
+
+/* tessera_clock_step, before the step: the Tessera cords of track tr into its settings (tessera_param_poke: no side
+ * effect; PULSES within STEPS ..) */
+static __attribute__((noinline)) void cord_step_begin(uint32_t tr)
+{
+    uint32_t m = cord_smask[tr], i, j;
+    int32_t off[CORD_MAX];
+    cord_held.n = 0;
+    for (i = 0; m; i++, m >>= 1) {
+        const cord_t *c = &cords[i];
+        const cord_dest_t *d;
+        const param_desc_t *pd;
+        uint32_t x;
+        if (!(m & 1u)) continue;
+        d = cord_dest(c->dst);
+        x = d->pid - PID_TESS(0);
+        pd = pid_desc(d->pid, tr);
+        for (j = 0; j < cord_held.n && cord_held.x[j] != x; j++)
+            ;
+        if (j == cord_held.n) {
+            cord_held.x[j] = (uint8_t)x;
+            cord_held.base[j] = (int16_t)tessera_param_get(tr, x);
+            off[j] = 0;
+            cord_held.n++;
+        }
+        off[j] += cord_steps(cord_share(c), pd->max - pd->min);
+    }
+    for (j = 0; j < cord_held.n; j++) {
+        tessera_param_poke(tr, cord_held.x[j], cord_held.base[j] + off[j]);
+        cord_held.set[j] = (int16_t)tessera_param_get(tr, cord_held.x[j]);
+    }
+}
+/* after it: the stored settings back; one the step itself changed (an EVOLVE mutation): that change kept */
+static __attribute__((noinline)) void cord_step_end(uint32_t tr)
+{
+    uint32_t j;
+    for (j = 0; j < cord_held.n; j++) {
+        int32_t now = tessera_param_get(tr, cord_held.x[j]);
+        tessera_param_poke(tr, cord_held.x[j], now == cord_held.set[j] ? cord_held.base[j] :
+                                               now - (cord_held.set[j] - cord_held.base[j]));
+    }
+    cord_held.n = 0;
+}

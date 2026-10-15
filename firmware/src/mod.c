@@ -51,6 +51,13 @@ _Static_assert(P_M2SRC == P_M1SRC + 3 && P_M4AMT == P_M1SRC + 11 && P_M4AMT + 1 
 #define MS_BIPOLAR(s) ((s) == MS_LFO || (s) == MS_KEY || (s) == MS_RAND || (s) >= MS_SH)
 #define MD_ENGINE(d) ((d) >= MD_E1 && (d) < MD_E1 + 8)           /* E1..E8: P_E0..P_E7 */
 
+/* Tessera's cords (cord.c) join the matrix here: up to CORD_MAX more parameters held per block, the per-track terms */
+#include "cord.h"
+static uint32_t cord_mask[NTRK];
+static uint8_t cord_envsrc;
+static __attribute__((noinline)) int32_t cord_depth(const track_t *t, int32_t g);   /* (out of mod_begin: */
+static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off);         /* no cords, no cost) */
+
 /* the track parameter of a per-block destination */
 static uint32_t mod_param(uint32_t d)
 {
@@ -66,8 +73,8 @@ static struct {                  /* the part in mix_part (one at a time) */
     int32_t ldep;                /* DEPTH: the track LFO's gain (Q15; 32767 = none, track_render leaves it alone) */
     uint8_t vsrc[NMSLOT], vdst[NMSLOT];
     int8_t vamt[NMSLOT];
-    uint8_t kid[NMSLOT];         /* per-block: the parameter, its stored value */
-    int16_t keep[NMSLOT];
+    uint8_t kid[NMSLOT + CORD_MAX];   /* per-block: the parameter, its stored value (and the cords') */
+    int16_t keep[NMSLOT + CORD_MAX];
 } mod;
 
 static uint32_t mod_seed = 0x2545F491u;
@@ -153,14 +160,14 @@ static __attribute__((noinline)) int32_t mod_depth(const track_t *t, int32_t lfo
 static __attribute__((noinline)) int mod_begin(track_t *t)
 {
     const int16_t *p = t->p;
-    int32_t lfo, off[NMSLOT];
+    int32_t lfo, off[NMSLOT + CORD_MAX];
     uint32_t k, j;
     mod.on = 0;
     for (k = 0; k < NMSLOT; k++)
         if (p[P_M1SRC + 3u * k] && (((0x1FFFFFu & ~0x3C1u) >> ((uint32_t)p[P_M1DST + 3u * k] & 31u)) & 1u) && p[P_M1AMT + 3u * k])
             break;
-    if (k == NMSLOT)
-        return 0;
+    if (k == NMSLOT && !cord_mask[t - trk] && !((cord_envsrc >> (t - trk)) & 1u))
+        return 0;                                       /* (a cord reading its ENV: its voices report it) */
     lfo = mulq15(t->lfo_val, t->lfo_fade);              /* (the LFO of the block before: track_render ticks it) */
     mod.on = 1;
     mod.amp = 0;
@@ -168,6 +175,8 @@ static __attribute__((noinline)) int mod_begin(track_t *t)
     mod.pit = mod.cut = mod.shp = 0;
     mod.gain = 32767;
     mod.ldep = mod_depth(t, lfo);
+    if (cord_mask[t - trk])
+        mod.ldep = cord_depth(t, mod.ldep);
     if (mod.ldep < 32767) lfo = mulq15(lfo, mod.ldep);
     for (; k < NMSLOT; k++) {
         uint32_t s = (uint32_t)p[P_M1SRC + 3u * k], d = (uint32_t)p[P_M1DST + 3u * k];
@@ -201,6 +210,8 @@ static __attribute__((noinline)) int mod_begin(track_t *t)
             off[j] += (((x * a) >> 6) * (pd->max - pd->min)) >> 15;
         }
     }
+    if (cord_mask[t - trk])
+        cord_block(t, off);
     for (j = 0; j < mod.nk; j++) {
         uint32_t id = mod.kid[j];
         const param_desc_t *pd = id >= P_E0 ? &ENGINES[t->engine]->edit[id - P_E0] : &TP[id];

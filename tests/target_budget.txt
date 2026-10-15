@@ -41,7 +41,9 @@ fm1_alnk0_irq 18778
 # Standalone voice-loop baseline from 83cdcdc's track_render, compiled
 # noinline with the same target flags. Existing ISR/engine limits unchanged.
 track_render_audio 821
-mod_begin 158
+# mod_begin +24 (2026-10-16, melodee-tess): Tessera's cords join the matrix (cord.c, out of line); with neither
+# slots nor cords it still returns at once.
+mod_begin 182
 mod_voice 30
 mod_end 7
 # Quarter-rate Tape now includes the fused wet interpolation/mix, replacing full-rate passes.

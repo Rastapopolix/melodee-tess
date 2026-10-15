@@ -122,6 +122,7 @@ enum {
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
+void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v); /* written as it is (cord.c, around a step) */
 void tessera_param_set(uint32_t tr, uint32_t x, int32_t v);  /* clamped, with what its knob does besides (a MODE
                                                                * change releases the notes, STEPS keeps PULSES ..) */
 /* the UI's view of a track's generators (read only; tr < TESSERA_TRACKS) */
