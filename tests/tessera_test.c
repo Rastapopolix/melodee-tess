@@ -110,7 +110,7 @@ static void s_markov_var(void)
 {
     gen(0, TESS_ENG_MARKOV);
     knob(tessera_knob, 1, 14);                        /* TENSION 81 */
-    knob(tessera_knob, 2, -8);                        /* DENSITY 60 */
+    knob(tessera_knob, 2, -2);                        /* DENSITY 60 */
     knob(tessera_knob, 3, 1);                         /* 3 octaves */
 }
 static void s_morph(void) { gen(0, TESS_ENG_MORPH); }
@@ -364,6 +364,7 @@ static void s_follow_step(void)
     trk[0].p[P_SCALE] = 1;                            /* major */
     trk[1].p[P_SCALE] = 1;
     gen(1, TESS_ENG_MARKOV);
+    knob(tessera_knob, 2, 6);                         /* DENSITY 100: a note every step (follow_run) */
     turns(tessera_tweak_knob, 3, 1);                  /* FOLLOW track 1 */
     knob(tessera_tweak_knob, 0, 2);                   /* SHIFT +2: a third */
 }

@@ -91,7 +91,7 @@ void tessera_init(void)
         /* 3. Markov */
         tessera.markov[i].cur_state = 0;
         tessera.markov[i].tension = 25;
-        tessera.markov[i].density = 100;
+        tessera.markov[i].density = 70;                 /* (a step in three rests: room to breathe) */
         tessera.markov[i].oct_span = 2;
         tessera_markov_recalc(i);
 
