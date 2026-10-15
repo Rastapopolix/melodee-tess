@@ -337,6 +337,7 @@ enum { CS_CARD, CS_STRIP, CS_RING, CS_FADER, CS_CHIP, CS_CAPTURE };   /* how dra
                                                                       * CS_CAPTURE: kept for a list's rows, ui_list.c) */
 static void list_capture(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc);
 static uint8_t col_style;                               /* (ui_pages.c pv_column) */
+static uint8_t col_quiet;                               /* the next card's value is an aside (ROLL's seed): 9 px, mid */
 static void pv_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc, int32_t ratio,
                       int hot);
 static void draw_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc,
@@ -350,12 +351,16 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
     const aafont_t *vf = &AF_M;
     uint32_t n, kn;
     int32_t kid = kc_tag(val, &kn);
+    int quiet = col_quiet;
+    col_quiet = 0;
     if (col_style == CS_CAPTURE) {                      /* a list's row (ui_list.c) */
         list_capture(c, label, val, unit, vc);
         fmt_named = 0;
         return;
     }
     fmt_named = 0;                                      /* (params.c: a name, for this card only) */
+    if (quiet)
+        vf = &AF_X, vc = T_MID;
     if (str_eq(unit, label))
         unit = "";                                      /* "BPM 124 BPM", "USB OFF USB": the label says it */
     if (icon == ICON_AUTO)
@@ -784,7 +789,8 @@ static void draw_columns(void)
         draw_column(2, "AMOUNT", e2, e2u, VAL(2u), (int32_t)ev->amount * 10, ICON_AUTO);
         if (tr >= TESSERA_TRACKS || tessera.mode[tr] == TESS_ENG_OFF || !tessera.seed[tr]) str_cpy(e3, "--", sizeof e3);
         else fmt_int(e3, tessera.seed[tr]);           /* (picked when a generator is first selected or played) */
-        draw_column(3, "SEED", e3, "", VAL(3u), -1, ICON_AUTO);
+        col_quiet = 1;                                  /* ROLL: each step a new line; the seed small, to find one again */
+        draw_column(3, "ROLL", e3, "", VAL(3u), -1, ICON_AUTO);
         return;
     }
     if (cur_page()->graph == GR_STEPS) {
