@@ -429,6 +429,10 @@ Plan: `docs/analysis/phase1-plan.md`.
       same draws: only a phrase at a bound plays otherwise (baseline: midi_clock_start_stop_continue). Morph's
       rhythm A and the drift itself (Gravity, phase 6) still open. Branch `mutation-bounds` (on `roll-range`);
       device check pending (build 1.1.7), then merge
+- [x] A start for testing the generators (Theo 2026-10-15, "a matter of convenience for testing"): at power-on and
+      NEW, track 1 CZ-1 VIBRAPHONE (was PROPHET FUNK BASS II), 85 BPM, the melodic parts in minor pentatonic.
+      `TRK_START_TESS` (engines.c); the host tests keep Melodee's start (hostsim.c sets it 0), and format 1
+      projects their power-on sounds (TRK_DEF_V1). Revisit before a public release. On `mutation-bounds`
 - [x] ROLL stops at 1 and 128 instead of wrapping (Theo 2026-10-15); a seed over 128 from 1.1.3-1.1.5 goes to
       128. On `mutation-bounds`, for the build after 1.1.7
 - [x] ROLL's range 1..128, with the knobs' acceleration (Theo 2026-10-15: 9999 too many to turn through): a quick
