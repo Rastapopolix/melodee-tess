@@ -22,7 +22,7 @@ typedef struct {
 /* 2. Euclidean rhythm */
 typedef struct {
     uint8_t  steps;       /* Total steps (1..32) */
-    uint8_t  pulses;      /* Active hits (0..steps) */
+    uint8_t  pulses;      /* Active hits (0..steps; EVOLVE keeps them 1..steps-1) */
     uint8_t  rot;         /* Step rotation offset */
     uint8_t  step_idx;    /* Current step index */
     uint8_t  last_hit;    /* 1 if current step fired */

@@ -202,7 +202,8 @@ static void gen_turing_mutate(gen_turing_t *g, uint32_t amt, uint32_t *rnd)
         g->reg ^= (uint16_t)(1u << gen_rnd(rnd, len));
 }
 
-/* Euclid: the rotation nudged by one, less often a pulse more or fewer, and the pitches re-rolled */
+/* Euclid: the rotation nudged by one, less often a pulse more or fewer (kept 1..STEPS-1: never silent nor every
+ * step; at a bound it turns back), and the pitches re-rolled */
 static void gen_euclid_mutate(gen_euclid_t *g, uint32_t amt, uint32_t *rnd)
 {
     uint32_t steps = g->steps ? g->steps : 16u;
@@ -211,13 +212,18 @@ static void gen_euclid_mutate(gen_euclid_t *g, uint32_t amt, uint32_t *rnd)
         else g->rot = (uint8_t)(g->rot ? g->rot - 1u : steps - 1u);
     }
     if (gen_rnd(rnd, 100u) < amt / 2u) {
-        if (gen_rnd(rnd, 2u) && g->pulses < steps) g->pulses++;
-        else if (g->pulses) g->pulses--;
+        uint32_t hi = steps > 1u ? steps - 1u : 1u, up = gen_rnd(rnd, 2u);
+        if (g->pulses <= 1u) up = 1;
+        if (g->pulses >= hi) up = 0;
+        g->pulses = (uint8_t)(g->pulses + (up ? 1 : -1));
+        if (g->pulses < 1u) g->pulses = 1;
+        if (g->pulses > hi) g->pulses = (uint8_t)hi;
     }
     if (gen_rnd(rnd, 100u) < amt) g->pitch_seed = gen_new_seed(g->pitch_seed, rnd);
 }
 
-/* Markov: the tension moves by up to +-AMOUNT/2 */
+/* Markov: the tension (LEAP) moves by up to +-AMOUNT/2, turning back at 0 and 100 (clamped, it sat there for long
+ * stretches) */
 static void gen_markov_mutate(gen_markov_t *g, uint32_t amt, uint32_t *rnd)
 {
     int32_t j = (int32_t)gen_rnd(rnd, amt + 1u) - (int32_t)(amt / 2u);

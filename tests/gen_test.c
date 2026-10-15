@@ -172,6 +172,22 @@ static void euclid_tests(void)
     check("euclid: no random draw on a step (its pitches are a hash of the seed)", draws);
     check("euclid: the same settings give the same steps", same);
     check("euclid: mutation keeps PULSES <= STEPS, ROT < STEPS, a seed other than 0", mut);
+    {   /* PULSES 1..STEPS-1 once a mutation moved them, from 0 and from STEPS too (STEPS 1: 1) */
+        int ok = 1;
+        for (uint32_t steps = 1; steps <= 32; steps++)
+            for (uint32_t start = 0; start < 3u; start++) {
+                uint32_t hi = steps > 1u ? steps - 1u : 1u, moved = 0;
+                gen_euclid_t g = {(uint8_t)steps, (uint8_t)(start == 0 ? 0u : start == 1 ? steps : steps / 2u), 0, 0, 0, 5};
+                for (uint32_t n = 0; n < 300; n++) {
+                    uint8_t was = g.pulses;
+                    gen_euclid_mutate(&g, 100, &rng_state);
+                    moved |= g.pulses != was;
+                    if (moved) ok &= g.pulses >= 1u && g.pulses <= hi;
+                }
+                ok &= moved || (g.pulses >= 1u && g.pulses <= hi);
+            }
+        check("euclid: mutation keeps PULSES 1..STEPS-1 (never silent, never every step), from 0 and from STEPS", ok);
+    }
     {
         int ok = 1;
         for (uint32_t s = 0; s < 256; s++) {
