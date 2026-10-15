@@ -458,11 +458,15 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] Fixed destination table; about 16 cords (source, destination, amount, offset) at control
       rate, extending `mod.c`
 - [ ] Generators and a first set of mod sources (LFO, envelope, S&H) on the bus
-- [ ] UI page map drafted before the phase ends; review it with the rendered UI PNGs (first draft in
-      words 2026-10-16, linked under Open questions; mock renders after Theo's four decisions)
+- [x] UI page map drafted before the phase ends; review it with the rendered UI PNGs (draft and
+      decisions 2026-10-16, linked under Open questions; mocks in `docs/design/phase2/`, "look good")
+- [x] GEN family under ARP's tap: GEN, EVOLVE, FORM, TWEAK, ARP, ARP 2 (2026-10-16, branch `gen-family`).
+      GEN is a second page onto PATTERN's knobs (MODE and the engine's three); PATTERN stays in SEQ for
+      the step sequencer, so upstream's page is untouched. `FAM_GEN` = `FAM_ARP` (no new family).
+      Device check pending (build 1.1.10), with the ARP reach check
 - [ ] Help text field in the central parameter table, filled for every parameter
 - [ ] Generate the online parameter reference from the table
-- [ ] Choose the function key and draft the key map alongside the page map
+- [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
 ### 3. Normalled default patch
 - [ ] Default patch that sounds good with no cords; cords override the normals
