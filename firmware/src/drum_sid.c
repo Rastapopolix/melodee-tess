@@ -3,10 +3,12 @@
 /* KIT SID: a drum track played as a C64 tune's drum routine plays it, on one MOS 6581 for the whole track
  * (eng_sid.c's model of it: oscillators, the noise register, the DACs, the envelope generator, the cutoff curve
  * and resonance, the C64's output stage).
- *  - The chip's three voices take the hits: the voice of the same lane (the two hats share one: a closed hat
- *    chokes the open one), else a silent voice, else the one struck longest ago. A voice still sounding fades
- *    out over a control tick first (0.73 ms: a player's hard restart, without its two frames); the hit then
- *    restarts its oscillator (the test bit) and its envelope from zero.
+ *  - The chip's three voices take the hits. A lane is one drum at a time (the two hats one lane: a closed hat
+ *    chokes the open one): its drum still sounding fades out over 5.8 ms, about the chip's fastest release (a
+ *    player's hard restart; switching the release rate instead would wait out the ADSR delay, up to 33 ms),
+ *    while the hit starts on a silent voice; with none, it takes the voice furthest into its fade, else the
+ *    oldest hit's, after a 2.9 ms fade. Never a cut: the 6581's DC offset would make it a hard step through
+ *    the C64's coupling capacitor. A hit restarts its oscillator (the test bit) and its envelope from zero.
  *  - Each drum is a frame program as trackers write them: a PAL frame (19656 cycles, 50.12 Hz) at a time a
  *    waveform, a frequency and its slide each frame, the gate; frames count from the hit. Its ADSR runs on the
  *    chip's envelope generator; the gate closes after the drum's frames (or a recorded hit's length).
@@ -23,6 +25,8 @@
 #define DSK_GATE 0x01u
 #define DSK_NOISE 0x80u
 #define DSK_DC (3 * 8192 - 910)                /* the 6581's DC under the volume (DAC x 4 by envelope Q15) */
+#define DSK_FADE 8                             /* blocks a lane's ringing drum fades over (5.8 ms) */
+#define DSK_STEAL 4                            /* .. a voice another drum takes, before that hit (2.9 ms) */
 #define DSK_REST 8                             /* DIGI: the master volume between samples */
 
 typedef struct { uint8_t ctrl, frames; uint16_t freq; int16_t slide; } dsk_step_t;
@@ -77,7 +81,7 @@ static const dsk_drum_t DSK_DRUMS[16] = {
 
 typedef struct {                               /* a hit: its drum at the hit's pitch, level, ADSR, SNAP, length */
     int32_t tune, gain, length;
-    uint8_t adsr[4], sound, level, snap;
+    uint8_t adsr[4], sound, lane, level, snap;
 } dsk_next_t;
 typedef struct {
     sid_voice_t e;                             /* its envelope generator (sid_env_clock); e.env_prev: a tick ago */
@@ -87,7 +91,8 @@ typedef struct {
     uint16_t freq;                             /* the frequency register */
     int16_t slide;
     uint8_t adsr[4], ctrl, sound, lane, step, left, gate_left, snap, level;
-    uint8_t restart;                           /* a hit waits: 1 the next block fades the voice out, 2 it does */
+    uint8_t restart;                           /* a hit waits (next) for the fade to end */
+    uint8_t fade, fade_len;                    /* the fade out: blocks left + 1 (dsk_render ramps fade .. fade - 1) */
     dsk_next_t next;
 } dsk_ch_t;
 struct dsk_part {                              /* (dsk_part_t: eng_drum.c) */
@@ -172,6 +177,13 @@ static void dsk_frame(dsk_ch_t *c)
 }
 
 static void dsk_start(dsk_ch_t *c);
+static void dsk_fade(dsk_ch_t *c, uint32_t len)   /* (a fade under way goes on) */
+{
+    if (!c->fade) {
+        c->fade = (uint8_t)(len + 1u);
+        c->fade_len = (uint8_t)len;
+    }
+}
 /* a hit on note at velocity vel: DIGI's KICK and SNARE on $D418, any other drum on a voice */
 static void dsk_hit(track_t *t, uint32_t note, uint32_t vel)
 {
@@ -198,13 +210,24 @@ static void dsk_hit(track_t *t, uint32_t note, uint32_t vel)
         K->digi = 1;
         return;
     }
-    for (k = 0; k < DSK_NCH && best == DSK_NCH; k++)   /* the lane's voice (the hats': one) */
-        if (K->ch[k].lane == lane || (lane - DV_HATC <= 1u && K->ch[k].lane - DV_HATC <= 1u))
+    for (k = 0; k < DSK_NCH; k++) {            /* the lane's drum (the hats': one) */
+        dsk_ch_t *v = &K->ch[k];
+        uint32_t l = v->restart ? v->next.lane : v->lane;
+        if (l != lane && (lane - DV_HATC > 1u || l - DV_HATC > 1u))
+            continue;
+        if (v->restart)                        /* waiting: this hit instead */
             best = k;
-    for (k = 0; k < DSK_NCH && best == DSK_NCH; k++)   /* a silent one */
-        if (dsk_done(&K->ch[k]))
+        else if (!dsk_done(v))                 /* sounding: it fades out */
+            dsk_fade(v, DSK_FADE);
+    }
+    for (k = 0; k < DSK_NCH && best == DSK_NCH; k++)   /* a silent voice */
+        if (dsk_done(&K->ch[k]) && !K->ch[k].e.env_prev && !K->ch[k].fade)
             best = k;
-    if (best == DSK_NCH)                       /* the oldest hit */
+    if (best == DSK_NCH)                       /* else the one furthest into its fade */
+        for (k = 0; k < DSK_NCH; k++)
+            if (K->ch[k].fade && !K->ch[k].restart && (best == DSK_NCH || K->ch[k].fade < K->ch[best].fade))
+                best = k;
+    if (best == DSK_NCH)                       /* else the oldest hit */
         for (best = 0, k = 1; k < DSK_NCH; k++)
             if (K->ch[k].age < K->ch[best].age)
                 best = k;
@@ -222,12 +245,14 @@ static void dsk_hit(track_t *t, uint32_t note, uint32_t vel)
     h->adsr[3] = (uint8_t)clamp(d->adsr[3] + dec, 0, 127);
     h->snap = (uint8_t)((snap + 32) / 64);
     h->length = (int32_t)drum_event_length;
-    c->lane = (uint8_t)lane;
+    h->lane = (uint8_t)lane;
     c->age = ++K->age;
-    if (dsk_done(c) && !c->e.env_prev && !c->restart)
+    if (dsk_done(c) && !c->e.env_prev && !c->fade) {
         dsk_start(c);                          /* silent: at once */
-    else
-        c->restart = 1;                        /* sounding: a hard restart first */
+    } else {
+        c->restart = 1;                        /* sounding: after its fade */
+        dsk_fade(c, DSK_STEAL);
+    }
 }
 
 /* the voice's waiting hit starts */
@@ -236,13 +261,14 @@ static void dsk_start(dsk_ch_t *c)
     const dsk_next_t *h = &c->next;
     const dsk_drum_t *d = &DSK_DRUMS[h->sound];
     c->sound = h->sound;
+    c->lane = h->lane;
     c->tune = h->tune;
     c->gain = h->gain;
     c->level = h->level;
     memcpy(c->adsr, h->adsr, sizeof c->adsr);
     c->snap = h->snap;
     c->length = h->length;
-    c->restart = 0;
+    c->restart = c->fade = 0;
     c->gate_left = d->gate;
     c->ph = 0;                                 /* the test bit: the accumulator from 0 */
     c->e.env = c->e.env_prev = 0;              /* the envelope from zero, as a hard restart leaves it */
@@ -268,11 +294,18 @@ static __attribute__((noinline)) int dsk_tick(track_t *t)
     for (k = 0; k < DSK_NCH; k++) {
         dsk_ch_t *v = &K->ch[k];
         v->e.env_prev = v->e.env;
-        if (v->restart == 1)                   /* this block fades the voice out (dsk_render), */
-            v->restart = 2;
-        else if (v->restart == 2)              /* the next one starts the hit */
-            dsk_start(v);
-        if (dsk_done(v) && !v->restart)
+        if (v->fade && !--v->fade) {           /* faded out: the hit waiting, or silence */
+            if (v->restart) {
+                dsk_start(v);
+            } else {
+                v->e.env = v->e.env_prev = 0;
+                v->e.state = SID_RELEASE;
+                v->e.hold_zero = 1;
+                v->ctrl &= (uint8_t)~DSK_GATE;
+                v->gate_left = 0;
+            }
+        }
+        if (dsk_done(v))
             continue;
         if (v->length > 0 && (v->length -= CTL) <= 0) {   /* a recorded hit's length: the release */
             v->gate_left = 0;
@@ -288,7 +321,7 @@ static __attribute__((noinline)) int dsk_tick(track_t *t)
         q[P_SUS] = v->adsr[2];
         q[P_REL] = v->adsr[3];
         sid_env_clock(&v->e, q, cycles);
-        busy |= !dsk_done(v) || v->e.env_prev || v->restart;
+        busy |= !dsk_done(v) || v->e.env_prev || v->fade;
     }
     return busy || K->digi || !K->quiet;
 }
@@ -316,11 +349,15 @@ static __attribute__((noinline)) void dsk_render(track_t *t, int32_t *out, uint3
     for (k = 0; k < DSK_NCH; k++) {
         const dsk_ch_t *c = &K->ch[k];
         int32_t lv;
-        if (dsk_done(c) && !c->e.env_prev && !c->restart)
+        if (dsk_done(c) && !c->e.env_prev && !c->fade)
             continue;
         lv = mulq15(c->gain, dsk_level(p, c->lane, c->level)) >> 1;   /* (half scale) */
         a0[k] = mulq15(sid_edac(SID_6581, c->e.env_prev), lv);
-        a1[k] = c->restart ? 0 : mulq15(sid_edac(SID_6581, c->e.env), lv);   /* (a hard restart: to 0) */
+        a1[k] = mulq15(sid_edac(SID_6581, c->e.env), lv);
+        if (c->fade) {                         /* fading out: fade / len .. (fade - 1) / len this block */
+            a0[k] = mulq15(a0[k], c->fade * 32767 / c->fade_len);
+            a1[k] = mulq15(a1[k], (c->fade - 1) * 32767 / c->fade_len);
+        }
         live |= 1u << k;
         route |= (uint32_t)DSK_DRUMS[c->sound].route << k;
     }

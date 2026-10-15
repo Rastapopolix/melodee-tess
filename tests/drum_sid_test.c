@@ -153,19 +153,45 @@ int main(int argc, char **argv)
         trk_note_on(&trk[0], 41, 110); run(0, 1);   /* TOM L, HAT C, CLAP, then RIM: the tom's voice */
         trk_note_on(&trk[0], 42, 110); run(0, 1);
         trk_note_on(&trk[0], 39, 110); run(0, 1);
-        trk_note_on(&trk[0], 37, 110); run(0, 2);   /* (a block of hard restart, then the rim) */
+        trk_note_on(&trk[0], 37, 110); run(0, DSK_STEAL + 2u);   /* (the voice's fade, then the rim) */
         held = (ch_with(D9_CH) < DSK_NCH) + (ch_with(D9_CP) < DSK_NCH) + (ch_with(D9_RS) < DSK_NCH);
         check("the kit plays on one voice; a fourth drum takes the oldest hit's SID voice", one == 1u && held == 3u &&
               ch_with(D9_LT) == DSK_NCH && ch_with(D9_RS) == 0u);
     }
-    {   /* the hats share a SID voice: a closed hat chokes the open one */
-        uint32_t ho;
+    {   /* the hats one lane: a closed hat chokes the open one (released at the fastest rate, 6 ms) */
+        uint32_t ho, rel, gone;
         kit(2, 0);
         trk_note_on(&trk[0], 46, 110); run(0, 4);
         ho = ch_with(D9_OH);
-        trk_note_on(&trk[0], 42, 110); run(0, 2);
-        check("a closed hat takes the open hat's SID voice (the choke)", ho < DSK_NCH && ch_with(D9_CH) == ho &&
-              ch_with(D9_OH) == DSK_NCH);
+        trk_note_on(&trk[0], 42, 110); run(0, 1);
+        rel = ho < DSK_NCH && dsk_part(0)->ch[ho].fade;
+        run(0, DSK_FADE + 1u);
+        gone = ch_with(D9_OH) == DSK_NCH;
+        check("a closed hat chokes the open hat: faded out in 5.8 ms, the closed hat on a free voice",
+              rel && gone && ch_with(D9_CH) < DSK_NCH && ch_with(D9_CH) != ho);
+    }
+    {   /* a tom fill, four notes of the TOM lane: each tom released fast, the next on a free voice, no cut */
+        static const uint8_t FILL[4] = {50, 48, 45, 41};
+        int32_t first = 0, later = 0;
+        kit(2, 0);
+        for (k = 0; k < 4u; k++) {
+            int32_t pk = 0;
+            trk_note_on(&trk[0], FILL[k], 110);
+            run(a, 86);                            /* 16ths at 120 BPM */
+            for (i = 1; i < 86u * CTL; i++)
+                pk = abs(a[i] - a[i - 1]) > pk ? abs(a[i] - a[i - 1]) : pk;
+            if (!k) first = pk; else later = pk > later ? pk : later;
+        }
+        printf("SID KIT:   tom fill 50 48 45 41: largest step, first tom %d, the next three %d\n", (int)first, (int)later);
+        check("a tom fill: the toms after the first step no harder than a tom alone", later < first + first / 4);
+        {   /* and no DC step: the low tom's first 4 ms after the next tom's hit stay near the faded level */
+            int32_t lo = 0, hi = 0;
+            kit(2, 0);
+            trk_note_on(&trk[0], 41, 120); run(a, 86);
+            trk_note_on(&trk[0], 50, 120); run(b, 8);
+            for (i = 0; i < 8u * CTL; i++) { lo = b[i] < lo ? b[i] : lo; hi = b[i] > hi ? b[i] : hi; }
+            printf("SID KIT:   low tom cut by a high one: the next 5.8 ms span %d .. %d\n", (int)lo, (int)hi);
+        }
     }
     {   /* a hit on a voice still sounding: faded out over a block first (the hard restart), no step */
         int32_t step = 0, before = 0;
