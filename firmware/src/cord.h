@@ -49,12 +49,14 @@ const cord_dest_t *cord_dest(uint32_t code);        /* 0: no such destination (a
 
 /* Source codes. FROZEN as the destinations. A source is a track's (its LFO, its latest note ..): one value per
  * track and block, so a cord crosses tracks. (Per voice, a voice's own envelope or velocity on its own pitch: the
- * MOD matrix's per-voice routes.) Values Q15: bipolar -32768..32767 (LFO, KEY, RAND, S&H, SLEW, NOTE), else 0..32767 */
+ * MOD matrix's per-voice routes.) Values Q15: bipolar -32768..32767 (LFO, KEY, RAND, S&H, SLEW, NOTE), else 0..32767 (CV too) */
 enum {
     CS_OFF,
     CS_LFO, CS_ENV, CS_VEL, CS_KEY, CS_RAND, CS_MODW, CS_AT, CS_EXPR, CS_SH, CS_SLEW,   /* mod.c's MS_LFO .. MS_SLEW */
     CS_GATE,                      /* the track's generator: 1 while its note sounds (Tessera) */
     CS_NOTE,                      /* the generator's last note, as KEY (C4 = 0, an octave = 0.19) */
+    CS_CV,                        /* the generator's CV (gen.c): Turing its register, Euclid and Morph a ramp, Markov the
+                                   * degree; 0..1 */
     CS_N
 };
 

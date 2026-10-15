@@ -181,6 +181,7 @@ A cord moves a destination on any track by a source on any track: by its AMOUNT 
 | SLEW | S&H, gliding from one value to the next |
 | GATE | 1 while the track's generator plays a note |
 | NOTE | the generator's last note (C4 = 0) |
+| CV | the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the degree it moved to |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |

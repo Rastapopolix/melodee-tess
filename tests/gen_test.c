@@ -55,7 +55,7 @@ static void turing_tests(void)
                     gen_turing_tick(&g, &CLK0, &rng_state, &o);
                     draws &= draws_since(c) == (prob ? 1u : 0u);
                     range &= o.note >= 36 && o.note <= 36 + 12 * (span - 1) + 10 && o.vel >= 90 && o.vel <= 121;
-                    range &= o.gate <= 1 && o.cv == 0;
+                    range &= o.gate <= 1 && o.cv >= 0;   /* (the CV: Q15, 0..32767) */
                 }
             }
     {   /* PROB 0: the register only rotates, so every LENGTH steps it plays the same again */
@@ -95,7 +95,7 @@ static void turing_tests(void)
         check("turing: a picked register is never 0, its low two bits never both 0", ok);
         check("turing: 4096 entropy values pick at least 3900 different registers", distinct >= 3900u);
     }
-    check("turing: notes 36..36+12*(SPAN-1)+10, velocity 90..121, gate 0/1, cv 0 (every LEN, SPAN, PROB)", range);
+    check("turing: notes 36..36+12*(SPAN-1)+10, velocity 90..121, gate 0/1, cv 0..32767 (every LEN, SPAN, PROB)", range);
     check("turing: one draw a step when PROB > 0, none at PROB 0", draws);
     check("turing: PROB 0 repeats every LENGTH steps", loop);
     check("turing: the same seed gives the same steps", same);

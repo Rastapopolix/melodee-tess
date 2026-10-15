@@ -566,6 +566,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
     }
     uint8_t note = out.note, vel = out.vel;
     int should_trigger = out.gate;
+    tessera.cv[tr] = out.cv;
 
     if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH)
         tessera_phrase_apply(tr, &note, &vel, &should_trigger);

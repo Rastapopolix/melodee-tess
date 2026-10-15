@@ -68,7 +68,7 @@ const cord_dest_t *cord_dest(uint32_t code)
 /* ------------------------------------------------------------ sources --- */
 _Static_assert(CS_LFO == MS_LFO && CS_SLEW == MS_SLEW && CS_EXPR == MS_EXPR, "CS_LFO .. CS_SLEW == mod.c's MS_*");
 static const char *const CORD_SRC_NAME[CS_N] = {"--", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H",
-                                                "SLEW", "GATE", "NOTE"};
+                                                "SLEW", "GATE", "NOTE", "CV"};
 const char *cord_src_name(uint32_t code) { return code < CS_N ? CORD_SRC_NAME[code] : 0; }
 
 /* track tr's source s now (Q15): mod.c's (ENV: the latest note's envelope, one block late; the LFO with its FADE),
@@ -80,12 +80,14 @@ static int32_t cord_src(uint32_t s, uint32_t tr)
         return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF && tessera.active_gate[tr] ? 32767 : 0;
     if (s == CS_NOTE)
         return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF ? mod_key(tessera.last_note[tr]) : 0;
+    if (s == CS_CV)
+        return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF ? tessera.cv[tr] : 0;
     return mod_tsrc(t, s, mulq15(t->lfo_val, t->lfo_fade));
 }
 /* as mod.c's MS_BIPOLAR (a UNI LFO: 0..1, as ENV) */
 static int cord_bipolar(uint32_t s, uint32_t tr)
 {
-    return s == CS_NOTE || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));
+    return s == CS_NOTE || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
 }
 
 /* ------------------------------------------------------------ the cords --- */

@@ -81,7 +81,8 @@ static void gen_markov_row(uint8_t tens, uint32_t s, uint8_t out[8])
 
 /* ------------------------------------------------------------------ the generators, one step each --- */
 /* Each fills only what it plays: out arrives as {gate 0, note 60, vel 100, cv 0} (tessera.c), which a rest
- * keeps, so LOCK's recording sees exactly what it did before phase 1. */
+ * keeps, so LOCK's recording sees exactly what it did before phase 1. The CV (the cords' source CV, Q15 0..32767)
+ * is set on every step, a rest's too, from what the step already worked out: no draw of its own */
 
 /* Turing's register picked from an entropy value (the adapter's: a timer at a human moment): never 0, the "not
  * picked yet" of the defaults, and its low two bits never both 0, so even LENGTH 2 has a hit */
@@ -114,6 +115,7 @@ static void gen_turing_tick(gen_turing_t *g, const gen_clock_t *clk, uint32_t *r
     uint8_t oct = (raw / 7) % span;
     out->note = (uint8_t)(36 + (oct * 12) + GEN_SCALE_MIN[idx]);
     out->vel = (uint8_t)(90 + ((mreg >> 8) & 0x1Fu));
+    out->cv = (int16_t)(raw * 32767u / 255u);           /* the register as a number: a Turing machine's voltage */
     if (g->reg & 1u)
         out->gate = 1;
 }
@@ -126,6 +128,7 @@ static void gen_euclid_tick(gen_euclid_t *g, const gen_clock_t *clk, uint32_t *r
     (void)clk;
     (void)rnd;
     g->step_idx = (curr_step + 1u) % steps;
+    out->cv = (int16_t)(steps > 1u ? curr_step * 32767u / (steps - 1u) : 0u);   /* a ramp over the cycle */
     if (gen_euclid_hit(curr_step, steps, g->pulses, g->rot)) {
         out->note = (uint8_t)(48u + gen_euclid_degree(g->pitch_seed, curr_step));
         out->gate = 1;
@@ -147,6 +150,7 @@ static void gen_markov_tick(gen_markov_t *g, const gen_clock_t *clk, uint32_t *r
         }
     }
     g->cur_state = next_state;
+    out->cv = (int16_t)(next_state * 32767u / 7u);      /* the degree it moved to */
 
     uint8_t m_oct = g->oct_span ? g->oct_span : 1;
     out->note = (uint8_t)(36 + clk->root + (next_state * 2) + (12 * gen_rnd(rnd, m_oct)));
@@ -162,6 +166,7 @@ static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, uint32_t *rnd
     uint8_t cur_s = (g->step_idx + 1u) & 0x0Fu;
     (void)clk;
     g->step_idx = (g->step_idx & 0xF0u) | cur_s;
+    out->cv = (int16_t)(cur_s * 32767u / 15u);          /* a ramp over its 16 steps */
 
     uint8_t hit_a = (g->snap_a >> cur_s) & 1u;
     uint8_t hit_b = (g->snap_b >> cur_s) & 1u;

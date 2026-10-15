@@ -126,6 +126,24 @@ static int behaviour(void)
     cord_step_end(0);
     check("...past the range: PULSES at most STEPS (16), back to 4", i == 16u && tessera.euclid[0].pulses == 4u);
 
+    /* the generators' CV: Euclid's ramp over its cycle, as gen.c makes it */
+    host_tracks_init();
+    tessera_reset();
+    tessera_param_set(0, TX_MODE, TESS_ENG_EUCLID);
+    tessera_param_set(0, TX_EUC_STEPS, 4);
+    {
+        int32_t seen[4];
+        for (i = 0; i < 4u; i++) {
+            tessera_clock_step(&trk[0]);
+            seen[i] = cord_src(CS_CV, 0);
+        }
+        check("CV: Euclid's ramp over its 4 steps (0, 1/3, 2/3, all), as the cords read it",
+              seen[0] == 0 && seen[1] == 10922 && seen[2] == 21844 && seen[3] == 32767);
+    }
+    check("CV, GATE, NOTE of a track without a generator: 0", !cord_src(CS_CV, 1) && !cord_src(CS_GATE, 1) &&
+          !cord_src(CS_NOTE, 1));
+    tessera_stop_all();
+
     /* sixteen at once, every kind, all four tracks: it plays, nothing breaks, and it is not the dry sound */
     host_tracks_init();
     tessera_reset();

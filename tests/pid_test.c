@@ -75,7 +75,9 @@ static int reference(FILE *f)
             "the latest note's velocity", "the latest note's pitch (C4 = 0)", "a new random value at each note",
             "MIDI mod wheel (CC1)", "MIDI channel aftertouch", "MIDI expression (CC11)",
             "a random value held for each cycle of the track's LFO", "S&H, gliding from one value to the next",
-            "1 while the track's generator plays a note", "the generator's last note (C4 = 0)"};
+            "1 while the track's generator plays a note", "the generator's last note (C4 = 0)",
+            "the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the "
+            "degree it moved to"};
         fprintf(f, "\n## Cords\n\nA cord moves a destination on any track by a source on any track: by its AMOUNT "
                    "(-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. "
                    "Room for %u, %u in use.\n\n| Source | |\n| --- | --- |\n", CORD_MAX, CORD_LIVE);
