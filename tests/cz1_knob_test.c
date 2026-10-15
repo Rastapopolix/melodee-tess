@@ -46,7 +46,7 @@ static void render(track_t *t, int32_t *dst)
         track_render(t, o, CTL);
         if (mod.on)
             mod_end(t);
-        for (i = 0; i < CTL; i++)
+        for (i = 0; i < CTL && n < RENDER_N; i++)
             dst[n++] = o[i];
     }
 }
