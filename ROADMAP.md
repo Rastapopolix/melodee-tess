@@ -423,6 +423,12 @@ Plan: `docs/analysis/phase1-plan.md`.
       ROLL waits for the track's next bar line while playing (Theo 2026-10-15): a click restarted the line mid-bar
       and a quick turn stuttered; stopped, at once. Not saved: a seed still waiting when saved is not kept.
       Device check passed on build 1.1.4 (test installer /test/1.1.4/webapp/installer/ on the site, as 1.1.3's)
+- [x] Mutation bounds (Theo 2026-10-15, from the overnight analysis): EVOLVE keeps Euclid's PULSES 1..STEPS-1
+      (it reached 0: silent bars), Turing's active bits never all 0 or all 1 (silence, or a note every step,
+      for good when locked), and Markov's TENSION (LEAP) turns back at 0 and 100 instead of sitting there. The
+      same draws: only a phrase at a bound plays otherwise (baseline: midi_clock_start_stop_continue). Morph's
+      rhythm A and the drift itself (Gravity, phase 6) still open. Branch `mutation-bounds` (on `roll-range`);
+      device check pending (build 1.1.7), then merge
 - [x] ROLL's range 1..128, with the knobs' acceleration (Theo 2026-10-15: 9999 too many to turn through): a quick
       half turn across it. Seeds saved by 1.1.3-1.1.5 (up to 9999) load and play as they were; ROLL from one lands
       in 1..128 (turning back does not return to it). Baseline rewritten (every fresh seed another). Branch

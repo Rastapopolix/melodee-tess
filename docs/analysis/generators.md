@@ -105,7 +105,8 @@ Two hours per setting (the `longform` probe; windows of 4 bars):
    adds or removes a pulse with equal chance, stopping only at 0 and at STEPS. At 0 the track is silent until the walk comes
    back; at 1 it plays a single note per loop. Measured: up to 72 silent bars in two hours. The same can
    happen to Turing at small LEN (a register whose LEN bits are all 0: silence; all 1: one note on every
-   step), and to Morph if rhythm A loses all its bits while MORPH is low.
+   step), and to Morph if rhythm A loses all its bits while MORPH is low. (Eased 2026-10-15: EVOLVE keeps
+   Euclid's PULSES 1..STEPS-1 and Turing's active bits never all alike; Morph's rhythm A not yet.)
 3. **Single notes and narrow pitch: fixed registers and downward snapping.** Pitches come from fixed
    ranges (at the default span of 2 octaves: Turing C2–A#3, Markov C2–D4; Euclid and Morph one octave
    from C3), built on a minor scale
@@ -116,6 +117,8 @@ Two hours per setting (the `longform` probe; windows of 4 bars):
    Turing's register, Euclid's rotation and pulses, Markov's tension (which can sit at 0 or 100 for
    long stretches because it is clamped), Morph's rhythm A. Over hours the music wanders anywhere in
    the parameter space and never returns to the opening idea, the opposite of the ROADMAP's "A is home".
+   (2026-10-15: Markov's tension now turns back at 0 and 100 instead of sitting there; the drift itself
+   waits for Gravity, phase 6.)
 5. **Monotony: Markov plays every step.** DENSITY defaults to 100 and nothing varies it: 16 notes a bar
    forever, an unbroken run of sixteenths. (Eased 2026-10-15: the default is 70.)
 6. **Not reproducible from a seed.** `rng()` is shared with the arpeggiator, step chance, LFO S&H on
