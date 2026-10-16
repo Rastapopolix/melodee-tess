@@ -445,7 +445,7 @@ static void go_title(const char *title);
 /* GEN (Tessera, ARP's tap): the generator page, EVOLVE, FORM, TWEAK, then the arpeggiator; SEQ keeps the step pages */
 static int test_gen_family(void)
 {
-    static const char *const WANT[] = {"GEN", "EVOLVE", "FORM", "TWEAK", "ARP", "ARP 2", "GEN"};
+    static const char *const WANT[] = {"GEN", "EVOLVE", "FORM", "TWEAK", "LENGTH", "ARP", "ARP 2", "GEN"};
     char got[96] = "";
     int bad = 0, in_seq = 0, pattern_seq = 0;
     uint32_t k, n = 0, used = 0;
@@ -457,7 +457,7 @@ static int test_gen_family(void)
         used += (uint32_t)snprintf(got + used, sizeof got - used, "%s%s", k ? " " : "", ui.home ? "HOME" : cur_page()->title);
         if (used >= sizeof got) used = sizeof got - 1u;
     }
-    bad += check("ARP's taps: GEN EVOLVE FORM TWEAK ARP ARP 2, then GEN again", n == k);
+    bad += check("ARP's taps: GEN EVOLVE FORM TWEAK LENGTH ARP ARP 2, then GEN again", n == k);
     if (n != k) printf("    got: %s\n", got);
     for (k = 0; k < NPAGES; k++)
         if (PAGES[k].fam == FAM_SEQ && (PAGES[k].graph == GR_EVOLVE || PAGES[k].graph == GR_FORM || PAGES[k].graph == GR_TWEAK))
@@ -470,6 +470,20 @@ static int test_gen_family(void)
     k = tessera.mode[song.sel];
     turn(EN_K1, 1);
     bad += check("GEN: KNOB 1 is MODE (one step on from STEP)", k == TESS_ENG_OFF && tessera.mode[song.sel] != k);
+    go_title("LENGTH");                           /* NOTE LENGTH: KNOBS 1-3 its own, a step a turn; KNOB 4 PATTERN's GATE */
+    {
+        uint32_t tr = song.sel;
+        int16_t g = trk[tr].p[P_SGATE];
+        turn(EN_K1, 5);
+        turn(EN_K2, 1);
+        turn(EN_K3, -1);
+        turn(EN_K4, 3);
+        bad += check("LENGTH: MODE FIXED, LEN 1/4, KEYS 3 a step a turn; KNOB 4 the GATE",
+                     tessera.nl_mode[tr] == NL_FIXED && tessera.nl_len[tr] == 3u && tessera.nl_keys[tr] == 3u &&
+                     trk[tr].p[P_SGATE] > g);
+        turn(EN_K1, -5);
+        bad += check("LENGTH: back to STEP", tessera.nl_mode[tr] == NL_STEP);
+    }
     go_title("PATTERN");                          /* (a generator on: PATTERN is upstream's all the same) */
     k = tessera.mode[song.sel];
     {

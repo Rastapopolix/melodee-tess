@@ -10,6 +10,8 @@ static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "M
 static const char *const TX_N_EVERY[] = {"OFF", "1", "2", "4", "8", "16"};
 static const char *const TX_N_FORM[] = {"OFF", "AB", "ABAC", "ABCB", "AABA", "ABCA", "AABC"};
 static const char *const TX_N_FOLLOW[] = {"OFF", "T1", "T2", "T3", "T4"};
+static const char *const TX_N_NLMODE[] = {"STEP", "FIXED", "HIT"};
+static const char *const TX_N_NLLEN[] = {"1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
 static const param_desc_t TX_DESC[TX_COUNT] = {
@@ -40,6 +42,9 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_X] = PD("X", F_INT, 0, 255, 128),
     [TX_GRD_Y] = PD("Y", F_INT, 0, 255, 128),
     [TX_GRD_DENS] = PD("DENS", F_PCT, 0, 100, 50),
+    [TX_NL_MODE] = PE("LENGTH", TX_N_NLMODE, 0),
+    [TX_NL_LEN] = PE("LEN", TX_N_NLLEN, 2),
+    [TX_NL_KEYS] = PD("KEYS", F_INT, 1, 4, 4),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -238,6 +243,11 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_GRD_X, "GRIDS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
     X_(TX_GRD_Y, "GRIDS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
     X_(TX_GRD_DENS, "GRIDS DENSITY", "How full the kick, snare and hat are: 0 silent, 100 every hit the map offers."),
+    X_(TX_NL_MODE, "NOTE LENGTH", "How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever "
+                                  "DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP."),
+    X_(TX_NL_LEN, "NOTE LENGTH LEN", "FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts."),
+    X_(TX_NL_KEYS, "NOTE LENGTH KEYS", "FIXED: how many notes may hold at once. One more ends the note nearest its end; "
+                                       "the same pitch again ends the one before."),
 };
 #undef T_
 #undef G_

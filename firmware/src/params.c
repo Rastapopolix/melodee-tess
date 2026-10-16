@@ -471,7 +471,7 @@ enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK,   /* SC_TRK: the TRACKS 
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
        GR_MOD, GR_PATS, GR_SONG, GR_MOTION, GR_CHORD, GR_SLICES,
        GR_FMEG, GR_FMPEG, GR_FMSTORE, GR_CZTOOLS, GR_SCALE_PICKER, GR_DRUMHIT, GR_PATGRID, GR_EVOLVE, GR_FORM, GR_TWEAK,
-       GR_CORDS }; /* NOTES shares GR_ROLL for steps and recorded events */
+       GR_CORDS, GR_NOTELEN }; /* NOTES shares GR_ROLL for steps and recorded events */
 
 typedef struct {
     const char *title;
@@ -590,6 +590,8 @@ static const page_t PAGES[] = {
     {"EVOLVE", FAM_GEN, SC_TRACK, GR_EVOLVE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: LOCK EVERY AMOUNT SEED (tessera_evolve_knob) */
     {"FORM", FAM_GEN, SC_TRACK, GR_FORM, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: FORM CONTRAST CLEAR (tessera_form_knob) */
     {"TWEAK", FAM_GEN, SC_TRACK, GR_TWEAK, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: SHIFT DROP HUMAN FOLLOW (tessera_tweak_knob) */
+    {"LENGTH", FAM_GEN, SC_TRACK, GR_NOTELEN, {0xFF, 0xFF, 0xFF, P_SGATE}},   /* Tessera: NOTE LENGTH's MODE LEN KEYS
+                                                                             * (tessera_len_knob), STEP's GATE */
     {"ARP", FAM_GEN, SC_TRACK, GR_ARP, {P_AMODE, P_ARATE, P_AOCT, P_AGATE}},
     {"ARP 2", FAM_GEN, SC_TRACK, GR_NONE, {P_ASWING, P_APROB, P_AHOLD, P_AORDER}},
     {"NOTES", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},

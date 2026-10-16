@@ -17,6 +17,7 @@ static void help_find(uint32_t k)
     static const uint8_t EV[4] = {TX_EV_LOCK, TX_EV_EVERY, TX_EV_AMOUNT, TX_EV_SEED};
     static const uint8_t FM[4] = {TX_FM_FORM, TX_FM_CONTRAST, 0xFF, TX_FM_FLOURISH};
     static const uint8_t TW[4] = {TX_TW_SHIFT, TX_TW_DROP, TX_TW_HUMAN, TX_TW_FOLLOW};
+    static const uint8_t NL[4] = {TX_NL_MODE, TX_NL_LEN, TX_NL_KEYS, 0xFF};   /* (GATE: PATTERN's, below) */
     static const uint8_t ENG[TESS_ENG_COUNT][3] = {{0xFF, 0xFF, 0xFF}, {TX_TUR_LEN, TX_TUR_PROB, TX_TUR_SPAN},
         {TX_EUC_STEPS, TX_EUC_PULSES, TX_EUC_ROT}, {TX_MKV_LEAP, TX_MKV_DENS, TX_MKV_SPAN}, {TX_MRP_POS, TX_MRP_SNPA, TX_MRP_SNPB},
         {TX_GRD_X, TX_GRD_Y, TX_GRD_DENS}};
@@ -40,6 +41,7 @@ static void help_find(uint32_t k)
     }
     if (pg->graph == GR_EVOLVE) x = EV[k];
     else if (pg->graph == GR_TWEAK) x = TW[k];
+    else if (pg->graph == GR_NOTELEN) x = NL[k];
     else if (pg->graph == GR_FORM) {
         x = FM[k];
         if (x == 0xFFu) {
