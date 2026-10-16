@@ -499,17 +499,19 @@ Plan: `docs/analysis/phase1-plan.md`.
       (cord_test); a sound's go when another sound loads, unless edited; a project's stay; no room:
       MODS FULL and the route keeps playing. Same-track ENV/VEL/KEY/RAND mods are per voice now.
       User sounds are saved without modulation (it is the project's)
-- [ ] Device check of phase 2 (build 1.2.4): GEN, PATTERN, the ARP reach, the selector lists, MODS, help, CORDS (a cord heard, saved,
+- [ ] Device check of phases 2 and 3 (build 1.2.5): GEN, PATTERN, the ARP reach, the selector lists, MODS, help, CORDS (a cord heard, saved,
       loaded), and the cost of 16 cords on the device
 - [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
 ### 3. Normalled default patch
-- [ ] Default patch that sounds good with no cords; cords override the normals
-- [ ] Slow, gentle normals to filter cutoff, LPG decay and FX sends
-- Recommendation (2026-10-16, not started: it changes the sound of every project, so it waits for
-  Theo's ears): normals as cords in the cords' own table, marked as normals; a NORMALS switch per
-  project, ON for a new project and OFF for one saved before them, so old projects sound as saved
-  (CLAUDE.md: automation opt-in); a cord to the same place replaces its normal
+- [x] Default patch (2026-10-16, Theo: "proceed to the next step"; branch `mods-merge`, build 1.2.5):
+      ordinary mods a new project starts with (no template; `cord_defaults`), seen and edited in MODS:
+      each track's CUTOFF +12 % by its own DRIFT, its FX SEND +10 % by another track's. Old projects
+      and templates keep theirs, so they sound as saved. The NORMALS switch first recommended needed
+      a new saved field (the flash layout): dropped for this, no format change
+- [x] DRIFT: a slow source per track (a point every 11.9 s, eased), clocked by `mix_block`
+- [ ] Tune the default patch by ear on the device (amounts, which destinations; LPG decay not yet)
+- [x] MODS: the list without a flash (only it and the chips sent), eight names; activity lights
 
 ### 4. Strip engines, new voices, FX
 - [ ] Hard fork: create the `tessera` repo, GPL-3.0 and attribution kept; rename identities
