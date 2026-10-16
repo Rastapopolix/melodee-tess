@@ -45,9 +45,33 @@ voice exists, against the same mix.
 Prophet's 5 banks (40 KB at 0x93000, right after the app area), FM6's bank and native banks, CZ-1's 8 banks,
 the FM6 user extension. They are not freed or reused in this phase.
 
+## Measured with the switches (step 1 done, 2026-10-16, branch `engine-switches`)
+
+`MELODEE_FM6`, `MELODEE_CZ`, `MELODEE_PROPHET` = 0 (build.py passes them): each built for the device. All on, the
+image is byte for byte the size it was (525,548 B).
+
+| Left out | Image | Flash freed | Static RAM freed | Audio arena freed |
+| --- | --- | --- | --- | --- |
+| FM6 | 495,320 | 30.2 KB | 9.5 KB | 8.2 KB |
+| Prophet | 500,192 | 25.4 KB | 0.3 KB | 2.8 KB |
+| CZ-1 | 511,884 | 13.7 KB | 0 | 0 |
+| all three | 455,900 | **69.6 KB** | **13.9 KB** | **11.0 KB** |
+
+So with all three out, **117.5 KB of app flash is free** (47.9 today + 69.6) and 18.2 KB of static RAM. A little
+more is still reachable from the UI and the editor (each engine's pages, its editor commands); it can be taken out
+later, round by round (`whorefs.py`-style: the disassembly's references walked back to the first non-engine
+caller, a guard there).
+
+How: an engine left out is never offered (`eng_ok`, `ENGINE_ORDER`, `NENG_SHOWN`), its table entry is
+`ENG_RETIRED`, and the functions that reach its big parts return at once (`if (!MELODEE_FM6) ...` at the top of its
+factory reader, its SysEx, its banks, its pages in `page_desc`; the generated FM6 RAM tables skipped). Everything
+still compiles, so a guard missed costs flash, never a broken build. `tests/engine_switch_test.c` (all three off):
+never offered, the power-on sounds built ones, a project's track of them SID INIT with its common settings, the
+parts play.
+
 ## The plan
 
-1. **Build switches, nothing removed.** `MELODEE_FM6`, `MELODEE_CZ` and `MELODEE_SID` beside the existing
+1. **Build switches, nothing removed** (done, above). `MELODEE_FM6`, `MELODEE_CZ` and `MELODEE_SID` beside the existing
    `MELODEE_PROPHET` (and `MELODEE_SLICE`), each taking out the engine with its UI pages, editor commands,
    stores and tests. Default: all on, so the firmware is as today. Each switch off is built and the suite run
    (the engine's own tests skipped). This gives the exact freed flash, RAM and CPU per engine.

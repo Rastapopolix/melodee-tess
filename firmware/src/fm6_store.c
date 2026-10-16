@@ -45,7 +45,7 @@ static uint32_t fm6_sx_first(void) { return fm6_bslot < 32u ? 0u : 32u; }
 static int fm6_send_voice(uint32_t tr, uint32_t ch)       /* VCED: the track's patch */
 {
     static const uint8_t H[6] = {0xF0, 0x43, 0x00, 0x00, 0x01, 0x1B};
-    if (!usb.config) return -1;
+    if (!MELODEE_FM6 || !usb.config) return -1;         /* (Tessera: FM6 left out, core.h) */
     memcpy(fm6_buf, H, 6);
     fm6_buf[2] = (uint8_t)(ch & 15u);
     memcpy(fm6_buf + 6, fm6_patch[tr % NTRK], 155);
@@ -56,6 +56,7 @@ static int fm6_send_voice(uint32_t tr, uint32_t ch)       /* VCED: the track's p
 
 static int fm6_send_bank(uint32_t ch)
 {
+    if (!MELODEE_FM6) return -1;                        /* (Tessera: FM6 left out, core.h) */
     static const uint8_t H[6] = {0xF0, 0x43, 0x00, 0x09, 0x20, 0x00};
     if (!usb.config) return -1;
     uint32_t first = fm6_sx_first();

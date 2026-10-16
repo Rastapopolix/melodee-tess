@@ -33,6 +33,7 @@ static int p5_bank_valid(const p5_bank_t *b,uint32_t bank)
 }
 static void p5_index(uint32_t bank,const p5_bank_t *b)
 {
+    if(!MELODEE_PROPHET)return;   /* (Tessera: left out, core.h) */
     p5_meta_ready[bank]=1;p5_meta[bank].used=b->used;p5_meta[bank].favorites=b->favorites;
     for(uint32_t k=0;k<P5_BANK_SLOTS;k++){
         p5_meta[bank].name[k][0]=0;
@@ -41,7 +42,7 @@ static void p5_index(uint32_t bank,const p5_bank_t *b)
 }
 static p5_bank_t *p5_user_bank(uint32_t bank)
 {
-    if(bank>=5u)return 0;
+    if(!MELODEE_PROPHET || bank>=5u)return 0;
 #if MELODEE_FLASH
     if(p5_cached!=bank){
         bank_claim(BK_P5);
@@ -64,7 +65,7 @@ static void p5_user_reset(void)
 }
 static int p5_user_used(uint32_t slot)
 {
-    if(slot>=P5_USER_SLOTS)return 0;uint32_t bank=slot/P5_BANK_SLOTS;
+    if(!MELODEE_PROPHET || slot>=P5_USER_SLOTS)return 0;uint32_t bank=slot/P5_BANK_SLOTS;
     if(!p5_meta_ready[bank])p5_user_bank(bank);
     return (p5_meta[bank].used>>(slot%P5_BANK_SLOTS))&1u;
 }

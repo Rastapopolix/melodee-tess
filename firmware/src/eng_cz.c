@@ -6,6 +6,7 @@
 /* Casio's tone k (0..CZ_FACTORY_N-1) into raw (CZ_BYTES), unpacked against CZ_DICT (tools/gen_cz1_factory.py) */
 static void cz_factory(uint32_t k, uint8_t *raw)
 {
+    if (!MELODEE_CZ) { memset(raw, 0, CZ_BYTES); return; }   /* (Tessera: left out, core.h; its bank with it) */
     uint8_t b[2u * CZ_BYTES];
     memcpy(b, CZ_DICT, CZ_BYTES);
     lz_unpack(b + CZ_BYTES, CZ_LZ + CZ_LZ_AT[k % CZ_FACTORY_N], CZ_BYTES);

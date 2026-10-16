@@ -175,6 +175,7 @@ static void fm6_rom_patch(const fm6_rom_t *r, uint8_t *v)   /* a Melodee factory
 static void fm6_factory(uint32_t k, uint8_t *pk)
 {
     uint8_t v[FP_SIZE + 1u];
+    if (!MELODEE_FM6) { memset(pk, 0, FM6_PACKED); return; }   /* (Tessera: left out, core.h; its ROM with it) */
     if (k < FM6_NFACTORY) {
         memcpy(pk, FM6_FACTORY[k], FM6_PACKED);
         return;
@@ -1014,6 +1015,7 @@ static uint8_t fm6_rx_on;
 
 static void fm6_sx_byte(uint8_t b)
 {
+    if (!MELODEE_FM6) return;                           /* (Tessera: left out, core.h) */
     if (b == 0xF0) {
         fm6_rx_on = !fm6_rx_ready;
         if (fm6_rx_on)

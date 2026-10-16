@@ -519,6 +519,9 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] Strip Prophet, FM6, CZ, SLICE and samples; measure the freed flash, RAM and CPU
       (measured 2026-10-16, plan for Theo's decisions: `docs/design/phase4/PLAN.md`: switches first, IDs
       reserved, flash banks untouched, new voices before the old ones go; Plaits considered)
+      Decided 2026-10-16: FM6, CZ-1, Prophet go (SID stays), a track of them loads SID INIT, new voices both
+      our own and a Plaits port. Build switches done (branch `engine-switches`): all three out frees 69.6 KB
+      of flash, 13.9 KB of RAM; on by default (the build unchanged) until the new voices are ready
 - [ ] Our own project format; drop `OBJ_TESSERA`
 - [ ] Voices: pad, LPG pluck, lead, percussion (DRUM kept)
 - [ ] FX with caps: delay, reverb, bitcrusher, wavefolder, ring mod, comb resonator

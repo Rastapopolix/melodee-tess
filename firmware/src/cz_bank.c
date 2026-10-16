@@ -40,7 +40,7 @@ static void cz_bank_default(cz_bank_t *b,uint32_t k)
 }
 static cz_bank_t *cz_bank_load(uint32_t k)
 {
-    if(k>=CZ_BANK_N)return 0;
+    if(!MELODEE_CZ || k>=CZ_BANK_N)return 0;   /* (Tessera: CZ-1 left out, core.h) */
     if(cz_bank_cached!=k){
         native_cz_cached=255;
 #if MELODEE_FLASH

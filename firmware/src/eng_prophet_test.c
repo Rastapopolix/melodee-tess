@@ -506,6 +506,7 @@ static void p5_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
 /* Sequential's factory program k (0..P5_FACTORY_N-1), unpacked (tools/gen_prophet_factory.py pack) */
 static void p5_factory(uint32_t k,p5_patch_t *p)
 {
+    if(!MELODEE_PROPHET){memset(p,0,sizeof *p);return;}   /* (Tessera: left out, core.h; its bank with it) */
     const uint8_t *b=P5_FPACK+k*P5_FACTORY_BYTES;
     uint32_t pos=0;
     for(uint32_t i=0;i<P5_RAW_MAX;i++){
