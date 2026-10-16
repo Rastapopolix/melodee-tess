@@ -277,6 +277,9 @@ def build_app(stub):
         v = os.environ.get(flag)    # unset: the default in firmware/src/melodee.c
         if v in ("0", "1"):
             flags.append(f"-D{flag}={v}")
+    if os.environ.get("MELODEE_DUAL_CORE") == "0" and "MELODEE_BATCH_AUDIO" not in os.environ:
+        flags.append("-DMELODEE_BATCH_AUDIO=0")   # melodee-tess: the serial build without upstream 1.4's batching
+                                                  # (built dual-core only there; its FM6 kernel cannot reach fm6_run)
     if os.environ.get("P5_OVERSAMPLE") in ("1", "2"):
         flags.append("-DP5_OVERSAMPLE=" + os.environ["P5_OVERSAMPLE"])
     flags.append(f'-DMELODEE_ID="{PRODUCT}"')
