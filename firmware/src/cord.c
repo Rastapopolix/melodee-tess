@@ -68,8 +68,26 @@ const cord_dest_t *cord_dest(uint32_t code)
 /* ------------------------------------------------------------ sources --- */
 _Static_assert(CS_LFO == MS_LFO && CS_SLEW == MS_SLEW && CS_EXPR == MS_EXPR, "CS_LFO .. CS_SLEW == mod.c's MS_*");
 static const char *const CORD_SRC_NAME[CS_N] = {"--", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H",
-                                                "SLEW", "GATE", "NOTE", "CV"};
+                                                "SLEW", "GATE", "NOTE", "CV", "DRIFT"};
 const char *cord_src_name(uint32_t code) { return code < CS_N ? CORD_SRC_NAME[code] : 0; }
+
+/* DRIFT: each track's slow wander, -1..1: a point every 2^14 audio blocks (11.9 s), the way between them eased
+ * (smoothstep), the tracks apart in time and in their points. Its clock: the blocks since power-on (cord_tick) */
+static uint32_t cord_blocks;
+void cord_tick(void) { cord_blocks++; }
+static int32_t cord_point(uint32_t k)
+{
+    k = (k ^ (k >> 16)) * 0x7FEB352Du;
+    k = (k ^ (k >> 15)) * 0x846CA68Bu;
+    return clamp((int32_t)((k ^ (k >> 16)) & 0xFFFFu) - 32768, -32767, 32767);
+}
+static int32_t cord_drift(uint32_t tr)
+{
+    uint32_t b = cord_blocks + tr * 5101u, k = (b >> 14) + tr * 0x9E3779B9u, f = b & 16383u;
+    int32_t a = cord_point(k), c = cord_point(k + 1u);
+    int64_t w = ((int64_t)f * f * (3 * 16384 - 2 * (int64_t)f)) >> 28;   /* (Q14) */
+    return a + (int32_t)(((int64_t)(c - a) * w) >> 14);
+}
 
 /* track tr's source s now (Q15): mod.c's (ENV: the latest note's envelope, one block late; the LFO with its FADE),
  * the generator's */
@@ -82,12 +100,14 @@ static int32_t cord_src(uint32_t s, uint32_t tr)
         return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF ? mod_key(tessera.last_note[tr]) : 0;
     if (s == CS_CV)
         return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF ? tessera.cv[tr] : 0;
+    if (s == CS_DRIFT)
+        return cord_drift(tr % NTRK);
     return mod_tsrc(t, s, mulq15(t->lfo_val, t->lfo_fade));
 }
 /* as mod.c's MS_BIPOLAR (a UNI LFO: 0..1, as ENV) */
 static int cord_bipolar(uint32_t s, uint32_t tr)
 {
-    return s == CS_NOTE || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
+    return s == CS_NOTE || s == CS_DRIFT || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
 }
 
 /* ------------------------------------------------------------ the cords --- */
@@ -261,6 +281,24 @@ static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32
             if (c->offset)
                 off[j] += cord_steps((32768 * c->offset) / 100, pd->max - pd->min);
         }
+    }
+}
+
+/* ------------------------------------------------------------ the default patch --- */
+/* a new project's mods (phase 3: it sounds alive with nothing patched; ordinary mods, edited or cleared as any): each
+ * track's brightness and its effects send wander slowly and a little, the send by another track's DRIFT (so a track
+ * does not get brighter and wetter at once). Old projects and templates keep their own (none: as saved) */
+void cord_defaults(void)
+{
+    uint32_t tr;
+    cord_clear();
+    for (tr = 0; tr < NTRK; tr++) {
+        cord_t c = {CS_DRIFT, (uint8_t)tr, CD_CUTOFF, (uint8_t)tr, 12, 0};
+        cord_set(2u * tr, &c);
+        c.src_trk = (uint8_t)((tr + 2u) % NTRK);
+        c.dst = CD_FX_SEND;
+        c.amount = 10;
+        cord_set(2u * tr + 1u, &c);
     }
 }
 

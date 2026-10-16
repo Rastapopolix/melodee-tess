@@ -240,6 +240,7 @@ static void mix_block(int32_t *out,uint32_t n)
 #endif
     memset(mix_l,0,n*sizeof *mix_l);memset(mix_r,0,n*sizeof *mix_r);
     events_block(n);
+    cord_tick();                                        /* (Tessera: DRIFT's clock, cord.c) */
     fx_bus_select();fx_send_on=(uint8_t)fx_bus_active();if(fx_send_on){memset(fx_send_l,0,n*sizeof *fx_send_l);memset(fx_send_r,0,n*sizeof *fx_send_r);
         if(fx_bus_separate){memset(fx_send_extra_l,0,sizeof fx_send_extra_l);memset(fx_send_extra_r,0,sizeof fx_send_extra_r);}}
     for(uint32_t i=0;i<NPART;i++)mix_part(&trk[i],n);

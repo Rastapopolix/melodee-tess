@@ -77,7 +77,8 @@ static int reference(FILE *f)
             "a random value held for each cycle of the track's LFO", "S&H, gliding from one value to the next",
             "1 while the track's generator plays a note", "the generator's last note (C4 = 0)",
             "the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the "
-            "degree it moved to"};
+            "degree it moved to", "a slow wander of the track's own, a new point every 12 s or so, eased between "
+            "(a new project's default mods: each track's CUTOFF and FX SEND)"};
         fprintf(f, "\n## Mods\n\nA mod (the MODS page, under LFO) moves a destination on any track by a source on any "
                    "track: by its AMOUNT (-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) "
                    "plus its OFFSET. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track "

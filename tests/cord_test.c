@@ -329,6 +329,49 @@ static int adoption(void)
     return bad - fails;
 }
 
+/* DRIFT and the default patch (phase 3) */
+static int drift_and_defaults(void)
+{
+    int fails = bad, smooth = 1, bounded = 1;
+    int32_t lo[NTRK], hi[NTRK], prev[NTRK];
+    uint32_t b, tr, apart = 0, saved = cord_blocks;
+    double d;
+    for (tr = 0; tr < NTRK; tr++) lo[tr] = 32767, hi[tr] = -32767, prev[tr] = cord_drift(tr);
+    for (b = 0; b < 1378u * 120u; b++) {            /* two minutes of blocks */
+        cord_tick();
+        for (tr = 0; tr < NTRK; tr++) {
+            int32_t x = cord_drift(tr);
+            if (x < -32767 || x > 32767) bounded = 0;
+            if ((x > prev[tr] ? x - prev[tr] : prev[tr] - x) > 16) smooth = 0;   /* (a point 12 s on: a few a block) */
+            if (x < lo[tr]) lo[tr] = x;
+            if (x > hi[tr]) hi[tr] = x;
+            prev[tr] = x;
+        }
+        if (cord_drift(0) != cord_drift(1)) apart++;
+    }
+    check("DRIFT: within -1..1, and smooth (at most 16 / 32768 a block: no step to hear)", bounded && smooth);
+    for (tr = 0, b = 1; tr < NTRK; tr++)
+        if (hi[tr] - lo[tr] < 16384) b = 0;
+    check("...it wanders: over two minutes each track's covers at least half its range", b);
+    check("...each track its own", apart > 1378u * 100u);
+    cord_blocks = saved;
+
+    fresh_tracks();
+    cord_defaults();
+    for (tr = 0, b = 1; tr < NTRK; tr++) {
+        const cord_t *c = cord_get(2u * tr), *e = cord_get(2u * tr + 1u);
+        if (c->src != CS_DRIFT || c->src_trk != tr || c->dst != CD_CUTOFF || c->dst_trk != tr || c->amount != 12 ||
+            e->src != CS_DRIFT || e->src_trk != (tr + 2u) % NTRK || e->dst != CD_FX_SEND || e->dst_trk != tr ||
+            e->amount != 10) b = 0;
+    }
+    check("the default patch: each track's CUTOFF (+12 %) and FX SEND (+10 %, another track's DRIFT): 8 mods, 8 free",
+          b && cord_count() == 8u);
+    d = render(4);
+    check("...four tracks for four seconds with it: plays, never past full scale", d > 0);
+    cord_clear();
+    return bad - fails;
+}
+
 int main(int argc, char **argv)
 {
     const char *golden = argc > 1 ? argv[1] : "tests/cord_dests.txt";
@@ -373,6 +416,7 @@ int main(int argc, char **argv)
 
     (void)behaviour();
     (void)adoption();
+    (void)drift_and_defaults();
 
     {
         FILE *f = fopen(golden, update ? "w" : "r");

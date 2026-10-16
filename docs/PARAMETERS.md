@@ -182,6 +182,7 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | GATE | 1 while the track's generator plays a note |
 | NOTE | the generator's last note (C4 = 0) |
 | CV | the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the degree it moved to |
+| DRIFT | a slow wander of the track's own, a new point every 12 s or so, eased between (a new project's default mods: each track's CUTOFF and FX SEND) |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |

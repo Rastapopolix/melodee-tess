@@ -48,8 +48,9 @@ typedef struct {
 const cord_dest_t *cord_dest(uint32_t code);        /* 0: no such destination (a gap, past the end) */
 
 /* Source codes. FROZEN as the destinations. A source is a track's (its LFO, its latest note ..): one value per
- * track and block, so a cord crosses tracks. (Per voice, a voice's own envelope or velocity on its own pitch: the
- * MOD matrix's per-voice routes.) Values Q15: bipolar -32768..32767 (LFO, KEY, RAND, S&H, SLEW, NOTE), else 0..32767 (CV too) */
+ * track and block, so a cord crosses tracks (on its own track's voice destinations, ENV VEL KEY RAND: each voice its
+ * own, as MOD's routes). Values Q15: bipolar -32768..32767 (LFO, KEY, RAND, S&H, SLEW, NOTE, DRIFT), else 0..32767
+ * (CV too) */
 enum {
     CS_OFF,
     CS_LFO, CS_ENV, CS_VEL, CS_KEY, CS_RAND, CS_MODW, CS_AT, CS_EXPR, CS_SH, CS_SLEW,   /* mod.c's MS_LFO .. MS_SLEW */
@@ -57,6 +58,7 @@ enum {
     CS_NOTE,                      /* the generator's last note, as KEY (C4 = 0, an octave = 0.19) */
     CS_CV,                        /* the generator's CV (gen.c): Turing its register, Euclid and Morph a ramp, Markov the
                                    * degree; 0..1 */
+    CS_DRIFT,                     /* a slow wander of the track's own, a new point every 12 s or so (the default mods) */
     CS_N
 };
 
@@ -73,6 +75,8 @@ const cord_t *cord_get(uint32_t i);
 void cord_clear(void);                              /* every cord off */
 uint32_t cord_count(void);                          /* cords doing something (a destination and an amount or offset) */
 uint32_t cord_adopt(void);
+void cord_tick(void);                               /* an audio block (mix.c mix_block): DRIFT's clock */
+void cord_defaults(void);                           /* a new project's mods (project.c): the default patch */
 void cord_sound_load(uint32_t tr);                  /* a sound loads on track tr (ui.c load_begin) */                          /* MOD's routes into cords (main loop): the routes left, no room */
 
 #endif

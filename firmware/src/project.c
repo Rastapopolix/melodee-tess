@@ -1225,6 +1225,7 @@ static void project_new_blank(void)
     proj_name[0] = 0;
     song.sel = 0;
     song.g[G_SLOT] = (int16_t)(project_free_slot() + 1u);
+    cord_defaults();                                  /* (Tessera: a new project's default mods, cord.c) */
 }
 /* the music differs from its slot (none: it holds notes): a new song asks first. Packs the project (proj_wire_u) */
 static int project_dirty(void)
@@ -1256,11 +1257,12 @@ static void project_boot(void)
             project_load(settings_boot - 1u);
         return;
     }
-    if (template_used()) {
-        if (bootguard.failed)
+    if (template_used() && !bootguard.failed)
+        template_load();
+    else {
+        if (template_used())
             ui_message("TEMPLATE SKIPPED");
-        else
-            template_load();
+        cord_defaults();                              /* (Tessera: a new project's default mods) */
     }
     song.g[G_SLOT] = (int16_t)(project_free_slot() + 1u);
 }

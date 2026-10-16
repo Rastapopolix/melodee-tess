@@ -20,8 +20,8 @@ static void help_find(uint32_t k)
     static const uint8_t ENG[TESS_ENG_COUNT][3] = {{0xFF, 0xFF, 0xFF}, {TX_TUR_LEN, TX_TUR_PROB, TX_TUR_SPAN},
         {TX_EUC_STEPS, TX_EUC_PULSES, TX_EUC_ROT}, {TX_MKV_LEAP, TX_MKV_DENS, TX_MKV_SPAN}, {TX_MRP_POS, TX_MRP_SNPA, TX_MRP_SNPB}};
     static const char *const CORD_TEXT[4] = {
-        "What moves it: a track's LFO, envelope, velocity, key, random, controllers, or its generator's gate, note "
-        "or CV. -- leaves the mod a fixed move.",
+        "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
+        "or CV, or DRIFT, a slow wander. -- leaves the mod a fixed move.",
         "Which of the 16 mods the other knobs edit.",
         "What it moves, on which track: the voices' pitch, cutoff, shape, gain, a sound setting, or a generator's.",
         "How far, and which way: at a full source, 100 % is the destination's whole range (pitch: an octave)."};

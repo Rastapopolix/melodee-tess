@@ -579,6 +579,9 @@ static int test_mods_page(void)
         bad += check("MODS: a cord moving its destination fully: its light lit; an empty one: none", lit != dark);
         cord_clear();
     }
+    project_new_blank();                          /* (a new project, no template: the default patch) */
+    bad += check("a new project: the default mods (8, DRIFT on each track's CUTOFF and FX SEND)", cord_count() == 8u &&
+                 cord_get(0)->src == CS_DRIFT && cord_get(0)->dst == CD_CUTOFF);
     cord_clear();
     return bad;
 }
