@@ -189,6 +189,10 @@ ui_renders() {
         python3 tests/ui_render.py build/ui_new build/ui_slot || fail "tests/ui_render.py"
         python3 tools/ui_mockcmp.py build/ui_new build/ui_mock || fail "tools/ui_mockcmp.py" # redesign parity (docs/design): a report, no gate yet
     fi
+    build ui_render_mono ui_render -O1 -w -DMELODEE_USB_AUDIO=1 -DMELODEE_LOOK=1 -Ibuild/gen -Ifirmware/src -Itests || return
+    mkdir -p build/ui_mono/ppm build/ui_mono_slot
+    step "UI renders, Mono look (MELODEE_LOOK 1, ui_mono.c): the same screens, lint and MONO gray" \
+        "$OUT/ui_render_mono" build/ui_mono build/ui_mono_slot
 }
 dsp_tracks() {
     build hostsim hostsim -O2 $FW || return

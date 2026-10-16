@@ -1816,7 +1816,10 @@ int main(int argc, char **argv)
                 write_ppm(out, "MONO", image);
             }
         }
-        if (fmp_charts - c0 != 96u) { fprintf(stderr, "ui_render: %u FM6 charts drawn of 96\n", fmp_charts - c0); return 1; }
+        if (!MELODEE_LOOK && fmp_charts - c0 != 96u) {   /* (the Mono look: no FM6 chart yet, ui_mono.c's stand-in) */
+            fprintf(stderr, "ui_render: %u FM6 charts drawn of 96\n", fmp_charts - c0);
+            return 1;
+        }
     }
     sweep_columns();
     roll_frames(argc > 2 ? argv[2] : 0);

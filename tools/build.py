@@ -272,7 +272,7 @@ def build_app(stub):
     subprocess.run([sys.executable, SRC / "tools/gen_909_tables.py", GEN / "x0x_drum_tables.h"], check=True)
     flags = [*CFLAGS, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
     for flag in ("MELODEE_FLASH", "MELODEE_OTA", "MELODEE_OTA_DRYRUN", "MELODEE_OTA_RAMONLY", "MELODEE_CDC",
-                 "MELODEE_UART", "MELODEE_USB_AUDIO", "MELODEE_ICONS", "MELODEE_PROPHET_PROTOTYPE", "MELODEE_PROPHET", "MELODEE_FM6", "MELODEE_CZ", "MELODEE_PLAITS",
+                 "MELODEE_UART", "MELODEE_USB_AUDIO", "MELODEE_ICONS", "MELODEE_PROPHET_PROTOTYPE", "MELODEE_PROPHET", "MELODEE_FM6", "MELODEE_CZ", "MELODEE_PLAITS", "MELODEE_LOOK",
                  "MELODEE_BENCH_SILENT", "MELODEE_FX_PROFILE", "MELODEE_AUDIO_PROFILE", "MELODEE_BATCH_AUDIO", "MELODEE_ADMISSION", "MELODEE_AUDIO_BENCH", "MELODEE_DUAL_CORE", "MELODEE_CACHE_RAM", "MELODEE_CORE1_TEST", "MELODEE_RAM_AUDIO", "MELODEE_HW_EQ"):
         v = os.environ.get(flag)    # unset: the default in firmware/src/melodee.c
         if v in ("0", "1"):
