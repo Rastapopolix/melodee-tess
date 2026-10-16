@@ -138,6 +138,24 @@ Candidates beside Turing, Euclid, Markov and Morph, each a `gen_<name>_tick` in 
   edges; a wall hit plays a note (which wall and where along it, snapped to the scale). SPEED and ANGLE set how often
   it hits; it loops when the angle brings it back to its start, and EVOLVE nudges the angle. PADDLE (knob, or a
   cord) adds Pong: a miss rests and serves again. One generator, the paddle optional. About 8 B a track.
+- **More from norns.community** (survey 2026-10-16, full notes in `docs/design/NORNS_GENERATORS.md`), easiest
+  first: nørgård (infinity series, from the step number's bits), fibonacci (mod N), rebound (= Bounce above),
+  orbital (rings at free ratios), less concepts (1D cellular automaton, rule/seed/range), Infinite Melody / Modulo
+  Magic (Ken Stone), foulplay (Euclid + logic against another track). Then zellen (Life), meadowphysics, acid
+  basslines (bline), Metropolis-style (skylines, metrix, m18s). Skipped: cyrene (= Grids), grurder, luck/jala/
+  raindrops (Turing covers them), kria/faeng (sequencers, not generators).
+- **MATRIX** (initenere, linusschrab): a shared 4 x 4 note matrix; a track in MATRIX mode plays its own row, on its
+  own clock (direction pause/fwd/back/random, play probability), so the polyrhythm comes from the track speeds and
+  EVOLVE/TWEAK/cords stay per track. Columns rotate up/down/shuffle on the song clock. Time routings: track A's step
+  also advances track B (B's gate-off handled from A's step; tracks step in index order, so it stays
+  deterministic). Shared block about 30 B plus about 3 B a track; a save-format step (TSR4) like Grids'. One screen
+  shows the whole matrix and all four playheads whatever track is selected (the one break from editing
+  `song.sel`). Build the shared four-track hook once: quence, meadowphysics, fugu/streams and foulplay's logic
+  reuse it.
+- **Visuals**: each mode draws its norns picture in `graph_tessera_viz` (Theo's wish). The 240 x 240 colour screen
+  holds norns' 128 x 64 grey layouts at about 1.9x, grey levels mapped to theme colours. Moving pictures (Bounce,
+  orbital) need a per-frame redraw of that area, not per step: measure the CPU on the device. Copying a script's
+  code or layout closely brings its licence (add to LICENSING.md); our own drawing of the idea does not.
 - Later: modulatable cord amounts, probability per cord.
 
 ### Visual feedback
@@ -571,6 +589,7 @@ Plan: `docs/analysis/phase1-plan.md`.
       (the map against Grids' own values), three tessera scenarios, the saved block. Device check and the web
       simulator still to do
 - [ ] More generators (Features > More generators): Awake, Fall, First Light chimes, Bounce / Pong
+- [ ] MATRIX (initenere) and the shared four-track hook (Features > More generators); then the norns.community list
 - [ ] **FOLLOW modes** (Features > FOLLOW): interval in scale degrees, chord tone, contrary, canon, bass; RHYTHM
       own / source / both; STEP tracks as sources. With phases 1-2; then in the web simulator (rebuild, site copy,
       test, guide and demo)
