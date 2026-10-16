@@ -166,6 +166,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x218 | GRIDS X | 0 to 255 | 128 | Where on the map of drum patterns, left to right; between two, a blend of both. |
 | 0x219 | GRIDS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |
 | 0x21A | GRIDS DENSITY | 0 to 100 % | 50 | How full the kick, snare and hat are: 0 silent, 100 every hit the map offers. |
+| 0x21B | NOTE LENGTH | STEP, FIXED, HIT | STEP | How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP. |
+| 0x21C | NOTE LENGTH LEN | 1/32, 1/16, 1/8, 1/4, 1/2, 1/1 | 1/8 | FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts. |
+| 0x21D | NOTE LENGTH KEYS | 1 to 4 | 4 | FIXED: how many notes may hold at once. One more ends the note nearest its end; the same pitch again ends the one before. |
 
 ## Mods
 

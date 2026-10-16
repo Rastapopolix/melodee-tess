@@ -25,6 +25,8 @@ static void pattern_commit(track_t *t)
 static void pattern_apply(track_t *t, uint32_t bank)
 {
     const pattern_t *p = pattern_at(t - trk, bank);
+    extern void tessera_len_stop(track_t *t);
+    tessera_len_stop(t);                            /* (a generator's FIXED / HIT notes: note_len.c) */
     seq_release(t);
     recording_stop(t);
     motion_restore(t);
