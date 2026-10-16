@@ -548,7 +548,9 @@ static void tess_obj_upgrade(tess_form_t f)
         if (!f.crd) tess_crd_empty();
         return;
     }
-    if (f.crd) memmove(tess_blob + TESS_OBJ_BYTES, tess_blob + 4u + 4u * sb, TESS_CRD_BYTES);
+    if (f.crd)                                        /* (up, from the end down: no memmove in libc.c) */
+        for (uint32_t i = TESS_CRD_BYTES; i-- > 0;)
+            tess_blob[TESS_OBJ_BYTES + i] = tess_blob[4u + 4u * sb + i];
     for (int slot = 3; slot >= 0; slot--) {
         uint8_t *src = tess_blob + 4u + (uint32_t)slot * sb, *dst = tess_blob + 4u + (uint32_t)slot * TESS_SLOT_BYTES;
         for (int tr = TESSERA_TRACKS - 1; tr >= 0; tr--) {
