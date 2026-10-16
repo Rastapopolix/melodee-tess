@@ -411,6 +411,16 @@ tests and on the device, which stays essential.
 - Process: before each merge, summarise upstream changes into platform/bug fixes to take, changes
   touching code we've modified, and changes to engines we're removing. Merge whole releases while
   feasible; cherry-pick after the hard fork. Update the synced version above after every merge.
+- **From 1.4 on: picks, not merges** (Theo 2026-10-17: only what still makes sense for Tessera as its own
+  firmware, feature set, character and look). Review: `docs/analysis/upstream-1.4.md`. Taken from `v1.4.1`
+  (branch `upstream-1.4-picks`): the CZ-1 test fix, RAM reclaimed for audio, the DSP optimizations and shared
+  voice BUDGET, single-core batching, SID's C64 models, POLY and the SID KIT / DIGI drums. Left out: the
+  "Large type" look, the shared preset bank, 1..4 tracks, dual-core only. Still to take, each in its own
+  session: OTA recovery of interrupted updates (`229dacd`), the boot storage safeguards (`569b820`), the
+  installer's stock-restore fix, the FX TONE / cuts DSP (with "FX with caps").
+- **Flash collision with Melodee 1.4:** its shared preset bank uses 0x9D000..0x9EFFF, Tessera's object 28.
+  Back up before installing Tessera on a unit that ran 1.4. Proposal (installer backup, a first-save warning,
+  Tessera's own layout with the "own project format" task) in `docs/analysis/upstream-1.4.md`: to decide.
 
 ## Phases
 
