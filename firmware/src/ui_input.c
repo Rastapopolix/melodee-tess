@@ -809,7 +809,7 @@ static void edit_param(uint32_t slot, int32_t steps)
         ui.force = 1;
         return;
     }
-    if (pg->graph == GR_STEPS) {
+    if (pg->graph == GR_STEPS && pg->fam == FAM_GEN) {   /* GEN: the generator's knobs (PATTERN: upstream's) */
         uint32_t sel_tr = song.sel;
         if (sel_tr < TESSERA_TRACKS) {
             if (slot == 0u || tessera.mode[sel_tr] != TESS_ENG_OFF) {
@@ -1568,7 +1568,7 @@ static void page_knob(uint32_t k, int32_t s)
         edit_param(k, s);
         pg = cur_page();
         if (!(pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_TWEAK || pg->graph == GR_CORDS ||   /* Tessera's own pages: no picker */
-              (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF))))
+              (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && pg->fam == FAM_GEN && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF))))
             pick_touch(k);                              /* a name from a long list: its picker (ui_popup.c) */
     }
 }

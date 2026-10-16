@@ -46,7 +46,7 @@ static void help_find(uint32_t k)
             help.text = "Forgets sections B and C: the phrase playing is A again.";
             return;
         }
-    } else if (pg->graph == GR_STEPS && tr < TESSERA_TRACKS && (k == 0u || tessera.mode[tr] != TESS_ENG_OFF))
+    } else if (pg->graph == GR_STEPS && pg->fam == FAM_GEN && tr < TESSERA_TRACKS && (k == 0u || tessera.mode[tr] != TESS_ENG_OFF))
         x = k == 0u ? (uint32_t)TX_MODE : ENG[tessera.mode[tr] % TESS_ENG_COUNT][k - 1u];
     if (x != 0xFFu) {
         help.pid = (uint16_t)PID_TESS(x);

@@ -580,7 +580,8 @@ static const page_t PAGES[] = {
     {"PRESETS", FAM_SAVE, SC_GLOBAL, GR_BROWSE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* browser: KNOB 1 LIST, 2 / PRESETS the sounds */
     {"USER", FAM_SAVE, SC_GLOBAL, GR_USER, {0xFF, 0xFF, 0xFF, 0xFF}},       /* user presets: SLOT LOAD ERASE SAVE */
     {"PROJECT", FAM_SAVE, SC_GLOBAL, GR_SLOTS, {G_SLOT, G_BOOT, G_LOAD, G_SAVE}},
-    /* GEN, ARP's tap: the note generators, the arpeggiator last; PATTERN stays in SEQ for the step sequencer */
+    /* GEN, ARP's tap: the note generators, the arpeggiator last; PATTERN stays in SEQ for the step sequencer,
+     * upstream's knobs (LEN DIV SWING GATE) again: FEEL, which stood in for them, gone */
     {"GEN", FAM_GEN, SC_TRACK, GR_STEPS, {P_SLEN, P_SDIV, P_SSWING, P_SGATE}},   /* Tessera: MODE and the engine's
                                                                                  * three, as on PATTERN */
     {"EVOLVE", FAM_GEN, SC_TRACK, GR_EVOLVE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: LOCK EVERY AMOUNT SEED (tessera_evolve_knob) */
@@ -590,7 +591,6 @@ static const page_t PAGES[] = {
     {"ARP 2", FAM_GEN, SC_TRACK, GR_NONE, {P_ASWING, P_APROB, P_AHOLD, P_AORDER}},
     {"NOTES", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},
     {"PATTERN", FAM_SEQ, SC_TRACK, GR_STEPS, {P_SLEN, P_SDIV, P_SSWING, P_SGATE}},
-    {"FEEL", FAM_SEQ, SC_TRACK, GR_NONE, {P_SDIV, P_SSWING, P_SGATE, 0xFF}},   /* timing, reachable while Tessera owns PATTERN */
     {"TEMPO", FAM_SEQ, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_TRK_RECQ, 0xFF}},   /* the project's: saved with it; QNT: the
                                                                                   * selected track's (TIMING's, folded in) */
     {"MIXER", FAM_TRK, SC_TRK, GR_TRK, {0, 1, 2, 3}},   /* GLO button; LEVEL PAN MUTE */

@@ -781,7 +781,7 @@ static void draw_columns(void)
         draw_column(3, "ROLL", e3, "", VAL(3u), -1, ICON_AUTO);
         return;
     }
-    if (cur_page()->graph == GR_STEPS) {
+    if (cur_page()->graph == GR_STEPS && cur_page()->fam == FAM_GEN) {   /* (PATTERN: upstream's columns) */
         uint32_t tr = song.sel;
         if (tr < TESSERA_TRACKS) {
             uint32_t m = tessera.mode[tr];

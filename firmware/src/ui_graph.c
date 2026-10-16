@@ -281,7 +281,7 @@ static void graph_evolve(const track_t *t, uint16_t c)
 static void graph_steps(const track_t *t, uint16_t c)
 {
     uint32_t tr = trk_index(t);
-    if (tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF) {
+    if (tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF && cur_page()->fam == FAM_GEN) {   /* (PATTERN: the steps) */
         graph_tessera_viz(tr, 0);
         return;
     }

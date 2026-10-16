@@ -469,7 +469,18 @@ static int test_gen_family(void)
     go_title("GEN");
     k = tessera.mode[song.sel];
     turn(EN_K1, 1);
-    bad += check("GEN: KNOB 1 is MODE, as on PATTERN (one step on from STEP)", k == TESS_ENG_OFF && tessera.mode[song.sel] != k);
+    bad += check("GEN: KNOB 1 is MODE (one step on from STEP)", k == TESS_ENG_OFF && tessera.mode[song.sel] != k);
+    go_title("PATTERN");                          /* (a generator on: PATTERN is upstream's all the same) */
+    k = tessera.mode[song.sel];
+    {
+        int32_t len = TSEL->p[P_SLEN];
+        turn(EN_K1, -1);
+        bad += check("PATTERN: KNOB 1 is LEN again, the generator left as it is (GEN owns MODE)",
+                     tessera.mode[song.sel] == k && TSEL->p[P_SLEN] == len - 1);
+    }
+    for (k = 0, n = 0; k < NPAGES; k++)
+        n += str_eq(PAGES[k].title, "FEEL");
+    bad += check("no FEEL page: PATTERN's DIV SWING GATE are reachable again", n == 0);
     go_title("EVOLVE");
     bad += check("GEN's pages are not step pages: the keys play, they write no step", !song.seq_mode);
     return bad;
