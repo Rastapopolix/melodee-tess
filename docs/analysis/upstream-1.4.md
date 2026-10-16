@@ -84,16 +84,8 @@ no flash a 1.4 unit leaves unused, so moving Tessera's object would not avoid th
 and, at the next project save, writes its own object over 1.4's presets there. Going back to Melodee 1.4
 then loses those presets. Melodee 1.2.x–1.3.x data is not affected.
 
-**Proposal (to decide):** Tessera owns the flash, as a firmware of its own should, and makes the handover
-explicit instead of moving objects around:
-
-1. The Tessera installer takes a full backup before flashing a unit that runs Melodee 1.4 or later (it can
-   read the version from the device identity), as upstream's stock-restore flow does.
-2. At first boot, Tessera recognises a foreign object in its sectors (a valid store header, not Tessera's
-   magic) and keeps it until the player saves; the first save then asks once ("Melodee 1.4 data here will
-   be replaced").
-3. Tessera's own layout comes with the "own project format" task: with FM6, CZ-1 and Prophet gone, their
-   banks (0x93000..0x9CFFF, 0xC8000..0xDBFFF, 0x9F000) are Tessera's to use for projects, generator state
-   and its own sound bank.
-
-Until then: back up before installing Tessera on a unit that ran Melodee 1.4.
+**Decided (Theo, 2026-10-17):** loading Melodee presets, projects or other data into melodee-tess or Tessera
+is not a goal. Tessera owns the flash: no installer backup step, no warning, no moving objects to dodge 1.4's
+data. Tessera's own layout comes with the "own project format" task: with FM6, CZ-1 and Prophet gone, their
+banks (0x93000..0x9CFFF, 0xC8000..0xDBFFF, 0x9F000) are Tessera's to use for projects, generator state and
+its own sound bank. Compatibility code kept only for Melodee's data can go with the hard fork.
