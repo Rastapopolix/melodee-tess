@@ -129,7 +129,7 @@ static void cu_leds(void)
         was[k] = key;
         cv_begin(8, 8, bg);
         if (lv)
-            cv_disc(4, 4, 6, lv > 1 ? ux_mix(T_LINE, T_THEME, (lv - 1) * 100 / 7) : T_LINE, 0);
+            cv_disc(4, 4, 6, lv > 1 ? ux_mix(T_DIM, T_THEME, (lv - 1) * 100 / 7) : T_DIM, 0);   /* (T_DIM: on either row) */
         cv_blit(CU_LED_X, (uint32_t)(CU_Y + (int32_t)k * CU_H + CU_LED_Y));
     }
 }
