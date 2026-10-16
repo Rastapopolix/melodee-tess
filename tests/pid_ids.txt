@@ -148,3 +148,6 @@
 0x218 GRIDS X                  track 0..255 def 128
 0x219 GRIDS Y                  track 0..255 def 128
 0x21a GRIDS DENSITY            track 0..100 def 50
+0x21b NOTE LENGTH              track 0..2 def 0
+0x21c NOTE LENGTH LEN          track 0..5 def 2
+0x21d NOTE LENGTH KEYS         track 1..4 def 4

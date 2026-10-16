@@ -345,8 +345,43 @@ static int tessera_archive(void)
         bad += check("an older archive (version 1: 28 \"TSR1\", 29 of 180 bytes) restores, each track given a seed", ok);
         tessera_reset(); project_load(0);
         ok = tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF;
-        ok &= !list(28, &len28, &crc28) && len28 == TESS_OBJ_BYTES_CRD;   /* stored as version 2, with the cords' part */
-        bad += check("... its saved slot loads with its generators, and the object is stored as version 2", ok);
+        ok &= !list(28, &len28, &crc28) && len28 == TESS_OBJ_BYTES_CRD;   /* stored as the current version, with the cords' part */
+        bad += check("... its saved slot loads with its generators, and the object is stored as the current version", ok);
+    }
+    {   /* an archive of the build before NOTE LENGTH: blocks of version 3 (each track 3 bytes shorter, "TSR3"), the
+         * cords after them */
+        static uint8_t obj3[TESS_OBJ_BYTES_V3_CRD], live3[TESSERA_PK_BYTES_V3];
+        const uint32_t n4 = TESSERA_PK_BYTES / TESSERA_TRACKS, n3 = TESSERA_PK_BYTES_V3 / TESSERA_TRACKS, m3 = 0x33525354u;
+        uint32_t slot, tr;
+        memcpy(obj3, &m3, 4);
+        for (slot = 0; slot < 4u; slot++) {
+            memcpy(obj3 + 4u + slot * TESS_SLOT_BYTES_V3, obj + 4u + slot * TESS_SLOT_BYTES, 4);   /* the tag */
+            for (tr = 0; tr < TESSERA_TRACKS; tr++)
+                memcpy(obj3 + 4u + slot * TESS_SLOT_BYTES_V3 + 4u + tr * n3, obj + 4u + slot * TESS_SLOT_BYTES + 4u + tr * n4, n3);
+        }
+        memcpy(obj3 + TESS_OBJ_BYTES_V3, obj + TESS_OBJ_BYTES, TESS_CRD_BYTES);
+        for (tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(live3 + tr * n3, live + tr * n4, n3);
+        memset(nor + 0x9D000, 0xFF, 2u * ST_SECTOR);
+        tessera_reset();
+        ok = !put_all(28, obj3, sizeof obj3, st_crc32(obj3, sizeof obj3)) && !put_all(29, live3, sizeof live3, st_crc32(live3, sizeof live3));
+        tessera_pack(now);
+        for (tr = 0; tr < TESSERA_TRACKS; tr++) {
+            ok &= !memcmp(now + tr * n4, live + tr * n4, n3);   /* every version 3 setting */
+            ok &= tessera.nl_mode[tr] == NL_STEP && tessera.nl_len[tr] == 2u && tessera.nl_keys[tr] == NL_KEYS;
+        }
+        bad += check("an older archive (version 3: 28 \"TSR3\" with cords, 29 of 204 bytes) restores, NOTE LENGTH STEP", ok);
+        tessera_reset(); project_load(0);
+        ok = tessera.mode[0] == TESS_ENG_TURING && tessera.mode[1] == TESS_ENG_EUCLID && tessera.mode[2] == TESS_ENG_OFF;
+        ok &= tessera.nl_mode[0] == NL_STEP && tessera.nl_keys[1] == NL_KEYS;
+        tessera_pack(now);
+        ok &= !memcmp(now, obj + 4u + TESS_SLOT_BYTES * 0u + 4u, n3);   /* slot 0's track 1, as saved */
+        {
+            uint8_t crd2[CORD_PK_BYTES];
+            cord_pack(crd2);
+            ok &= !memcmp(obj3 + TESS_OBJ_BYTES_V3 + 4u + 4u, crd2, sizeof crd2);   /* slot 0's cords kept */
+        }
+        ok &= !list(28, &len28, &crc28) && len28 == TESS_OBJ_BYTES_CRD;   /* stored as version 4 */
+        bad += check("... its saved slot loads with its generators and cords, and the object is stored as version 4", ok);
     }
     bad += check("an empty 29 (no live generators in the archive): all OFF",
                  !put_all(29, 0, 0, 0) && tessera.mode[0] == TESS_ENG_OFF && tessera.mode[1] == TESS_ENG_OFF);
