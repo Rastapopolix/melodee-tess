@@ -114,9 +114,81 @@ another), so people can try the modes in the browser before installing.
   audio envelope follower; drum ducking; macros.
 - Clock tools: dividers/multipliers, Marbles-style jitter, Bernoulli gates, ratchets/bursts,
   per-track swing.
+- **Logic and Branches** (Theo 2026-10-16; Mutable Instruments Branches: a Bernoulli gate, each trigger goes to
+  output A or B by a coin toss of probability P; toggle and latch modes). Three pieces, smallest first:
+  - BRANCH on TWEAK: with probability P a hit plays on another track (TO 1..4) instead of this one, so two tracks
+    answer each other; TOGGLE alternates, LATCH keeps the last side until the toss changes. DROP is already the
+    one-sided case (hit or nothing). The toss uses the track's seeded stream, so it replays with its SEED, and LOCK
+    could repeat the last tosses (deja vu). Playing on another track shares MATRIX's four-track hook (that track's
+    gate-off). About 3 B a track.
+  - LOGIC on TWEAK (foulplay-style): this track's hits combined with another track's: AND (only when both hit), OR,
+    XOR, NOT (only when the other rests). The tracks step in index order, so a track reads a lower one's hit from
+    this step and a higher one's from the last. About 2 B a track.
+  - Cord sources: COIN A / COIN B (a source track's gate split by a toss, P set by the cord's amount), then
+    AND/OR/XOR of two tracks' gates, flip-flop, comparator. Two-track logic needs a second source track in the cord
+    (a CRD format step); COIN fits the present cord.
+  Every piece has an OFF position (P = 0, LOGIC off). Each is a few lines in `tessera.c` beside DROP; most of the
+  work is the help texts, the parameter IDs and a host test per mode.
 - Quantizer with weighted scale degrees; learn the scale from played notes.
 - Kria-style polymetric lanes (note, trigger, octave, gate, each with its own length).
 - Later generators: 1D cellular automata, cascading counters, Bloom-style branching mutations.
+
+### More generators (Theo 2026-10-16)
+
+Candidates beside Turing, Euclid, Markov and Morph, each a `gen_<name>_tick` in `gen.c` that plays one note a step
+(Grids: up to three). Feasibility checked against each original (thread "generative sequencing scripts").
+
+- **Grids** (Mutable Instruments Grids): kick, snare and hat from a point on its 5 x 5 map of drum patterns. X, Y,
+  DENSITY on GEN; CHAOS is LOCK turned round; EVOLVE walks X and Y. Its map is 2.4 KB of flash, 8 B a track of RAM.
+  GPL-3.0-or-later, so its table and logic are used as they are. First built: branch `grids`.
+- **Awake** (norns, tehn): two looping sequences of different lengths (up to 16 each) added into the scale, and a
+  PROBABILITY. Easy as a generator; the work is entering 32 step values (ROLL to fill them, editing on the keys).
+  About 34 B a track saved.
+- **Fall** (norns, ambalek, MIT): up to 8 leaves, each with a note and a falling speed, playing when they land; a
+  leaf lands, fades and falls again. Steps on its own 1/16 clock already, so it maps directly; leaves landing on the
+  same step play one note, and its collision "rustle" sound is left out.
+- **First Light chimes** (norns, tehn): only the wind chimes carry over: bursts from a small set of notes, then a
+  rest of 3 to 9 seconds, in steps. Its sequencer moves a delay's loop length (shared FX here): not ported.
+- **Bounce / Pong** (Theo's idea): a ball moving a fixed distance each step, no gravity, bouncing off the screen's
+  edges; a wall hit plays a note (which wall and where along it, snapped to the scale). SPEED and ANGLE set how often
+  it hits; it loops when the angle brings it back to its start, and EVOLVE nudges the angle. PADDLE (knob, or a
+  cord) adds Pong: a miss rests and serves again. One generator, the paddle optional. About 8 B a track.
+- **More from norns.community** (survey 2026-10-16, full notes in `docs/design/NORNS_GENERATORS.md`), easiest
+  first: nørgård (infinity series, from the step number's bits), fibonacci (mod N), rebound (= Bounce above),
+  orbital (rings at free ratios), less concepts (1D cellular automaton, rule/seed/range), Infinite Melody / Modulo
+  Magic (Ken Stone), foulplay (Euclid + logic against another track). Then zellen (Life), meadowphysics, acid
+  basslines (bline), Metropolis-style (skylines, metrix, m18s). Skipped: cyrene (= Grids), grurder, luck/jala/
+  raindrops (Turing covers them), kria/faeng (sequencers, not generators).
+- **MATRIX** (initenere, linusschrab): a shared 4 x 4 note matrix; a track in MATRIX mode plays its own row, on its
+  own clock (direction pause/fwd/back/random, play probability), so the polyrhythm comes from the track speeds and
+  EVOLVE/TWEAK/cords stay per track. Columns rotate up/down/shuffle on the song clock. Time routings: track A's step
+  also advances track B (B's gate-off handled from A's step; tracks step in index order, so it stays
+  deterministic). Shared block about 30 B plus about 3 B a track; a save-format step (TSR4) like Grids'. One screen
+  shows the whole matrix and all four playheads whatever track is selected (the one break from editing
+  `song.sel`). Build the shared four-track hook once: quence, meadowphysics, fugu/streams and foulplay's logic
+  reuse it.
+- **From O_C Phazerville, EuroPi and Pam's Pro Workout** (survey 2026-10-16, notes in
+  `docs/design/MODULE_GENERATORS.md`; EuroPi is CC0, Hemisphere MIT, O_C GPL-3.0), easiest first: ProbMeloD
+  (a weight per note), Pigeons (Fibonacci mod N, merge with fibonacci), Polyrhythmic Sequencer (Subharmonicon),
+  Cumulus (Nibbler accumulator), RunglBook (Rungler), ProbDiv, DCSN-2, Probapoly, The Darkest Timeline, Shredder
+  (Mimetic Digitalis). Moderate: TB-3PO (seeded 303 lines; needs glide), Gate Phaser (Reich phasing) and Ocean Surge
+  (Swell Physics, four buoys) on the four-track hook, Automatonnetz / Harrington 1200 (neo-Riemannian chords, with
+  Chords), Relabi. Modifiers: RESEED another track and mask (Pam's cross-ops), timing HUMAN and RAMP (flex-ops),
+  Euclid PAD, ratchets, Palimpsest accents, threshold-logic neurons.
+- **Comparison of every candidate** (Theo 2026-10-16: weigh them up before choosing): effort, RAM, flash, musical
+  value and shared dependencies in `docs/design/GENERATOR_COMPARISON.md`. Shared work that unlocks several items: the
+  four-track hook (MATRIX), sub-step timing (ratchets, swing, phasing), glide (TB-3PO), Chords (Automatonnetz).
+  Shortlist: Bounce, Awake, Subharmonicon-style polyrhythm sequencer, organic LFOs, BRANCH, LOGIC; then MATRIX and
+  ratchets; then TB-3PO and Automatonnetz. Flash, not RAM, limits how many modes fit (~1 KB RAM, 25-30 KB flash for
+  all S and M modes).
+- **Organic LFOs** (Triple Sloth, ochd): cord sources SLOTH (Torpor ~15-20 min, Apathy ~1 min, Inertia ~2-4 min:
+  fixed-point jerk systems at control rate, seeded, clamped) and OCHD (8 free LFOs at related non-integer rates, one
+  RATE, organic shape table), shared, chosen by the cord's source-track byte (no CRD step). About 70 B RAM and
+  1.5 KB flash for both; DRIFT stays as the simple one.
+- **Visuals**: each mode draws its norns picture in `graph_tessera_viz` (Theo's wish). The 240 x 240 colour screen
+  holds norns' 128 x 64 grey layouts at about 1.9x, grey levels mapped to theme colours. Moving pictures (Bounce,
+  orbital) need a per-frame redraw of that area, not per step: measure the CPU on the device. Copying a script's
+  code or layout closely brings its licence (add to LICENSING.md); our own drawing of the idea does not.
 - Later: modulatable cord amounts, probability per cord.
 
 ### Visual feedback
@@ -544,11 +616,21 @@ Plan: `docs/analysis/phase1-plan.md`.
 ### Not yet placed in a phase
 - [x] FOLLOW, first piece (branch `follow-step`): STEP tracks as sources (the highest sounding note, held across
       rests); while following, SHIFT counts scale degrees (TWEAK shows "deg"). Chromatic tracks play as before
+- [x] **Grids** generator (Theo 2026-10-16, branch `grids`): GEN's X Y DENSITY, LOCK as CHAOS, EVOLVE and FORM walk
+      X and Y; every part a GM drum note (36 38 42; a DRUM track's kit). Saved: block version 3 ("TSR3", 51 bytes a
+      track), versions 1 and 2 converted on reading (projects, backups); cords on X, Y, DENSITY. Host tests: gen_test
+      (the map against Grids' own values), three tessera scenarios, the saved block. Device check and the web
+      simulator still to do
+- [ ] More generators (Features > More generators): Awake, Fall, First Light chimes, Bounce / Pong
+- [ ] MATRIX (initenere) and the shared four-track hook (Features > More generators); then the norns.community list
 - [ ] **FOLLOW modes** (Features > FOLLOW): interval in scale degrees, chord tone, contrary, canon, bass; RHYTHM
       own / source / both; STEP tracks as sources. With phases 1-2; then in the web simulator (rebuild, site copy,
       test, guide and demo)
 - [ ] STEP as seed: locks, Gravity, Keep, ghost-note grid; Ornament and Serial generators
       (phase 1's `input_phrase` prepares for it)
+- [ ] Organic LFOs SLOTH and OCHD as cord sources (Features > More generators)
+- [ ] Choose from the generator comparison (docs/design/GENERATOR_COMPARISON.md) with Theo
+- [ ] Logic and Branches (Features > Mod sources): BRANCH and LOGIC on TWEAK, then COIN and logic cord sources
 - [ ] The remaining mod sources, clock tools, quantizer, Kria-style lanes
 - [ ] Chords as a per-track note-generation option
 - [ ] External MIDI over USB: per-track routing and channel, clock out

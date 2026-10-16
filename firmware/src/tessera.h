@@ -15,6 +15,7 @@ enum {
     TESS_ENG_EUCLID,      /* Euclidean rhythm generator */
     TESS_ENG_MARKOV,      /* 1st-order Markov pitch matrix */
     TESS_ENG_MORPH,       /* Vector/Morph interpolation */
+    TESS_ENG_GRIDS,       /* Grids' drum map: kick, snare, hat */
     TESS_ENG_COUNT
 };
 
@@ -23,6 +24,7 @@ typedef gen_turing_t tessera_turing_t;
 typedef gen_euclid_t tessera_euclid_t;
 typedef gen_markov_t tessera_markov_t;
 typedef gen_morph_t  tessera_morph_t;
+typedef gen_grids_t  tessera_grids_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
@@ -54,7 +56,7 @@ typedef struct {
 
 /* One remembered section (A, B or C) of a track's form */
 typedef struct {
-    uint16_t reg;         /* Turing: base register; Morph: snapshot A */
+    uint16_t reg;         /* Turing: base register; Morph: snapshot A; Grids: x, y << 8 */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos */
     uint8_t  note[32];    /* Markov / Morph phrase: bit 7 = hit, bits 0..6 = note */
     uint8_t  vel[16];     /* 4 bits per step */
@@ -67,6 +69,7 @@ typedef struct {
     tessera_euclid_t euclid[TESSERA_TRACKS];
     tessera_markov_t markov[TESSERA_TRACKS];
     tessera_morph_t  morph[TESSERA_TRACKS];
+    tessera_grids_t  grids[TESSERA_TRACKS];
     tessera_evolve_t evolve[TESSERA_TRACKS];
     tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
@@ -102,12 +105,15 @@ void tessera_tweak_knob(uint32_t k, int32_t s);
 void tessera_form_knob(uint32_t k, int32_t s);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 188u                       /* the saved state, version 2 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
-#define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED): older projects and backups */
+#define TESSERA_PK_BYTES 204u                       /* the saved state, version 3 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V2 188u                    /* version 2 (before GRIDS): older projects and backups */
+#define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
+int tessera_unpack_v2(const uint8_t *in);           /* the same for a version 2 block */
 int tessera_unpack_v1(const uint8_t *in);           /* the same for a version 1 block */
-void tessera_v1_track(const uint8_t *in, uint8_t *out);   /* one track's record, version 1 -> 2 */
+void tessera_v2_track(const uint8_t *in, uint8_t *out);   /* one track's record, version 2 -> 3 */
+void tessera_v1_track(const uint8_t *in, uint8_t *out);   /* one track's record, version 1 -> 3 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
@@ -120,6 +126,7 @@ enum {
     TX_EV_LOCK, TX_EV_EVERY, TX_EV_AMOUNT, TX_EV_SEED,
     TX_FM_FORM, TX_FM_CONTRAST, TX_FM_FLOURISH,
     TX_TW_SHIFT, TX_TW_DROP, TX_TW_HUMAN, TX_TW_FOLLOW,
+    TX_GRD_X, TX_GRD_Y, TX_GRD_DENS,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -131,5 +138,6 @@ const gen_turing_t *tessera_turing(uint32_t tr);
 const gen_euclid_t *tessera_euclid(uint32_t tr);
 const gen_markov_t *tessera_markov(uint32_t tr);
 const gen_morph_t *tessera_morph(uint32_t tr);
+const gen_grids_t *tessera_grids(uint32_t tr);
 
 #endif

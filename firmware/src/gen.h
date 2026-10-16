@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* The note generators (Turing, Euclid, Markov, Morph) behind one interface: each knows only its own state, the
+/* The note generators (Turing, Euclid, Markov, Morph, Grids) behind one interface: each knows only its own state, the
  * clock and the input phrase, nothing of tracks, scales, the UI or Melodee. tessera.c is the adapter between them
  * and the sequencer (docs/analysis/phase1-plan.md). Randomness: each draw from the track's own stream
  * (gen.c gen_rnd), handed in by the adapter, which starts it from the track's SEED. */
@@ -48,10 +48,20 @@ typedef struct {
     uint8_t  oct_span;    /* Octave span */
 } gen_morph_t;
 
+/* 5. Grids (Mutable Instruments Grids' drum map, gen_grids.h): kick, snare and hat from a point on a 5 x 5 map of
+ * patterns, blended between the four nearest */
+typedef struct {
+    uint8_t  x, y;        /* 0..255: the point on the map */
+    uint8_t  dens;        /* 0..100: how full the three parts are (Grids' FILL, one for all three) */
+    uint8_t  chaos;       /* 0..100: random hits added each bar (Grids' CHAOS; LOCK turned round) */
+    uint8_t  step_idx;    /* the next step, 0..31 */
+    uint8_t  perturb[3];  /* this bar's random push per part, 0..63 (drawn on the bar's first step) */
+} gen_grids_t;
+
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
-    uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A */
+    uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8 */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos */
 } gen_sec_t;
 
@@ -71,6 +81,8 @@ typedef struct {
     uint8_t gate;           /* 1 = a note starts on this step */
     uint8_t note, vel;      /* the raw note (before LOCK, the scale snap, transpose, SHIFT) */
     int16_t cv;             /* the generator's CV for the signal bus (phase 2; 0 until then) */
+    uint8_t parts;          /* Grids: the drum parts that hit, bit 0 kick, 1 snare, 2 hat (gate: any); else 0 */
+    uint8_t accent;         /* Grids: the parts among them accented */
 } gen_out_t;
 
 #endif

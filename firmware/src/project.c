@@ -490,64 +490,92 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
  * (no room in it). A slot's block is valid only while its tag equals the project record's hash (proj_saved_hash):
  * any other write to the slot (an archive, a failed or interrupted save) loads the project with Tessera OFF. */
 #if MELODEE_FLASH
-#define TESS_OBJ_MAGIC 0x32525354u                    /* "TSR2": blocks of version 2 (with SEED) */
+#define TESS_OBJ_MAGIC 0x33525354u                    /* "TSR3": blocks of version 3 (with Grids) */
 #define TESS_SLOT_BYTES (4u + TESSERA_PK_BYTES)
 #define TESS_OBJ_BYTES (4u + 4u * TESS_SLOT_BYTES)
-#define TESS_OBJ_MAGIC_V1 0x31525354u                 /* "TSR1": version 1, read and converted (tess_obj_v1) */
+#define TESS_OBJ_MAGIC_V2 0x32525354u                 /* "TSR2": version 2 (before Grids), read and converted */
+#define TESS_SLOT_BYTES_V2 (4u + TESSERA_PK_BYTES_V2)
+#define TESS_OBJ_BYTES_V2 (4u + 4u * TESS_SLOT_BYTES_V2)
+#define TESS_OBJ_MAGIC_V1 0x31525354u                 /* "TSR1": version 1 (before SEED), read and converted */
 #define TESS_SLOT_BYTES_V1 (4u + TESSERA_PK_BYTES_V1)
 #define TESS_OBJ_BYTES_V1 (4u + 4u * TESS_SLOT_BYTES_V1)
 /* the cords (cord.c), after the blocks: "CRD1", then per slot a tag (as the slot's block's) and its cords. An object
- * without them (TESS_OBJ_BYTES: saved before cords) reads as every slot without cords */
+ * without them (saved before cords) reads as every slot without cords */
 #define TESS_CRD_MAGIC 0x31445243u                    /* "CRD1" */
 #define TESS_CRD_SLOT (4u + CORD_PK_BYTES)
-#define TESS_OBJ_BYTES_CRD (TESS_OBJ_BYTES + 4u + 4u * TESS_CRD_SLOT)
+#define TESS_CRD_BYTES (4u + 4u * TESS_CRD_SLOT)
+#define TESS_OBJ_BYTES_CRD (TESS_OBJ_BYTES + TESS_CRD_BYTES)
+#define TESS_OBJ_BYTES_V2_CRD (TESS_OBJ_BYTES_V2 + TESS_CRD_BYTES)
 _Static_assert(TESS_OBJ_BYTES_CRD <= ST_SECTOR - 256u - sizeof(st_hdr_t), "Tessera object: one sector");
 static uint8_t tess_blob[TESS_OBJ_BYTES_CRD] __attribute__((section(".pool")));
 static uint8_t *tess_crd(uint32_t slot) { return tess_blob + TESS_OBJ_BYTES + 4u + (slot & 3u) * TESS_CRD_SLOT; }
 static void tess_crd_empty(void)                      /* the cords' part: its magic, no slot's */
 {
     uint32_t m = TESS_CRD_MAGIC;
-    memset(tess_blob + TESS_OBJ_BYTES, 0, 4u + 4u * TESS_CRD_SLOT);
+    memset(tess_blob + TESS_OBJ_BYTES, 0, TESS_CRD_BYTES);
     memcpy(tess_blob + TESS_OBJ_BYTES, &m, 4);
 }
 
-/* tess_blob holding a version 1 object (TESS_OBJ_BYTES_V1 at its start) -> version 2 in place: each slot's tag
- * kept, each track given its seed (tessera_v1_track). From the end down, so nothing is overwritten before it is
- * read (every record moves up) */
-static void tess_obj_v1(void)
+/* The forms a stored object (or a backup of one) may have: its version, whether the cords follow its blocks. 0 = none
+ * of them (a length or magic of no version, a cords' part without its magic) */
+typedef struct { uint8_t ver, crd; } tess_form_t;
+static tess_form_t tess_obj_form(const uint8_t *raw, uint32_t len)
 {
-    uint32_t m = TESS_OBJ_MAGIC;
+    tess_form_t f = {0, 0};
+    uint32_t got, cm = TESS_CRD_MAGIC;
+    if (len < 4u) return f;
+    memcpy(&got, raw, 4);
+    if (len == TESS_OBJ_BYTES_CRD) { f.ver = 3; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES, 4); }
+    else if (len == TESS_OBJ_BYTES) f.ver = 3;
+    else if (len == TESS_OBJ_BYTES_V2_CRD) { f.ver = 2; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V2, 4); }
+    else if (len == TESS_OBJ_BYTES_V2) f.ver = 2;
+    else if (len == TESS_OBJ_BYTES_V1) f.ver = 1;
+    if (!f.ver || got != (f.ver == 3 ? TESS_OBJ_MAGIC : f.ver == 2 ? TESS_OBJ_MAGIC_V2 : TESS_OBJ_MAGIC_V1) ||
+        cm != TESS_CRD_MAGIC)
+        f.ver = 0;
+    return f;
+}
+static uint32_t tess_slot_bytes(uint32_t ver) { return ver == 3 ? TESS_SLOT_BYTES : ver == 2 ? TESS_SLOT_BYTES_V2 : TESS_SLOT_BYTES_V1; }
+
+/* tess_blob holding an object of form f (as stored, at its start) -> version 3 with the cords' part, in place: each
+ * slot's tag kept, each track converted (tessera_v2_track, tessera_v1_track); the cords moved after the longer blocks,
+ * or none. The cords up first, then the blocks from the end down, so nothing is overwritten before it is read
+ * (everything moves up) */
+static void tess_obj_upgrade(tess_form_t f)
+{
+    uint32_t m = TESS_OBJ_MAGIC, sb = tess_slot_bytes(f.ver), pk = sb - 4u;
+    if (f.ver == 3) {                                 /* (nothing moves) */
+        if (!f.crd) tess_crd_empty();
+        return;
+    }
+    if (f.crd)                                        /* (up, from the end down: no memmove in libc.c) */
+        for (uint32_t i = TESS_CRD_BYTES; i-- > 0;)
+            tess_blob[TESS_OBJ_BYTES + i] = tess_blob[4u + 4u * sb + i];
     for (int slot = 3; slot >= 0; slot--) {
-        uint8_t *src = tess_blob + 4u + (uint32_t)slot * TESS_SLOT_BYTES_V1, *dst = tess_blob + 4u + (uint32_t)slot * TESS_SLOT_BYTES;
+        uint8_t *src = tess_blob + 4u + (uint32_t)slot * sb, *dst = tess_blob + 4u + (uint32_t)slot * TESS_SLOT_BYTES;
         for (int tr = TESSERA_TRACKS - 1; tr >= 0; tr--) {
             uint8_t rec[TESSERA_PK_BYTES / TESSERA_TRACKS];
-            tessera_v1_track(src + 4u + (uint32_t)tr * (TESSERA_PK_BYTES_V1 / TESSERA_TRACKS), rec);
+            (f.ver == 2 ? tessera_v2_track : tessera_v1_track)(src + 4u + (uint32_t)tr * (pk / TESSERA_TRACKS), rec);
             memcpy(dst + 4u + (uint32_t)tr * sizeof rec, rec, sizeof rec);
         }
         {
-            uint32_t tg;                                  /* (slot 0: the same place) */
+            uint32_t tg;                              /* (slot 0: the same place) */
             memcpy(&tg, src, 4);
             memcpy(dst, &tg, 4);
         }
     }
     memcpy(tess_blob, &m, 4);
+    if (!f.crd) tess_crd_empty();
 }
 
-/* the stored object -> tess_blob (version 1 converted); 0 = none / damaged (tess_blob then empty, ready to fill) */
+/* the stored object -> tess_blob (older versions converted); 0 = none / damaged (tess_blob then empty, ready to fill) */
 static int tess_obj_read(void)
 {
-    uint32_t m = TESS_OBJ_MAGIC, got, crd;
+    uint32_t m = TESS_OBJ_MAGIC;
     int n = st_load(OBJ_TESSERA, tess_blob, sizeof tess_blob);
-    memcpy(&got, tess_blob, 4);
-    memcpy(&crd, tess_blob + TESS_OBJ_BYTES, 4);
-    if (n == (int)sizeof tess_blob && got == m && crd == TESS_CRD_MAGIC) return 1;
-    if (n == (int)TESS_OBJ_BYTES && got == m) {        /* (saved before cords) */
-        tess_crd_empty();
-        return 1;
-    }
-    if (n == (int)TESS_OBJ_BYTES_V1 && got == TESS_OBJ_MAGIC_V1) {
-        tess_obj_v1();
-        tess_crd_empty();
+    tess_form_t f = tess_obj_form(tess_blob, n > 0 ? (uint32_t)n : 0u);
+    if (f.ver) {
+        tess_obj_upgrade(f);
         return 1;
     }
     memset(tess_blob, 0, sizeof tess_blob);
@@ -626,31 +654,28 @@ static void tessera_store_retag(uint32_t slot, uint32_t old_tag)
 static uint32_t tessera_store_restore(const uint8_t *raw, uint32_t len)
 {
     uint8_t live[TESSERA_PK_BYTES];
-    uint32_t m = TESS_OBJ_MAGIC, got, tag, slot, ok = 1;
+    uint32_t m = TESS_OBJ_MAGIC, tag, slot, ok = 1;
     if (len) {
-        int v1 = len == TESS_OBJ_BYTES_V1, crd = len == TESS_OBJ_BYTES_CRD;   /* (v1, before cords: converted below) */
-        uint32_t sb = v1 ? TESS_SLOT_BYTES_V1 : TESS_SLOT_BYTES, cm = 0;
+        tess_form_t f = tess_obj_form(raw, len);     /* (older versions, before cords: converted below) */
+        uint32_t sb = tess_slot_bytes(f.ver), crd_at = 4u + 4u * sb;
+        int (*unpack)(const uint8_t *) = f.ver == 3 ? tessera_unpack : f.ver == 2 ? tessera_unpack_v2 : tessera_unpack_v1;
         uint8_t live_c[CORD_PK_BYTES];
-        memcpy(&got, raw, 4);
-        if (crd) memcpy(&cm, raw + TESS_OBJ_BYTES, 4);
-        if (v1 ? got != TESS_OBJ_MAGIC_V1 : (len != TESS_OBJ_BYTES && !crd) || got != m || (crd && cm != TESS_CRD_MAGIC))
-            return 2;
+        if (!f.ver) return 2;
         tessera_pack(live);
         cord_pack(live_c);
         for (slot = 0; slot < 4u && ok; slot++) {
             memcpy(&tag, raw + 4u + slot * sb, 4);
-            if (tag) ok = (v1 ? tessera_unpack_v1 : tessera_unpack)(raw + 4u + slot * sb + 4u) == 1;
-            if (crd && ok) {
-                memcpy(&tag, raw + TESS_OBJ_BYTES + 4u + slot * TESS_CRD_SLOT, 4);
-                if (tag) ok = cord_unpack(raw + TESS_OBJ_BYTES + 4u + slot * TESS_CRD_SLOT + 4u);
+            if (tag) ok = unpack(raw + 4u + slot * sb + 4u) == 1;
+            if (f.crd && ok) {
+                memcpy(&tag, raw + crd_at + 4u + slot * TESS_CRD_SLOT, 4);
+                if (tag) ok = cord_unpack(raw + crd_at + 4u + slot * TESS_CRD_SLOT + 4u);
             }
         }
         tessera_unpack(live);
         (void)cord_unpack(live_c);
         if (!ok) return 2;
         memcpy(tess_blob, raw, len);
-        if (v1) tess_obj_v1();
-        if (!crd) tess_crd_empty();
+        tess_obj_upgrade(f);
     } else {
         memset(tess_blob, 0, sizeof tess_blob);
         memcpy(tess_blob, &m, 4);

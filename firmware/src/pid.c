@@ -6,7 +6,7 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH"};
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS"};
 static const char *const TX_N_EVERY[] = {"OFF", "1", "2", "4", "8", "16"};
 static const char *const TX_N_FORM[] = {"OFF", "AB", "ABAC", "ABCB", "AABA", "ABCA", "AABC"};
 static const char *const TX_N_FOLLOW[] = {"OFF", "T1", "T2", "T3", "T4"};
@@ -37,6 +37,9 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_TW_DROP] = PD("DROP", F_PCT, 0, 100, 0),
     [TX_TW_HUMAN] = PD("HUMAN", F_PCT, 0, 100, 0),
     [TX_TW_FOLLOW] = PE("FOLLOW", TX_N_FOLLOW, 0),
+    [TX_GRD_X] = PD("X", F_INT, 0, 255, 128),
+    [TX_GRD_Y] = PD("Y", F_INT, 0, 255, 128),
+    [TX_GRD_DENS] = PD("DENS", F_PCT, 0, 100, 50),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -200,7 +203,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     G_(G_FXRETURN, 0, "FX RETURN", "The level of the send effects in the mix."),
     G_(G_FXMODE, 0, "FX MODE",
         "CHAIN: one send through all three effects in a row; SPLIT: a send to each effect of its own."),
-    X_(TX_MODE, "GENERATOR MODE", "STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes."),
+    X_(TX_MODE, "GENERATOR MODE", "STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; "
+                                  "GRIDS plays kick, snare and hat (best on a DRUM track)."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
@@ -216,7 +220,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_MRP_SNPA, "MORPH RHYTHM A", "Rhythm A: one of eight preset patterns."),
     X_(TX_MRP_SNPB, "MORPH RHYTHM B", "Rhythm B: one of eight preset patterns."),
     X_(TX_EV_LOCK, "EVOLVE LOCK", "How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every "
-                                  "time. Turing's is its PROB turned round; Euclid has none."),
+                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid has none."),
     X_(TX_EV_EVERY, "EVOLVE EVERY", "Bars between mutations; OFF keeps the phrase as it is."),
     X_(TX_EV_AMOUNT, "EVOLVE AMOUNT", "How much changes at each mutation."),
     X_(TX_EV_SEED, "EVOLVE ROLL", "The track's seed, 1 to 128: each one a line of its own, the same every time. "
@@ -229,6 +233,9 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_TW_DROP, "TWEAK DROP", "The chance a hit is left out, whatever the generator."),
     X_(TX_TW_HUMAN, "TWEAK HUMAN", "Varies velocity and gate a little, as a player would."),
     X_(TX_TW_FOLLOW, "TWEAK FOLLOW", "Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own."),
+    X_(TX_GRD_X, "GRIDS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
+    X_(TX_GRD_Y, "GRIDS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
+    X_(TX_GRD_DENS, "GRIDS DENSITY", "How full the kick, snare and hat are: 0 silent, 100 every hit the map offers."),
 };
 #undef T_
 #undef G_

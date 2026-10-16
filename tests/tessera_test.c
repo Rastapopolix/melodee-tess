@@ -410,6 +410,25 @@ static void b_replay(uint32_t bar)
     }
 }
 
+static void s_grids(void) { gen(0, TESS_ENG_GRIDS); }
+static void s_grids_var(void)
+{
+    gen(0, TESS_ENG_GRIDS);
+    knob(tessera_knob, 1, -20);                       /* X 48 */
+    knob(tessera_knob, 2, 25);                        /* Y 228 */
+    knob(tessera_knob, 3, 15);                        /* DENSITY 80 */
+    knob(tessera_evolve_knob, 0, -20);                /* LOCK 60: CHAOS 40 */
+    knob(tessera_tweak_knob, 1, 10);                  /* DROP 20 */
+    knob(tessera_tweak_knob, 2, 15);                  /* HUMAN 30 */
+}
+static void s_evolve_grids(void)
+{
+    gen(0, TESS_ENG_GRIDS);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 20);                 /* AMOUNT 70 */
+    turns(tessera_form_knob, 0, 2);                   /* FORM ABAC */
+}
+
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
     {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
@@ -443,6 +462,9 @@ static const scen_t SCEN[] = {
     {"seed_back_markov_turing", 8, 0x101Eu, s_seed_back, b_seed_back},
     {"seed_none_markov_turing", 4, 0x101Eu, s_seed_back, 0},
     {"replay_markov", 4, 0x101Fu, s_replay, b_replay},
+    {"grids", 4, 0x1020u, s_grids, 0},
+    {"grids_x48_y228_dens80_chaos40_drop_human", 8, 0x1021u, s_grids_var, 0},
+    {"evolve_grids_every1_amount70_abac", 16, 0x1022u, s_evolve_grids, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -644,7 +666,7 @@ static void pack_run(char *res, size_t cap)
     tessera_pack(b);
     ok &= !memcmp(a, b, sizeof a);                   /* refused whole: nothing changed */
     {   /* a seed of 1.1.3 to 1.1.5 (up to 9999) loads as it was, ROLL from it lands in 1..128; over 9999 refused */
-        const uint32_t at = 0u * (TESSERA_PK_BYTES / TESSERA_TRACKS) + TESSERA_PK_BYTES / TESSERA_TRACKS - 2u;
+        const uint32_t at = 0u * (TESSERA_PK_BYTES / TESSERA_TRACKS) + TESSERA_PK_BYTES_V1 / TESSERA_TRACKS;   /* (after version 1's) */
         memcpy(c, a, sizeof c);
         c[at] = 9999u & 0xFFu, c[at + 1u] = 9999u >> 8;
         ok &= tessera_unpack(c) == 1 && tessera.seed[0] == 9999u;
@@ -678,6 +700,28 @@ static void pack_run(char *res, size_t cap)
         ok &= tessera_unpack_v1(v1) == 1;
         tessera_pack(c);
         ok &= !memcmp(b, c, sizeof c);                /* the same block: the same seeds */
+    }
+    {   /* a version 2 block (before GRIDS: each track 4 bytes shorter) loads every setting, Grids' a fresh track's;
+         * Grids' DENSITY or CHAOS out of range is refused */
+        static uint8_t v2[TESSERA_PK_BYTES_V2], v2b[TESSERA_PK_BYTES_V2];
+        const uint32_t n3 = TESSERA_PK_BYTES / TESSERA_TRACKS, n2 = TESSERA_PK_BYTES_V2 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v2 + tr * n2, a + tr * n3, n2);
+        tessera_reset();
+        ok &= tessera_unpack_v2(v2) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            memcpy(v2b + tr * n2, b + tr * n3, n2);
+            ok &= tessera.grids[tr].x == 128u && tessera.grids[tr].y == 128u && tessera.grids[tr].dens == 50u &&
+                  !tessera.grids[tr].chaos;
+        }
+        ok &= !memcmp(v2, v2b, sizeof v2);            /* every version 2 setting as it was */
+        memcpy(c, a, sizeof c);
+        c[2u * n3 + n2 + 2u] = 101u;                  /* track 3's Grids DENSITY */
+        ok &= tessera_unpack(c) == 0;
+        memcpy(c, a, sizeof c);
+        c[n2 + 3u] = 101u;                            /* track 1's Grids CHAOS */
+        ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
     }
     snprintf(res, cap, "0x%08x %u", ha, ok);
 }

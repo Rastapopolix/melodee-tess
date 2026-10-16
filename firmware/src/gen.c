@@ -12,6 +12,8 @@ static const uint16_t GEN_MORPH_PRESETS[8] = {
     0xB6D7u  /* Dense poly */
 };
 
+#include "gen_grids.h"
+
 /* Scale degree to semitone intervals (natural minor; the track's scale snaps the notes afterwards) */
 static const uint8_t GEN_SCALE_MIN[8] = {0, 2, 3, 5, 7, 8, 10, 12};
 
@@ -184,6 +186,55 @@ static void gen_morph_tick(gen_morph_t *g, const gen_clock_t *clk, uint32_t *rnd
     }
 }
 
+/* Grids: the chance (0..255) of part `part`'s hit on step `step` (0..31, 32nds) at x, y: the four patterns around the
+ * point blended by where it sits between them (Grids' ReadDrumMap and U8Mix) */
+static uint32_t gen_grids_mix(uint32_t a, uint32_t b, uint32_t bal) { return (a * (255u - bal) + b * bal) >> 8; }
+static uint32_t gen_grids_level(uint32_t step, uint32_t part, uint32_t x, uint32_t y)
+{
+    uint32_t i = x >> 6, j = y >> 6, fx = (x << 2) & 0xFFu, fy = (y << 2) & 0xFFu, o = part * 32u + (step & 31u);
+    uint32_t a = GEN_GRIDS_NODE[i * 5u + j][o], b = GEN_GRIDS_NODE[(i + 1u) * 5u + j][o];
+    uint32_t c = GEN_GRIDS_NODE[i * 5u + j + 1u][o], d = GEN_GRIDS_NODE[(i + 1u) * 5u + j + 1u][o];
+    return gen_grids_mix(gen_grids_mix(a, b, fx), gen_grids_mix(c, d, fx), fy);
+}
+/* Grids: steps in its bar: 32 (Grids' own 32nds) when the track's division makes 32 a bar, else 16 (its 16ths) */
+static uint32_t gen_grids_steps(uint32_t steps_per_bar) { return steps_per_bar >= 32u ? 32u : 16u; }
+
+/* 1 = part `part` hits on step `step` of its bar (steps of them): the map's chance plus the bar's push over the
+ * threshold DENSITY sets (Grids' EvaluateDrums); *acc: 1 when it is an accent */
+static int gen_grids_hit(const gen_grids_t *g, uint32_t step, uint32_t steps, uint32_t part, uint32_t push, int *acc)
+{
+    uint32_t lv = gen_grids_level(step * (32u / steps), part, g->x, g->y);
+    uint32_t thr = 255u - (uint32_t)(g->dens > 100u ? 100u : g->dens) * 255u / 100u;
+    lv = lv < 255u - push ? lv + push : 255u;
+    if (acc) *acc = lv > 192u;
+    return lv > thr;
+}
+
+/* Grids: kick, snare and hat of this step, from the map at x, y. CHAOS draws each part's push at the bar's start (none
+ * drawn at 0: the pattern alone); the note is the first part's (GM 36 kick, 38 snare, 42 closed hat), the adapter
+ * plays every part (tessera.c) */
+static const uint8_t GEN_GRIDS_NOTE[3] = {36, 38, 42};
+static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    uint32_t steps = gen_grids_steps(clk->steps_per_bar), cur = g->step_idx % steps, p;
+    g->step_idx = (uint8_t)((cur + 1u) % steps);
+    if (!cur)
+        for (p = 0; p < 3u; p++)
+            g->perturb[p] = (uint8_t)(g->chaos ? (gen_rnd(rnd, 256u) * ((uint32_t)g->chaos * 255u / 100u >> 2)) >> 8 : 0u);
+    out->cv = (int16_t)(gen_grids_level(cur * (32u / steps), 0u, g->x, g->y) * 32767u / 255u);   /* the kick's chance */
+    for (p = 0; p < 3u; p++) {
+        int acc;
+        if (!gen_grids_hit(g, cur, steps, p, g->perturb[p], &acc)) continue;
+        if (!out->parts) {
+            out->note = GEN_GRIDS_NOTE[p];
+            out->vel = acc ? 127 : 96;
+        }
+        out->parts |= (uint8_t)(1u << p);
+        if (acc) out->accent |= (uint8_t)(1u << p);
+    }
+    out->gate = out->parts != 0;
+}
+
 /* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
@@ -248,6 +299,21 @@ static void gen_morph_mutate(gen_morph_t *g, uint32_t amt, uint32_t *rnd)
     g->morph_pos = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
 }
 
+/* Grids: the point wanders: X, then Y, by up to +-AMOUNT/100 of a quarter of the map, turning back at the edges */
+static uint8_t gen_grids_walk(uint32_t v, uint32_t amt, uint32_t *rnd)
+{
+    uint32_t r = amt * 64u / 100u;
+    int32_t n = (int32_t)v + (int32_t)gen_rnd(rnd, 2u * r + 1u) - (int32_t)r;
+    if (n < 0) n = -n;
+    if (n > 255) n = 510 - n;
+    return (uint8_t)(n < 0 ? 0 : n > 255 ? 255 : n);
+}
+static void gen_grids_mutate(gen_grids_t *g, uint32_t amt, uint32_t *rnd)
+{
+    g->x = gen_grids_walk(g->x, amt, rnd);
+    g->y = gen_grids_walk(g->y, amt, rnd);
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -262,3 +328,5 @@ static void gen_markov_save(const gen_markov_t *g, gen_sec_t *s) { s->p0 = g->te
 static void gen_markov_load(gen_markov_t *g, const gen_sec_t *s) { g->tension = s->p0; }
 static void gen_morph_save(const gen_morph_t *g, gen_sec_t *s) { s->reg = g->snap_a; s->p0 = g->morph_pos; }
 static void gen_morph_load(gen_morph_t *g, const gen_sec_t *s) { g->snap_a = s->reg; g->morph_pos = s->p0; }
+static void gen_grids_save(const gen_grids_t *g, gen_sec_t *s) { s->reg = (uint16_t)(g->x | g->y << 8); }
+static void gen_grids_load(gen_grids_t *g, const gen_sec_t *s) { g->x = (uint8_t)s->reg; g->y = (uint8_t)(s->reg >> 8); }

@@ -55,6 +55,9 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_TW_HUMAN] = S_(CD_TW_HUMAN, TX_TW_HUMAN, "HUMAN", "TWEAK's HUMAN: velocity and gate variation"),
     [CD_EV_AMOUNT] = S_(CD_EV_AMOUNT, TX_EV_AMOUNT, "EV AMT", "EVOLVE's AMOUNT: how much each mutation changes"),
     [CD_FM_CONTRAST] = S_(CD_FM_CONTRAST, TX_FM_CONTRAST, "CONTR", "FORM's CONTRAST: how different a new section is"),
+    [CD_GRD_X] = S_(CD_GRD_X, TX_GRD_X, "G X", "Grids' X: across its map of drum patterns"),
+    [CD_GRD_Y] = S_(CD_GRD_Y, TX_GRD_Y, "G Y", "Grids' Y: down its map of drum patterns"),
+    [CD_GRD_DENS] = S_(CD_GRD_DENS, TX_GRD_DENS, "G DENS", "Grids' density: how full its parts are"),
 };
 #undef V_
 #undef B_

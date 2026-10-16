@@ -14,12 +14,11 @@
 static const uint8_t ED_BK_IDS[30] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29};
 #if MELODEE_FLASH
 #define ED_BK_TESS_OBJ TESS_OBJ_BYTES_CRD         /* (with the cords) */
-#define ED_BK_TESS_OBJ_V2 TESS_OBJ_BYTES          /* (before cords: restored, every slot without them) */
-#define ED_BK_TESS_OBJ_V1 TESS_OBJ_BYTES_V1       /* (an older backup's: restored, converted) */
+#define ED_BK_TESS_OK(len) ((len) == TESS_OBJ_BYTES_CRD || (len) == TESS_OBJ_BYTES || \
+    (len) == TESS_OBJ_BYTES_V2_CRD || (len) == TESS_OBJ_BYTES_V2 || (len) == TESS_OBJ_BYTES_V1)   /* (older ones: converted) */
 #else
 #define ED_BK_TESS_OBJ 0u                         /* (no flash: no stored blocks) */
-#define ED_BK_TESS_OBJ_V2 0u
-#define ED_BK_TESS_OBJ_V1 0u
+#define ED_BK_TESS_OK(len) 0
 #endif
 static uint8_t ed_bk_tess_live[TESSERA_PK_BYTES]; /* id 29, as LIST found it */
 static uint32_t ed_bk_tess_len;                   /* id 28: TESS_OBJ_BYTES_CRD, 0 none stored */
@@ -215,7 +214,8 @@ static uint32_t ed_bk_commit_inner(void)
 #endif
     } else if (ed_bk_id == 29u) {                  /* the live generators (stopped: ed_flash_stop) */
         if (!ed_bk_len) tessera_reset();
-        else if ((ed_bk_len == TESSERA_PK_BYTES_V1 ? tessera_unpack_v1 : tessera_unpack)(raw) != 1) return 2;   /* (v1: an older backup) */
+        else if ((ed_bk_len == TESSERA_PK_BYTES_V1 ? tessera_unpack_v1 : ed_bk_len == TESSERA_PK_BYTES_V2 ? tessera_unpack_v2 :
+                  tessera_unpack)(raw) != 1) return 2;   /* (v1, v2: an older backup) */
         sync_reload = 1; ui.force = 1;
         return 0;
     } else if(ed_bk_id>=23u && ed_bk_id<=27u){
@@ -275,8 +275,8 @@ static uint32_t ed_bk_write(const uint8_t *a, uint32_t n)
             (a[1] == 8u && len) ||
             (a[1]>=9u && a[1]<=16u && len && len!=sizeof(cz_bank_t)) ||
             (a[1]>=23u && a[1]<=27u && len && len!=sizeof(p5_bank_t)) ||
-            (a[1] == 28u && len && len != ED_BK_TESS_OBJ && len != ED_BK_TESS_OBJ_V2 && len != ED_BK_TESS_OBJ_V1) ||
-            (a[1] == 29u && len && len != TESSERA_PK_BYTES && len != TESSERA_PK_BYTES_V1) ||
+            (a[1] == 28u && len && !ED_BK_TESS_OK(len)) ||
+            (a[1] == 29u && len && len != TESSERA_PK_BYTES && len != TESSERA_PK_BYTES_V2 && len != TESSERA_PK_BYTES_V1) ||
             (a[1]>=19u && a[1]<=22u && len && len!=sizeof(native_fm_t))) return 1;
         ed_bk_valid = 0; ed_bk_put = 1; ed_bk_id = a[1]; ed_bk_len = len; ed_bk_gen = ++proj_wire_gen;
         ed_bk_crc = ed_bk_r32(a + 7); ed_bk_pos = 0;
