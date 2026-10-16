@@ -85,7 +85,7 @@ def main(path):
     L += arr("CUTOFF_HZ", "uint16_t", [int(round(f)) for f in fc])
     # trapezoidal (Simper) SVF: g = tan(pi fc / FS), Q12; stable at any cutoff/resonance
     L += arr("SVF_G", "uint16_t", [int(4096 * math.tan(math.pi * min(f, 0.45 * FS) / FS)) for f in fc])
-    L += ["#if !defined(MELODEE_PROPHET) || MELODEE_PROPHET"]
+    L += ["#if 1  /* (melodee-tess: always; MELODEE_PROPHET 0 leaves them to the linker, nothing reading them) */"]
     L += [f"#define P5_KEYTRACK_HALF_Q7 {round(128 * 256 * 127 * math.log(2) / (2 * 192 * math.log(fc[-1] / fc[0])))}"]
     # LFO rate, raw 0..127. Measured on a Rev-4 factory demo (rates 74..97 -> 2.4..8.4 Hz,
     # within 2 %): ln Hz = -3.1005 + 0.05387 raw, bent at the ends to the documented .022 / 500 Hz.
@@ -397,6 +397,9 @@ def fm6_tables():
           "{",
           "    int32_t u = 1 << 30, v = 0, x;",
           "    uint32_t i, e;",
+          "#if defined(MELODEE_FM6) && !MELODEE_FM6 && defined(MELODEE_CZ) && !MELODEE_CZ   /* (melodee-tess: neither built, */",
+          "    return;                                      /* the tables left to the linker) */",
+          "#endif",
           "    for (i = 0; i < 512u; i++) {",
           "        x = (v + 32) >> 6;",
           "        FM6_SIN[i] = (float)x * (1.0f / 16777216.0f);",

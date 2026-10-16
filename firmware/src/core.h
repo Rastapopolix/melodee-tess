@@ -35,17 +35,36 @@
 #define MELODEE_LEGACY_EXTRAS 0 /* reference tests only: retired TRIO, WHEEL and PHYS; PHASE, VOICE and NOISE (retired
                                  * 2026-10-10: the flash for the redesign; CZ-1 keeps PHASE's phase-distortion core) */
 #endif
+/* Tessera (phase 4, docs/design/phase4/PLAN.md): an engine left out of the build (0) is never offered; its stored ID
+ * stays reserved and a project's track of it loads SID's INIT (project.c). Its code goes where nothing reaches it */
+#ifndef MELODEE_PROPHET
 #define MELODEE_PROPHET 1
+#endif
+#ifndef MELODEE_FM6
+#define MELODEE_FM6 1
+#endif
+#ifndef MELODEE_CZ
+#define MELODEE_CZ 1
+#endif
+#ifndef MELODEE_PLAITS
+#define MELODEE_PLAITS 0         /* MACRO (eng_macro.c): Plaits' synthesis, C++ (build.py); the prototype: off by default */
+#endif
+#define ENG_BUILT(e) ((e) == 12u ? MELODEE_FM6 : (e) == 15u ? MELODEE_CZ : (e) == 19u ? MELODEE_PROPHET : \
+                      (e) == 21u ? MELODEE_PLAITS : 1)   /* FM6 CZ-1 PROPHET MACRO */
+#define ENGI_SID 3u
+#define ENGI_FALLBACK (MELODEE_FM6 ? 12u : ENGI_SID)   /* a retired engine's place (eng_rank, the designer) */
 #define ENGI_PROPHET 19u /* 16..18 reserved: historical preset namespaces */
 #define USER_GENERAL 16u
 #define USER_NATIVE_P5 20u
-#define NENGINES 20               /* 13 SLICE and 14 OBXF reserved; 15 native CZ-1 */
+#define NENGINES 22               /* 13 SLICE and 14 OBXF reserved; 15 native CZ-1; 20 reserved (USER_NATIVE_P5's
+                                   * namespace in the browser); 21 MACRO (Tessera) */
 #define USER_NATIVE_FM 17u
 #define USER_NATIVE_CZ 18u
 #define USER_NONE 256u
 #define ENGI_ANALOG 0u           /* retired in 1.2: never selectable (eng_ok), its stored sounds play silent */
 #define ENGI_DIGITAL 1u          /* retired: never selectable (eng_ok), its stored sounds play silent */
-#define NENG_SHOWN (NENGINES - 8u - !MELODEE_SLICE - 6u * !MELODEE_LEGACY_EXTRAS)   /* the engines one can pick: PRESETS, the EDIT
+#define NENG_SHOWN (NENGINES - 9u - !MELODEE_SLICE - 6u * !MELODEE_LEGACY_EXTRAS - !MELODEE_FM6 - !MELODEE_CZ - !MELODEE_PROPHET - \
+                    !MELODEE_PLAITS)   /* the engines one can pick: PRESETS, the EDIT
                                                 * layer, the editor, in the display order of engines.c ENGINE_ORDER */
 #define ENGI_SLICE 13u           /* reserved without MELODEE_SLICE: never selectable (eng_ok) */
 #ifdef SMP_USER_SLOTS

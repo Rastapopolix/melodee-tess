@@ -890,14 +890,17 @@ static int project_restore_runtime(const project_t *input)
     for (k = 0; k < NTRK; k++) {
         track_t *t = &trk[k];
         const proj_trk_t *s = &p->t[k];
-        uint32_t e = s->engine % NENGINES;
+        uint32_t e = s->engine % NENGINES, gone = !ENG_BUILT(e);   /* (gone: an engine left out of the build, */
+        if (gone)                                                     /* Tessera: SID's INIT, the common settings */
+            e = ENGI_SID;                                             /* kept, core.h) */
         t->eng_req = (uint8_t)e;
         t->user = 0; t->user_native=0;                                    /* (no user preset slot is saved) */
         for (i = 0; i < P_COUNT; i++) {                 /* every value back inside its range */
             const param_desc_t *d = param_desc_of(e, i);
-            t->p[i] = param_reserved(i) ? 0 : eng_extra_retired(e) && i >= P_E0 ? s->p[i] : (int16_t)clamp(s->p[i], d->min, d->max);
+            t->p[i] = param_reserved(i) ? 0 : gone && i >= P_E0 ? d->def : eng_extra_retired(e) && i >= P_E0 ? s->p[i] :
+                      (int16_t)clamp(s->p[i], d->min, d->max);
         }
-        t->preset = eng_extra_retired(e) ? s->preset : (uint8_t)(ENGINES[e]->npresets ? (s->preset >= PROJ_DEF_KEEP ? 0u : s->preset) % ENGINES[e]->npresets : 0u);
+        t->preset = gone ? 0u : eng_extra_retired(e) ? s->preset : (uint8_t)(ENGINES[e]->npresets ? (s->preset >= PROJ_DEF_KEEP ? 0u : s->preset) % ENGINES[e]->npresets : 0u);
         t->pattern = p->pattern[k];
         memcpy(t->step, s->step, sizeof t->step);
         proj_steps(t->step);

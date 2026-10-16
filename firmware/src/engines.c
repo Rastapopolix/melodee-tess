@@ -3,9 +3,7 @@
 /* Engine table (order = PRESETS browsing order and the engine numbers of the editor protocol) and the parts'
  * sounds at power-on. */
 #include "dsp.c"
-#if MELODEE_PROPHET
-#include "eng_prophet_test.c"
-#endif
+#include "eng_prophet_test.c"   /* (always: what the rest names; MELODEE_PROPHET 0: nothing reaches it, core.h) */
 #include "eng_phase.c"
 #include "eng_cz.c"
 #include "eng_sid.c"
@@ -39,6 +37,7 @@ static const engine_t ENG_RETIRED = {         /* 13 without MELODEE_SLICE: reser
 /* Each track owns only its selected engine's working state. Simple engines
  * use voice_t alone. State is released after the old engine's switch fade. */
 #include "resources.c"
+#include "eng_macro.c"          /* MACRO: Plaits' synthesis (MELODEE_PLAITS; macro_glue.cc, third_party/mi) */
 static uint32_t eng_state_size(uint32_t e)
 {
     switch (e) {
@@ -57,6 +56,9 @@ static uint32_t eng_state_size(uint32_t e)
 #endif
     case ENGI_CZ: return sizeof(cz_part_t);
     case 3: return sizeof(sid_part_t);              /* SID (eng_sid.c) */
+#if MELODEE_PLAITS
+    case ENGI_MACRO: return mc_bytes();             /* MACRO: Plaits' voice and its working memory (eng_macro.c) */
+#endif
     case ENGI_DRUM: return sizeof(drum909_part_t);
     case ENGI_FM6: return sizeof(fm6_part_t);
 #if MELODEE_SLICE
@@ -82,9 +84,7 @@ static drw_part_t *drw_of(const track_t *t) { return resource_get(RES_ENGINE0 + 
 static fm6_part_t *fm6_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(fm6_part_t)); }
 static cz_part_t *cz_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(cz_part_t)); }
 static sid_part_t *sid_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(sid_part_t)); }
-#if MELODEE_PROPHET
 static p5_part_t *p5_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(p5_part_t)); }
-#endif
 #if MELODEE_SLICE
 static int16_t (*slc_rbuf(uint32_t part))[SLC_RB] { return resource_get(RES_ENGINE0 + part % NPART, sizeof(slc_rb_t)); }
 #endif
@@ -131,16 +131,34 @@ static const engine_t *const ENGINES[NENGINES] = {
 #else
     &ENG_RETIRED,                /* 11: retired NOISE; stored ID reserved */
 #endif
+#if MELODEE_FM6
     &ENG_FM6,                    /* 12 (ENGI_FM6) */
+#else
+    &ENG_RETIRED,                /* 12: FM6 left out of the build; stored ID reserved */
+#endif
 #if MELODEE_SLICE
     &ENG_SLICE,                  /* 13 (ENGI_SLICE) */
 #else
     &ENG_RETIRED,             /* 13: reserved (MELODEE_SLICE=0 builds without SLICE) */
 #endif
     &ENG_RETIRED,                /* 14: retired OBXF; stored index reserved */
+#if MELODEE_CZ
     &ENG_CZ,                     /* 15: native Casio CZ-1 */
+#else
+    &ENG_RETIRED,                /* 15: CZ-1 left out of the build; stored ID reserved */
+#endif
     &ENG_RETIRED, &ENG_RETIRED, &ENG_RETIRED, /* 16..18 reserved */
+#if MELODEE_PROPHET
     &ENG_P5_TEST,                /* 19: Prophet (ANALOG's ID 0 stays reserved) */
+#else
+    &ENG_RETIRED,                /* 19: Prophet left out of the build; stored ID reserved */
+#endif
+    &ENG_RETIRED,                /* 20: reserved (USER_NATIVE_P5, the browser's Prophet user bank) */
+#if MELODEE_PLAITS
+    &ENG_MACRO,                  /* 21: MACRO, Plaits' synthesis (Tessera) */
+#else
+    &ENG_RETIRED,                /* 21: MACRO left out of the build; stored ID reserved */
+#endif
 };
 
 /* a track's engine number as an index (the audio paths: a compare, cheaper than % NENGINES; a bad number: 0) */
@@ -167,14 +185,24 @@ static const preset_t *eng_preset(const engine_t *e, uint32_t k)
  * engine indices, never a retired one. The indices stay as they are (the
  * stores and the protocol hold them); only this table orders them */
 static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
+#if MELODEE_PROPHET
     ENGI_PROPHET,                /* Prophet replaces ANALOG in new-sound browsing */
+#endif
+#if MELODEE_FM6
     12,                          /* FM6 */
+#endif
 #if MELODEE_LEGACY_EXTRAS
     2, ENGI_CZ, 3, 5,             /* PHASE CZ-1 SID VOICE */
     6, 7, 9,
     11,                          /* NOISE */
 #else
-    ENGI_CZ, 3,                   /* CZ-1 SID */
+#if MELODEE_CZ
+    ENGI_CZ,                     /* CZ-1 */
+#endif
+    3,                           /* SID */
+#endif
+#if MELODEE_PLAITS
+    ENGI_MACRO,                  /* MACRO */
 #endif
 #if MELODEE_SLICE
     13,                          /* SLICE */
@@ -195,18 +223,19 @@ static int eng_extra_retired(uint32_t e)
  * eng_vis(n), e's place among them eng_rank(e), the next / previous one eng_step(e, dir) (wraps) */
 static int eng_ok(uint32_t e)
 {
-    return e < NENGINES && !(e >= 16u && e <= 18u) && !eng_extra_retired(e) && e != 4u && e != 8u && e != 14u && (MELODEE_SLICE || e != ENGI_SLICE);
+    return e < NENGINES && !(e >= 16u && e <= 18u) && !eng_extra_retired(e) && e != 4u && e != 8u && e != 14u && e != 20u && (MELODEE_SLICE || e != ENGI_SLICE) &&
+           ENG_BUILT(e);
 }
 static uint32_t eng_sound_idx(uint32_t e)
 {
-    return eng_extra_retired(e) || eng_ok(e) ? e : ENGI_FM6;
+    return eng_extra_retired(e) || eng_ok(e) ? e : ENGI_FALLBACK;
 }
 static uint32_t eng_vis(uint32_t n) { return ENGINE_ORDER[n % NENG_SHOWN]; }
 static uint32_t eng_rank(uint32_t e)
 {
     uint32_t n;
     if (!eng_ok(e))
-        e = ENGI_FM6;                            /* (a retired or reserved engine: FM6's place) */
+        e = ENGI_FALLBACK;                       /* (a retired or reserved engine: FM6's place, or SID's) */
     for (n = 0; n < NENG_SHOWN && ENGINE_ORDER[n] != e; n++)
         ;
     return n < NENG_SHOWN ? n : 0u;
@@ -224,12 +253,19 @@ static uint32_t eng_step(uint32_t e, int32_t dir)
 #endif
 /* the parts at power-on (engine, preset; the steps empty): bass (TRK_START_TESS: mallet), pad, lead, drums */
 static const uint8_t TRK_DEF[NPART][2] = {
-#if TRK_START_TESS
+#if TRK_START_TESS && MELODEE_CZ
     {ENGI_CZ, 42},                                  /* CZ-1 VIBRAPHONE */
-#else
+#elif !TRK_START_TESS && MELODEE_PROPHET
     {ENGI_PROPHET, 4},                              /* PROPHET FUNK BASS II (was ANALOG ACID) */
+#else
+    {ENGI_SID, 26},                                 /* (without it: SID BELL RING) */
 #endif
-    {ENGI_FM6, 4}, {3, 0}, {ENGI_DRUM, 0}};         /* FM6 PAD (was DIGITAL PAD), SID INIT SID, DRUM KIT */
+#if MELODEE_FM6
+    {ENGI_FM6, 4},                                  /* FM6 PAD (was DIGITAL PAD) */
+#else
+    {ENGI_SID, 19},                                 /* (without it: SID 8580 PAD) */
+#endif
+    {3, 0}, {ENGI_DRUM, 0}};                        /* SID INIT SID, DRUM KIT */
 /* the power-on presets when project format 1 was written (project.c PROJ_DEF_SOUND): fixed, whatever TRK_DEF becomes */
 static const uint8_t TRK_DEF_V1[NPART] = {4, 4, 0, 0};
 #if TRK_START_TESS

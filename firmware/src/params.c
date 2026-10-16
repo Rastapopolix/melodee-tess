@@ -663,6 +663,7 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
 {
     uint32_t id = pg->id[slot];
     if(pg->scope==SC_P5 || pg->scope==SC_P5STORE){
+        if(!MELODEE_PROPHET){*valp=0;return 0;}   /* (Tessera: left out, core.h) */
         if(id==255u || (pg->scope==SC_P5 && (id>=88u || !P5_PANEL[id].label))){*valp=0;return 0;}
         p5_cell[slot&3u]=pg->scope==SC_P5STORE?(slot?0:p5_store_slot):p5_patch_of(TSEL)->raw[id]+(id==P5_BEND?1:0);
         /* Sequential stores zero for the default five-voice unison count. */
@@ -674,6 +675,7 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
         }
         return pg->scope==SC_P5STORE?&P5_STORE[slot&3u]:id==P5_BEND?&P5_BEND_DISPLAY:&P5_PANEL[id];
     }
+    if (pg->scope == SC_CZ1 && !MELODEE_CZ) { *valp = 0; return 0; }   /* (Tessera: left out, core.h) */
     if (pg->scope == SC_CZ1) {                           /* a copy of the tone's panel value (cz_ed_put writes it) */
         *valp = 0;
         if (id == 0xFFu || TSEL->eng_req != ENGI_CZ)
@@ -685,6 +687,7 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
         }
         return cz_ed_desc(song.sel % NTRK, id, slot, valp);
     }
+    if ((pg->scope == SC_FM6 || pg->scope == SC_FMOP) && !MELODEE_FM6) { *valp = 0; return 0; }   /* (left out) */
     if (pg->scope == SC_FM6 || pg->scope == SC_FMOP)
         return fm6_page_desc(pg, slot, valp);
     if(pg->scope==SC_DRUM || pg->scope==SC_DRUMHIT){*valp=0;return 0;}

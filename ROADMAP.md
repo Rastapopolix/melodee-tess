@@ -589,6 +589,16 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] Hard fork: create the `tessera` repo, GPL-3.0 and attribution kept; rename identities
       (package, USB, menu, web installer and editor)
 - [ ] Strip Prophet, FM6, CZ, SLICE and samples; measure the freed flash, RAM and CPU
+      (measured 2026-10-16, plan for Theo's decisions: `docs/design/phase4/PLAN.md`: switches first, IDs
+      reserved, flash banks untouched, new voices before the old ones go; Plaits considered)
+      Decided 2026-10-16: FM6, CZ-1, Prophet go (SID stays), a track of them loads SID INIT, new voices both
+      our own and a Plaits port. Build switches done (branch `engine-switches`): all three out frees 69.6 KB
+      of flash, 13.9 KB of RAM; on by default (the build unchanged) until the new voices are ready
+- [ ] MACRO, the Plaits port (2026-10-17, branch `macro-plaits`, prototype): engine 21 behind `MELODEE_PLAITS`
+      (off by default), 20 reserved; `macro_test` in `run_tests.sh` passes (host cost about 2x SID a note).
+      With FM6, CZ-1, Prophet in, flash overflows by 8 KB; with the three out it links (app 515,872 B, arena
+      157,984 B). Still to do: cost on the device, presets, merge with `grids`, then the switch on by default
+      when the three go
 - [ ] Our own project format; drop `OBJ_TESSERA`
 - [ ] Voices: pad, LPG pluck, lead, percussion (DRUM kept)
 - [ ] FX with caps: delay, reverb, bitcrusher, wavefolder, ring mod, comb resonator
