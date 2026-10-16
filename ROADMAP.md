@@ -499,7 +499,7 @@ Plan: `docs/analysis/phase1-plan.md`.
       (cord_test); a sound's go when another sound loads, unless edited; a project's stay; no room:
       MODS FULL and the route keeps playing. Same-track ENV/VEL/KEY/RAND mods are per voice now.
       User sounds are saved without modulation (it is the project's)
-- [ ] Device check of phases 2 and 3 (build 1.2.5): GEN, PATTERN, the ARP reach, the selector lists, MODS, help, CORDS (a cord heard, saved,
+- [x] Device check of phases 2 and 3 (build 1.2.5, Theo 2026-10-16: "tested and happy"; merged into `tessera-dev`): GEN, PATTERN, the ARP reach, the selector lists, MODS, help, CORDS (a cord heard, saved,
       loaded), and the cost of 16 cords on the device
 - [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
