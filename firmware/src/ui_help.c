@@ -118,23 +118,31 @@ static void help_strip(int32_t top, int32_t h, const char *name, const char *val
     cv_oy = 0;
     cv_blit(10, (uint32_t)(40 + top));
 }
+/* the card's value: as the knobs' columns show it, a name whole ("TURING": the columns cut one to 5) */
+static void help_value(const pid_entry_t *e, char *val, uint32_t size)
+{
+    const param_desc_t *d = e && !(e->flags & PID_F_ACTION) ? pid_desc(e->pid, song.sel) : 0;
+    const char *unit = "";
+    int32_t v;
+    val[0] = 0;
+    if (!d)
+        return;
+    v = pid_get(e->pid, song.sel);
+    param_format(d, v, val, &unit);
+    if (d->fmt == F_ENUM && d->names && d->names != N_ROUTE)
+        str_cpy(val, d->names[clamp(v, d->min, d->max)], size);
+    if (unit[0] && str_len(val) + str_len(unit) + 2u < size) {
+        str_cpy(val + str_len(val), " ", 2);
+        str_cpy(val + str_len(val), unit, 8);
+    }
+}
 static void help_draw(void)
 {
     const pid_entry_t *e = help.pid != PID_NONE ? pid_find(help.pid) : 0;
-    const char *name = e ? e->name : help.name, *text = e ? e->help : help.text, *unit = "";
-    char val[24] = "";
+    char val[24];
     if (!ui.force)
         return;
-    if (e && !(e->flags & PID_F_ACTION)) {
-        const param_desc_t *d = pid_desc(help.pid, song.sel);
-        if (d) {
-            param_format(d, pid_get(help.pid, song.sel), val, &unit);
-            if (unit[0] && str_len(val) + str_len(unit) + 2u < sizeof val) {
-                str_cpy(val + str_len(val), " ", 2);
-                str_cpy(val + str_len(val), unit, 8);
-            }
-        }
-    }
-    help_strip(0, 112, name, val, text);
-    help_strip(112, 56, name, val, text);
+    help_value(e, val, sizeof val);
+    help_strip(0, 112, e ? e->name : help.name, val, e ? e->help : help.text);
+    help_strip(112, 56, e ? e->name : help.name, val, e ? e->help : help.text);
 }

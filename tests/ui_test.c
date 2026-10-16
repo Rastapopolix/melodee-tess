@@ -534,6 +534,14 @@ static int test_help_gesture(void)
     frame();
     frame();
     bad += check("ARP let go: the help closes, and no page opens (still EVOLVE)", !help.on && str_eq(cur_page()->title, "EVOLVE"));
+    {
+        char v[24];
+        tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);
+        help_value(pid_find(PID_TESS(TX_MODE)), v, sizeof v);
+        bad += check("the card's value is a name whole: TURING, not the columns' TURIN", str_eq(v, "TURING"));
+        if (!str_eq(v, "TURING")) printf("    got: %s\n", v);
+        tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
+    }
     go_title("LFO");
     fm1_in.buttons |= 1u << panel.btn[B_ARP];
     frame();
