@@ -4,16 +4,33 @@ Notes gathered for the online manual (ROADMAP phase 7). Each recipe uses only wh
 the page and knob names are the ones on the screen. Checked against the code; marked where a step still
 needs a check on the device.
 
+## Finding your way: the EDIT pages and their map
+
+An engine's sound settings are on EDIT pages, grouped in sections. SID, for example, has a **Sound** section
+(the **CHIP** and **FILTER** pages) and a **Voice** section (the **VOICE** page). The sections show as tabs
+under the header, and the pages of the section you are in as the header's dots.
+
+On a page, the four knobs set the four settings along the top of the screen (on CHIP: MODEL, WAVE, STACK, PW).
+
+Moving between pages:
+- **SELECT** turns through the EDIT pages one by one, on across the sections.
+- **PRESETS** jumps to the next section, on the page last used there.
+- **EDIT held**: the sections on the white keys; press one to go straight to it.
+- **EDIT pressed** on an EDIT page opens the **map**: a row a section, a tile a page.
+  - **KNOB 1** moves across a row, **KNOB 2** between the rows.
+  - **OCT+** opens the page under the cursor.
+  - **OCT-** or **EDIT** closes the map without moving.
+
 ## SID: chip arpeggios (C64 POLY)
 
 A held chord played the way a C64 tune plays one: a note per frame, fast enough to sound like a chord.
 From 1.2.7 (upstream Melodee 1.4's SID).
 
 1. Pick **SID** as the track's engine.
-2. EDIT, **CHIP** page: **MODEL** to **C64 6581** or **C64 8580**. The track is now one channel of a C64:
-   one voice, and its pitch, pulse width and filter change once a PAL frame (50 Hz), as a player routine
-   writes them.
-3. EDIT, **VOICE** page: **VCE** on **POLY** (the default).
+2. EDIT, **CHIP** page (in the map: the Sound row): **KNOB 1, MODEL** to **C64 6581** or **C64 8580**. The
+   track is now one channel of a C64: one voice, and its pitch, pulse width and filter change once a PAL
+   frame (50 Hz), as a player routine writes them.
+3. EDIT, **VOICE** page (in the map: the Voice row): **KNOB 1, VCE** on **POLY** (the default).
 4. Hold a chord on the keys. Each frame plays the next held note up from the one sounding, back to the lowest
    past the top. The envelope runs once for the whole chord; the arpeggio goes on through the release.
 
