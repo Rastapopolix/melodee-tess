@@ -890,7 +890,7 @@ const selection = () => {     /* the release, or a channel ("nightly-dual": meta
 const ready = () => { lastKey = "ready"; $("status").textContent = `Melodee (tess) ${selection().channel.version} (${t(build() + "Tag")})`; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "1.2.0", "product": "FM-1_91020", "pkg": {"dual": "../../firmware/melodee-tess-1.2.0.fwsc", "single": "../../firmware/melodee-tess-1.2.0-1core.fwsc"}, "nightly": null, "synth": null};
+const meta = {"version": "1.2.2", "product": "FM-1_91022", "pkg": {"dual": "../../firmware/melodee-tess-1.2.2.fwsc", "single": "../../firmware/melodee-tess-1.2.2-1core.fwsc"}, "nightly": null, "synth": null};
 $("nightly-options").hidden = !meta.nightly;
 if (meta.nightly) $("nightly-info").textContent = `next · ${meta.nightly.commit.slice(0, 7)} · ${meta.nightly.builtAt}`;
 $("synth-options").hidden = !meta.synth;
