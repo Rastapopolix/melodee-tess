@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 melodee-tess: a fork of Melodee (FM-1 alternative firmware, GPL-3.0) where the Tessera
-generators (Turing, Euclid, Markov, Morph; `firmware/src/tessera.c`, `tessera.h`) were built.
+generators (Turing, Euclid, Markov, Morph, Grids; `firmware/src/gen.c`, `tessera.c`) were built.
 It becomes the Tessera firmware, a hard fork. Plan, phases and tasks: `ROADMAP.md`.
 
 ## Start and end of each session

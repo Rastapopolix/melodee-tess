@@ -42,3 +42,6 @@
 39 HUMAN    step  TWEAK HUMAN
 40 EV AMT   step  EVOLVE AMOUNT
 41 CONTR    step  FORM CONTRAST
+42 G X      step  GRIDS X
+43 G Y      step  GRIDS Y
+44 G DENS   step  GRIDS DENSITY

@@ -769,6 +769,7 @@ static void pv_picture(void)
             else if (m == TESS_ENG_EUCLID) pp = tessera_euclid(tr)->step_idx;
             else if (m == TESS_ENG_MARKOV) pp = tessera_markov(tr)->cur_state;
             else if (m == TESS_ENG_MORPH) pp = tessera_morph(tr)->step_idx;
+            else if (m == TESS_ENG_GRIDS) pp = tessera_grids(tr)->step_idx;
         } else {
             pp = (int32_t)(TSEL->seq_idx % (uint32_t)clamp(TSEL->p[P_SLEN], 1, NSTEP));
         }

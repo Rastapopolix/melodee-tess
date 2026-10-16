@@ -32,12 +32,13 @@ static void check(const char *what, int ok)
 }
 
 static const gen_clock_t CLK0 = {0, 16, 0};
-static gen_out_t step_out(void) { gen_out_t o = {0, 60, 100, 0}; return o; }   /* as tessera.c starts each step */
+static gen_out_t step_out(void) { gen_out_t o = {0, 60, 100, 0, 0, 0}; return o; }   /* as tessera.c starts each step */
 /* field by field: gen_out_t has a padding byte (before cv), which memcmp would compare too */
 static int out_eq(const gen_out_t *a, const gen_out_t *b, uint32_t n)
 {
     for (uint32_t i = 0; i < n; i++)
-        if (a[i].gate != b[i].gate || a[i].note != b[i].note || a[i].vel != b[i].vel || a[i].cv != b[i].cv) return 0;
+        if (a[i].gate != b[i].gate || a[i].note != b[i].note || a[i].vel != b[i].vel || a[i].cv != b[i].cv ||
+            a[i].parts != b[i].parts || a[i].accent != b[i].accent) return 0;
     return 1;
 }
 
@@ -314,6 +315,71 @@ static void morph_tests(void)
     check("morph: mutation keeps POS 0..127 and leaves snapshot B", mut);
 }
 
+/* ------------------------------------------------------------------ Grids --- */
+static void grids_tests(void)
+{
+    /* the map read against Grids itself: values from its resources.cc and ReadDrumMap (U8Mix), off the nodes too */
+    static const uint8_t REF[][5] = {{0, 0, 0, 0, 143}, {4, 1, 255, 255, 0}, {8, 2, 48, 228, 187}, {12, 0, 100, 30, 130},
+                                     {30, 1, 200, 77, 114}, {16, 2, 128, 128, 74}, {2, 0, 63, 191, 0}};
+    int ref = 1, range = 1, rest = 1, draws = 1, silent = 1, full = 1, len = 1, same = 1, mut = 1;
+    for (uint32_t i = 0; i < sizeof REF / sizeof REF[0]; i++)
+        ref &= gen_grids_level(REF[i][0], REF[i][1], REF[i][2], REF[i][3]) == REF[i][4];
+    for (uint32_t x = 0; x <= 255; x += 51)
+        for (uint32_t y = 0; y <= 255; y += 85)
+            for (uint32_t dens = 0; dens <= 100; dens += 25)
+                for (uint32_t chaos = 0; chaos <= 100; chaos += 50) {
+                    gen_grids_t g = {(uint8_t)x, (uint8_t)y, (uint8_t)dens, (uint8_t)chaos, 0, {0, 0, 0}};
+                    for (uint32_t i = 0; i < 48; i++) {
+                        gen_out_t o = step_out();
+                        uint32_t c = rng_state, st = g.step_idx;
+                        gen_grids_tick(&g, &CLK0, &rng_state, &o);
+                        draws &= draws_since(c) == (st == 0u && chaos ? 3u : 0u);
+                        range &= o.parts <= 7u && (o.accent & ~o.parts) == 0u && o.gate == (o.parts != 0u) && o.cv >= 0;
+                        range &= g.perturb[0] <= 63u && g.perturb[1] <= 63u && g.perturb[2] <= 63u;
+                        if (o.gate) range &= (o.note == 36 || o.note == 38 || o.note == 42) && (o.vel == 96 || o.vel == 127);
+                        else rest &= o.note == 60 && o.vel == 100;
+                        if (!dens) silent &= !o.gate;
+                        if (dens == 100u && !chaos)          /* every step the map gives a chance plays */
+                            for (uint32_t p = 0; p < 3u; p++)
+                                full &= ((o.parts >> p) & 1u) == (gen_grids_level(st * 2u, p, x, y) > 0u);
+                    }
+                }
+    {   /* 16 steps a bar at 16ths (the map's even 32nds), 32 at 32nds */
+        gen_grids_t g = {128, 128, 50, 0, 0, {0, 0, 0}};
+        const gen_clock_t c32 = {0, 32, 0};
+        for (uint32_t i = 0; i < 40; i++) { gen_out_t o = step_out(); gen_grids_tick(&g, &CLK0, &rng_state, &o); }
+        len &= g.step_idx == 40u % 16u;
+        g.step_idx = 0;
+        for (uint32_t i = 0; i < 40; i++) { gen_out_t o = step_out(); gen_grids_tick(&g, &c32, &rng_state, &o); }
+        len &= g.step_idx == 40u % 32u;
+    }
+    {
+        gen_out_t a[64], b[64];
+        for (int run = 0; run < 2; run++) {
+            gen_grids_t g = {77, 190, 70, 60, 0, {0, 0, 0}};
+            rng_state = 0xC0FFEEu;
+            for (uint32_t i = 0; i < 64; i++) {
+                gen_out_t *o = run ? &b[i] : &a[i];
+                *o = step_out();
+                gen_grids_tick(&g, &CLK0, &rng_state, o);
+            }
+        }
+        same = out_eq(a, b, 64);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 10) {
+        gen_grids_t g = {3, 250, 40, 20, 5, {0, 0, 0}};
+        for (uint32_t n = 0; n < 200; n++) gen_grids_mutate(&g, amt, &rng_state);
+        mut &= g.dens == 40 && g.chaos == 20 && g.step_idx == 5 && (amt || (g.x == 3 && g.y == 250));
+    }
+    check("grids: the map reads as Grids' ReadDrumMap, on and between its patterns", ref);
+    check("grids: hits play 36/38/42 at velocity 96 or 127 (accent); a rest keeps note 60, vel 100", range && rest);
+    check("grids: CHAOS draws three a bar (on its first step), none at 0", draws);
+    check("grids: DENSITY 0 is silent; 100 plays every step the map gives a chance", silent && full);
+    check("grids: a bar of 16 steps at 16ths, 32 at 32nds", len);
+    check("grids: the same seed gives the same steps", same);
+    check("grids: mutation moves only X and Y, inside the map (AMOUNT 0: not at all)", mut);
+}
+
 /* ------------------------------------------------------------------ sections --- */
 static void section_tests(void)
 {
@@ -323,16 +389,19 @@ static void section_tests(void)
     gen_euclid_t eu = {16, 5, 3, 0, 0, 42};
     gen_markov_t mk = {0, 0, 61, 100, 2};
     gen_morph_t mo = {99, 0x2222u, 0xAAAAu, 0x0F, 2};
+    gen_grids_t gr = {40, 200, 50, 10, 3, {0, 0, 0}};
     gen_turing_save(&tu, &s); ok &= s.reg == 0xBEEFu && s.p0 == 7 && s.p1 == 9;    /* only its own fields */
     gen_markov_save(&mk, &s); ok &= s.reg == 0xBEEFu && s.p0 == 61 && s.p1 == 9;
     gen_euclid_save(&eu, &s); ok &= s.reg == 42 && s.p0 == 5 && s.p1 == 3;
     gen_morph_save(&mo, &s);  ok &= s.reg == 0x2222u && s.p0 == 99 && s.p1 == 3;
+    gen_grids_save(&gr, &s);  ok &= s.reg == (40u | 200u << 8) && s.p0 == 99 && s.p1 == 3;
     {
         gen_sec_t e = {42, 6, 2}, m = {0x8888u, 10, 0}, k = {0, 33, 0}, t = {0xACE1u, 0, 0};
         gen_euclid_load(&eu, &e); ok &= eu.pulses == 6 && eu.rot == 2 && eu.pitch_seed == 42 && eu.steps == 16;
         gen_morph_load(&mo, &m);  ok &= mo.snap_a == 0x8888u && mo.morph_pos == 10 && mo.snap_b == 0xAAAAu;
         gen_markov_load(&mk, &k); ok &= mk.tension == 33 && mk.density == 100;
         gen_turing_load(&tu, &t); ok &= tu.reg == 0xACE1u && tu.len == 16;
+        gen_grids_load(&gr, &t);  ok &= gr.x == 0xE1u && gr.y == 0xACu && gr.dens == 50 && gr.chaos == 10;
     }
     check("sections: each generator saves and loads only its own fields", ok);
 }
@@ -344,6 +413,7 @@ static double ns_per_step(int kind)
     gen_euclid_t eu = {16, 5, 0, 0, 0, 9};
     gen_markov_t mk = {0, 0, 40, 80, 2};
     gen_morph_t mo = {64, 0x8888u, 0xA5A5u, 0x0F, 2};
+    gen_grids_t gr = {77, 190, 70, 60, 0, {0, 0, 0}};
     const uint32_t N = 2000000u;
     volatile uint32_t sink = 0;
     struct timespec a, b;
@@ -353,7 +423,8 @@ static double ns_per_step(int kind)
         if (kind == 0) gen_turing_tick(&tu, &CLK0, &rng_state, &o);
         else if (kind == 1) gen_euclid_tick(&eu, &CLK0, &rng_state, &o);
         else if (kind == 2) gen_markov_tick(&mk, &CLK0, &rng_state, &o);
-        else gen_morph_tick(&mo, &CLK0, &rng_state, &o);
+        else if (kind == 3) gen_morph_tick(&mo, &CLK0, &rng_state, &o);
+        else gen_grids_tick(&gr, &CLK0, &rng_state, &o);
         sink += o.note + o.gate;
     }
     clock_gettime(CLOCK_MONOTONIC, &b);
@@ -387,9 +458,10 @@ int main(void)
     euclid_tests();
     markov_tests();
     morph_tests();
+    grids_tests();
     section_tests();
-    printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns\n",
-           ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3));
+    printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns\n",
+           ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3), ns_per_step(4));
     printf(bad ? "gen: %d FAILED\n" : "gen: all passed\n", bad);
     return bad != 0;
 }

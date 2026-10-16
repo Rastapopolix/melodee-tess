@@ -34,6 +34,7 @@ enum {
     CD_MRP_POS,
     CD_TW_SHIFT, CD_TW_DROP, CD_TW_HUMAN,
     CD_EV_AMOUNT, CD_FM_CONTRAST,
+    CD_GRD_X, CD_GRD_Y, CD_GRD_DENS,
     CD_N
 };
 
@@ -57,7 +58,7 @@ enum {
     CS_GATE,                      /* the track's generator: 1 while its note sounds (Tessera) */
     CS_NOTE,                      /* the generator's last note, as KEY (C4 = 0, an octave = 0.19) */
     CS_CV,                        /* the generator's CV (gen.c): Turing its register, Euclid and Morph a ramp, Markov the
-                                   * degree; 0..1 */
+                                   * degree, Grids the kick's chance; 0..1 */
     CS_DRIFT,                     /* a slow wander of the track's own, a new point every 12 s or so (the default mods) */
     CS_N
 };

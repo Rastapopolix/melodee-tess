@@ -117,6 +117,27 @@ another), so people can try the modes in the browser before installing.
 - Quantizer with weighted scale degrees; learn the scale from played notes.
 - Kria-style polymetric lanes (note, trigger, octave, gate, each with its own length).
 - Later generators: 1D cellular automata, cascading counters, Bloom-style branching mutations.
+
+### More generators (Theo 2026-10-16)
+
+Candidates beside Turing, Euclid, Markov and Morph, each a `gen_<name>_tick` in `gen.c` that plays one note a step
+(Grids: up to three). Feasibility checked against each original (thread "generative sequencing scripts").
+
+- **Grids** (Mutable Instruments Grids): kick, snare and hat from a point on its 5 x 5 map of drum patterns. X, Y,
+  DENSITY on GEN; CHAOS is LOCK turned round; EVOLVE walks X and Y. Its map is 2.4 KB of flash, 8 B a track of RAM.
+  GPL-3.0-or-later, so its table and logic are used as they are. First built: branch `grids`.
+- **Awake** (norns, tehn): two looping sequences of different lengths (up to 16 each) added into the scale, and a
+  PROBABILITY. Easy as a generator; the work is entering 32 step values (ROLL to fill them, editing on the keys).
+  About 34 B a track saved.
+- **Fall** (norns, ambalek, MIT): up to 8 leaves, each with a note and a falling speed, playing when they land; a
+  leaf lands, fades and falls again. Steps on its own 1/16 clock already, so it maps directly; leaves landing on the
+  same step play one note, and its collision "rustle" sound is left out.
+- **First Light chimes** (norns, tehn): only the wind chimes carry over: bursts from a small set of notes, then a
+  rest of 3 to 9 seconds, in steps. Its sequencer moves a delay's loop length (shared FX here): not ported.
+- **Bounce / Pong** (Theo's idea): a ball moving a fixed distance each step, no gravity, bouncing off the screen's
+  edges; a wall hit plays a note (which wall and where along it, snapped to the scale). SPEED and ANGLE set how often
+  it hits; it loops when the angle brings it back to its start, and EVOLVE nudges the angle. PADDLE (knob, or a
+  cord) adds Pong: a miss rests and serves again. One generator, the paddle optional. About 8 B a track.
 - Later: modulatable cord amounts, probability per cord.
 
 ### Visual feedback
@@ -544,6 +565,12 @@ Plan: `docs/analysis/phase1-plan.md`.
 ### Not yet placed in a phase
 - [x] FOLLOW, first piece (branch `follow-step`): STEP tracks as sources (the highest sounding note, held across
       rests); while following, SHIFT counts scale degrees (TWEAK shows "deg"). Chromatic tracks play as before
+- [x] **Grids** generator (Theo 2026-10-16, branch `grids`): GEN's X Y DENSITY, LOCK as CHAOS, EVOLVE and FORM walk
+      X and Y; every part a GM drum note (36 38 42; a DRUM track's kit). Saved: block version 3 ("TSR3", 51 bytes a
+      track), versions 1 and 2 converted on reading (projects, backups); cords on X, Y, DENSITY. Host tests: gen_test
+      (the map against Grids' own values), three tessera scenarios, the saved block. Device check and the web
+      simulator still to do
+- [ ] More generators (Features > More generators): Awake, Fall, First Light chimes, Bounce / Pong
 - [ ] **FOLLOW modes** (Features > FOLLOW): interval in scale degrees, chord tone, contrary, canon, bass; RHYTHM
       own / source / both; STEP tracks as sources. With phases 1-2; then in the web simulator (rebuild, site copy,
       test, guide and demo)

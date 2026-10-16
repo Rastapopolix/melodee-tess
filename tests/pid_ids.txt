@@ -120,7 +120,7 @@
 0x126 SEND FX 3 CHARACTER      global 0..127 def 64
 0x127 FX RETURN                global 0..127 def 100
 0x128 FX MODE                  global 0..1 def 0
-0x200 GENERATOR MODE           track 0..4 def 0
+0x200 GENERATOR MODE           track 0..5 def 0
 0x201 TURING LENGTH            track 2..16 def 16
 0x202 TURING PROB              track 0..100 def 0
 0x203 TURING SPAN              track 1..3 def 2
@@ -144,3 +144,6 @@
 0x215 TWEAK DROP               track 0..100 def 0
 0x216 TWEAK HUMAN              track 0..100 def 0
 0x217 TWEAK FOLLOW             track 0..4 def 0
+0x218 GRIDS X                  track 0..255 def 128
+0x219 GRIDS Y                  track 0..255 def 128
+0x21a GRIDS DENSITY            track 0..100 def 50

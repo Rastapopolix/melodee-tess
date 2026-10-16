@@ -230,7 +230,31 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         }
         /* morph position: left = A, right = B */
         cv_rect(x0, y_base + h + 9, sw, 1, dim);
-        cv_rect(x0 + ((int32_t)mo->morph_pos * (sw - 4)) / 127, y_base + h + 6, 4, 7, c);
+        cv_rect(x0 + ((int32_t)mo->morph_pos * (sw - 4)) / 127, y_base + h + 6, 4, 7, c);    } else if (mode == TESS_ENG_GRIDS) {
+        /* three lanes, hat on top, snare, kick at the bottom: the bar's hits at X, Y and DENSITY (without this bar's
+         * CHAOS), an accent in the accent colour; the playhead under them */
+        const gen_grids_t *g = tessera_grids(tr);
+        uint32_t steps = gen_grids_steps(tess_steps_per_bar(&trk[tr]));
+        uint32_t cur = (g->step_idx + steps - 1u) % steps;
+        int h = is_panel ? 14 : 18;
+        int lane = h / 3;
+        int step_w = steps > 16u ? (is_panel ? 4 : 5) : (is_panel ? 10 : 11);
+
+        for (uint32_t i = 0; i < steps; i++) {
+            int32_t sx = steps > 16u ? (is_panel ? 16 + (int32_t)i * 6 : 13 + (int32_t)i * 6)
+                                     : (is_panel ? (18 + (int32_t)i * 12 + (int32_t)(i / 4u) * 4)
+                                                 : (13 + (int32_t)i * 13 + (int32_t)(i / 4u) * 4));
+            int is_head = song.playing && i == cur;
+            for (uint32_t p = 0; p < 3u; p++) {
+                int acc;
+                int32_t ly = y_base + (int32_t)(2u - p) * lane;
+                if (gen_grids_hit(g, i, steps, p, 0u, &acc))
+                    cv_rrect(sx, ly, step_w, lane - 1, 1, is_head ? T_TEXT : acc ? T_ACCENT : c, bg);
+                else
+                    cv_rect(sx, ly + lane - 2, step_w, 1, dim);
+            }
+            cv_rect(sx, y_base + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
+        }
     }
 }
 

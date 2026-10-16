@@ -138,7 +138,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH | STEP | STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS | STEP | STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track). |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -151,7 +151,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x20A | MORPH POSITION | 0 to 127 | 0 | Blends rhythm A (0) into rhythm B (full). |
 | 0x20B | MORPH RHYTHM A | 0 to 7 | 0 | Rhythm A: one of eight preset patterns. |
 | 0x20C | MORPH RHYTHM B | 0 to 7 | 2 | Rhythm B: one of eight preset patterns. |
-| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round; Euclid has none. |
+| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid has none. |
 | 0x20E | EVOLVE EVERY | OFF, 1, 2, 4, 8, 16 | OFF | Bars between mutations; OFF keeps the phrase as it is. |
 | 0x20F | EVOLVE AMOUNT | 0 to 100 % | 30 | How much changes at each mutation. |
 | 0x210 | EVOLVE ROLL | 1 to 128 | 1 | The track's seed, 1 to 128: each one a line of its own, the same every time. Playing, a new one starts on the next bar line. |
@@ -162,6 +162,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x215 | TWEAK DROP | 0 to 100 % | 0 | The chance a hit is left out, whatever the generator. |
 | 0x216 | TWEAK HUMAN | 0 to 100 % | 0 | Varies velocity and gate a little, as a player would. |
 | 0x217 | TWEAK FOLLOW | OFF, T1, T2, T3, T4 | OFF | Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own. |
+| 0x218 | GRIDS X | 0 to 255 | 128 | Where on the map of drum patterns, left to right; between two, a blend of both. |
+| 0x219 | GRIDS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |
+| 0x21A | GRIDS DENSITY | 0 to 100 % | 50 | How full the kick, snare and hat are: 0 silent, 100 every hit the map offers. |
 
 ## Mods
 
@@ -227,3 +230,6 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | HUMAN | the generator's step | TWEAK's HUMAN: velocity and gate variation |
 | EV AMT | the generator's step | EVOLVE's AMOUNT: how much each mutation changes |
 | CONTR | the generator's step | FORM's CONTRAST: how different a new section is |
+| G X | the generator's step | Grids' X: across its map of drum patterns |
+| G Y | the generator's step | Grids' Y: down its map of drum patterns |
+| G DENS | the generator's step | Grids' density: how full its parts are |
