@@ -491,7 +491,9 @@ Plan: `docs/analysis/phase1-plan.md`.
       writes it and fails when it is out of date), with the cords' sources and destinations
 - [x] Help gesture: ARP held + a knob turned shows the knob's help card, the value left as it is;
       ARP's release then opens no page (`ui_help.c`). Engine panels (FM6, CZ-1, PROPHET): label only
-- [ ] Device check of phase 2 (build 1.2.2): GEN, PATTERN, the ARP reach, help, CORDS (a cord heard, saved,
+- [x] Selector lists (Theo 2026-10-16): CORDS' SOURCE and DESTINATION turned show the picker's list
+      (each entry with its track), MOD's DST list by the engine's names; the help card names a value whole
+- [ ] Device check of phase 2 (build 1.2.3): GEN, PATTERN, the ARP reach, the selector lists, help, CORDS (a cord heard, saved,
       loaded), and the cost of 16 cords on the device
 - [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
