@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* Help (Theo 2026-10-16; docs/design/phase2/help.png): ARP held, a knob turned shows what it does, its value left as it
+/* Help (Theo 2026-10-16; tessera-notes/docs/design/phase2/help.png): ARP held, a knob turned shows what it does, its value left as it
  * is: a card over the page, dimmed, with the parameter's name, its value and its text (pid.c). Letting ARP go closes it
  * (and opens no page: ui_input.c). The FM-1's knobs cannot sense a touch, so a turn it is. Included by ui_pages.c. */
 

@@ -43,7 +43,7 @@
 #define MELODEE_LEGACY_EXTRAS 0 /* reference tests only: retired TRIO, WHEEL and PHYS; PHASE, VOICE and NOISE (retired
                                  * 2026-10-10: the flash for the redesign; CZ-1 keeps PHASE's phase-distortion core) */
 #endif
-/* Tessera (phase 4, docs/design/phase4/PLAN.md): an engine left out of the build (0) is never offered; its stored ID
+/* Tessera (phase 4, tessera-notes/docs/design/phase4/PLAN.md): an engine left out of the build (0) is never offered; its stored ID
  * stays reserved and a project's track of it loads SID's INIT (project.c). Its code goes where nothing reaches it */
 #ifndef MELODEE_PROPHET
 #define MELODEE_PROPHET 1

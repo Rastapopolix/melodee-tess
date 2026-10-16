@@ -1100,7 +1100,7 @@ static void setup(int s)
         }
         go_title(s == S_GEN_EVOLVE ? "EVOLVE" : "GEN");    /* (GEN: ARP's tap) */
         break;
-    case S_HELP:                                    /* ARP held, KNOB 1 on EVOLVE (docs/design/phase2/help.png) */
+    case S_HELP:                                    /* ARP held, KNOB 1 on EVOLVE (tessera-notes/docs/design/phase2/help.png) */
         tessera_reset();
         song.sel = 0;
         tessera_knob(0, TESS_ENG_MARKOV);
@@ -1109,7 +1109,7 @@ static void setup(int s)
         help.on = 1;
         help_find(0);
         break;
-    case S_CORDS: case S_CORDS_PICK_SRC: case S_CORDS_PICK_DST: {   /* (docs/design/phase2/cords.png's four; KNOB 1's
+    case S_CORDS: case S_CORDS_PICK_SRC: case S_CORDS_PICK_DST: {   /* (tessera-notes/docs/design/phase2/cords.png's four; KNOB 1's
                                                      * and 3's lists) */
         static const cord_t C4[4] = {{CS_NOTE, 0, CD_CUTOFF, 1, 40, 0}, {CS_GATE, 1, CD_DECAY, 3, -25, 0},
                                      {CS_LFO, 2, CD_EUC_PULSES, 0, 30, 0}, {CS_SH, 0, CD_FX_SEND, 1, 15, 0}};

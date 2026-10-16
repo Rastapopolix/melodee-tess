@@ -2,11 +2,15 @@
 
 melodee-tess: a fork of Melodee (FM-1 alternative firmware, GPL-3.0) where the Tessera
 generators (Turing, Euclid, Markov, Morph, Grids; `firmware/src/gen.c`, `tessera.c`) were built.
-It becomes the Tessera firmware, a hard fork. Plan, phases and tasks: `ROADMAP.md`.
+It becomes the Tessera firmware, a hard fork. Plan, phases and tasks: `ROADMAP.md` in the private
+notes repo `~/src/tessera-notes` (github.com/Rastapopolix/tessera-notes), with `docs/analysis/` and
+Tessera's design notes (`docs/design/phase*`, the generator surveys). This repo is public: keep plans,
+reviews and decisions there, not here (they are in `.gitignore`).
 
 ## Start and end of each session
 
-Read `ROADMAP.md` first. At the end, update it (tick tasks, record decisions) and commit.
+Read `~/src/tessera-notes/ROADMAP.md` first (`git -C ~/src/tessera-notes pull`). At the end, update it
+(tick tasks, record decisions) and commit and push it there; commit code here as usual.
 
 ## Build
 

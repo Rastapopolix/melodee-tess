@@ -1,6 +1,6 @@
 # Measuring Mutable Instruments' Plaits for the FM-1
 
-Scripts used for `docs/design/phase4/PLAN.md` (2026-10-16). Plaits is MIT (Emilie Gillet); it is not in this
+Scripts used for `tessera-notes/docs/design/phase4/PLAN.md` (2026-10-16). Plaits is MIT (Emilie Gillet); it is not in this
 repo. Get it: `git clone https://github.com/pichenettes/eurorack E` and `git clone
 https://github.com/pichenettes/stmlib E/stmlib` (the submodule), in a directory of its own.
 

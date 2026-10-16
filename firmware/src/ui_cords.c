@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* MODS (LFO family; MOD's place: its page hidden, ui.c page_visible; docs/design/phase2/cords.png): the cords (cord.c)
+/* MODS (LFO family; MOD's place: its page hidden, ui.c page_visible; tessera-notes/docs/design/phase2/cords.png): the cords (cord.c)
  * four to a screen, as MOD's rows:
  * "2  [2] ENV -> [4] DECAY  -25 %" over the amount's bar from the middle; the cord KNOB 2 is on: a card. The knobs as
  * MOD's: KNOB 1 the source (--, then T1 LFO .. T4 NOTE), 2 the cord, 3 the destination (--, then T1 PITCH ..), 4 the
@@ -109,7 +109,7 @@ static void cu_rows(void)
     }
 }
 
-/* a row's activity light under its number (docs/design/phase2/cords.png): how far the cord moves its destination
+/* a row's activity light under its number (tessera-notes/docs/design/phase2/cords.png): how far the cord moves its destination
  * now (cord.c cord_share: the source by the amount, and the offset), in 8 steps of the theme's colour; each light
  * its own small canvas, sent when its step changes */
 #define CU_LED_X 9                                      /* 8 x 8 at (9, a row's y + 28) */

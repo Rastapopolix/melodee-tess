@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* The engines left out of the build (phase 4, docs/design/phase4/PLAN.md): FM6, CZ-1 and Prophet off. Never
+/* The engines left out of the build (phase 4, tessera-notes/docs/design/phase4/PLAN.md): FM6, CZ-1 and Prophet off. Never
  * offered; a project's track of one loads SID's INIT with its common settings; the power-on sounds are built ones;
  * the parts play. Built with -DMELODEE_FM6=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0 (run_tests.sh). */
 #if MELODEE_FM6 || MELODEE_CZ || MELODEE_PROPHET

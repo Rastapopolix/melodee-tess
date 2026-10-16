@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* Unit test of the note generators (firmware/src/gen.c) on their own: no sequencer, no tracks, no Melodee; only
  * gen.h, gen.c and a random stream of its own, as tessera.c hands each track's. That it builds this way is part of the test: the
- * generators know nothing of the firmware (phase 1, docs/analysis/phase1-plan.md step 9).
+ * generators know nothing of the firmware (phase 1, tessera-notes/docs/analysis/phase1-plan.md step 9).
  *   build/host/gen_test
  * Checks, per generator and across its settings: the same seed gives the same steps; notes and velocities stay
  * inside the generator's range; a rest leaves out's {note 60, vel 100} (LOCK records it); the random draws per

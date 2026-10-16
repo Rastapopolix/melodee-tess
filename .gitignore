@@ -9,3 +9,11 @@ fm1-recovery-backups/
 
 .nightly-deps/
 .nightly-pages/
+# melodee-tess: planning notes live in the private repo tessera-notes (~/src/tessera-notes)
+/ROADMAP.md
+/docs/analysis/
+/docs/design/GENERATOR_COMPARISON.md
+/docs/design/MODULE_GENERATORS.md
+/docs/design/NORNS_GENERATORS.md
+/docs/design/phase2/
+/docs/design/phase4/

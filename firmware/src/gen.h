@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* The note generators (Turing, Euclid, Markov, Morph, Grids) behind one interface: each knows only its own state, the
  * clock and the input phrase, nothing of tracks, scales, the UI or Melodee. tessera.c is the adapter between them
- * and the sequencer (docs/analysis/phase1-plan.md). Randomness: each draw from the track's own stream
+ * and the sequencer (tessera-notes/docs/analysis/phase1-plan.md). Randomness: each draw from the track's own stream
  * (gen.c gen_rnd), handed in by the adapter, which starts it from the track's SEED. */
 #ifndef GEN_H
 #define GEN_H
