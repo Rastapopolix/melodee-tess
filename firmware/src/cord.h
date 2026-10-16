@@ -72,5 +72,7 @@ int cord_set(uint32_t i, const cord_t *c);          /* i < CORD_LIVE; out of ran
 const cord_t *cord_get(uint32_t i);
 void cord_clear(void);                              /* every cord off */
 uint32_t cord_count(void);                          /* cords doing something (a destination and an amount or offset) */
+uint32_t cord_adopt(void);
+void cord_sound_load(uint32_t tr);                  /* a sound loads on track tr (ui.c load_begin) */                          /* MOD's routes into cords (main loop): the routes left, no room */
 
 #endif

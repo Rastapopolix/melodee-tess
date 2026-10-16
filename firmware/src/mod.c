@@ -56,7 +56,7 @@ _Static_assert(P_M2SRC == P_M1SRC + 3 && P_M4AMT == P_M1SRC + 11 && P_M4AMT + 1 
 static uint32_t cord_mask[NTRK];
 static uint8_t cord_envsrc;
 static __attribute__((noinline)) int32_t cord_depth(const track_t *t, int32_t g);   /* (out of mod_begin: */
-static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off);         /* no cords, no cost) */
+static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32_t lfo);   /* no cords, no cost) */
 
 /* the track parameter of a per-block destination */
 static uint32_t mod_param(uint32_t d)
@@ -71,8 +71,8 @@ static struct {                  /* the part in mix_part (one at a time) */
     uint8_t nv, nk;              /* voice terms, per-block parameters held */
     int32_t pit, cut, shp, gain; /* per voice, from the per-track sources (gain Q15) */
     int32_t ldep;                /* DEPTH: the track LFO's gain (Q15; 32767 = none, track_render leaves it alone) */
-    uint8_t vsrc[NMSLOT], vdst[NMSLOT];
-    int8_t vamt[NMSLOT];
+    uint8_t vsrc[NMSLOT + CORD_LIVE], vdst[NMSLOT + CORD_LIVE];   /* (and the cords' on their own track: cord.c) */
+    int8_t vamt[NMSLOT + CORD_LIVE];
     uint8_t kid[NMSLOT + CORD_MAX];   /* per-block: the parameter, its stored value (and the cords') */
     int16_t keep[NMSLOT + CORD_MAX];
 } mod;
@@ -211,7 +211,7 @@ static __attribute__((noinline)) int mod_begin(track_t *t)
         }
     }
     if (cord_mask[t - trk])
-        cord_block(t, off);
+        cord_block(t, off, lfo);
     for (j = 0; j < mod.nk; j++) {
         uint32_t id = mod.kid[j];
         const param_desc_t *pd = id >= P_E0 ? &ENGINES[t->engine]->edit[id - P_E0] : &TP[id];

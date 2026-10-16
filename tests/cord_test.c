@@ -8,6 +8,8 @@
  * them), any change fails. Rewrite (CORD_UPDATE=1) only to append. */
 #define main hostsim_main
 #include "hostsim.c"
+#include <sys/wait.h>
+#include <unistd.h>
 #undef main
 
 static int bad;
@@ -179,6 +181,154 @@ static int behaviour(void)
     return bad - fails;
 }
 
+/* MOD's routes into cords (cord_adopt): the same move, the sound's go with it, the project's stay, no room: left */
+static void fresh_tracks(void)
+{
+    uint32_t i;
+    memset(trk, 0, sizeof trk);                         /* (as fx_performance: every voice, LFO and effect from rest) */
+    memset(&song, 0, sizeof song);
+    memset(fx_state, 0, sizeof fx_state);
+    spread_on = 0;
+    host_tracks_init();
+    tessera_reset();
+    cord_clear();
+    for (i = 0; i < 4u; i++) host_power_on_sound(&trk[i], i);
+    mod_seed = 0x2545F491u;
+}
+static void route(uint32_t tr, uint32_t k, int32_t s, int32_t d, int32_t a)
+{
+    trk[tr].p[P_M1SRC + 3u * k] = (int16_t)s;
+    trk[tr].p[P_M1DST + 3u * k] = (int16_t)d;
+    trk[tr].p[P_M1AMT + 3u * k] = (int16_t)a;
+}
+static int routes_off(uint32_t tr)
+{
+    uint32_t k;
+    for (k = 0; k < 12u; k++)
+        if (trk[tr].p[P_M1SRC + k]) return 0;
+    return 1;
+}
+/* track 1 a chord of three velocities (each voice its own VEL, KEY, ENV), the others one note */
+static double render_chord(uint32_t seconds)
+{
+    static const uint8_t N[3] = {48, 55, 64}, V[3] = {30, 80, 127};
+    uint32_t f, i;
+    double sum = 0;
+    for (i = 0; i < 3u; i++) trk_note_on(&trk[1], N[i], V[i]);
+    trk_note_on(&trk[0], 60, 100);
+    for (f = 0; f < seconds * FS; f += CTL) {
+        int32_t o[2 * CTL];
+        mix_block(o, CTL);
+        for (i = 0; i < 2u * CTL; i++) sum += (double)o[i] * (double)(1u + (f / CTL + i) % 7u);   /* (the order counts) */
+    }
+    for (i = 0; i < 3u; i++) trk_note_off(&trk[1], N[i]);
+    trk_note_off(&trk[0], 60);
+    return sum;
+}
+/* a render from the same start every time: in a child process (the engines keep state of their own across
+ * renders); adopt: the routes into cords first. Its sum, or -1 */
+static double render_fresh(uint32_t tr, uint32_t s, uint32_t d, int32_t a, int adopt, const cord_t *cord)
+{
+    int fd[2];
+    double r = -1;
+    pid_t child;
+    if (pipe(fd)) return -1;
+    child = fork();
+    if (!child) {
+        fresh_tracks();
+        if (s) route(tr, 2, (int32_t)s, (int32_t)d, a);
+        if (adopt && (cord_adopt() || !routes_off(tr) || cord_count() != 1u)) r = -2;
+        if (cord) cord_set(0, cord);
+        if (r != -2) r = render_chord(1);
+        if (write(fd[1], &r, sizeof r) != sizeof r) _exit(1);
+        _exit(0);
+    }
+    close(fd[1]);
+    if (read(fd[0], &r, sizeof r) != sizeof r) r = -1;
+    close(fd[0]);
+    waitpid(child, 0, 0);
+    return r;
+}
+static int adoption(void)
+{
+    static const struct { uint8_t s, d; int8_t a; const char *what; } R[] = {
+        {MS_VEL, MD_CUT, 40, "VEL -> CUTOFF"}, {MS_KEY, MD_PITCH, -23, "KEY -> PITCH"}, {MS_ENV, MD_AMP, 50, "ENV -> GAIN"},
+        {MS_RAND, MD_SHP, 63, "RAND -> SHAPE"}, {MS_LFO, MD_CUT, -64, "LFO -> CUTOFF"}, {MS_MODW, MD_DEPTH, 30, "MODW -> DEPTH"},
+        {MS_ENV, MD_DEPTH, -40, "ENV -> DEPTH"}, {MS_LFO, MD_PAN, 37, "LFO -> PAN"}, {MS_ENV, MD_RATE, 21, "ENV -> RATE"},
+        {MS_LFO, MD_VIB, 45, "LFO -> VIB"}, {MS_VEL, MD_E1 + 4, -50, "VEL -> E5"}};
+    int fails = bad, ok;
+    int32_t a;
+    uint32_t i, n;
+    cord_t c;
+    double was, now;
+    char what[160];
+
+    for (a = -64, ok = 1; a <= 63; a++) {               /* every AMT: the cord's percentage moves by it again */
+        if (!a) continue;
+        cord_clear();
+        route(0, 0, MS_VEL, MD_AMP, a);
+        if (cord_adopt() || !routes_off(0) || cord_get(0)->src != MS_VEL || cord_get(0)->dst != CD_GAIN ||
+            cord_amt(cord_get(0)->amount) != a || cord_get(0)->src_trk || cord_get(0)->dst_trk) ok = 0;
+    }
+    check("MOD's route -> a cord on its track, for every AMT (-64..63) the same amount again (cord_amt)", ok);
+    was = render_fresh(0, 0, 0, 0, 0, 0);
+    check("(two renders from the same start: the same)", was > 0 && was == render_fresh(0, 0, 0, 0, 0, 0));
+    for (i = 0; i < sizeof R / sizeof R[0]; i++) {      /* the sound: a route and its cord, sample for sample */
+        was = render_fresh(1, R[i].s, R[i].d, R[i].a, 0, 0);
+        now = render_fresh(1, R[i].s, R[i].d, R[i].a, 1, 0);
+        snprintf(what, sizeof what, "%s on a chord: the cord sounds as the route did, bit for bit", R[i].what);
+        check(what, was > 0 && was == now);
+    }
+    c = C(CS_VEL, 1, CD_CUTOFF, 1, 60, 0);
+    was = render_fresh(0, 0, 0, 0, 0, &c);
+    c = C(CS_VEL, 0, CD_CUTOFF, 1, 60, 0);
+    now = render_fresh(0, 0, 0, 0, 0, &c);
+    check("...VEL on its own track's chord: each voice its own (another track's VEL: its latest, not the same)",
+          was > 0 && now > 0 && was != now && was != render_fresh(0, 0, 0, 0, 0, 0));
+    fresh_tracks();
+    route(2, 0, MS_LFO, MD_PAN, 20);
+    route(2, 1, MS_LFO, 0, 30);                         /* (no destination: moves nothing) */
+    route(2, 3, MS_VEL, MD_RESERVED7, 30);
+    n = cord_adopt();
+    check("a project's routes (just loaded) -> cords; ones that move nothing just go", !n && routes_off(2) &&
+          cord_count() == 1u && cord_get(0)->dst == CD_PAN);
+    cord_sound_load(2);
+    (void)cord_adopt();
+    check("...another sound on the track: the project's cord stays", cord_count() == 1u);
+    route(2, 0, MS_VEL, MD_CUT, 20);                    /* a sound with a route, loaded */
+    route(2, 1, MS_ENV, MD_E1 + 2, -10);
+    (void)cord_adopt();
+    check("a sound's routes -> cords (the next free: 2 and 3)", cord_count() == 3u && cord_get(1)->dst == CD_CUTOFF &&
+          cord_get(2)->dst == CD_E3 && cord_get(2)->amount == -16 && routes_off(2));
+    c = *cord_get(2);
+    c.amount = -50;
+    cord_set(2, &c);                                    /* (one edited: the project's now) */
+    cord_sound_load(2);
+    (void)cord_adopt();
+    check("...another sound loaded: the sound's cord goes, the one edited stays", cord_count() == 2u &&
+          !cord_get(1)->dst && cord_get(2)->dst == CD_E3 && cord_get(2)->amount == -50);
+    route(2, 0, MS_LFO, MD_PAN, 20);                    /* (the same as cord 1: an undo, the same sound again) */
+    (void)cord_adopt();
+    check("a route there is a cord for already: no second one", cord_count() == 2u && routes_off(2));
+
+    cord_clear();
+    for (i = 0; i < CORD_LIVE; i++) {
+        c = C(CS_LFO, i % 4u, CD_LEVEL, i % 4u, 10 + (int32_t)i, 0);
+        cord_set(i, &c);
+    }
+    route(3, 1, MS_AT, MD_CUT, 33);
+    n = cord_adopt();
+    check("sixteen cords in use: the route left, and still there (it plays as before)", n == 1u &&
+          trk[3].p[P_M2SRC] == MS_AT && trk[3].p[P_M2AMT] == 33);
+    c = C(0, 0, 0, 0, 0, 0);
+    cord_set(9, &c);
+    n = cord_adopt();
+    check("...a cord freed: the route takes it", !n && routes_off(3) && cord_get(9)->src == CS_AT &&
+          cord_get(9)->src_trk == 3u && cord_get(9)->dst == CD_CUTOFF);
+    cord_clear();
+    return bad - fails;
+}
+
 int main(int argc, char **argv)
 {
     const char *golden = argc > 1 ? argv[1] : "tests/cord_dests.txt";
@@ -222,6 +372,7 @@ int main(int argc, char **argv)
     check(what, CORD_MAX == 32u && CORD_LIVE == 16u);
 
     (void)behaviour();
+    (void)adoption();
 
     {
         FILE *f = fopen(golden, update ? "w" : "r");

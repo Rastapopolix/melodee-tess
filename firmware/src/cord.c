@@ -96,6 +96,11 @@ static cord_t cords[CORD_MAX];
  * envsrc: bit t, a cord reads track t's ENV (its voices report it only with mod.c active: mod_begin keeps it on) */
 static uint32_t cord_mask[NTRK], cord_smask[NTRK];
 static uint8_t cord_envsrc;
+/* cord_adopt: bit i, cords[i] came with track t's sound (a route of it, unedited since) and goes with it; sig the
+ * sound it came with; fresh: the cords just loaded (a project's routes are the project's: kept) */
+static uint16_t cord_adopted[NTRK];
+static uint32_t cord_adopt_sig[NTRK];
+static uint8_t cord_fresh = 1;
 
 static int cord_live(const cord_t *c)
 {
@@ -117,6 +122,7 @@ static void cord_masks(void)
 
 int cord_set(uint32_t i, const cord_t *c)
 {
+    uint32_t t;
     if (i >= CORD_LIVE || c->src >= CS_N || c->src_trk >= NTRK || !cord_dest(c->dst) || c->dst_trk >= NTRK ||
         c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100)
         return 0;
@@ -124,6 +130,8 @@ int cord_set(uint32_t i, const cord_t *c)
     cords[i] = *c;
     cord_masks();
     TESS_IRQ_ON();
+    for (t = 0; t < NTRK; t++)                          /* (edited: the project's now) */
+        cord_adopted[t] &= (uint16_t)~(1u << i);
     return 1;
 }
 const cord_t *cord_get(uint32_t i) { return i < CORD_MAX ? &cords[i] : 0; }
@@ -132,8 +140,9 @@ const cord_t *cord_get(uint32_t i) { return i < CORD_MAX ? &cords[i] : 0; }
 static void cord_reset(void)
 {
     uint32_t t;
-    for (t = 0; t < NTRK; t++) cord_mask[t] = cord_smask[t] = 0;
+    for (t = 0; t < NTRK; t++) cord_mask[t] = cord_smask[t] = cord_adopted[t] = 0;
     cord_envsrc = 0;
+    cord_fresh = 1;
     memset(cords, 0, sizeof cords);
 }
 void cord_clear(void)
@@ -173,6 +182,8 @@ static int cord_unpack(const uint8_t *in)
     memcpy(cords, got, sizeof cords);
     cord_masks();
     TESS_IRQ_ON();
+    for (i = 0; i < NTRK; i++) cord_adopted[i] = 0;
+    cord_fresh = 1;
     return 1;
 }
 uint32_t cord_count(void)
@@ -210,20 +221,28 @@ static __attribute__((noinline)) int32_t cord_depth(const track_t *t, int32_t g)
 }
 
 /* mod.c mod_begin, for track t: the voice cords into mod's per-track terms, the parameter cords into off[] (the
- * offsets of mod.kid's parameters, as the MOD slots' are) */
-static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off)
+ * offsets of mod.kid's parameters, as the MOD slots' are: by mod.c's sums, so a route made a cord moves as it did).
+ * lfo: t's LFO as mod_begin has it (its DEPTH on it), for t's own LFO */
+static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32_t lfo)
 {
-    uint32_t m = cord_mask[t - trk], i, j;
+    uint32_t m = cord_mask[t - trk], i, j, tr = (uint32_t)(t - trk);
     for (i = 0; m; i++, m >>= 1) {
         const cord_t *c = &cords[i];
         const cord_dest_t *d;
+        int32_t x;
         if (!(m & 1u)) continue;
         d = cord_dest(c->dst);
+        x = c->src == CS_LFO && c->src_trk == tr ? lfo : c->src ? cord_src(c->src, c->src_trk) : 0;
         if (d->kind == CK_VOICE) {
             mod.amp |= d->md == MD_AMP;
-            if (c->src && c->amount)
-                mod_voice_add(cord_bipolar(c->src, c->src_trk) ? MS_LFO : MS_ENV, d->md, cord_src(c->src, c->src_trk),
-                              cord_amt(c->amount), &mod.pit, &mod.cut, &mod.shp, &mod.gain);
+            if (c->src && c->amount && MS_VOICE(c->src) && c->src_trk == (uint8_t)(t - trk) &&
+                mod.nv < NMSLOT + CORD_LIVE) {          /* its own voices' ENV VEL KEY RAND: each voice its own, as */
+                mod.vsrc[mod.nv] = c->src;              /* MOD's routes (mod_voice) */
+                mod.vdst[mod.nv] = (uint8_t)d->md;
+                mod.vamt[mod.nv++] = (int8_t)cord_amt(c->amount);
+            } else if (c->src && c->amount)
+                mod_voice_add(cord_bipolar(c->src, c->src_trk) ? MS_LFO : MS_ENV, d->md, x, cord_amt(c->amount), &mod.pit,
+                              &mod.cut, &mod.shp, &mod.gain);
             if (c->offset)
                 mod_voice_add(MS_ENV, d->md, 32768, cord_amt(c->offset), &mod.pit, &mod.cut, &mod.shp, &mod.gain);
         } else if (d->kind == CK_BLOCK) {
@@ -237,9 +256,80 @@ static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off)
                 off[j] = 0;
                 mod.nk++;
             }
-            off[j] += cord_steps(cord_share(c), pd->max - pd->min);
+            if (c->src && c->amount)                    /* (mod_begin's: AMT 64 the whole range) */
+                off[j] += (((x * cord_amt(c->amount)) >> 6) * (pd->max - pd->min)) >> 15;
+            if (c->offset)
+                off[j] += cord_steps((32768 * c->offset) / 100, pd->max - pd->min);
         }
     }
+}
+
+/* ------------------------------------------------------------ MOD's routes --- */
+/* Tessera: MODS (the cords) take the place of MOD's four routes a track. A route that comes in (a project or a sound
+ * saved with one, the editor's) becomes a cord on its track, the same move: SRC the source, DST its destination
+ * (VIB: LFO PIT, DEPTH: LFO DEP), AMT (-64..63, 64 = all) the percentage whose cord_amt is AMT again. The routes of a
+ * sound go with it: loading another sound on the track takes the cords that came with the last one away, unless one
+ * was edited. A project's are its own. Main loop (ui_input); returns the routes left (no free cord: they stay, and
+ * play as before, until one is) */
+static const uint8_t CORD_OF_MD[MD_N] = {[MD_PITCH] = CD_PITCH, [MD_CUT] = CD_CUTOFF, [MD_SHP] = CD_SHAPE,
+    [MD_AMP] = CD_GAIN, [MD_PAN] = CD_PAN, [MD_RATE] = CD_LFO_RATE, [MD_VIB] = CD_LFO_PIT, [MD_E1] = CD_E1,
+    [MD_E1 + 1] = CD_E2, [MD_E1 + 2] = CD_E3, [MD_E1 + 3] = CD_E4, [MD_E1 + 4] = CD_E5, [MD_E1 + 5] = CD_E6,
+    [MD_E1 + 6] = CD_E7, [MD_E1 + 7] = CD_E8, [MD_DEPTH] = CD_LFO_DEPTH};
+static uint8_t cord_sound_gen[NTRK];
+void cord_sound_load(uint32_t tr) { cord_sound_gen[tr % NTRK]++; }   /* ui.c load_begin: a sound loads on track tr */
+static int cord_empty(const cord_t *c) { return !c->src && !c->dst && !c->amount && !c->offset; }
+uint32_t cord_adopt(void)
+{
+    uint32_t tr, k, i, left = 0, fresh = cord_fresh;
+    cord_fresh = 0;
+    for (tr = 0; tr < NTRK; tr++) {
+        track_t *t = &trk[tr];
+        uint32_t sig = cord_sound_gen[tr];
+        if (cord_adopted[tr] && sig != cord_adopt_sig[tr]) {   /* another sound: the last one's cords go */
+            TESS_IRQ_OFF();
+            for (i = 0; i < CORD_LIVE; i++)
+                if ((cord_adopted[tr] >> i) & 1u) memset(&cords[i], 0, sizeof cords[i]);
+            cord_masks();
+            TESS_IRQ_ON();
+            cord_adopted[tr] = 0;
+        }
+        for (k = 0; k < 4u; k++) {
+            int16_t *p = &t->p[P_M1SRC + 3u * k];
+            uint32_t s = (uint32_t)p[0], d = (uint32_t)p[1];
+            int32_t a = p[2], pct = (a < 0 ? -a : a) * 100;
+            cord_t c = {0};
+            if (!p[0] && !p[1] && !p[2])
+                continue;
+            if (s && s < MS_N && d < MD_N && CORD_OF_MD[d] && a) {
+                c.src = (uint8_t)s; c.src_trk = (uint8_t)tr;
+                c.dst = CORD_OF_MD[d]; c.dst_trk = (uint8_t)tr;
+                pct = clamp((pct + 63) / 64, 0, 100);   /* (up: cord_amt rounds down, to AMT again) */
+                c.amount = (int8_t)(a < 0 ? -pct : pct);
+                for (i = 0; i < CORD_LIVE && memcmp(&cords[i], &c, sizeof c); i++)
+                    ;                                   /* (the same cord there: an undo, the sound again) */
+                if (i == CORD_LIVE)
+                    for (i = 0; i < CORD_LIVE && !cord_empty(&cords[i]); i++)
+                        ;
+                if (i == CORD_LIVE) {
+                    left++;
+                    continue;
+                }
+            } else
+                i = CORD_LIVE;                          /* (a route that moves nothing: gone) */
+            TESS_IRQ_OFF();
+            if (i < CORD_LIVE) {
+                cords[i] = c;
+                cord_masks();
+            }
+            p[0] = p[1] = p[2] = 0;
+            TESS_IRQ_ON();
+            if (i < CORD_LIVE && !fresh) {
+                cord_adopted[tr] |= (uint16_t)(1u << i);
+                cord_adopt_sig[tr] = sig;
+            }
+        }
+    }
+    return left;
 }
 
 /* ------------------------------------------------------------ at the generator's step --- */

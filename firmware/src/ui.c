@@ -699,6 +699,8 @@ static void load_begin(track_t *t, uint32_t what)
     undo_t *u;
     momentary_restore();
     uint32_t i = trk_index(t);
+    if (what & UNDO_SOUND)
+        cord_sound_load(i);                             /* (Tessera: the cords its last sound brought go: cord.c) */
     if (undo_depth++)
         return;
     browse_loads++;
