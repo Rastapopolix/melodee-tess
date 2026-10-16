@@ -547,6 +547,38 @@ static int test_mods_page(void)
     cord_clear();
     frame();
     bad += check("...one freed: the route moves in", cord_count() == 1u && !TSEL->p[P_M2SRC]);
+    {                                             /* the source list scrolled: only it and the chips sent (no flash) */
+        uint64_t sent;
+        go_title("MODS");
+        cord_clear();
+        cord_ui_sel = 0;
+        ui.force = 1;
+        frame();
+        turn(EN_K1, 1);                           /* (its list opens: the page under it once) */
+        host_sent = 0;
+        turn(EN_K1, 1);
+        sent = host_sent;
+        bad += check("MODS: SOURCE turned with its list open: the list and the chips sent, not the page (no flash)",
+                     pop.on == POP_PICK && sent > 0 && sent < 112u * 176u + 4u * 60u * 20u);
+        if (!(sent < 112u * 176u + 4u * 60u * 20u)) printf("    sent %llu px\n", (unsigned long long)sent);
+        bad += check("...eight names in it, above the chips (the values at the bottom stay in view)",
+                     (pick_bottom() - 56) / 20 == 8 && 40 + 16 + 8 * 20 <= 220);
+        pop_close();
+    }
+    {                                             /* the activity lights: a cord moving lit, an empty one dark */
+        cord_t on = {0};
+        uint16_t lit, dark;
+        cord_clear();
+        on.dst = CD_PAN; on.offset = 100;
+        cord_set(0, &on);
+        cord_ui_sel = 3;                          /* (no row selected but the last: rows 1 and 3 on the page's colour) */
+        ui.force = 1;
+        frame();
+        lit = host_screen[(uint32_t)(CU_Y + CU_LED_Y + 4) * 240u + CU_LED_X + 4u];
+        dark = host_screen[(uint32_t)(CU_Y + 2 * CU_H + CU_LED_Y + 4) * 240u + CU_LED_X + 4u];
+        bad += check("MODS: a cord moving its destination fully: its light lit; an empty one: none", lit != dark);
+        cord_clear();
+    }
     cord_clear();
     return bad;
 }

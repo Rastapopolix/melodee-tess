@@ -1299,7 +1299,8 @@ static void ui_draw_frame(void)
             draw_page();
             cv_dim = cv_under = 0;
             ui.force = 1;
-        }
+        } else if (pop.on == POP_PICK)
+            pv_mod_chips();                             /* (the values under it, the page left as it is: no flash) */
         pop_draw();
         ui.force = 0;
         return;

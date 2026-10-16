@@ -21,7 +21,7 @@ enum { POP_NONE, POP_SHEET, POP_PICK, POP_LIST };
 #define POP_X 6                                         /* a sheet: 228 wide, its rows 20 px, 22 apart from y 28 */
 #define POP_W 228
 #define POP_ROW 22
-#define POP_PICK_W 112                                  /* a picker: up to five names, 20 px each; two whole columns */
+#define POP_PICK_W 112                                  /* a picker: up to eight names, 20 px each; two whole columns */
 static struct {
     uint8_t on, n, sel, col;
     char title[24], sub[20];
@@ -562,8 +562,9 @@ static void pick_draw(void)
         return;
     pop.sig = sig;
     {
-    int32_t rows = count < 5 ? count : 5, h = 16 + rows * 20;
-    int32_t first = clamp(cur - 2, 0, count - rows);   /* five names around it, the list's ends kept */
+    int32_t most = (pick_bottom() - 40 - 16) / 20;     /* (8 over MODS' chips, 6 over a page's strips) */
+    int32_t rows = count < most ? count : most, h = 16 + rows * 20;
+    int32_t first = clamp(cur - (rows - 1) / 2, 0, count - rows);   /* the names around it, the list's ends kept */
     x = 4 + 60 * (int32_t)(pop.col < 3u ? pop.col : 2u);   /* its column and the next (the last: the two last), whole:
                                                          * a neighbour's value is under it entirely or not at all */
     cv_begin(POP_PICK_W, (uint32_t)h, T_BG);

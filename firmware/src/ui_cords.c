@@ -61,6 +61,7 @@ static void cu_chip(int32_t x, int32_t y, int32_t w, uint32_t tr, const char *s,
                  on ? T_TEXT : T_DIM, fill, w - 8);
 }
 
+static uint8_t cu_led_was[4];                           /* (cu_leds: the step each light shows; a row redrawn: none) */
 #define CU_Y 22                                         /* the rows: 48 px each from y 22 (as MOD's), the chips at 220 */
 #define CU_H 48
 static void cu_rows(void)
@@ -78,6 +79,7 @@ static void cu_rows(void)
     if (!ui.force && sg == sig)
         return;
     sig = sg;
+    memset(cu_led_was, 0xFF, sizeof cu_led_was);        /* (the rows over their lights: cu_leds again) */
     for (k = 0; k < 4u; k++) {
         const cord_t *c = cord_get(top + k);
         int sel = top + k == cord_ui_sel, on = c->dst != CD_OFF && (c->amount || c->offset);
@@ -104,6 +106,31 @@ static void cu_rows(void)
             cv_rect(x < m ? x : m, 30, x < m ? m - x : x - m, 3, on ? (sel ? T_THEME : ux_mix(bg, T_THEME, 60)) : T_DIM);
         cv_rect(m, 28, 1, 7, T_MID);
         cv_blit(0, (uint32_t)(CU_Y + (int32_t)k * CU_H));
+    }
+}
+
+/* a row's activity light under its number (docs/design/phase2/cords.png): how far the cord moves its destination
+ * now (cord.c cord_share: the source by the amount, and the offset), in 8 steps of the theme's colour; each light
+ * its own small canvas, sent when its step changes */
+#define CU_LED_X 9                                      /* 8 x 8 at (9, a row's y + 28) */
+#define CU_LED_Y 28
+static void cu_leds(void)
+{
+    uint8_t *was = cu_led_was;
+    uint32_t k, top = cord_ui_sel / 4u * 4u;
+    for (k = 0; k < 4u; k++) {
+        const cord_t *c = cord_get(top + k);
+        int32_t s = cord_live(c) ? cord_share(c) : 0;
+        uint8_t lv = (uint8_t)(cord_live(c) ? 1 + clamp((s < 0 ? -s : s) * 7 / 32768, 0, 7) : 0);
+        uint8_t key = (uint8_t)(lv | (top + k == cord_ui_sel) << 4 | (ux.pal & 7u) << 5);
+        uint16_t bg = top + k == cord_ui_sel ? T_LIFT : T_BG;
+        if (!ui.force && key == was[k])
+            continue;
+        was[k] = key;
+        cv_begin(8, 8, bg);
+        if (lv)
+            cv_disc(4, 4, 6, lv > 1 ? ux_mix(T_LINE, T_THEME, (lv - 1) * 100 / 7) : T_LINE, 0);
+        cv_blit(CU_LED_X, (uint32_t)(CU_Y + (int32_t)k * CU_H + CU_LED_Y));
     }
 }
 
@@ -188,5 +215,6 @@ static void cu_knob(uint32_t slot, int32_t steps)
         else c.offset = (int8_t)v;
     }
     (void)cord_set(cord_ui_sel, &c);
-    ui.force = 1;
+    if (slot == 3u)                                     /* (SOURCE, DESTINATION: their list over the page, which */
+        ui.force = 1;                                   /* stays as it is under it: the chips alone, cu_under) */
 }

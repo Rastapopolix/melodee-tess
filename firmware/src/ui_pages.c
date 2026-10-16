@@ -72,6 +72,22 @@ static uint32_t pv_kind(void)
     return PV_NONE;
 }
 
+/* a knob's picker open (ui_draw.c): MODS' and MOD's chips under it as they change, the rest of the page as it was
+ * (drawn again when the picker goes); the picker's lowest row: above the chips (220), else above the strips (188) */
+static void cu_columns(void);
+static void pv_mod_chips(void)
+{
+    uint32_t kind = pv_kind();
+    if (kind != PV_CORDS && kind != PV_MOD)
+        return;
+    col_style = CS_CHIP;
+    pv_chip_y = 220;
+    draw_columns();
+    pv_chip_y = PV_CHIP_Y;
+    col_style = CS_CARD;
+}
+static int32_t pick_bottom(void) { return pv_kind() == PV_CORDS || pv_kind() == PV_MOD ? 216 : 184; }
+
 #include "ui_cords.c"                                  /* CORDS (Tessera) */
 #include "ui_help.c"                                   /* ARP held + a knob: its help (Tessera) */
 
@@ -959,11 +975,12 @@ static void pv_draw(void)
         }
         return;
     }
-    if (kind == PV_CORDS) {                             /* (as MOD: the rows, the chips under them) */
+    if (kind == PV_CORDS) {                             /* (as MOD: the rows, the chips under them; the lights) */
         if (ui.force)
             lcd_fill(0, H_HEAD, 240, 240 - H_HEAD, T_BG);
         draw_head();
         cu_rows();
+        cu_leds();
         col_style = CS_CHIP;
         pv_chip_y = 220;
         draw_columns();
