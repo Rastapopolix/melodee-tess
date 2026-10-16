@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* CORDS (LFO family, after MOD; docs/design/phase2/cords.png): the cords (cord.c) four to a screen, as MOD's rows:
+/* MODS (LFO family; MOD's place: its page hidden, ui.c page_visible; docs/design/phase2/cords.png): the cords (cord.c)
+ * four to a screen, as MOD's rows:
  * "2  [2] ENV -> [4] DECAY  -25 %" over the amount's bar from the middle; the cord KNOB 2 is on: a card. The knobs as
  * MOD's: KNOB 1 the source (--, then T1 LFO .. T4 NOTE), 2 the cord, 3 the destination (--, then T1 PITCH ..), 4 the
  * amount. A cord without a source is a fixed move: KNOB 4 its OFFSET. Included by ui_pages.c. */
@@ -8,6 +9,17 @@
 static int32_t accel(uint32_t role, int32_t s, int32_t range);                       /* ui_input.c */
 static int32_t list_accel(uint32_t role, int32_t s, uint32_t total, uint32_t *fast);
 static uint8_t cord_ui_sel;                             /* the cord KNOB 2 is on: 0 .. CORD_LIVE - 1 */
+
+/* every frame (ui_input): a route of MOD's that came in (a project, a sound) into a cord (cord.c cord_adopt); no
+ * room: MODS FULL, once for each route more left */
+static void cu_adopt(void)
+{
+    static uint32_t was;
+    uint32_t left = cord_adopt();
+    if (left > was) ui_message("MODS FULL");
+    if (left != was) ui.force = 1;
+    was = left;
+}
 
 #define CU_NSRC (1u + NTRK * (CS_N - 1u))               /* KNOB 1's list: --, then track by track */
 #define CU_NDST (1u + NTRK * (CD_N - 1u))
@@ -107,7 +119,7 @@ static void cu_columns(void)
         str_cpy(src, "--", sizeof src);
     draw_column(0, "", src, "", c->src ? VAL(0u) : T_DIM, -1, ICON_NONE);
     fmt_int(val, (int32_t)cord_ui_sel + 1);
-    draw_column(1, "CORD", val, "/16", VAL(1u), (int32_t)cord_ui_sel * 1000 / (CORD_LIVE - 1u), ICON_NONE);
+    draw_column(1, "MOD", val, "/16", VAL(1u), (int32_t)cord_ui_sel * 1000 / (CORD_LIVE - 1u), ICON_NONE);
     if (c->dst) {
         val[0] = 'T'; val[1] = (char)('1' + c->dst_trk); val[2] = ' ';
         str_cpy(val + 3, cu_dst_name(c), sizeof val - 3);

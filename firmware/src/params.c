@@ -503,7 +503,8 @@ static const page_t PAGES[] = {
     {"LFO 2", FAM_LFO, SC_TRACK, GR_LFO, {P_LSYNC, P_LTRIG, P_LPOL, 0xFF}},
     {"LFO DEST", FAM_LFO, SC_TRACK, GR_NONE, {P_LD_PIT, P_LD_FLT, P_LD_SHP, P_LD_AMP}},
     {"MOD", FAM_LFO, SC_TRACK, GR_MOD, {P_M1SRC, 0xFF, P_M1DST, P_M1AMT}},   /* KNOB 2: the route (mod_ui_slot) */
-    {"CORDS", FAM_LFO, SC_GLOBAL, GR_CORDS, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: the cords (cord.c, ui_cords.c) */
+    {"MODS", FAM_LFO, SC_GLOBAL, GR_CORDS, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: the cords (cord.c, ui_cords.c), MOD's
+                                                                     * place (MOD hidden: ui.c page_visible) */
     {"SCALES", FAM_SCL, SC_TRACK, GR_SCALE_PICKER, {0xFF, P_SCALE, P_ROOT, P_QUANT}},
     {"SCL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, 0xFF, P_QUANT, P_TRANS}}, /* K2: scale favorite */
     {"CHORD", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHRD, P_VOIC, 0xFF, 0xFF}},   /* SCL again: the chord keys (chord.c) */

@@ -235,6 +235,8 @@ static int native_page(uint32_t i, uint32_t fam)       /* page i: one of fam's n
 
 static int page_visible(uint32_t i)
 {
+    if (PAGES[i].graph == GR_MOD)                       /* Tessera: MODS (the cords) instead, MOD's routes become */
+        return 0;                                       /* cords (cord.c cord_adopt) */
     if(PAGES[i].fam==FAM_FX && PAGES[i].scope==SC_TRACK && PAGES[i].id[0]==P_FXSEND)
         return song.g[G_FXMODE]!=0;
     if (list_gone(i))

@@ -493,7 +493,7 @@ static int test_cords_page(void)
     const cord_t *c;
     ui_power_on();
     cord_clear();
-    go_title("CORDS");
+    go_title("MODS");
     turn(EN_K1 + 1u, 1);
     bad += check("CORDS: KNOB 2 picks the cord (2 of 16)", cord_ui_sel == 1u);
     c = cord_get(1);
@@ -509,6 +509,44 @@ static int test_cords_page(void)
     bad += check("KNOB 1 back to --: the move kept as its OFFSET", c->src == CS_OFF && c->offset == 22 && !c->amount);
     turn(EN_K1 + 1u, -5);
     bad += check("KNOB 2 stops at cord 1", cord_ui_sel == 0u);
+    cord_clear();
+    return bad;
+}
+
+/* MODS (Tessera): MOD's page gone from LFO's taps, the cords' page in its place; a route that comes in (a project, a
+ * sound) is a mod on its track at the next frame; no room: MODS FULL */
+static int test_mods_page(void)
+{
+    char got[160] = "";
+    int bad = 0, mod_seen = 0, mods_seen = 0;
+    uint32_t k, used = 0;
+    cord_t c = {0};
+    ui_power_on();
+    for (k = 0; k < 8u; k++) {
+        press(B_LFO);
+        if (!ui.home && str_eq(cur_page()->title, "MOD")) mod_seen = 1;
+        if (!ui.home && str_eq(cur_page()->title, "MODS")) mods_seen = 1;
+        used += (uint32_t)snprintf(got + used, sizeof got - used, "%s ", ui.home ? "HOME" : cur_page()->title);
+        if (used >= sizeof got) used = sizeof got - 1u;
+    }
+    bad += check("LFO's taps: MODS, no MOD", mods_seen && !mod_seen);
+    if (!mods_seen || mod_seen) printf("    got: %s\n", got);
+    cord_clear();
+    TSEL->p[P_M1SRC] = MS_VEL; TSEL->p[P_M1DST] = MD_CUT; TSEL->p[P_M1AMT] = 32;   /* (a sound saved with a route) */
+    frame();
+    bad += check("a route that came in: a mod on its track at the next frame, the route gone",
+                 cord_count() == 1u && cord_get(0)->src == CS_VEL && cord_get(0)->dst == CD_CUTOFF &&
+                 cord_get(0)->amount == 50 && cord_get(0)->dst_trk == song.sel && !TSEL->p[P_M1SRC]);
+    for (k = 0; k < CORD_LIVE; k++) {
+        c.src = CS_LFO; c.dst = CD_LEVEL; c.amount = (int8_t)(10 + k);
+        cord_set(k, &c);
+    }
+    TSEL->p[P_M2SRC] = MS_AT; TSEL->p[P_M2DST] = MD_PAN; TSEL->p[P_M2AMT] = 20;
+    frame();
+    bad += check("...sixteen in use: MODS FULL, the route left as it is", msg_is("MODS FULL") && TSEL->p[P_M2SRC] == MS_AT);
+    cord_clear();
+    frame();
+    bad += check("...one freed: the route moves in", cord_count() == 1u && !TSEL->p[P_M2SRC]);
     cord_clear();
     return bad;
 }
@@ -536,7 +574,7 @@ static int test_help_gesture(void)
     bad += check("ARP let go: the help closes, and no page opens (still EVOLVE)", !help.on && str_eq(cur_page()->title, "EVOLVE"));
     {                                             /* the selectors' lists (ui_popup.c pick_*) */
         int32_t n, cur, tr;
-        go_title("CORDS");
+        go_title("MODS");
         cord_clear();
         cord_ui_sel = 0;
         turn(EN_K1, 2);
@@ -548,12 +586,6 @@ static int test_help_gesture(void)
                      pick_list(&n, &cur) && n == (int32_t)CU_NDST && cur == 1 && pick_name(cur, &tr) && tr == 0);
         turn(EN_K1 + 1u, 1);
         bad += check("...KNOB 2 (the cord): no list", pop.on != POP_PICK);
-        cord_clear();
-        go_title("MOD");
-        turn(EN_K1 + 2u, 1);
-        bad += check("MOD: KNOB 3 opens its list, by the engine's names (as the page's)",
-                     pop.on == POP_PICK && pop.col == 2u && pick_list(&n, &cur) &&
-                     str_eq(pick_name(cur, &tr), mod_dst_name(TSEL, TSEL->p[P_M1DST + 3u * mod_ui_slot])));
         pop_close();
     }
     {
@@ -2003,6 +2035,7 @@ static int test_init_scales_patterns(void)
     return bad;
 }
 
+#if 0   /* Tessera: MOD hidden (ui.c page_visible), its routes mods (test_mods_page) */
 /* MOD as rows: KNOB 2 the route, KNOB 1 its source (its picker), KNOB 3 its destination, KNOB 4 its amount */
 static int test_mod_rows(void)
 {
@@ -2020,6 +2053,7 @@ static int test_mod_rows(void)
     bad += check("..KNOB 4 its amount", TSEL->p[P_M2AMT] > 0 && !TSEL->p[P_M1AMT]);
     return bad;
 }
+#endif
 
 /* ENV / LFO on the engines with envelopes and LFOs of their own (ui.c native_titles): their pages, the track's ADSR
  * and ENV DEST hidden; LFO goes on to the track LFO. OCT- on a sound page: Stage; on SCALES: SCL */
@@ -4682,6 +4716,7 @@ int main(void)
     bad += test_gen_family();
     bad += test_cords_page();
     bad += test_help_gesture();
+    bad += test_mods_page();
     bad += test_midi();
     bad += test_save();
     bad += test_actions();
@@ -4724,7 +4759,7 @@ int main(void)
     bad += test_popups();
     bad += test_native_env_lfo();
     bad += test_step_sheets();
-    bad += test_mod_rows();
+    /* (test_mod_rows: MOD hidden in Tessera, its routes mods: test_mods_page) */
     bad += test_patterns_queue();
     bad += test_init_scales_patterns();
     bad += test_bughunt_ui();

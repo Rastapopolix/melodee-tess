@@ -52,7 +52,7 @@ static int reference(FILE *f)
     char r[512], df[64];
     fprintf(f, "# Parameters\n\nEvery setting of melodee-tess with its number, generated from `firmware/src/pid.c` by "
                "`tests/pid_test.c` (`PID_UPDATE=1 sh tests/run_tests.sh` rewrites it; the suite fails when it is out of "
-               "date). The numbers are fixed: cords and saved projects keep them.\n\nThe engine's eight (ENGINE 1 to 8) "
+               "date). The numbers are fixed: mods and saved projects keep them.\n\nThe engine's eight (ENGINE 1 to 8) "
                "are named by the track's engine; their ranges here are the first track's default engine's.\n");
     for (part = 0; part < 3u; part++) {
         fprintf(f, "\n## %s\n\n| ID | Name | Range | Default | What it does |\n| --- | --- | --- | --- | --- |\n", PART[part]);
@@ -78,9 +78,13 @@ static int reference(FILE *f)
             "1 while the track's generator plays a note", "the generator's last note (C4 = 0)",
             "the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the "
             "degree it moved to"};
-        fprintf(f, "\n## Cords\n\nA cord moves a destination on any track by a source on any track: by its AMOUNT "
-                   "(-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. "
-                   "Room for %u, %u in use.\n\n| Source | |\n| --- | --- |\n", CORD_MAX, CORD_LIVE);
+        fprintf(f, "\n## Mods\n\nA mod (the MODS page, under LFO) moves a destination on any track by a source on any "
+                   "track: by its AMOUNT (-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) "
+                   "plus its OFFSET. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track "
+                   "follow each note, as a chord's; elsewhere the latest note. Room for %u, %u in use. They are the project's, saved with it. Melodee's MOD page is "
+                   "gone: the four routes a project or a sound was saved with become mods on their track, the same move "
+                   "(a sound's go when another sound is loaded on the track, unless one was edited).\n\n"
+                   "| Source | |\n| --- | --- |\n", CORD_MAX, CORD_LIVE);
         for (i = 1; i < CS_N; i++)
             fprintf(f, "| %s | %s |\n", cord_src_name(i), SRC_HELP[i]);
         fprintf(f, "\n| Destination | Moved at | What it moves |\n| --- | --- | --- |\n");

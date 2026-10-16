@@ -1669,6 +1669,7 @@ static void ui_input(void)
         return;
     }
     if(ui.import_refresh){pop.on=0;brw.on=0;ui.import_refresh=0;ui.force=1;}
+    cu_adopt();                                         /* (Tessera: MOD's routes into MODS, ui_cords.c) */
     if (scr_input(pressed, notes)) return;
     if (designer_on() && !name_on() && !ui.confirm && designer_input(pressed, notes)) return;
     if (notes)

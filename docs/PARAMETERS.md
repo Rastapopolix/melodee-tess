@@ -1,6 +1,6 @@
 # Parameters
 
-Every setting of melodee-tess with its number, generated from `firmware/src/pid.c` by `tests/pid_test.c` (`PID_UPDATE=1 sh tests/run_tests.sh` rewrites it; the suite fails when it is out of date). The numbers are fixed: cords and saved projects keep them.
+Every setting of melodee-tess with its number, generated from `firmware/src/pid.c` by `tests/pid_test.c` (`PID_UPDATE=1 sh tests/run_tests.sh` rewrites it; the suite fails when it is out of date). The numbers are fixed: mods and saved projects keep them.
 
 The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges here are the first track's default engine's.
 
@@ -163,9 +163,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x216 | TWEAK HUMAN | 0 to 100 % | 0 | Varies velocity and gate a little, as a player would. |
 | 0x217 | TWEAK FOLLOW | OFF, T1, T2, T3, T4 | OFF | Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own. |
 
-## Cords
+## Mods
 
-A cord moves a destination on any track by a source on any track: by its AMOUNT (-100 to 100 %, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. Room for 32, 16 in use.
+A mod (the MODS page, under LFO) moves a destination on any track by a source on any track: by its AMOUNT (-100 to 100 %, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track follow each note, as a chord's; elsewhere the latest note. Room for 32, 16 in use. They are the project's, saved with it. Melodee's MOD page is gone: the four routes a project or a sound was saved with become mods on their track, the same move (a sound's go when another sound is loaded on the track, unless one was edited).
 
 | Source | |
 | --- | --- |

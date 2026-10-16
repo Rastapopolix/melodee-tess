@@ -522,8 +522,8 @@ static void sheet_draw(void)
         top += sh;
     }
 }
-/* the picker's list: its length, the value's entry, entry i's name and track (-1: none). An enum's names (MOD's
- * destinations by the engine's labels, as the page names them); CORDS: its own (ui_cords.c) */
+/* the picker's list: its length, the value's entry, entry i's name and track (-1: none). An enum's names; MODS
+ * (the cords): its own (ui_cords.c) */
 static int pick_list(int32_t *count, int32_t *cur)
 {
     int16_t *vp;
@@ -547,8 +547,6 @@ static const char *pick_name(int32_t i, int32_t *tr)
         return cu_pick_name(pop.col, i, tr);
     d = page_desc(cur_page(), pop.col, &vp);
     v = enum_value(d, i);
-    if (cur_page()->graph == GR_MOD && pop.col == 2u)
-        return mod_dst_name(TSEL, v);
     return d->names[v - d->min];
 }
 static void pick_draw(void)
