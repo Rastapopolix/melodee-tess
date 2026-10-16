@@ -484,7 +484,7 @@ Plan: `docs/analysis/phase1-plan.md`.
       the step sequencer, so upstream's page is untouched. `FAM_GEN` = `FAM_ARP` (no new family).
       2026-10-16 (Theo: one page reached from both ARP and SEQ is confusing; branch `gen-owns-knobs`):
       GEN alone shows the generator; PATTERN is upstream's again (LEN DIV SWING GATE, the step grid),
-      and FEEL, which stood in for those, is gone. Device check pending (build 1.2.2), with the ARP reach
+      and FEEL, which stood in for those, is gone. Passed on the device (1.2.5), with the ARP reach
 - [x] Help text field in the central parameter table, filled for every parameter (all 144; checked
       against the code where a label said too little)
 - [x] Generate the online parameter reference from the table: `docs/PARAMETERS.md` (`pid_test`
@@ -510,7 +510,7 @@ Plan: `docs/analysis/phase1-plan.md`.
       and templates keep theirs, so they sound as saved. The NORMALS switch first recommended needed
       a new saved field (the flash layout): dropped for this, no format change
 - [x] DRIFT: a slow source per track (a point every 11.9 s, eased), clocked by `mix_block`
-- [ ] Tune the default patch by ear on the device (amounts, which destinations; LPG decay not yet)
+- [x] Default patch heard on the device (1.2.5, Theo: happy); LPG decay as a default mod left for later
 - [x] MODS: the list without a flash (only it and the chips sent), eight names; activity lights
 
 ### 4. Strip engines, new voices, FX
