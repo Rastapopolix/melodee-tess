@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+#pragma once
+/* the few of <algorithm> Plaits uses (the JieLi toolchain has no C++ library) */
+namespace std {
+template <class T> inline const T &min(const T &a, const T &b) { return b < a ? b : a; }
+template <class T> inline const T &max(const T &a, const T &b) { return a < b ? b : a; }
+template <class I, class T> inline void fill(I f, I l, const T &v) { for (; f != l; ++f) *f = v; }
+template <class I, class O> inline O copy(I f, I l, O o) { for (; f != l; ++f, ++o) *o = *f; return o; }
+template <class T> inline void swap(T &a, T &b) { T t = a; a = b; b = t; }
+template <class I> inline void sort(I f, I l) { for (I i = f; i != l; ++i) for (I j = i; j != f && *j < *(j - 1); --j) swap(*j, *(j - 1)); }
+template <class I, class C> inline void sort(I f, I l, C c) { for (I i = f; i != l; ++i) for (I j = i; j != f && c(*j, *(j - 1)); --j) swap(*j, *(j - 1)); }
+}

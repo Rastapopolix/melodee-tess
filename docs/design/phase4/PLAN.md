@@ -1,6 +1,7 @@
 # Phase 4 plan: retiring engines, making room for Tessera's voices
 
-Status: a plan for Theo to decide on (2026-10-16). Nothing below is done yet.
+Status (2026-10-16): Theo decided: retire FM6, CZ-1 and Prophet; keep SID; a retired engine's track loads
+SID's INIT; the new voices both Tessera's own and a Plaits port. Nothing below is done yet.
 
 ## Measurements (tessera-dev, 9c6da85)
 
@@ -70,14 +71,12 @@ work: making its settings mod destinations (MODS reaches 8 of its settings today
 its own panels. It gets harder only if its files are deleted or its flash banks reused, which the plan does
 not do.
 
-## Decisions for Theo
+## Decisions (Theo, 2026-10-16)
 
-1. Retire FM6, CZ-1 and Prophet, as the ROADMAP planned? (Recommended, once the new voices are ready.)
-2. Keep SID? (11 KB, light on CPU, a distinct sound. Recommended: keep for now, decide with the new voices.)
-3. A retired engine's track in an old project loads as: SID's INIT (recommended until the new voices), later
-   the nearest new voice.
-4. The new voices: Tessera's own (pad, LPG pluck, lead, percussion: ROADMAP), or a port of Mutable
-   Instruments' Plaits (see below), or both.
+1. Retire FM6, CZ-1 and Prophet: yes (once the new voices are ready).
+2. SID: kept.
+3. A retired engine's track in an old project loads as SID's INIT (later: the nearest new voice).
+4. The new voices: both Tessera's own and a Plaits port.
 
 ## Plaits / Braids (Mutable Instruments)
 
@@ -90,13 +89,29 @@ Both are open source (the code is MIT, compatible with GPL-3.0; the attribution 
   device measurement.
 - **Braids** (2012): 30+ models, integer DSP for a smaller chip; lighter but older-sounding and aliasing more.
   Plaits is the better fit.
-- **Space:** Plaits' firmware fits in a 256 KB chip with its UI. All of its models, with the wavetables and the
-  speech data, are likely **about 100–150 KB**; a subset (virtual analog, waveshaping, FM, wavetable, chords,
-  string, modal, the drums) much less. **RAM:** each voice wants a working buffer (about 16 KB in Plaits),
-  from the audio arena (157 KB free there). To measure before deciding: compile Plaits' DSP for the AC79 with
-  this toolchain and read the sizes.
-- **Work:** it is C++ (the firmware is C); the toolchain is clang, so it can likely be compiled as C++ without
-  exceptions or RTTI (Plaits needs no heap). Then an engine wrapper: MODEL, HARMONICS, TIMBRE, MORPH and the
+- **Measured** (2026-10-16, `tools/plaits_measure`): Plaits (eurorack f4cfa76, stmlib d18def8) compiles for
+  the AC79 with the JieLi clang as C++ (no exceptions, no RTTI, a 20-line stand-in for `<algorithm>`), and
+  links with unused code dropped. Flash and static RAM, one voice:
+
+  | Plaits models | Flash | RAM |
+  | --- | --- | --- |
+  | all 24 (the whole voice, its LPG and post-processing) | 155 KB | 25 KB |
+  | 17 without the wavetables, speech and 6-OP (VA, VA VCF, waveshaping, FM, phase distortion, grain, additive, string machine, chiptune, swarm, noise, particle, string, modal, the three drums) | 57 KB | 20 KB |
+  | those and the three that share the wavetables (wavetable, chords, wave terrain) | 113 KB | 20 KB |
+  | the planned four voices: VA VCF, waveshaping, string, modal, chords, the three drums | 86 KB | 19 KB |
+  | each alone (with what it shares) | 4–8 KB most; 6-OP 14; speech 24; wavetable, chords, terrain 55–57 | 17–21 KB |
+
+  The big tables: the wavetables 51 KB (wavetable, chords and wave terrain share them), the 6-OP's three DX7
+  banks 12 KB, the speech data ~11 KB. The RAM is mostly the 16 KB working buffer each voice has; it can come
+  from the audio arena (157 KB free there) rather than static RAM.
+- **CPU, on this computer only** (ns per sample of one voice, the same machine and compiler level; the ratios
+  are what count): the FM-1's SID 23, CZ-1 31, FM6 33, Prophet 54; Plaits' models 16 (speech) to 114 (FM),
+  most 55–105. So **one Plaits voice costs about one to two Prophet voices** (3 of the 16 voice-budget units
+  each): a few Plaits voices across the tracks, not four-voice chords on every track. To measure on the device.
+- **What it brings back:** its 6-OP plays DX7 patches (3 banks of 32) and its phase distortion is CZ-like, so a
+  little of FM6's and CZ-1's character returns in 22 KB.
+- **Work:** it is C++ (the firmware is C): shown to compile; the build needs a C++ step and the link of its
+  objects beside `melodee.o`. Then an engine wrapper: MODEL, HARMONICS, TIMBRE, MORPH and the
   LPG's decay and colour as the engine's settings, so MODS and help reach them all; 44.1 kHz in place of 48;
   the voice budget. A first prototype with a few models is a few sessions of work.
 - **Fit:** its models cover the planned pad (chords, wavetable), LPG pluck (its LPG), lead (virtual analog,
