@@ -517,6 +517,8 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] Hard fork: create the `tessera` repo, GPL-3.0 and attribution kept; rename identities
       (package, USB, menu, web installer and editor)
 - [ ] Strip Prophet, FM6, CZ, SLICE and samples; measure the freed flash, RAM and CPU
+      (measured 2026-10-16, plan for Theo's decisions: `docs/design/phase4/PLAN.md`: switches first, IDs
+      reserved, flash banks untouched, new voices before the old ones go; Plaits considered)
 - [ ] Our own project format; drop `OBJ_TESSERA`
 - [ ] Voices: pad, LPG pluck, lead, percussion (DRUM kept)
 - [ ] FX with caps: delay, reverb, bitcrusher, wavefolder, ring mod, comb resonator
