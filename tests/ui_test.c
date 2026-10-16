@@ -534,6 +534,28 @@ static int test_help_gesture(void)
     frame();
     frame();
     bad += check("ARP let go: the help closes, and no page opens (still EVOLVE)", !help.on && str_eq(cur_page()->title, "EVOLVE"));
+    {                                             /* the selectors' lists (ui_popup.c pick_*) */
+        int32_t n, cur, tr;
+        go_title("CORDS");
+        cord_clear();
+        cord_ui_sel = 0;
+        turn(EN_K1, 2);
+        bad += check("CORDS: KNOB 1 turned opens its list, on the source chosen (T1 ENV)",
+                     pop.on == POP_PICK && pop.col == 0u && pick_list(&n, &cur) && n == (int32_t)CU_NSRC && cur == 2 &&
+                     str_eq(pick_name(cur, &tr), "ENV") && tr == 0);
+        turn(EN_K1 + 2u, 1);
+        bad += check("...KNOB 3: the destinations' list instead (T1 PITCH)", pop.on == POP_PICK && pop.col == 2u &&
+                     pick_list(&n, &cur) && n == (int32_t)CU_NDST && cur == 1 && pick_name(cur, &tr) && tr == 0);
+        turn(EN_K1 + 1u, 1);
+        bad += check("...KNOB 2 (the cord): no list", pop.on != POP_PICK);
+        cord_clear();
+        go_title("MOD");
+        turn(EN_K1 + 2u, 1);
+        bad += check("MOD: KNOB 3 opens its list, by the engine's names (as the page's)",
+                     pop.on == POP_PICK && pop.col == 2u && pick_list(&n, &cur) &&
+                     str_eq(pick_name(cur, &tr), mod_dst_name(TSEL, TSEL->p[P_M1DST + 3u * mod_ui_slot])));
+        pop_close();
+    }
     {
         char v[24];
         tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);

@@ -355,9 +355,16 @@ static void pick_touch(uint32_t c)
         pop_close();
     if (ui.home || pop.on == POP_SHEET || own_screen())
         return;
+    if (cur_page()->graph == GR_CORDS) {                /* CORDS: its source and destination lists (ui_cords.c) */
+        int32_t n, i;
+        if (!cu_pick(c, &n, &i))
+            return;
+        d = 0;
+    } else {
     d = page_desc(cur_page(), c, &vp);
     if (!d || !vp || d->fmt != F_ENUM || !d->names || d->max - d->min < 4 || pick_numbers(d))
         return;
+    }
     if (pop.on != POP_PICK)
         ui.force = 1;                                   /* (the page dimmed under it) */
     pop.on = POP_PICK;
@@ -515,40 +522,75 @@ static void sheet_draw(void)
         top += sh;
     }
 }
-static void pick_draw(void)
+/* the picker's list: its length, the value's entry, entry i's name and track (-1: none). An enum's names (MOD's
+ * destinations by the engine's labels, as the page names them); CORDS: its own (ui_cords.c) */
+static int pick_list(int32_t *count, int32_t *cur)
 {
     int16_t *vp;
-    const param_desc_t *d = page_desc(cur_page(), pop.col, &vp);
-    int32_t x, v, i;
+    const param_desc_t *d;
+    if (cur_page()->graph == GR_CORDS)
+        return cu_pick(pop.col, count, cur);
+    d = page_desc(cur_page(), pop.col, &vp);
+    if (!d || !vp || !d->names)
+        return 0;
+    *count = enum_rows(d);
+    *cur = enum_rank(d, *vp);
+    return 1;
+}
+static const char *pick_name(int32_t i, int32_t *tr)
+{
+    int16_t *vp;
+    const param_desc_t *d;
+    int32_t v;
+    *tr = -1;
+    if (cur_page()->graph == GR_CORDS)
+        return cu_pick_name(pop.col, i, tr);
+    d = page_desc(cur_page(), pop.col, &vp);
+    v = enum_value(d, i);
+    if (cur_page()->graph == GR_MOD && pop.col == 2u)
+        return mod_dst_name(TSEL, v);
+    return d->names[v - d->min];
+}
+static void pick_draw(void)
+{
+    int32_t x, i, count, cur;
     uint32_t sig;
-    if (!d || !vp || !d->names) {
+    if (!pick_list(&count, &cur)) {
         pop_close();
         return;
     }
-    v = *vp;
-    sig = (uint32_t)(v + 1) * 7919u + pop.col * 131u + ux.gen * 977u + ux.pal * 31u;
+    sig = (uint32_t)(cur + 1) * 7919u + pop.col * 131u + ux.gen * 977u + ux.pal * 31u + cord_ui_sel * 37u;
     if (!ui.force && sig == pop.sig)
         return;
     pop.sig = sig;
     {
-    int32_t rows = enum_rows(d) < 5 ? enum_rows(d) : 5, h = 16 + rows * 20;
-    int32_t first = clamp(enum_rank(d,v) - 2, 0, enum_rows(d) - rows);   /* five names around it, the list's ends kept */
+    int32_t rows = count < 5 ? count : 5, h = 16 + rows * 20;
+    int32_t first = clamp(cur - 2, 0, count - rows);   /* five names around it, the list's ends kept */
     x = 4 + 60 * (int32_t)(pop.col < 3u ? pop.col : 2u);   /* its column and the next (the last: the two last), whole:
                                                          * a neighbour's value is under it entirely or not at all */
     cv_begin(POP_PICK_W, (uint32_t)h, T_BG);
     cv_rrect(0, 0, POP_PICK_W, h, 10, T_LINE, T_BG);
     cv_rrect(1, 1, POP_PICK_W - 2, h - 2, 9, T_SURF, T_LINE);
     for (i = 0; i < rows; i++) {
-        int32_t n = enum_value(d,first + i), y = 8 + i * 20, far = n - v > 1 || v - n > 1;
+        int32_t n = first + i, y = 8 + i * 20, far = n - cur > 1 || cur - n > 1, tr, tx = 12;
+        uint16_t bg = n == cur ? T_LIFT : T_SURF;
+        const char *name = pick_name(n, &tr);
         char b[16];
-        list_words(b, d->names[n - d->min], sizeof b);
-        if (n == v) {
+        if (tr >= 0 || cur_page()->graph == GR_CORDS)
+            str_cpy(b, name, sizeof b);                 /* (a cord's: as its chips name it, "LFO RTE") */
+        else
+            list_words(b, name, sizeof b);
+        if (n == cur) {
             cv_rrect(4, y - 1, POP_PICK_W - 8, 20, 5, T_THEME, T_SURF);
             cv_rrect(5, y, POP_PICK_W - 10, 18, 4, T_LIFT, T_THEME);
-            cv_free_text(12, y + 2, &AF_S, b, T_TEXT, T_LIFT, POP_PICK_W - 20);
-        } else {
-            cv_free_text(12, y + 2, &AF_S, b, far ? T_MID : T_SEC, T_SURF, POP_PICK_W - 20);
         }
+        if (tr >= 0) {                                  /* a cord's: the track's number on its colour (as the rows') */
+            char num[2] = {(char)('1' + (tr & 3)), 0};
+            cv_rrect(10, y + 3, 12, 12, 3, T_TRK((uint32_t)tr), bg);
+            cv_text_on(13, y + 4, &AF_X, num, T_BG, T_TRK((uint32_t)tr));
+            tx = 27;
+        }
+        cv_free_text(tx, y + 2, &AF_S, b, n == cur ? T_TEXT : far ? T_MID : T_SEC, bg, POP_PICK_W - 8 - tx);
     }
     cv_blit((uint32_t)x, 40);
     }

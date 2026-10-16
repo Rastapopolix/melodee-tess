@@ -118,6 +118,33 @@ static void cu_columns(void)
     draw_column(3, c->src ? "" : "OFS", val, "", cu_pct(c) ? VAL(3u) : T_DIM, (cu_pct(c) + 100) * 1000 / 200, ICON_NONE);
 }
 
+/* KNOB 1's and 3's lists for the picker (ui_popup.c): their length and the cord's entry; 0: no list on that knob */
+static int cu_pick(uint32_t col, int32_t *count, int32_t *cur)
+{
+    const cord_t *c = cord_get(cord_ui_sel);
+    if (col != 0u && col != 2u)
+        return 0;
+    *count = (int32_t)(col ? CU_NDST : CU_NSRC);
+    *cur = (int32_t)(col ? cu_dst_of(c) : cu_src_of(c));
+    return 1;
+}
+/* entry i of a list: its name, its track (-1: none, the "--" first) */
+static const char *cu_pick_name(uint32_t col, int32_t i, int32_t *tr)
+{
+    cord_t c = {0};
+    *tr = -1;
+    if (i <= 0)
+        return "--";
+    if (col == 0u) {
+        *tr = (i - 1) / (int32_t)(CS_N - 1u);
+        return cord_src_name((uint32_t)((i - 1) % (int32_t)(CS_N - 1u) + 1));
+    }
+    *tr = (i - 1) / (int32_t)(CD_N - 1u);
+    c.dst = (uint8_t)((i - 1) % (int32_t)(CD_N - 1u) + 1);
+    c.dst_trk = (uint8_t)*tr;
+    return cu_dst_name(&c);
+}
+
 /* a knob on CORDS (ui_input.c edit_param) */
 static void cu_knob(uint32_t slot, int32_t steps)
 {
