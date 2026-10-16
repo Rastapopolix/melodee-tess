@@ -175,6 +175,16 @@ Candidates beside Turing, Euclid, Markov and Morph, each a `gen_<name>_tick` in 
   (Swell Physics, four buoys) on the four-track hook, Automatonnetz / Harrington 1200 (neo-Riemannian chords, with
   Chords), Relabi. Modifiers: RESEED another track and mask (Pam's cross-ops), timing HUMAN and RAMP (flex-ops),
   Euclid PAD, ratchets, Palimpsest accents, threshold-logic neurons.
+- **Comparison of every candidate** (Theo 2026-10-16: weigh them up before choosing): effort, RAM, flash, musical
+  value and shared dependencies in `docs/design/GENERATOR_COMPARISON.md`. Shared work that unlocks several items: the
+  four-track hook (MATRIX), sub-step timing (ratchets, swing, phasing), glide (TB-3PO), Chords (Automatonnetz).
+  Shortlist: Bounce, Awake, Subharmonicon-style polyrhythm sequencer, organic LFOs, BRANCH, LOGIC; then MATRIX and
+  ratchets; then TB-3PO and Automatonnetz. Flash, not RAM, limits how many modes fit (~1 KB RAM, 25-30 KB flash for
+  all S and M modes).
+- **Organic LFOs** (Triple Sloth, ochd): cord sources SLOTH (Torpor ~15-20 min, Apathy ~1 min, Inertia ~2-4 min:
+  fixed-point jerk systems at control rate, seeded, clamped) and OCHD (8 free LFOs at related non-integer rates, one
+  RATE, organic shape table), shared, chosen by the cord's source-track byte (no CRD step). About 70 B RAM and
+  1.5 KB flash for both; DRIFT stays as the simple one.
 - **Visuals**: each mode draws its norns picture in `graph_tessera_viz` (Theo's wish). The 240 x 240 colour screen
   holds norns' 128 x 64 grey layouts at about 1.9x, grey levels mapped to theme colours. Moving pictures (Bounce,
   orbital) need a per-frame redraw of that area, not per step: measure the CPU on the device. Copying a script's
@@ -618,6 +628,8 @@ Plan: `docs/analysis/phase1-plan.md`.
       test, guide and demo)
 - [ ] STEP as seed: locks, Gravity, Keep, ghost-note grid; Ornament and Serial generators
       (phase 1's `input_phrase` prepares for it)
+- [ ] Organic LFOs SLOTH and OCHD as cord sources (Features > More generators)
+- [ ] Choose from the generator comparison (docs/design/GENERATOR_COMPARISON.md) with Theo
 - [ ] Logic and Branches (Features > Mod sources): BRANCH and LOGIC on TWEAK, then COIN and logic cord sources
 - [ ] The remaining mod sources, clock tools, quantizer, Kria-style lanes
 - [ ] Chords as a per-track note-generation option
