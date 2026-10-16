@@ -37,6 +37,7 @@ static const engine_t ENG_RETIRED = {         /* 13 without MELODEE_SLICE: reser
 /* Each track owns only its selected engine's working state. Simple engines
  * use voice_t alone. State is released after the old engine's switch fade. */
 #include "resources.c"
+#include "eng_macro.c"          /* MACRO: Plaits' synthesis (MELODEE_PLAITS; macro_glue.cc, third_party/mi) */
 static uint32_t eng_state_size(uint32_t e)
 {
     switch (e) {
@@ -55,6 +56,9 @@ static uint32_t eng_state_size(uint32_t e)
 #endif
     case ENGI_CZ: return sizeof(cz_part_t);
     case 3: return sizeof(sid_part_t);              /* SID (eng_sid.c) */
+#if MELODEE_PLAITS
+    case ENGI_MACRO: return mc_bytes();             /* MACRO: Plaits' voice and its working memory (eng_macro.c) */
+#endif
     case ENGI_DRUM: return sizeof(drum909_part_t);
     case ENGI_FM6: return sizeof(fm6_part_t);
 #if MELODEE_SLICE
@@ -149,6 +153,12 @@ static const engine_t *const ENGINES[NENGINES] = {
 #else
     &ENG_RETIRED,                /* 19: Prophet left out of the build; stored ID reserved */
 #endif
+    &ENG_RETIRED,                /* 20: reserved (USER_NATIVE_P5, the browser's Prophet user bank) */
+#if MELODEE_PLAITS
+    &ENG_MACRO,                  /* 21: MACRO, Plaits' synthesis (Tessera) */
+#else
+    &ENG_RETIRED,                /* 21: MACRO left out of the build; stored ID reserved */
+#endif
 };
 
 /* a track's engine number as an index (the audio paths: a compare, cheaper than % NENGINES; a bad number: 0) */
@@ -191,6 +201,9 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
 #endif
     3,                           /* SID */
 #endif
+#if MELODEE_PLAITS
+    ENGI_MACRO,                  /* MACRO */
+#endif
 #if MELODEE_SLICE
     13,                          /* SLICE */
 #endif
@@ -210,7 +223,7 @@ static int eng_extra_retired(uint32_t e)
  * eng_vis(n), e's place among them eng_rank(e), the next / previous one eng_step(e, dir) (wraps) */
 static int eng_ok(uint32_t e)
 {
-    return e < NENGINES && !(e >= 16u && e <= 18u) && !eng_extra_retired(e) && e != 4u && e != 8u && e != 14u && (MELODEE_SLICE || e != ENGI_SLICE) &&
+    return e < NENGINES && !(e >= 16u && e <= 18u) && !eng_extra_retired(e) && e != 4u && e != 8u && e != 14u && e != 20u && (MELODEE_SLICE || e != ENGI_SLICE) &&
            ENG_BUILT(e);
 }
 static uint32_t eng_sound_idx(uint32_t e)

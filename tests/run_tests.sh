@@ -201,6 +201,23 @@ prophet() {
             "$P5/P5_Factory_Programs_FACTORY_v1.03.syx" "$P5/P5_Factory_Programs_USER_v1.03.syx"
     fi
 }
+macro_tests() {                                  # MACRO (eng_macro.c): Plaits' C++ for this computer, then macro_test
+    M=firmware/third_party/mi
+    if ! command -v c++ >/dev/null 2>&1; then echo "== MACRO: skipped (no c++)"; return; fi
+    mkdir -p "$OUT/mi"
+    _objs=
+    for _f in $M/plaits/dsp/*.cc $M/plaits/dsp/*/*.cc $M/plaits/resources.cc $M/stmlib/dsp/*.cc $M/stmlib/utils/*.cc \
+        firmware/src/macro_glue.cc; do
+        _o=$OUT/mi/$(echo "$_f" | tr / _).o
+        c++ -O2 -std=c++11 -fno-exceptions -fno-rtti -fno-threadsafe-statics -w -DMACRO_HOST -DTEST -DPLAITS_LEAN \
+            -DPLAITS_SAMPLE_RATE=44100.0f -DPLAITS_SAMPLE_RATE_EXACT -DPLAITS_BLOCK_SIZE=16 -include stdio.h \
+            -I$M -Ifirmware/src -c "$_f" -o "$_o" || { fail "compile $_f (MACRO)"; return 1; }
+        _objs="$_objs $_o"
+    done
+    $CC -O2 $FW -DMELODEE_PLAITS=1 -c tests/macro_test.c -o "$OUT/macro_test.o" &&
+        c++ -o "$OUT/macro_test" "$OUT/macro_test.o" $_objs -lm || { fail "compile tests/macro_test.c (MACRO)"; return 1; }
+    step "MACRO: Plaits' models play, pitch, HIT, every knob, arena memory, cost against SID" "$OUT/macro_test"
+}
 phys_ref() {
     D=${DAISYSP:-vendor/DaisySP}/Source
     if [ ! -d "$D/PhysicalModeling" ] || ! command -v c++ >/dev/null 2>&1; then
@@ -340,6 +357,7 @@ if sound && [ $TABLES = 1 ]; then
     t "native fp32: independent numerical references, exact pitch, quiet signals and fractional envelopes" synth_fpu_test \
         -O2 $FW
     job prophet
+    job macro_tests
     t "modulation matrix: off = bit-identical, the math, MIDI CC1 / CC11 / aftertouch, cost, demos" mod_test \
         -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW -- "$OUT/mod_test" build/mod_demo
     t "matrix S&H / SLEW / DEPTH, SPREAD: off = bit-identical, stereo sides and routing" mod_spread_test -O2 $FW
