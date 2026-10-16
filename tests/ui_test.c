@@ -513,6 +513,48 @@ static int test_cords_page(void)
     return bad;
 }
 
+/* Mod shortcut (ui_modsc.c): FX held + a knob sets its parameter's cord amount on this track, the value left; SELECT
+ * the source; back at 0 the slot is free; a parameter no cord reaches: nothing; FX let go opens no page */
+static int test_mod_shortcut(void)
+{
+    int bad = 0, i;
+    cord_t full = {CS_RAND, 1, CD_LEVEL, 1, 10, 0};
+    ui_power_on();
+    cord_clear();
+    tessera_knob(0, TESS_ENG_TURING);
+    go_title("TWEAK");
+    tessera.evolve[0].drop = 0;
+    fm1_in.buttons |= 1u << panel.btn[B_FX];
+    frame();
+    turn(EN_K1 + 1u, 5);
+    bad += check("FX + KNOB 2 on TWEAK: a cord from track 1's LFO to its DROP, +10 %", cord_count() == 1u &&
+                 cord_get(0)->src == CS_LFO && cord_get(0)->src_trk == 0u && cord_get(0)->dst == CD_TW_DROP &&
+                 cord_get(0)->dst_trk == 0u && cord_get(0)->amount == 10 && msc.on);
+    bad += check("...DROP itself left as it was", tessera.evolve[0].drop == 0u);
+    turn(EN_K1 + 1u, -10);
+    bad += check("...turned back past 0: the same cord, -10 %", cord_count() == 1u && cord_get(0)->amount == -10);
+    turn(EN_SELECT, 1);
+    bad += check("FX + SELECT: the cord's source the next one (ENV)", cord_get(0)->src == CS_ENV);
+    turn(EN_K1 + 3u, 3);
+    bad += check("FX + KNOB 4 (FOLLOW, no cord reaches it): no cord, FOLLOW left", cord_count() == 1u && !tessera.evolve[0].follow);
+    turn(EN_K1 + 1u, 5);
+    bad += check("DROP back to 0: the slot free again", cord_count() == 0u);
+    fm1_in.buttons &= ~(1u << panel.btn[B_FX]);
+    frame();
+    frame();
+    bad += check("FX let go: the map closed, TWEAK still shown", !msc.on && str_eq(cur_page()->title, "TWEAK"));
+    for (i = 0; i < (int)CORD_LIVE; i++)
+        cord_set((uint32_t)i, &full);
+    fm1_in.buttons |= 1u << panel.btn[B_FX];
+    frame();
+    turn(EN_K1 + 2u, 5);
+    bad += check("every slot used: MODS FULL, nothing changed", cord_count() == CORD_LIVE && cord_get(0)->dst == CD_LEVEL);
+    fm1_in.buttons &= ~(1u << panel.btn[B_FX]);
+    frame();
+    cord_clear();
+    return bad;
+}
+
 /* MODS (Tessera): MOD's page gone from LFO's taps, the cords' page in its place; a route that comes in (a project, a
  * sound) is a mod on its track at the next frame; no room: MODS FULL */
 static int test_mods_page(void)
@@ -4752,6 +4794,7 @@ int main(void)
     bad += test_rec();
     bad += test_gen_family();
     bad += test_cords_page();
+    bad += test_mod_shortcut();
     bad += test_help_gesture();
     bad += test_mods_page();
     bad += test_midi();

@@ -90,6 +90,7 @@ static int32_t pick_bottom(void) { return pv_kind() == PV_CORDS || pv_kind() == 
 
 #include "ui_cords.c"                                  /* CORDS (Tessera) */
 #include "ui_help.c"                                   /* ARP held + a knob: its help (Tessera) */
+#include "ui_modsc.c"                                  /* FX held + a knob: its mod amount (Tessera) */
 
 /* MOD (docs/design: mock/r6_pages MOD): the matrix's four routes as rows, "1  LFO -> Cutoff  +62 %" over the amount's
  * bar (from the middle); the route KNOB 2 is on: a card in the track's colour; unused routes dim. The knobs' chips
