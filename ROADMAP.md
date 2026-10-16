@@ -114,6 +114,21 @@ another), so people can try the modes in the browser before installing.
   audio envelope follower; drum ducking; macros.
 - Clock tools: dividers/multipliers, Marbles-style jitter, Bernoulli gates, ratchets/bursts,
   per-track swing.
+- **Logic and Branches** (Theo 2026-10-16; Mutable Instruments Branches: a Bernoulli gate, each trigger goes to
+  output A or B by a coin toss of probability P; toggle and latch modes). Three pieces, smallest first:
+  - BRANCH on TWEAK: with probability P a hit plays on another track (TO 1..4) instead of this one, so two tracks
+    answer each other; TOGGLE alternates, LATCH keeps the last side until the toss changes. DROP is already the
+    one-sided case (hit or nothing). The toss uses the track's seeded stream, so it replays with its SEED, and LOCK
+    could repeat the last tosses (deja vu). Playing on another track shares MATRIX's four-track hook (that track's
+    gate-off). About 3 B a track.
+  - LOGIC on TWEAK (foulplay-style): this track's hits combined with another track's: AND (only when both hit), OR,
+    XOR, NOT (only when the other rests). The tracks step in index order, so a track reads a lower one's hit from
+    this step and a higher one's from the last. About 2 B a track.
+  - Cord sources: COIN A / COIN B (a source track's gate split by a toss, P set by the cord's amount), then
+    AND/OR/XOR of two tracks' gates, flip-flop, comparator. Two-track logic needs a second source track in the cord
+    (a CRD format step); COIN fits the present cord.
+  Every piece has an OFF position (P = 0, LOGIC off). Each is a few lines in `tessera.c` beside DROP; most of the
+  work is the help texts, the parameter IDs and a host test per mode.
 - Quantizer with weighted scale degrees; learn the scale from played notes.
 - Kria-style polymetric lanes (note, trigger, octave, gate, each with its own length).
 - Later generators: 1D cellular automata, cascading counters, Bloom-style branching mutations.
@@ -595,6 +610,7 @@ Plan: `docs/analysis/phase1-plan.md`.
       test, guide and demo)
 - [ ] STEP as seed: locks, Gravity, Keep, ghost-note grid; Ornament and Serial generators
       (phase 1's `input_phrase` prepares for it)
+- [ ] Logic and Branches (Features > Mod sources): BRANCH and LOGIC on TWEAK, then COIN and logic cord sources
 - [ ] The remaining mod sources, clock tools, quantizer, Kria-style lanes
 - [ ] Chords as a per-track note-generation option
 - [ ] External MIDI over USB: per-track routing and channel, clock out
