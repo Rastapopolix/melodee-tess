@@ -493,7 +493,13 @@ Plan: `docs/analysis/phase1-plan.md`.
       ARP's release then opens no page (`ui_help.c`). Engine panels (FM6, CZ-1, PROPHET): label only
 - [x] Selector lists (Theo 2026-10-16): CORDS' SOURCE and DESTINATION turned show the picker's list
       (each entry with its track), MOD's DST list by the engine's names; the help card names a value whole
-- [ ] Device check of phase 2 (build 1.2.3): GEN, PATTERN, the ARP reach, the selector lists, help, CORDS (a cord heard, saved,
+- [x] MODS replaces MOD (Theo 2026-10-16, branch `mods-merge`): CORDS renamed MODS; MOD hidden
+      from LFO's taps (its code kept for upstream syncs). Routes that come in (an old project, a sound
+      saved with them, the editor) become mods on their track, sounding bit for bit as before
+      (cord_test); a sound's go when another sound loads, unless edited; a project's stay; no room:
+      MODS FULL and the route keeps playing. Same-track ENV/VEL/KEY/RAND mods are per voice now.
+      User sounds are saved without modulation (it is the project's)
+- [ ] Device check of phase 2 (build 1.2.4): GEN, PATTERN, the ARP reach, the selector lists, MODS, help, CORDS (a cord heard, saved,
       loaded), and the cost of 16 cords on the device
 - [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
