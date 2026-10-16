@@ -630,6 +630,7 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [ ] Performance page
 - [ ] In-box help: help combo + knob touch, live-state line, page summaries
 - [ ] Online manual; QR code on the About page
+      (material so far: `docs/manual/recipes.md`: SID chip arpeggios, Grids variations with FORM and LFO cords)
 - [ ] Boot behaviour and curated random patches
 - [ ] WebAssembly build; GitHub Pages demo
 
