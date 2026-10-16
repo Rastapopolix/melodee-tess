@@ -630,7 +630,9 @@ Plan: `docs/analysis/phase1-plan.md`.
       X and Y; every part a GM drum note (36 38 42; a DRUM track's kit). Saved: block version 3 ("TSR3", 51 bytes a
       track), versions 1 and 2 converted on reading (projects, backups); cords on X, Y, DENSITY. Host tests: gen_test
       (the map against Grids' own values), three tessera scenarios, the saved block. Device check and the web
-      simulator still to do
+      simulator still to do. 2026-10-17: the device build failed to link (memmove, none in libc.c), fixed;
+      merged with `macro-plaits` into `phase4-dev`; test page 1.2.6 (MACRO off) for the device check:
+      https://rastapopolix.github.io/melodee-tess/test/1.2.6/webapp/installer/
 - [ ] More generators (Features > More generators): Awake, Fall, First Light chimes, Bounce / Pong
 - [ ] MATRIX (initenere) and the shared four-track hook (Features > More generators); then the norns.community list
 - [ ] **FOLLOW modes** (Features > FOLLOW): interval in scale degrees, chord tone, contrary, canon, bass; RHYTHM
