@@ -167,6 +167,14 @@ Candidates beside Turing, Euclid, Markov and Morph, each a `gen_<name>_tick` in 
   shows the whole matrix and all four playheads whatever track is selected (the one break from editing
   `song.sel`). Build the shared four-track hook once: quence, meadowphysics, fugu/streams and foulplay's logic
   reuse it.
+- **From O_C Phazerville, EuroPi and Pam's Pro Workout** (survey 2026-10-16, notes in
+  `docs/design/MODULE_GENERATORS.md`; EuroPi is CC0, Hemisphere MIT, O_C GPL-3.0), easiest first: ProbMeloD
+  (a weight per note), Pigeons (Fibonacci mod N, merge with fibonacci), Polyrhythmic Sequencer (Subharmonicon),
+  Cumulus (Nibbler accumulator), RunglBook (Rungler), ProbDiv, DCSN-2, Probapoly, The Darkest Timeline, Shredder
+  (Mimetic Digitalis). Moderate: TB-3PO (seeded 303 lines; needs glide), Gate Phaser (Reich phasing) and Ocean Surge
+  (Swell Physics, four buoys) on the four-track hook, Automatonnetz / Harrington 1200 (neo-Riemannian chords, with
+  Chords), Relabi. Modifiers: RESEED another track and mask (Pam's cross-ops), timing HUMAN and RAMP (flex-ops),
+  Euclid PAD, ratchets, Palimpsest accents, threshold-logic neurons.
 - **Visuals**: each mode draws its norns picture in `graph_tessera_viz` (Theo's wish). The 240 x 240 colour screen
   holds norns' 128 x 64 grey layouts at about 1.9x, grey levels mapped to theme colours. Moving pictures (Bounce,
   orbital) need a per-frame redraw of that area, not per step: measure the CPU on the device. Copying a script's
