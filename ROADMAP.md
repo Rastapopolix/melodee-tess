@@ -482,14 +482,16 @@ Plan: `docs/analysis/phase1-plan.md`.
 - [x] GEN family under ARP's tap: GEN, EVOLVE, FORM, TWEAK, ARP, ARP 2 (2026-10-16, branch `gen-family`).
       GEN is a second page onto PATTERN's knobs (MODE and the engine's three); PATTERN stays in SEQ for
       the step sequencer, so upstream's page is untouched. `FAM_GEN` = `FAM_ARP` (no new family).
-      Device check pending (build 1.2.0), with the ARP reach check
+      2026-10-16 (Theo: one page reached from both ARP and SEQ is confusing; branch `gen-owns-knobs`):
+      GEN alone shows the generator; PATTERN is upstream's again (LEN DIV SWING GATE, the step grid),
+      and FEEL, which stood in for those, is gone. Device check pending (build 1.2.2), with the ARP reach
 - [x] Help text field in the central parameter table, filled for every parameter (all 144; checked
       against the code where a label said too little)
 - [x] Generate the online parameter reference from the table: `docs/PARAMETERS.md` (`pid_test`
       writes it and fails when it is out of date), with the cords' sources and destinations
 - [x] Help gesture: ARP held + a knob turned shows the knob's help card, the value left as it is;
       ARP's release then opens no page (`ui_help.c`). Engine panels (FM6, CZ-1, PROPHET): label only
-- [ ] Device check of phase 2 (build 1.2.1): GEN, the ARP reach, help, CORDS (a cord heard, saved,
+- [ ] Device check of phase 2 (build 1.2.2): GEN, PATTERN, the ARP reach, help, CORDS (a cord heard, saved,
       loaded), and the cost of 16 cords on the device
 - [x] Choose the function key (ARP held, 2026-10-16); the key map with it still to draft
 
