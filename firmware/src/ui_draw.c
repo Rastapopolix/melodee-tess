@@ -1218,7 +1218,8 @@ static void draw_page(void)
     } else if (!own_screen() && list_on()) {            /* a list page (ui_list.c) */
         list_draw();
 #if MELODEE_LOOK
-    } else if (!own_screen() && (pv_kind() == PV_CURVE || pv_kind() == PV_RINGS)) {   /* Mono: the knob pages */
+    } else if (!own_screen() && (pv_kind() == PV_CURVE || pv_kind() == PV_RINGS || pv_kind() == PV_NOTES)) {   /* Mono:
+                                                         * the knob pages, NOTES */
         mono_page();
         return;
 #endif

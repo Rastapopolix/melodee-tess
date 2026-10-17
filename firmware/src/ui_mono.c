@@ -613,6 +613,76 @@ static void mo_pic_lfo(track_t *t)
         mo_textr(b, 118, 102, MO_INK);
     }
 }
+/* NOTES (a melodic track's steps): the cursor's page of 16, tabs 1..4 for the pattern's pages (the one shown inverted)
+ * with LEN and DIV; a step a column 5 cells wide in groups of four: a note's height its pitch among the page's notes
+ * (a chord: a tick above for each note more), a tie an outline at the note before's height, a rest a dim dash; an
+ * accent a mark under, a slide a tail into the next; the playhead a dim frame, the cursor a thick underline */
+static void mo_pic_notes(const track_t *t)
+{
+    uint32_t len = (uint32_t)clamp(t->p[P_SLEN], 1, NSTEP), pages = (len + 15u) / 16u, pg = ui.cursor / 16u, i;
+    int32_t lo = 127, hi = 0, prev = 3, base = 92;
+    char b[20];
+    const char *unit;
+    for (i = 0; i < 4u; i++) {                          /* the pattern's pages */
+        char d[2] = {(char)('1' + i), 0};
+        if (i == pg) mo_inv(d, 3 + (int32_t)i * 9, 54);
+        else mo_text(d, 3 + (int32_t)i * 9, 54, i < pages ? MO_DIM : MO_BG);
+        if (i >= pages) mo_px(5 + (int32_t)i * 9, 60, MO_DIM);   /* (past LEN: a dot) */
+    }
+    str_cpy(b, "LEN ", sizeof b);
+    fmt_int(b + 4, (int32_t)len);
+    mo_text(b, 46, 54, MO_DIM);
+    param_format(&TP[P_SDIV], t->p[P_SDIV], b, &unit);
+    mo_textr(b, 118, 54, MO_DIM);
+    for (i = pg * 16u; i < pg * 16u + 16u && i < len; i++) {   /* the page's pitch range */
+        const step_t *st = &seq_steps(t)[i];
+        if (step_on(st) && st->n) {
+            lo = st->note[0] < lo ? st->note[0] : lo;
+            hi = st->note[0] > hi ? st->note[0] : hi;
+        }
+    }
+    if (hi - lo < 12) lo = hi - 12 < 0 ? 0 : (lo + hi) / 2 - 6, hi = lo + 12;   /* (an octave at least) */
+    for (i = 0; i < 16u; i++) {
+        uint32_t si = pg * 16u + i;
+        const step_t *st = &seq_steps(t)[si < NSTEP ? si : 0u];
+        int32_t x = 3 + (int32_t)i * 7 + (int32_t)(i / 4u) * 2, h;
+        if (si >= len) {                                /* past LEN: nothing but a dot */
+            mo_px(x + 2, base - 1, MO_DIM);
+            continue;
+        }
+        if (step_on(st) && st->n) {
+            uint32_t k;
+            h = 3 + (st->note[0] - lo) * 19 / (hi - lo > 0 ? hi - lo : 1);
+            h = h > 22 ? 22 : h;
+            prev = h;
+            mo_fill(x, base - h, 5, h, MO_INK);
+            for (k = 1; k < st->n && k < 4u; k++)       /* a chord's other notes */
+                mo_hl(x + 1, base - h - 2 * (int32_t)k, 3, MO_INK);
+            if (st->flags & SF_ACCENT) mo_fill(x + 1, base + 2, 3, 2, MO_INK);
+            if (st->flags & SF_SLIDE) mo_hl(x + 5, base - h, 2, MO_INK);
+        } else if (st->time == ST_TIE) {
+            mo_box(x - 1, base - prev, 6, prev, MO_INK);
+        } else {
+            mo_hl(x, base - 1, 5, MO_DIM);
+        }
+        if (song.playing && si == t->seq_idx % len)
+            mo_box(x - 1, base - 26, 7, 28, MO_DIM);
+        if (si == ui.cursor)
+            mo_fill(x, base + 5, 5, 2, MO_INK);
+    }
+    {                                                   /* the cursor's step in words */
+        const step_t *st = &seq_steps(t)[ui.cursor % NSTEP];
+        static const char *const TM[3] = {"NOTE", "TIE", "REST"};
+        str_cpy(b, "STEP ", sizeof b);
+        fmt_int(b + 5, (int32_t)ui.cursor + 1);
+        str_cpy(b + str_len(b), ": ", 3);
+        if (step_on(st) && st->n) note_name(b + str_len(b), st->note[0]);
+        else str_cpy(b + str_len(b), TM[st->time % 3u], 6);
+        if (st->flags & SF_ACCENT) str_cpy(b + str_len(b), " ACC", 5);
+        if (st->flags & SF_SLIDE) str_cpy(b + str_len(b), " SLD", 5);
+        mo_text(b, 1, 101, MO_DIM);
+    }
+}
 static void mo_picture(void)
 {
     const page_t *pg = cur_page();
@@ -626,6 +696,10 @@ static void mo_picture(void)
         case TESS_ENG_MORPH: mo_pic_morph(tessera_morph(tr)); return;
         case TESS_ENG_GRIDS: mo_pic_grids(tessera_grids(tr), t); return;
         }
+    }
+    if (pg->graph == GR_ROLL) {
+        mo_pic_notes(t);
+        return;
     }
     if (pg->graph == GR_STEPS) {
         mo_pic_pattern(t);
@@ -775,6 +849,8 @@ static uint32_t mo_signature(void)
         h = (h ^ tessera.morph[song.sel].step_idx ^ (uint32_t)tessera.markov[song.sel].cur_state << 8) * 16777619u;
         h = (h ^ tessera.markov[song.sel].last_hit ^ (uint32_t)tessera.markov[song.sel].tension << 8) * 16777619u;
     }
+    if (cur_page()->graph == GR_ROLL)                   /* NOTES: the steps */
+        h = (h ^ steps_hash(t) ^ (uint32_t)t->p[P_SLEN] << 8 ^ (uint32_t)t->p[P_SDIV] << 16) * 16777619u;
     if (cur_page()->graph == GR_LFO)                    /* the LFO's dot: 58 places a cycle */
         h = (h ^ (t->lfo_ph / (0xFFFFFFFFu / 58u))) * 16777619u;
     if (ui.msg_t)
