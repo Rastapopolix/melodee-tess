@@ -57,6 +57,12 @@
   </section>
   <p><button id="go" disabled data-t="install"></button></p>
   <details style="margin-top:24px">
+    <summary data-t="localTitle"></summary>
+    <p class="small" data-t="localWhy"></p>
+    <p><label><span data-t="localFile"></span><br><input id="local-file" type="file" accept=".fwsc"></label></p>
+    <p><button id="local-go" disabled data-t="localGo"></button></p>
+  </details>
+  <details style="margin-top:24px">
     <summary data-t="stockTitle"></summary>
     <p class="small" data-t="back"></p>
     <p class="small"><a href="https://www.m-vave.com/download" target="_blank" rel="noopener" style="color:inherit">M-VAVE Downloads</a></p>
@@ -795,6 +801,10 @@ const TEXT = {
     recoveryLink: "USB 復旧手順とダウンロード",
     beta: "Melodee (tess) は Melodee の実験的フォークです。不具合は github.com/Rastapopolix/melodee-tess へ知らせてください（本家には送らないでください）。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
     back: "M-VAVEから公式FM-1 V15を取得し、未変更のFM-1.fwscを選んでください。ファイルはこのブラウザ内で検証し、サーバーへ送りません。",
+    localTitle: "テストビルド（パソコンのファイル）", localFile: "テスト用ファームウェア（.fwsc）", localGo: "テストビルドをインストール",
+    localWhy: "テスト用の Melodee (tess) ビルドです。パソコンに保存した .fwsc（build/ や テストページのもの）を選んでください。tools/fm1pkg_make.py で作ったパッケージだけを受け付けます。ファイルはこのブラウザ内で確認し、サーバーへ送りません。テストビルドは未リリースで、正しく動かないことがあります。標準を選んでインストールするとリリース版に戻せます。",
+    localValid: "テストビルドを確認しました: ", localError: "このファイルは使えません: ",
+    localConfirm: "このテストビルドをインストールしますか？ リリース版ではなく、正しく動かないことがあります。\n",
     stockTitle: "公式V15に戻す", stockFile: "公式FM-1.fwsc", stockGo: "バックアップして公式V15へ戻す",
     stockBackup: "現在の曲・保存曲・音色バンク・サンプル・設定を先に保存します。バックアップできない場合は、Melodeeを更新するか、データ消失を了承してバックアップを省略できます。復元はMelodeeを再インストールしてエディタから行います。",
     stockSkipBackup: "バックアップを省略する（Melodeeの曲・音色・設定が失われる可能性があります）",
@@ -839,6 +849,10 @@ const TEXT = {
     recoveryLink: "USB recovery instructions and downloads",
     beta: "Melodee (tess) is an experimental fork of Melodee; please report problems at github.com/Rastapopolix/melodee-tess, not to upstream. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
     back: "Get official FM-1 V15 from M-VAVE and select the unmodified FM-1.fwsc. The browser validates it locally; it is not sent to a server.",
+    localTitle: "Test build from this computer", localFile: "Test firmware (.fwsc)", localGo: "Install test build",
+    localWhy: "For testing: pick a Melodee (tess) .fwsc saved on this computer, such as one from build/ or a test page. Only packages made by tools/fm1pkg_make.py are accepted. The browser checks the file locally; it is not sent to a server. Test builds are unreleased and may not work; choose Standard and install again to go back to the release.",
+    localValid: "Test build checked: ", localError: "Cannot use this file: ",
+    localConfirm: "Install this test build? It is not a release and may not work.\n",
     stockTitle: "Return to official V15", stockFile: "Official FM-1.fwsc", stockGo: "Back up and return to official V15",
     stockBackup: "Current music, saved music, sound banks, samples and settings are saved first. If backups are unavailable, update Melodee or choose to skip the backup and accept possible data loss. To restore an archive later, reinstall Melodee and use the editor.",
     stockSkipBackup: "Skip backup (Melodee music, sounds and settings may be lost)",
@@ -897,8 +911,8 @@ $("synth-options").hidden = !meta.synth;
 if (meta.synth) $("synth-info").textContent = `${meta.synth.branch} · ${meta.synth.commit.slice(0, 7)} · ${meta.synth.builtAt}`;
 const images = {};                // a build ("dual", "nightly-single", "synth-dual" ..) -> its package's image, each fetched once
 
-let writing = false, stock = null, stockFileEpoch = 0, buildEpoch = 0;
-const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; buildIds.forEach(k => { $("build-" + k).disabled = on; }); $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; $("stock-skip-backup").disabled = on; };
+let writing = false, stock = null, stockFileEpoch = 0, buildEpoch = 0, local = null, localFileEpoch = 0;
+const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("local-go").disabled = on || !local; $("local-file").disabled = on; buildIds.forEach(k => { $("build-" + k).disabled = on; }); $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; $("stock-skip-backup").disabled = on; };
 window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = t("leave"); } });
 
 // the chosen build's package: Install stays off until it is loaded and checked
@@ -923,9 +937,8 @@ async function choose() {
 buildIds.forEach(k => $("build-" + k).addEventListener("change", choose));
 choose();
 
-$("go").addEventListener("click", async () => {
-  if (writing || !image) return;
-  const product = selection().channel.product;
+// install an image whose identity the device must report afterwards (the chosen build, or a local test build)
+async function flash(image, product) {
   lockInstaller(true);
   let midi;
   try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
@@ -955,6 +968,37 @@ $("go").addEventListener("click", async () => {
     log(String(e && e.stack || e));
   }
   lockInstaller(false);
+}
+$("go").addEventListener("click", () => { if (!writing && image) return flash(image, selection().channel.product); });
+
+// a test build from this computer: only a Melodee package (fm1pkg_make.py: CRCs intact, an FM-1_9 identity and
+// Melodee's loader, so never a vendor or patched official package), as web/make_site.py checks before publishing
+const LOADER_MARK = Array.from("FELUCCA-LOADER-1", (c) => c.charCodeAt(0));
+const hasLoader = (raw) => {
+  for (let i = raw.indexOf(LOADER_MARK[0]); i >= 0; i = raw.indexOf(LOADER_MARK[0], i + 1))
+    if (LOADER_MARK.every((b, j) => raw[i + j] === b)) return true;
+  return false;
+};
+function checkLocal(raw) {
+  new Package(raw);
+  const product = productOf(raw);
+  if (!/^FM-1_9\d{2,4}$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Melodee package`);
+  if (!hasLoader(raw)) throw new Error("no Melodee loader in it (only tools/fm1pkg_make.py packages)");
+  return {image: logicalImage(raw), product};
+}
+$("local-file").addEventListener("change", async () => {
+  const epoch = ++localFileEpoch, file = $("local-file").files[0]; local = null; lockInstaller(false);
+  if (!file) return;
+  try {
+    const checked = checkLocal(new Uint8Array(await file.arrayBuffer()));
+    if (epoch !== localFileEpoch) return;
+    local = {...checked, name: file.name}; sayK("localValid", `${file.name} (${checked.product})`); lockInstaller(false);
+  } catch (e) { if (epoch === localFileEpoch) sayK("localError", e.message); }
+});
+$("local-go").addEventListener("click", () => {
+  if (writing || !local) return;
+  const {image, product, name} = local;
+  if (confirm(t("localConfirm") + `${name} (${product})`)) return flash(image, product);
 });
 
 $("stock-file").addEventListener("change", async () => {
