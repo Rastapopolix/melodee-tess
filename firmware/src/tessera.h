@@ -18,6 +18,7 @@ enum {
     TESS_ENG_GRIDS,       /* Grids' drum map: kick, snare, hat */
     TESS_ENG_BOUNCE,      /* a ball in a box: a wall hit plays */
     TESS_ENG_AWAKE,       /* two loops added (norns' Awake) */
+    TESS_ENG_POLY,        /* four rhythms advance four steps (EuroPi's Polyrhythmic Sequencer) */
     TESS_ENG_COUNT
 };
 
@@ -137,6 +138,7 @@ enum {
     TX_GRD_X, TX_GRD_Y, TX_GRD_DENS,
     TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_PADDLE,
     TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB,
+    TX_POL_DIV1, TX_POL_DIV2, TX_POL_DIV3, TX_POL_DIV4, TX_POL_SPAN,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -151,5 +153,6 @@ const gen_morph_t *tessera_morph(uint32_t tr);
 const gen_grids_t *tessera_grids(uint32_t tr);
 const gen_bounce_t *tessera_bounce(uint32_t tr);
 const gen_awake_t *tessera_awake(uint32_t tr);
+const gen_poly_t *tessera_poly(uint32_t tr);
 
 #endif

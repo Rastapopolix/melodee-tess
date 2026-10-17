@@ -6,7 +6,9 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE"};
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY"};
+static const char *const TX_N_DIV[] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
+                                         "15", "16"};
 static const char *const TX_N_EVERY[] = {"OFF", "1", "2", "4", "8", "16"};
 static const char *const TX_N_FORM[] = {"OFF", "AB", "ABAC", "ABCB", "AABA", "ABCA", "AABC"};
 static const char *const TX_N_FOLLOW[] = {"OFF", "T1", "T2", "T3", "T4"};
@@ -46,6 +48,11 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_AWK_LENA] = PD("LEN A", F_INT, 1, 16, 8),
     [TX_AWK_LENB] = PD("LEN B", F_INT, 1, 16, 7),
     [TX_AWK_PROB] = PD("PROB", F_PCT, 0, 100, 100),
+    [TX_POL_DIV1] = {"DIV 1", F_ENUM, 0, 16, 4, TX_N_DIV, "st"},
+    [TX_POL_DIV2] = {"DIV 2", F_ENUM, 0, 16, 3, TX_N_DIV, "st"},
+    [TX_POL_DIV3] = {"DIV 3", F_ENUM, 0, 16, 0, TX_N_DIV, "st"},
+    [TX_POL_DIV4] = {"DIV 4", F_ENUM, 0, 16, 0, TX_N_DIV, "st"},
+    [TX_POL_SPAN] = PD("SPAN", F_INT, 1, 2, 1),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -213,7 +220,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
        "How much sound work the FM-1 shares out between the tracks; lower leaves more headroom, higher allows more voices."),
     X_(TX_MODE, "GENERATOR MODE", "STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; "
                                   "GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball "
-                                  "hits the walls of its box; AWAKE adds two loops of its own lengths."),
+                                  "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
@@ -229,7 +236,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_MRP_SNPA, "MORPH RHYTHM A", "Rhythm A: one of eight preset patterns."),
     X_(TX_MRP_SNPB, "MORPH RHYTHM B", "Rhythm B: one of eight preset patterns."),
     X_(TX_EV_LOCK, "EVOLVE LOCK", "How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every "
-                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid, Bounce and Awake have none."),
+                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid, Bounce, Awake and Poly have none."),
     X_(TX_EV_EVERY, "EVOLVE EVERY", "Bars between mutations; OFF keeps the phrase as it is."),
     X_(TX_EV_AMOUNT, "EVOLVE AMOUNT", "How much changes at each mutation."),
     X_(TX_EV_SEED, "EVOLVE ROLL", "The track's seed, 1 to 128: each one a line of its own, the same every time. "
@@ -255,6 +262,12 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_AWK_LENB, "AWAKE LENGTH B", "Steps in loop B, which moves the melody up the scale; a length other than A's "
                                       "shifts it against A, a longer pattern from two short ones."),
     X_(TX_AWK_PROB, "AWAKE PROB", "The chance each of A's notes plays: 100 every one, lower leaves gaps."),
+    X_(TX_POL_DIV1, "POLY RHYTHM 1", "Every how many steps rhythm 1 moves the four notes on (OFF: never). Rhythms that land "
+                                     "together play once, louder: 4 against 3 is a polyrhythm."),
+    X_(TX_POL_DIV2, "POLY RHYTHM 2", "Every how many steps rhythm 2 moves the four notes on (OFF: never)."),
+    X_(TX_POL_DIV3, "POLY RHYTHM 3", "Every how many steps rhythm 3 moves the four notes on (OFF: never)."),
+    X_(TX_POL_DIV4, "POLY RHYTHM 4", "Every how many steps rhythm 4 moves the four notes on (OFF: never)."),
+    X_(TX_POL_SPAN, "POLY SPAN", "Octaves the four notes spread over; ROLL draws them, EVOLVE moves them a little."),
 };
 #undef T_
 #undef G_

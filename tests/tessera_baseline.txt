@@ -82,4 +82,10 @@ awake_lena12_lenb5_prob70_shift2 0x10e40a47 66
 awake_lena12_lenb5_prob70_shift2.state 0x3b8a22f2
 evolve_awake_every1_amount70_abac 0xa188e2ba 185
 evolve_awake_every1_amount70_abac.state 0x6be67545
+poly 0x3b042a26 33
+poly.state 0x07445b44
+poly_div_4_3_5_7_span2_human40 0x30db1e86 85
+poly_div_4_3_5_7_span2_human40.state 0x0b54a594
+evolve_poly_every1_amount100_ab 0x5687774e 129
+evolve_poly_every1_amount100_ab.state 0xa73ea2dd
 saved_block 0x4b6fad25 320

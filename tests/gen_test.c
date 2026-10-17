@@ -524,6 +524,74 @@ static void awake_tests(void)
     check("awake: mutation changes values inside A's and B's loops only (AMOUNT 0: none)", mut);
 }
 
+/* ------------------------------------------------------------------ Poly --- */
+static gen_poly_t poly_at(uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t span, uint32_t seed)
+{
+    gen_poly_t g;
+    memset(&g, 0, sizeof g);
+    g.div[0] = (uint8_t)d0, g.div[1] = (uint8_t)d1, g.div[2] = (uint8_t)d2, g.div[3] = (uint8_t)d3, g.span = (uint8_t)span;
+    g.pos = 3;
+    gen_poly_fill(&g, seed);
+    return g;
+}
+static void poly_tests(void)
+{
+    int range = 1, draws = 1, hits = 1, fill = 1, mut = 1, loud = 1, off = 1, wrap = 1;
+    for (uint32_t d = 0; d <= 16; d++)
+        for (uint32_t span = 1; span <= 2; span++) {
+            gen_poly_t g = poly_at(d, 16u - d, d / 2u, 7, span, d * 7u + 1u);
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_out_t o = step_out();
+                uint32_t c = rng_state;
+                gen_poly_tick(&g, &CLK0, &rng_state, &o);
+                draws &= draws_since(c) == 0u;
+                range &= o.gate ? o.note >= 48 && o.note <= 70 && o.vel >= 88 && o.vel <= 127 : o.note == 60 && o.vel == 100;
+                range &= g.pos < 4u && o.cv >= 0;
+            }
+        }
+    {   /* 4 against 3: a note on steps 0 3 4 6 8 9 (twelve a cycle: 6 notes), step 0 louder (both land) */
+        gen_poly_t g = poly_at(4, 3, 0, 0, 1, 1);
+        static const uint8_t WANT[12] = {1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0};
+        for (uint32_t i = 0; i < 24; i++) {
+            gen_out_t o = step_out();
+            gen_poly_tick(&g, &CLK0, &rng_state, &o);
+            hits &= o.gate == WANT[i % 12u];
+            if (i % 12u == 0u) loud &= o.vel == 101u;
+            else if (o.gate) loud &= o.vel == 88u;
+        }
+    }
+    {   /* every rhythm OFF: silent */
+        gen_poly_t g = poly_at(0, 0, 0, 0, 2, 3);
+        for (uint32_t i = 0; i < 64; i++) { gen_out_t o = step_out(); gen_poly_tick(&g, &CLK0, &rng_state, &o); off &= !o.gate; }
+    }
+    {   /* the count wraps where every divider lands: no step lost or doubled across it */
+        gen_poly_t g = poly_at(7, 11, 13, 16, 1, 9);
+        uint32_t n = 0;
+        g.tick = GEN_POLY_WRAP - 2u;
+        for (uint32_t i = 0; i < 4; i++) { gen_out_t o = step_out(); gen_poly_tick(&g, &CLK0, &rng_state, &o); n += o.gate; }
+        wrap &= n == 1u && g.tick == 2u;
+    }
+    for (uint32_t sd = 0; sd < 300; sd++)
+        for (uint32_t span = 1; span <= 2; span++) {
+            gen_poly_t g = poly_at(4, 3, 0, 0, span, sd);
+            for (uint32_t i = 0; i < 4; i++) fill &= g.pitch[i] < 7u * span;
+        }
+    for (uint32_t amt = 0; amt <= 100; amt += 25)
+        for (uint32_t span = 1; span <= 2; span++) {
+            gen_poly_t g = poly_at(5, 2, 9, 0, span, 4), g0 = g;
+            for (uint32_t n = 0; n < 200; n++) {
+                gen_poly_mutate(&g, amt, &rng_state);
+                for (uint32_t i = 0; i < 4; i++) mut &= g.pitch[i] < 7u * span && g.div[i] == g0.div[i];
+            }
+            if (!amt) mut &= !memcmp(g.pitch, g0.pitch, 4);
+        }
+    check("poly: notes 48..70, louder (88 + 13 a rhythm more) where rhythms land together; else a rest as ever", range);
+    check("poly: no random draw a step", draws);
+    check("poly: 4 against 3 plays steps 0 3 4 6 8 9 of every 12, step 0 louder; all OFF silent", hits && loud && off);
+    check("poly: its count wraps at 720720 with no step lost or doubled", wrap);
+    check("poly: the seed's pitches and mutation's stay inside SPAN; the rhythms stay as set", fill && mut);
+}
+
 /* ------------------------------------------------------------------ sections --- */
 static void section_tests(void)
 {
@@ -552,6 +620,14 @@ static void section_tests(void)
         gen_awake_load(&aw, &a2); ok &= aw.len_a == 3u && aw.len_b == 12u && aw.prob == 50u;
     }
     {
+        gen_poly_t po = poly_at(4, 3, 0, 0, 2, 1);
+        gen_sec_t p2 = {0xD210u, 1, 77};
+        po.pitch[0] = 1, po.pitch[1] = 2, po.pitch[2] = 3, po.pitch[3] = 13;
+        gen_poly_save(&po, &s); ok &= s.reg == 0xD321u && s.p0 == 2 && s.p1 == 4;
+        gen_poly_load(&po, &p2); ok &= po.pitch[0] == 0 && po.pitch[1] == 1 && po.pitch[2] == 2 && po.pitch[3] == 13 &&
+                                       po.span == 1 && po.div[0] == 4;
+    }
+    {
         gen_sec_t e = {42, 6, 2}, m = {0x8888u, 10, 0}, k = {0, 33, 0}, t = {0xACE1u, 0, 0};
         gen_euclid_load(&eu, &e); ok &= eu.pulses == 6 && eu.rot == 2 && eu.pitch_seed == 42 && eu.steps == 16;
         gen_morph_load(&mo, &m);  ok &= mo.snap_a == 0x8888u && mo.morph_pos == 10 && mo.snap_b == 0xAAAAu;
@@ -572,6 +648,7 @@ static double ns_per_step(int kind)
     gen_grids_t gr = {77, 190, 70, 60, 0, {0, 0, 0}};
     gen_bounce_t bo = bounce_at(37, 61, 30);
     gen_awake_t aw = awake_at(9, 5, 70, 3);
+    gen_poly_t po = poly_at(4, 3, 5, 0, 2, 3);
     const uint32_t N = 2000000u;
     volatile uint32_t sink = 0;
     struct timespec a, b;
@@ -584,7 +661,8 @@ static double ns_per_step(int kind)
         else if (kind == 3) gen_morph_tick(&mo, &CLK0, &rng_state, &o);
         else if (kind == 4) gen_grids_tick(&gr, &CLK0, &rng_state, &o);
         else if (kind == 5) gen_bounce_tick(&bo, &CLK0, &rng_state, &o);
-        else gen_awake_tick(&aw, &CLK0, &rng_state, &o);
+        else if (kind == 6) gen_awake_tick(&aw, &CLK0, &rng_state, &o);
+        else gen_poly_tick(&po, &CLK0, &rng_state, &o);
         sink += o.note + o.gate;
     }
     clock_gettime(CLOCK_MONOTONIC, &b);
@@ -621,10 +699,11 @@ int main(void)
     grids_tests();
     bounce_tests();
     awake_tests();
+    poly_tests();
     section_tests();
     printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns, "
-           "Bounce %.1f ns, Awake %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3), ns_per_step(4),
-           ns_per_step(5), ns_per_step(6));
+           "Bounce %.1f ns, Awake %.1f ns, Poly %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3),
+           ns_per_step(4), ns_per_step(5), ns_per_step(6), ns_per_step(7));
     printf(bad ? "gen: %d FAILED\n" : "gen: all passed\n", bad);
     return bad != 0;
 }

@@ -338,6 +338,28 @@ static void gen_awake_tick(gen_awake_t *g, const gen_clock_t *clk, uint32_t *rnd
     }
 }
 
+/* Poly: the rhythms that land on this step (its count a multiple of their divider) advance the sequence a step and play
+ * it, louder for each one more that lands with it; no draw. The CV: the step, a ramp over the four */
+#define GEN_POLY_WRAP 720720u                           /* (every divider 1..16 divides it: the count wraps unheard) */
+static void gen_poly_tick(gen_poly_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    uint32_t i, n = 0;
+    (void)clk;
+    (void)rnd;
+    for (i = 0; i < 4u; i++)
+        n += g->div[i] && g->div[i] <= 16u && g->tick % g->div[i] == 0u;
+    g->tick = (g->tick + 1u) % GEN_POLY_WRAP;
+    if (n) {
+        uint32_t deg;
+        g->pos = (uint8_t)((g->pos + 1u) & 3u);
+        deg = g->pitch[g->pos] > 13u ? 13u : g->pitch[g->pos];
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = (uint8_t)(88u + 13u * (n - 1u));
+        out->gate = 1;
+    }
+    out->cv = (int16_t)((g->pos & 3u) * 32767u / 3u);
+}
+
 /* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
@@ -442,6 +464,20 @@ static void gen_awake_mutate(gen_awake_t *g, uint32_t amt, uint32_t *rnd)
     }
 }
 
+/* Poly: each pitch at AMOUNT % moves a degree or two, turning back at the span's ends; the rhythms stay */
+static void gen_poly_mutate(gen_poly_t *g, uint32_t amt, uint32_t *rnd)
+{
+    int32_t top = 7 * (g->span == 2u ? 2 : 1) - 1;
+    for (uint32_t i = 0; i < 4u; i++) {
+        int32_t v;
+        if (gen_rnd(rnd, 100u) >= amt) continue;
+        v = (int32_t)g->pitch[i] + (int32_t)(1u + gen_rnd(rnd, 2u)) * (gen_rnd(rnd, 2u) ? 1 : -1);
+        if (v < 0) v = -v;
+        if (v > top) v = 2 * top - v;
+        g->pitch[i] = (uint8_t)(v < 0 ? 0 : v > top ? top : v);
+    }
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -471,4 +507,17 @@ static void gen_awake_load(gen_awake_t *g, const gen_sec_t *s)
 {
     g->len_a = s->p0 < 1u ? 1u : s->p0 > 16u ? 16u : s->p0;
     g->len_b = s->p1 < 1u ? 1u : s->p1 > 16u ? 16u : s->p1;
+}
+static void gen_poly_save(const gen_poly_t *g, gen_sec_t *s)
+{
+    s->reg = (uint16_t)(g->pitch[0] | g->pitch[1] << 4 | g->pitch[2] << 8 | g->pitch[3] << 12);
+    s->p0 = g->span;
+}
+static void gen_poly_load(gen_poly_t *g, const gen_sec_t *s)
+{
+    for (uint32_t i = 0; i < 4u; i++) {
+        uint32_t v = (s->reg >> (i * 4u)) & 0xFu;
+        g->pitch[i] = (uint8_t)(v > 13u ? 13u : v);
+    }
+    g->span = s->p0 == 2u ? 2u : 1u;
 }

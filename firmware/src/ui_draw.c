@@ -858,6 +858,17 @@ static void draw_columns(void)
                 draw_column(2, "LEN B", v2, "", VAL(2u), (int32_t)(a->len_b - 1u) * 1000 / 15, ICON_AUTO);
                 fmt_int(v3, a->prob);
                 draw_column(3, "PROB", v3, "%", VAL(3u), (int32_t)a->prob * 10, ICON_AUTO);
+            } else if (m == TESS_ENG_POLY) {
+                const gen_poly_t *p = tessera_poly(tr);
+                uint32_t d = p->div[p->sel & 3u];
+                draw_column(0, "MODE", "POLY", "", VAL(0u), TESS_ENG_POLY * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                fmt_int(v1, (p->sel & 3u) + 1u);
+                draw_column(1, "RHY", v1, "/4", VAL(1u), (int32_t)(p->sel & 3u) * 1000 / 3, ICON_AUTO);
+                if (d) fmt_int(v2, d), str_cpy(u2, "st", sizeof u2);
+                else str_cpy(v2, "OFF", sizeof v2);
+                draw_column(2, "DIV", v2, u2, VAL(2u), (int32_t)d * 1000 / 16, ICON_AUTO);
+                fmt_int(v3, p->span);
+                draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(p->span - 1u) * 1000, ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
                 draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);

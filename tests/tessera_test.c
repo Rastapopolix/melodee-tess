@@ -463,6 +463,25 @@ static void s_evolve_awake(void)
     turns(tessera_form_knob, 0, 2);                   /* FORM ABAC: A's values come back */
 }
 
+static void s_poly(void) { gen(0, TESS_ENG_POLY); }
+static void s_poly_var(void)
+{
+    gen(0, TESS_ENG_POLY);
+    turns(tessera_knob, 1, 2);                        /* RHY 3 */
+    knob(tessera_knob, 2, 5);                         /* its DIV 5 */
+    turns(tessera_knob, 1, 1);                        /* RHY 4 */
+    knob(tessera_knob, 2, 7);                         /* its DIV 7 */
+    knob(tessera_knob, 3, 1);                         /* SPAN 2 */
+    knob(tessera_tweak_knob, 2, 20);                  /* HUMAN 40 */
+}
+static void s_evolve_poly(void)
+{
+    gen(0, TESS_ENG_POLY);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 35);                 /* AMOUNT 100 */
+    turns(tessera_form_knob, 0, 1);                   /* FORM AB */
+}
+
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
     {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
@@ -505,6 +524,9 @@ static const scen_t SCEN[] = {
     {"awake", 8, 0x1026u, s_awake, 0},
     {"awake_lena12_lenb5_prob70_shift2", 8, 0x1027u, s_awake_var, 0},
     {"evolve_awake_every1_amount70_abac", 16, 0x1028u, s_evolve_awake, 0},
+    {"poly", 4, 0x1029u, s_poly, 0},
+    {"poly_div_4_3_5_7_span2_human40", 8, 0x102Au, s_poly_var, 0},
+    {"evolve_poly_every1_amount100_ab", 16, 0x102Bu, s_evolve_poly, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 

@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE | STEP | STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY | STEP | STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms. |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -152,7 +152,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x20A | MORPH POSITION | 0 to 127 | 0 | Blends rhythm A (0) into rhythm B (full). |
 | 0x20B | MORPH RHYTHM A | 0 to 7 | 0 | Rhythm A: one of eight preset patterns. |
 | 0x20C | MORPH RHYTHM B | 0 to 7 | 2 | Rhythm B: one of eight preset patterns. |
-| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid, Bounce and Awake have none. |
+| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid, Bounce, Awake and Poly have none. |
 | 0x20E | EVOLVE EVERY | OFF, 1, 2, 4, 8, 16 | OFF | Bars between mutations; OFF keeps the phrase as it is. |
 | 0x20F | EVOLVE AMOUNT | 0 to 100 % | 30 | How much changes at each mutation. |
 | 0x210 | EVOLVE ROLL | 1 to 128 | 1 | The track's seed, 1 to 128: each one a line of its own, the same every time. Playing, a new one starts on the next bar line. |
@@ -172,6 +172,11 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x21E | AWAKE LENGTH A | 1 to 16 | 8 | Steps in loop A, the melody (its values are degrees of the scale, some rests; ROLL draws them, EVOLVE changes a few). |
 | 0x21F | AWAKE LENGTH B | 1 to 16 | 7 | Steps in loop B, which moves the melody up the scale; a length other than A's shifts it against A, a longer pattern from two short ones. |
 | 0x220 | AWAKE PROB | 0 to 100 % | 100 | The chance each of A's notes plays: 100 every one, lower leaves gaps. |
+| 0x221 | POLY RHYTHM 1 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | 4 | Every how many steps rhythm 1 moves the four notes on (OFF: never). Rhythms that land together play once, louder: 4 against 3 is a polyrhythm. |
+| 0x222 | POLY RHYTHM 2 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | 3 | Every how many steps rhythm 2 moves the four notes on (OFF: never). |
+| 0x223 | POLY RHYTHM 3 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | OFF | Every how many steps rhythm 3 moves the four notes on (OFF: never). |
+| 0x224 | POLY RHYTHM 4 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | OFF | Every how many steps rhythm 4 moves the four notes on (OFF: never). |
+| 0x225 | POLY SPAN | 1 to 2 | 1 | Octaves the four notes spread over; ROLL draws them, EVOLVE moves them a little. |
 
 ## Mods
 
