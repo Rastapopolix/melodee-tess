@@ -1242,6 +1242,8 @@ static void draw_page(void)
             mono_page();
             return;
         }
+        mono_stage();                                   /* .. Stage too */
+        return;
 #endif
         if (ui.force)
             draw_frame(ui.home);

@@ -882,3 +882,265 @@ static void mono_page(void)
         cv_blit(0, s * 120u);
     }
 }
+
+/* ---- Stage (HOME) ---- */
+/* The header: PLAY or STOP and the tempo, the selected track's engine. A column a track, 30 cells: its role (the
+ * selected track's inverted; an armed track's REC), the sound in two words of four letters, the engine, the pattern
+ * playing (inverted) and the next one waiting (dashed), the bar playing as 4 x 4 steps (a hit filled, the playhead
+ * hollow or notched), the level (dB or MUTE) over a bar; the selected column outlined. Under them the panel: the
+ * output's waveform, the notes the selected track played and their chord over it (a DRUM track: its lanes, lit as
+ * they hit). A knob turning: its four dials over the columns' tops, the panel the value. The top half is drawn again
+ * when it changes, the bottom (the steps, the panel) every other frame */
+static uint32_t mo_stage_sig;
+static void mo_word(char *d, const char *s, uint32_t which)   /* s's first or second word, four letters */
+{
+    char w[24];
+    uint32_t i = 0, k = 0;
+    while (s[i] == ' ') i++;
+    if (which) {
+        while (s[i] && s[i] != ' ') i++;
+        while (s[i] == ' ') i++;
+    }
+    for (; s[i] && s[i] != ' ' && k + 1u < sizeof w; i++) w[k++] = s[i];
+    w[k] = 0;
+    mo_abbr(d, w);
+}
+static void mo_stage_col(uint32_t k, int top)
+{
+    const track_t *t = &trk[k];
+    uint32_t sel = k == song.sel, mute = t->p[P_MUTE] != 0u, arm = (song.rec >> k) & 1u, len = (uint32_t)t->p[P_SLEN];
+    uint32_t page = song.playing && t->seq_idx < len ? t->seq_idx / 16u : 0u, ph = song.playing ? t->seq_idx : 0xFFFFu;
+    uint32_t next = t->pattern_next < NPAT ? t->pattern_next + 1u : 0u, lvl = (uint32_t)t->p[P_LEVEL] & 127u, i, src, kk;
+    int32_t x0 = (int32_t)k * 30, cx = x0 + 15;
+    uint16_t ink = mute ? MO_DIM : MO_INK;
+    char nm[16], a[8], b[8], chip[3] = {'P', (char)('1' + t->pattern % NPAT), 0};
+    if (sel && !stage.out)
+        mo_box(x0, 10, 30, 78, MO_INK);
+    else if (sel && !top)                               /* (the knobs out: under them only) */
+        mo_box(x0, 60, 30, 28, MO_INK), mo_hl(x0, 60, 30, MO_BG);
+    if (top && !stage.out) {
+        uint32_t cat;
+        trk_short_name(k, nm);
+        if (t->eng_req == ENGI_PROPHET)
+            p5_short_name(t, nm, sizeof nm);
+        stage_entry(k, &src, &kk);
+        cat = entry_cat(src, kk) % CAT_N;
+        if (arm) str_cpy(a, "REC", sizeof a);
+        else if (cat == CAT_DRUM) str_cpy(a, "DRUM", sizeof a);
+        else if (cat == CAT_KEYS) str_cpy(a, "CHRD", sizeof a);
+        else if (cat && cat != CAT_OTHER) mo_abbr(a, CAT_NAME[cat]);
+        else a[0] = 'T', a[1] = (char)('1' + k), a[2] = 0;
+        if (sel || arm) {
+            mo_fill(x0 + 2, 12, 26, 9, ink);
+            mo_textc(a, cx, 13, MO_BG);
+        } else {
+            mo_textc(a, cx, 13, ink);
+        }
+        mo_word(a, nm, 0);
+        mo_word(b, nm, 1);
+        mo_textc(a, cx, 23, ink);
+        mo_textc(b, cx, 31, ink);
+    }
+    if (top) {
+        str_cpy(a, eng_abbr(ENGINES[eng_idx(t->eng_req)]->name), 5);
+        mo_textc(a, cx, 41, MO_DIM);
+        mo_fill(x0 + 3, 50, 13, 9, ink);                /* the pattern playing; the next one dashed */
+        mo_text(chip, x0 + 4, 51, MO_BG);
+        if (next) {
+            char n2[3] = {'P', (char)('0' + next), 0};
+            mo_dash(x0 + 17, 50, 11, ink);
+            mo_dash(x0 + 17, 58, 11, ink);
+            mo_text(n2, x0 + 18, 51, ink);
+        }
+        return;
+    }
+    for (i = 0; i < 16u; i++) {                         /* the bar playing */
+        uint32_t si = page * 16u + i;
+        const step_t *st = &seq_steps(t)[si % NSTEP];
+        int32_t x = x0 + 4 + (int32_t)(i % 4u) * 6, y = 62 + (int32_t)(i / 4u) * 4;
+        if (si >= len)
+            break;
+        if (step_on(st)) {
+            mo_fill(x, y, 4, 3, ink);
+            if (si == ph) mo_px(x + 1, y + 1, MO_BG), mo_px(x + 2, y + 1, MO_BG);
+        } else if (si == ph) {
+            mo_box(x, y, 4, 3, MO_INK);
+        } else {
+            mo_px(x + 1, y + 1, st->time == ST_TIE ? ink : MO_DIM);
+        }
+    }
+    if (mute) {
+        str_cpy(a, "MUTE", sizeof a);
+    } else if (lvl) {
+        int32_t d = LEVEL_DB_X10[lvl];
+        fmt_int(a, (d + (d < 0 ? -5 : 5)) / 10);
+    } else {
+        str_cpy(a, "OFF", sizeof a);
+    }
+    mo_textc(a, cx, 78, ink);
+    mo_dash(x0 + 3, 86, 24, MO_DIM);
+    mo_hl(x0 + 3, 86, (int32_t)lvl * 24 / 127, ink);
+}
+static void mo_stage_head(void)
+{
+    char b[16];
+    if (ui.msg_t && ui.msg[0]) {
+        mo_cut(b, ui.msg, 15);
+        mo_inv(b, 2, 1);
+    } else {
+        if (song.playing) {                             /* PLAY: a triangle; STOP: a square */
+            int32_t r;
+            for (r = 0; r < 7; r++) mo_vl(1 + r / 2, 1 + r / 2, 7 - r / 2 * 2, MO_INK);
+        } else {
+            mo_fill(1, 2, 5, 5, MO_INK);
+        }
+        fmt_int(b, song.g[G_BPM]);
+        mo_text(b, 9, 1, ui.bpm_t ? MO_INK : MO_DIM);
+        if (ui.bpm_t) mo_hl(9, 8, mo_tw(b), MO_INK);
+    }
+    str_cpy(b, eng_abbr(ENGINES[TSEL->eng_req % NENGINES]->name), 8);
+    mo_textr(b, 118, 1, MO_DIM);
+    mo_hl(0, 9, 120, MO_INK);
+}
+static void mo_stage_wave(int32_t top, int32_t h, uint16_t c)   /* the output, triggered on a rising zero crossing */
+{
+    int16_t *snap = scope_snap;
+    uint32_t w = scope_w, i, trig = 1;
+    int32_t peak = 1500, x, py = 0, cy = top + h / 2;
+    for (i = 0; i < SCOPE_N; i++) {
+        snap[i] = scope_buf[(w + i) & (SCOPE_N - 1u)];
+        if (snap[i] > peak) peak = snap[i];
+        else if (-snap[i] > peak) peak = -snap[i];
+    }
+    for (i = 2; i < SCOPE_N - 240u; i++)
+        if (snap[i - 1] < 0 && snap[i] >= 0) { trig = i; break; }
+    for (x = 0; x < 116; x++) {
+        uint32_t k = trig + (uint32_t)x * 2u;
+        int32_t v = ((int32_t)snap[k - 1u] + 2 * snap[k] + snap[k + 1u]) / 4, y = cy - v * (h / 2 - 1) / peak;
+        if (x) mo_line(1 + x, py, 2 + x, y, c);
+        py = y;
+    }
+}
+static void mo_stage_panel(void)
+{
+    uint32_t sel = song.sel % NTRK, bits[4], i, n = 0, pcs = 0, root = 0, held = 0, l;
+    uint8_t note[8];
+    char b[40];
+    const char *q;
+    if (drum_track(TSEL)) {                             /* a DRUM track: its lanes, lit as they hit */
+        mo_stage_wave(90, 12, MO_DIM);
+        for (l = 0; l < NLANE; l++) {
+            int32_t x = 1 + (int32_t)(l % 4u) * 30, y = 104 + (int32_t)(l / 4u) * 0;
+            char ab[6];
+            mo_cut(ab, drum_lane_abbr(TSEL, l), 4);
+            x = 1 + (int32_t)l * 15;
+            if (stage.hit_t[l]) { mo_fill(x, y - 1, 14, 9, MO_INK); mo_textc(ab, x + 7, y, MO_BG); }
+            else mo_textc(ab, x + 7, y, MO_DIM);
+        }
+        return;
+    }
+    if (stage.out) {                                    /* a knob turning: its value, large */
+        int16_t *vp;
+        const char *unit;
+        const page_t *sp = stage_page();
+        const param_desc_t *d = page_desc(sp, ui.hot_col & 3u, &vp);
+        if (d && vp) {
+            stage_value(sp, d, *vp, b, &unit);
+            str_cpy(b + str_len(b), unit, 4);
+            mo_text(stage_label(ui.hot_col & 3u, d), 2, 92, MO_DIM);
+            mo_text_s(b, 2, 102, 2, MO_INK);
+            return;
+        }
+    }
+    fm1_irq_off();
+    for (i = 0; i < 4u; i++) {
+        bits[i] = live_last[sel][i];
+        held |= live_held[sel][i];
+    }
+    fm1_irq_on();
+    mo_stage_wave(90, 28, held ? MO_DIM : MO_INK);
+    for (i = 0; i < 128u; i++)
+        if ((bits[i >> 5] >> (i & 31u)) & 1u) {
+            pcs |= 1u << (i % 12u);
+            if (n < sizeof note) note[n] = (uint8_t)i;
+            n++;
+        }
+    if (!n)
+        return;
+    q = micro_active(TSEL) ? 0 : chord_of(pcs, note[0] % 12u, &root);
+    b[0] = 0;
+    if (q) {
+        str_cpy(b, N_NOTE[root], 4);
+        str_cpy(b + str_len(b), q, 8);
+        if (root != note[0] % 12u) {
+            str_cpy(b + str_len(b), "/", 2);
+            str_cpy(b + str_len(b), N_NOTE[note[0] % 12u], 4);
+        }
+        mo_inv(b, 2, 91);
+    }
+    for (i = 0, b[0] = 0; i < n && i < 5u; i++) {       /* the notes */
+        if (i) str_cpy(b + str_len(b), " ", 2);
+        note_name(b + str_len(b), note[i]);
+    }
+    b[19] = 0;
+    mo_text(b, 2, 111, held ? MO_INK : MO_DIM);
+}
+static uint32_t mo_stage_signature(void)
+{
+    uint32_t h = 2166136261u, k, src, kk;
+    for (k = 0; k < NTRK; k++) {
+        const track_t *t = &trk[k];
+        char nm[16];
+        trk_short_name(k, nm);
+        stage_entry(k, &src, &kk);
+        h = str_hash(h, nm);
+        h = (h ^ t->pattern ^ (uint32_t)t->pattern_next << 4 ^ (uint32_t)t->p[P_MUTE] << 8 ^ (uint32_t)t->eng_req << 12 ^
+             entry_cat(src, kk) << 20) * 16777619u;
+    }
+    h = (h ^ song.sel ^ (uint32_t)song.rec << 4 ^ (uint32_t)song.playing << 8 ^ (uint32_t)song.g[G_BPM] << 12) * 16777619u;
+    h = (h ^ stage.out ^ (uint32_t)(ui.bpm_t != 0) << 1 ^ (uint32_t)ui.hot_col << 2) * 16777619u;
+    if (ui.msg_t)
+        h = str_hash(h, ui.msg);
+    if (stage.out) {
+        const uint8_t *p = (const uint8_t *)mo_col;
+        for (k = 0; k < sizeof mo_col; k++)
+            h = (h ^ p[k]) * 16777619u;
+    }
+    return h;
+}
+static void mono_stage(void)
+{
+    uint32_t k, sig;
+    stage_panel_hits();
+    stage.out = (uint8_t)stage_knobs_out();
+    memset(mo_col, 0, sizeof mo_col);
+    if (stage.out) {                                    /* the selected track's four knobs, as its pages */
+        mo_on = 1;
+        stage_columns();
+        mo_on = 0;
+    }
+    sig = mo_stage_signature();
+    if (ui.force || sig != mo_stage_sig) {              /* the top half: header, roles, names, engines, patterns */
+        mo_stage_sig = sig;
+        cv_begin(240, 120, MO_BG);
+        cv_oy = 0;
+        mo_stage_head();
+        for (k = 0; k < NTRK; k++)
+            mo_stage_col(k, 1);
+        if (stage.out) {                                /* the knobs over the columns' tops */
+            mo_fill(0, 10, 120, 50, MO_BG);
+            mo_cols();
+        }
+        cv_blit(0, 0);
+    } else if (ui.frame & 1u) {
+        return;
+    }
+    cv_begin(240, 120, MO_BG);                          /* the bottom half: steps, levels, the panel (every other frame) */
+    cv_oy = -120;
+    for (k = 0; k < NTRK; k++)
+        mo_stage_col(k, 0);
+    mo_dash(0, 88, 120, MO_DIM);
+    mo_stage_panel();
+    cv_oy = 0;
+    cv_blit(0, 120);
+}
