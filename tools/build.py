@@ -253,8 +253,9 @@ def build_plaits(flags):
     objects linked beside melodee.o, what nothing reaches dropped (--gc-sections)"""
     mi = FW / "third_party" / "mi"
     inc = "/opt/jieli/pi32v2/include" if use_docker() else str(toolchain() / "pi32v2" / "include")
-    cxx = [f for f in flags if f.startswith(("-m", "-f", "-O", "-D")) and f != "-fno-builtin"] + [   # (fabsf .. inline)
-        "-x", "c++", "-std=c++11", "-fno-exceptions", "-fno-rtti", "-fno-threadsafe-statics", "-w",
+    # (-O2, not the firmware's -Os: at -Os Plaits' per-sample helpers are calls, not inlined; fm1-gator builds it so)
+    cxx = [f for f in flags if f.startswith(("-m", "-f", "-D")) and f != "-fno-builtin"] + [   # (fabsf .. inline)
+        "-O2", "-fno-math-errno", "-x", "c++", "-std=c++11", "-fno-exceptions", "-fno-rtti", "-fno-threadsafe-statics", "-w",
         "-DTEST", "-DPLAITS_LEAN", "-DPLAITS_SAMPLE_RATE=44100.0f", "-DPLAITS_SAMPLE_RATE_EXACT", "-DPLAITS_BLOCK_SIZE=16",
         "-DMELODEE_PLAITS_RAM",
         "-DM_PI=3.14159265358979323846", "-include", "stdio.h", "-I", mi / "shim", "-isystem", inc, "-I", mi,
