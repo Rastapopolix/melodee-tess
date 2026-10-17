@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only
-     Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments -->
+     Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+     Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -35,10 +36,25 @@
   <p class="small" data-t="direct"></p>
   <p class="small" data-t="beta"></p>
   <p class="small"><span data-t="brick"></span>
-    <a href="https://github.com/kurogedelic/FM-1-transporter" target="_blank" rel="noopener" style="color:inherit">FM-1-transporter</a></p>
+    <a href="https://github.com/keremimo/melodee/blob/next/docs/RECOVERY.md" target="_blank" rel="noopener" style="color:inherit" data-t="recoveryLink"></a></p>
   <p><label><input type="radio" name="build" id="build-dual" checked> <span data-t="dual"></span></label><br>
     <label><input type="radio" name="build" id="build-single"> <span data-t="single"></span></label></p>
   <p class="small" data-t="singleWhy"></p>
+  <section id="nightly-options" hidden>
+    <p><strong data-t="nightlyTitle"></strong></p>
+    <p><label><input type="radio" name="build" id="build-nightly-dual"> <span data-t="nightly-dual"></span></label><br>
+      <label><input type="radio" name="build" id="build-nightly-single"> <span data-t="nightly-single"></span></label></p>
+    <p class="small" data-t="nightlyWhy"></p>
+    <p class="small" id="nightly-info"></p>
+  </section>
+  <section id="synth-options" hidden>
+    <p><strong data-t="synthTitle"></strong></p>
+    <p><label><input type="radio" name="build" id="build-synth-dual"> <span data-t="synth-dual"></span></label><br>
+      <label><input type="radio" name="build" id="build-synth-single"> <span data-t="synth-single"></span></label></p>
+    <p class="small" data-t="synthWhy"></p>
+    <p class="small" id="synth-info"></p>
+    <p class="small"><a id="synth-editor" href="../synth-editor/" style="color:inherit" data-t="synthEditor"></a></p>
+  </section>
   <p><button id="go" disabled data-t="install"></button></p>
   <details style="margin-top:24px">
     <summary data-t="stockTitle"></summary>
@@ -56,7 +72,7 @@
   <p><a href="../editor/" style="color:inherit" data-t="editor"></a></p>
   <p class="small">Melodee (tess) is a fork of Melodee by Theo Dainis, adding the Tessera note engines and project save. <a href="https://github.com/Rastapopolix/melodee-tess" target="_blank" rel="noopener" style="color:inherit">github.com/Rastapopolix/melodee-tess</a><br>
     Melodee by Ellic Studio, based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener" style="color:inherit">Felucca</a>
-    by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener" style="color:inherit">Hügelton Instruments</a>, with its CrispyZebra waveforms, drum voices, Sample Pack and Fukiai icons (MIT).<br>
+    by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener" style="color:inherit">Hügelton Instruments</a>, with its CrispyZebra waveforms and Fukiai icons (MIT).<br>
     Font: Inter Tight (The Inter Project Authors, SIL OFL 1.1). Samples: Versilian Studios VSCO-2 Community Edition and VCSL (CC0 1.0).<br>
     FM6 engine: msfa from Dexed (Google Inc., Pascal Gauthier, Apache-2.0). The package also holds three JieLi AC79 SDK files, uboot.boot, cfg_tool.bin and eq_cfg_hw.bin (JieLi Technology, Apache-2.0). <a href="../../firmware/LICENSING.md" style="color:inherit">Licences</a>: <a href="../../firmware/LICENSE" style="color:inherit">GPL-3.0</a>, <a href="../../firmware/LICENSES/Apache-2.0.txt" style="color:inherit">Apache-2.0</a>, <a href="../../firmware/LICENSES/" style="color:inherit">all</a>.<br>
     M-VAVE and FM-1 are trademarks of their respective owners.<br>
@@ -321,7 +337,8 @@ async function buildMelodeePackage(stockBytes, appBytes, product) {
 }
 
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+// Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+// Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 //
 // The FM-1 USB-MIDI update protocol over WebMIDI (after tools/fm1_install.py).
 // Step 1: the running firmware (official
@@ -510,7 +527,7 @@ class Updater {
     const ota = await this.waitFor((id) => id.model === "ota-" + model, 30000);
     if (!ota) throw fail("noloader", "the update loader did not appear. Replug the USB cable and press Install again: the device stays in update mode until it is finished.");
     const s2 = await this.write(ota, image, step);
-    if (!s2.finished) throw fail(s2.lost ? "lost" : "stopped", `the loader ${s2.lost ? "was disconnected" : "stopped"} after ${s2.served} requests. Replug and press Install again to resume.`);
+    if (!s2.finished) throw fail(s2.lost ? "lost" : "stopped", `the loader ${s2.lost ? "was disconnected" : "stopped"} after ${s2.served} requests. Reconnect and press Install again. With boot-protected firmware, power on holding OCT− alone if needed; three short key-light flashes mean update mode.`);
     step("reboot");
     await sleep(3000);
     const back = await this.waitFor((id) => !IS_OTA(id), 40000);
@@ -561,8 +578,9 @@ const BACKUP_IDS_CZ = Array.from({length:17},(_,i)=>i);
 const BACKUP_IDS_OWN = Array.from({length:21},(_,i)=>i);
 const BACKUP_IDS_NATIVE = Array.from({length:23},(_,i)=>i);
 const BACKUP_IDS_P5 = Array.from({length:28},(_,i)=>i);
+const BACKUP_IDS_TESS = Array.from({length:30},(_,i)=>i);   // melodee-tess: 28 the generators of the saved slots, 29 the live ones
 const maxSize = id => id >= 32 ? 81920 : (id === 0 || (id >= 2 && id <= 5)) ? 27904 : id>=23&&id<=27?3600:3840;
-const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : null);
+const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : n === 30 ? BACKUP_IDS_TESS : null);
 const BACKUP_CMD = { LIST: 65, GET: 66, PUT: 67 };
 const BACKUP_CHUNK = 256;
 const bkU32 = (n) => Array.from({ length: 5 }, (_, i) => (n >>> (i * 7)) & (i === 4 ? 15 : 127));
@@ -690,6 +708,14 @@ async function restoreBackup(request, file, onProgress = () => {}) {
     throw new Error("This backup needs firmware with larger recording storage");
   for (const o of archive.objects) if (!supported.some(x => x.id === o.id) && o.size) throw new Error("This firmware does not support a nonempty object in this backup");
   const put = async (args) => { const a = await ask([BACKUP_CMD.PUT, args]); bkCheck(a[2]); return a; };
+  // The firmware accepts or refuses each object's size before the first write (2.0 reads only the formats of
+  // 1.0 and later: an older archive restores on 1.2 first), so a refused archive writes nothing.
+  for (const o of archive.objects) if (o.id < 32 && o.size && supported.some(x => x.id === o.id)) {
+    const a = await ask([BACKUP_CMD.PUT, [0, o.id, ...bkU32(o.size), ...bkU32(o.crc)]]);
+    await ask([BACKUP_CMD.PUT, [3, o.id]]);
+    if (a[2] === 1) throw new Error("This backup holds an older format. Restore it with Melodee 1.2 first.");
+    bkCheck(a[2]);
+  }
   // Restore live music last. Other objects commit individually; a disconnect can leave a partial restore.
   for (const o of [...archive.objects.slice(2), archive.objects[1], archive.objects[0]]) {
     if (!supported.some(x => x.id === o.id)) continue;
@@ -754,11 +780,19 @@ const TEXT = {
     intro: "FM-1 を USB で接続してください。（Chrome か Edge で使えます）",
     warn: "書き込み中は USB を抜かないでください。",
     install: "インストール", other: "English",
+    nightlyTitle: "Nightly（next）", "nightly-dual": "Nightly（デュアルコア）",
+    "nightly-single": "Nightly（シングルコア）", "nightly-dualTag": "nightly・デュアルコア", "nightly-singleTag": "nightly・シングルコア",
+    nightlyWhy: "next の開発版です。インストール前にエディタで全体バックアップを保存してください。標準版を選ぶとリリース版へ戻せます。",
+    synthTitle: "シンセ専用（オプション）", "synth-dual": "シンセ専用（デュアルコア）", "synth-single": "シンセ専用（シングルコア）",
+    "synth-dualTag": "シンセ専用・デュアルコア", "synth-singleTag": "シンセ専用・シングルコア",
+    synthWhy: "パソコンで演奏・録音するための 1 トラックの音源版です。すべてのシンセと音色エディット、ARP・CHORD・SCALES、エフェクト（ドライブ、コーラス、ディレイ、リバーブ）、USB オーディオのステレオ録音を備えます。シーケンサー、ソング、プロジェクトの保存はありません。PLAY は ARP のホールドです。本体に保存したプロジェクトとプリセットはそのまま残り、標準を選んでインストールすると戻ります。インストール前にエディタで全体バックアップを保存してください。",
+    synthEditor: "シンセ専用版のエディタ（音色・エフェクト・設定をパソコンから編集）",
     dual: "標準（デュアルコア）", single: "シングルコア", dualTag: "標準", singleTag: "シングルコア",
     singleWhy: "シングルコア版は、標準版でクラッシュする FM-1 のためのものです（赤い MELODEE CRASH 画面、フリーズ、書き込みモードでの再起動）。FM-1 の 2 つ目のコアを起動しません（公式ファームウェアも使っていません）。PROPHET の最大発音数は 8 から 5 になり、重い FM6・PROPHET の音色は早めに処理の上限に達します。標準版に戻すには、標準を選んでインストールしてください。",
     editor: "エディタ（インストール後、パソコンから音色やシーケンスを編集）",
     direct: "USB ケーブルはパソコンに直接つないでください。Probe や Transporter などの機材は不要です。",
-    brick: "万一インストールに失敗して起動しなくなった場合は、復旧に Transporter が必要です:",
+    brick: "起動保護付きファームウェアの更新が中断した場合は、電源を入れ直すか、OCT− だけを押しながら電源を入れてください。キーのライトが短く3回点滅したら更新モードです。USB を接続し直して、もう一度インストールしてください。以前のファームウェアや長い1回の点滅の場合は、USB 復旧手順を確認してください:",
+    recoveryLink: "USB 復旧手順とダウンロード",
     beta: "Melodee (tess) 1.0 は Melodee の実験的フォークです。不具合は github.com/Rastapopolix/melodee-tess へ知らせてください（本家には送らないでください）。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
     back: "M-VAVEから公式FM-1 V15を取得し、未変更のFM-1.fwscを選んでください。ファイルはこのブラウザ内で検証し、サーバーへ送りません。",
     stockTitle: "公式V15に戻す", stockFile: "公式FM-1.fwsc", stockGo: "バックアップして公式V15へ戻す",
@@ -790,11 +824,19 @@ const TEXT = {
     intro: "Connect the FM-1 by USB. (Works in Chrome or Edge.)",
     warn: "Do not unplug the USB cable while writing.",
     install: "Install", other: "日本語",
+    nightlyTitle: "Nightly (next)", "nightly-dual": "Nightly — dual core",
+    "nightly-single": "Nightly — single core", "nightly-dualTag": "nightly, dual core", "nightly-singleTag": "nightly, single core",
+    nightlyWhy: "Development builds from next. Save a complete backup in the editor before installing. Choose Standard to return to the release.",
+    synthTitle: "Synth only (optional)", "synth-dual": "Synth only — dual core", "synth-single": "Synth only — single core",
+    "synth-dualTag": "synth only, dual core", "synth-singleTag": "synth only, single core",
+    synthWhy: "A one-track sound module for playing and recording into a computer: every synth and its sound editing, ARP, CHORD and SCALES, the effects (drive, chorus, delay, reverb) and stereo recording over USB audio. There is no sequencer, song or project saving; PLAY holds the ARP. Projects and presets saved on the FM-1 stay where they are and come back when you choose Standard and install again. Save a complete backup in the editor before installing.",
+    synthEditor: "Synth-only editor (sounds, effects and settings from the computer)",
     dual: "Standard (dual core)", single: "Single core", dualTag: "standard", singleTag: "single core",
     singleWhy: "The single-core build is for FM-1s that crash with the standard build (a red MELODEE CRASH screen, freezes, or restarts into update mode). It never starts the FM-1's second core, which the official firmware does not use either. PROPHET then plays up to five voices instead of eight, and heavy FM6 and PROPHET sounds reach the CPU limit sooner. To go back, choose Standard and install again.",
     editor: "Editor (after installing: edit sounds and sequences from the computer)",
     direct: "Connect the USB cable directly to the computer. No probe or Transporter is needed.",
-    brick: "If an install fails and the FM-1 no longer starts, recovering it needs a Transporter:",
+    brick: "If an update is interrupted on firmware with boot protection, switch the FM-1 on again (or hold OCT− alone while switching on). Three short key-light flashes mean update mode: reconnect USB and press Install again. Older firmware and one long flash need the USB recovery instructions:",
+    recoveryLink: "USB recovery instructions and downloads",
     beta: "Melodee (tess) 1.0 is an experimental fork of Melodee; please report problems at github.com/Rastapopolix/melodee-tess, not to upstream. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
     back: "Get official FM-1 V15 from M-VAVE and select the unmodified FM-1.fwsc. The browser validates it locally; it is not sent to a server.",
     stockTitle: "Return to official V15", stockFile: "Official FM-1.fwsc", stockGo: "Back up and return to official V15",
@@ -839,41 +881,51 @@ applyLang();
 $("stock-skip-backup").addEventListener("change", applyLang);
 const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textContent = t(k) + arg; };
 const say = (txt) => { lastKey = null; $("status").textContent = txt; };
-const build = () => $("build-single").checked ? "single" : "dual";
-const ready = () => { lastKey = "ready"; $("status").textContent = `Melodee (tess) ${meta.version} (${t(build() + "Tag")})`; };
+const buildIds = ["dual", "single", "nightly-dual", "nightly-single", "synth-dual", "synth-single"];
+const build = () => buildIds.find(k => $("build-" + k).checked) || "dual";
+const selection = () => {     /* the release, or a channel ("nightly-dual": meta.nightly's dual-core package) */
+  const kind = build(), dash = kind.indexOf("-");
+  return dash < 0 ? {kind, channel: meta, key: kind} : {kind, channel: meta[kind.slice(0, dash)], key: kind.slice(dash + 1)};
+};
+const ready = () => { lastKey = "ready"; $("status").textContent = `Melodee (tess) ${selection().channel.version} (${t(build() + "Tag")})`; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "1.0", "product": "FM-1_910", "pkg": {"dual": "../../firmware/melodee-tess-1.0.fwsc", "single": "../../firmware/melodee-tess-1.0-1core.fwsc"}};
-const images = {};                // "dual" / "single" -> the package's image, each fetched once
+const meta = {"version": "1.2.7", "product": "FM-1_91027", "pkg": {"dual": "../../firmware/melodee-tess-1.2.7.fwsc", "single": "../../firmware/melodee-tess-1.2.7-1core.fwsc"}, "nightly": null, "synth": null};
+$("nightly-options").hidden = !meta.nightly;
+if (meta.nightly) $("nightly-info").textContent = `next · ${meta.nightly.commit.slice(0, 7)} · ${meta.nightly.builtAt}`;
+$("synth-options").hidden = !meta.synth;
+if (meta.synth) $("synth-info").textContent = `${meta.synth.branch} · ${meta.synth.commit.slice(0, 7)} · ${meta.synth.builtAt}`;
+const images = {};                // a build ("dual", "nightly-single", "synth-dual" ..) -> its package's image, each fetched once
 
 let writing = false, stock = null, stockFileEpoch = 0, buildEpoch = 0;
-const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("build-dual").disabled = on; $("build-single").disabled = on; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; $("stock-skip-backup").disabled = on; };
+const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; buildIds.forEach(k => { $("build-" + k).disabled = on; }); $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; $("stock-skip-backup").disabled = on; };
 window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = t("leave"); } });
 
 // the chosen build's package: Install stays off until it is loaded and checked
 async function choose() {
   if (writing) return;
   if (!navigator.requestMIDIAccess) { sayK("nomidi"); return; }
-  const kind = build(), epoch = ++buildEpoch;
+  const {kind, channel, key} = selection(), epoch = ++buildEpoch;
   image = null; $("go").disabled = true;
   try {
     if (!images[kind]) {
-      const url = meta.pkg[kind], r = await fetch(url);
+      if (!channel) throw new Error(kind.startsWith("synth-") ? "Synth only is not available yet" : "Nightly is not available yet");
+      const url = channel.pkg[key] + (channel.commit ? "?commit=" + channel.commit : ""), r = await fetch(url);
       if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
       const pkg = new Uint8Array(await r.arrayBuffer());
-      if (productOf(pkg) !== meta.product) { if (epoch === buildEpoch) sayK("badpkg"); return; }
+      if (productOf(pkg) !== channel.product) { if (epoch === buildEpoch) sayK("badpkg"); return; }
       images[kind] = logicalImage(pkg);
     }
     if (epoch !== buildEpoch) return;
     image = images[kind]; if (!writing) ready(); lockInstaller(writing);
   } catch (e) { if (epoch === buildEpoch) sayK("loadfail", e.message); }
 }
-$("build-dual").addEventListener("change", choose);
-$("build-single").addEventListener("change", choose);
+buildIds.forEach(k => $("build-" + k).addEventListener("change", choose));
 choose();
 
 $("go").addEventListener("click", async () => {
   if (writing || !image) return;
+  const product = selection().channel.product;
   lockInstaller(true);
   let midi;
   try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
@@ -893,9 +945,9 @@ $("go").addEventListener("click", async () => {
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
-      sayK((await up.resume(image, step, meta.product)) ? "done" : "stopped");
+      sayK((await up.resume(image, step, product)) ? "done" : "stopped");
     } else {
-      await up.install(image, meta.product, step);
+      await up.install(image, product, step);
     }
   } catch (e) {
     if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");

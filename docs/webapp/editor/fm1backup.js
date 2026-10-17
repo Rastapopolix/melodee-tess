@@ -8,8 +8,9 @@ const BACKUP_IDS_CZ = Array.from({length:17},(_,i)=>i);
 const BACKUP_IDS_OWN = Array.from({length:21},(_,i)=>i);
 const BACKUP_IDS_NATIVE = Array.from({length:23},(_,i)=>i);
 const BACKUP_IDS_P5 = Array.from({length:28},(_,i)=>i);
+const BACKUP_IDS_TESS = Array.from({length:30},(_,i)=>i);   // melodee-tess: 28 the generators of the saved slots, 29 the live ones
 const maxSize = id => id >= 32 ? 81920 : (id === 0 || (id >= 2 && id <= 5)) ? 27904 : id>=23&&id<=27?3600:3840;
-const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : null);
+const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : n === 30 ? BACKUP_IDS_TESS : null);
 export const BACKUP_CMD = { LIST: 65, GET: 66, PUT: 67 };
 const BACKUP_CHUNK = 256;
 export const bkU32 = (n) => Array.from({ length: 5 }, (_, i) => (n >>> (i * 7)) & (i === 4 ? 15 : 127));
@@ -137,6 +138,14 @@ export async function restoreBackup(request, file, onProgress = () => {}) {
     throw new Error("This backup needs firmware with larger recording storage");
   for (const o of archive.objects) if (!supported.some(x => x.id === o.id) && o.size) throw new Error("This firmware does not support a nonempty object in this backup");
   const put = async (args) => { const a = await ask([BACKUP_CMD.PUT, args]); bkCheck(a[2]); return a; };
+  // The firmware accepts or refuses each object's size before the first write (2.0 reads only the formats of
+  // 1.0 and later: an older archive restores on 1.2 first), so a refused archive writes nothing.
+  for (const o of archive.objects) if (o.id < 32 && o.size && supported.some(x => x.id === o.id)) {
+    const a = await ask([BACKUP_CMD.PUT, [0, o.id, ...bkU32(o.size), ...bkU32(o.crc)]]);
+    await ask([BACKUP_CMD.PUT, [3, o.id]]);
+    if (a[2] === 1) throw new Error("This backup holds an older format. Restore it with Melodee 1.2 first.");
+    bkCheck(a[2]);
+  }
   // Restore live music last. Other objects commit individually; a disconnect can leave a partial restore.
   for (const o of [...archive.objects.slice(2), archive.objects[1], archive.objects[0]]) {
     if (!supported.some(x => x.id === o.id)) continue;
