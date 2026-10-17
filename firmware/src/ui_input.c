@@ -1537,6 +1537,8 @@ static void page_knob(uint32_t k, int32_t s)
     int16_t *hv;
     if (!pop.on && help_knob(k))                       /* ARP held: the knob's help, the value left (ui_help.c) */
         return;
+    if (!pop.on && msc_knob(k, s))                     /* FX held: the knob's mod amount, the value left (ui_modsc.c) */
+        return;
     if (ui.home || pg->scope == SC_STEP || pg->scope == SC_TRK || ((pg->scope==SC_DRUM || pg->scope==SC_DRUMHIT) && pg->id[k]!=255) || page_desc(pg, k, &hv) ||
         (pg->graph == GR_USER && k == 0u) || (pg->graph == GR_MOD && k == 1u)
         || pg->graph == GR_SONG || pg->graph == GR_PATGRID || pg->graph == GR_SCALE_PICKER || (scale_settings_page(pg) && k == 1u)
@@ -1977,6 +1979,7 @@ static void ui_input(void)
         }
     }
     if(momentary.active)ui.pg_down&=(uint16_t)~(1u<<panel.btn[B_LFO]);
+    msc_frame();                                        /* (FX held for a mod amount: its release opens no page) */
     if (help.on) {                                      /* (ARP held for help: its release opens no page) */
         ui.pg_down &= (uint16_t)~(1u << panel.btn[B_ARP]);
         if (!(fm1_in.buttons & (1u << panel.btn[B_ARP]))) {
@@ -2086,7 +2089,8 @@ static void ui_input(void)
     }
     if ((s = panel_enc(EN_SELECT)) != 0) {          /* SELECT: pages; with SEQ / a step key / ENV / SCL: below */
         step_edit_combo();
-        if(bulk_jog(s)) {
+        if (!pop.on && msc_select(s)) {                 /* FX held: the mod shortcut's source (ui_modsc.c) */
+        } else if(bulk_jog(s)) {
         } else if (pattern_keys_on()) {
             ui.seq_t0 |= 2u;
             uint32_t from = TSEL->pattern_next < NPAT ? TSEL->pattern_next : TSEL->pattern;
