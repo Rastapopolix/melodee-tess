@@ -52,7 +52,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_POL_DIV2] = {"DIV 2", F_ENUM, 0, 16, 3, TX_N_DIV, ""},
     [TX_POL_DIV3] = {"DIV 3", F_ENUM, 0, 16, 0, TX_N_DIV, ""},
     [TX_POL_DIV4] = {"DIV 4", F_ENUM, 0, 16, 0, TX_N_DIV, ""},
-    [TX_POL_SPAN] = PD("SPAN", F_INT, 1, 2, 1),
+    [TX_POL_SPAN] = PD("SPAN", F_INT, 1, 3, 1),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}

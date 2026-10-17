@@ -790,8 +790,8 @@ static void pack_run(char *res, size_t cap)
          * out of range is refused */
         static uint8_t v3[TESSERA_PK_BYTES_V3], v3b[TESSERA_PK_BYTES_V3];
         static const uint8_t BAD[][2] = {{0, 0}, {0, 65}, {1, 91}, {2, 0}, {2, 5}, {3, 0}, {4, 17}, {5, 101}, {6, 0x09},
-                                         {13, 0x90}, {14, 0x08}, {21, 0x80}, {22, 17}, {26, 0x0E}, {27, 0xE0},
-                                         {28, 0}, {28, 3}};   /* (Bounce 0..2, Awake 3..21, Poly 22..28) */
+                                         {13, 0x90}, {14, 0x08}, {21, 0x80}, {22, 17},
+                                         {28, 0}, {28, 4}, {28, 0x10}};   /* (Bounce 0..2, Awake 3..21, Poly 22..28) */
         const uint32_t n4 = TESSERA_PK_BYTES / TESSERA_TRACKS, n3 = TESSERA_PK_BYTES_V3 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v3 + tr * n3, a + tr * n4, n3);
         tessera_reset();
@@ -818,6 +818,15 @@ static void pack_run(char *res, size_t cap)
             c[3u * n4 + n3 + BAD[k][0]] = BAD[k][1];  /* (track 4's) */
             ok &= tessera_unpack(c) == 0;
         }
+        tessera_unpack(a);
+    }
+    {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */
+        static const uint8_t P[4] = {20, 16, 5, 15};
+        tessera.poly[3].span = 3;
+        memcpy(tessera.poly[3].pitch, P, 4);
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.poly[3].span == 3u && !memcmp(tessera.poly[3].pitch, P, 4);
         tessera_unpack(a);
     }
     snprintf(res, cap, "0x%08x %u", ha, ok);

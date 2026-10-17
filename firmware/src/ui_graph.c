@@ -256,8 +256,8 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rect(sx, y_base + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
         }
     } else if (mode == TESS_ENG_BOUNCE) {
-        /* the box (its 256 x 256 the panel's; on the older page squeezed into a strip), the balls (the first one
-         * larger), the walls hit on the last step lit */
+        /* the box (its 256 x 256 the panel's; on the older page squeezed into a strip), the balls (all alike), the walls
+         * hit on the last step lit */
         const gen_bounce_t *b = tessera_bounce(tr);
         int h = is_panel ? 14 : 18;
         int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 8 : y_base - 2, bh = is_panel ? 96 : h + 8;
@@ -267,13 +267,13 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         cv_rect(x0, top, w & 2u ? 2 : 1, bh, w & 2u ? T_TEXT : dim);                     /* left */
         cv_rect(x0 + sw - (w & 4u ? 2 : 1), top, w & 4u ? 2 : 1, bh, w & 4u ? T_TEXT : dim);   /* right */
         for (uint32_t k = n; k-- > 0;) {
-            int32_t r = k ? 3 : 5;
+            int32_t r = 5;
             int32_t bx = x0 + 2 + (int32_t)b->x[k] * (sw - 4 - r) / 255, by = top + bh - 2 - r - (int32_t)b->y[k] * (bh - 4 - r) / 255;
-            cv_rrect(bx, by, r, r, 1, k ? c : song.playing ? T_TEXT : c, bg);
+            cv_rrect(bx, by, r, r, 1, T_TEXT, bg);
         }
     } else if (mode == TESS_ENG_AWAKE) {
-        /* loop A (the notes) over loop B (their lift), 16 cells each: a value a bar its height (A: 1..8, B: 0..7), a rest
-         * a dash; past the loop's length dim; the steps playing lit; the step the keys picked framed */
+        /* loop A (the notes) over loop B (their lift), 16 cells each: a value a bar its height (A: 1..8, B: 0..7; 1 two
+         * pixels at least), a rest (A) or no lift (B) a dash; past the loop's length dim; the steps playing lit; the step the keys picked framed */
         const gen_awake_t *a = tessera_awake(tr);
         int32_t ha = is_panel ? 44 : 12, hb = is_panel ? 28 : 6, ya = is_panel ? 10 : y_base, yb = ya + ha + (is_panel ? 14 : 4);
         uint32_t la = a->len_a ? a->len_a : 1u, lb = a->len_b ? a->len_b : 1u;
@@ -285,10 +285,12 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             int ha_on = song.playing && i == ca, hb_on = song.playing && i == cb;
             if (i >= la) cv_rect(sx, ya + ha - 1, step_w, 1, dim);
             else if (!va) cv_rect(sx, ya + ha - 2, step_w, 2, ha_on ? T_TEXT : dim);
-            else cv_rrect(sx, ya + ha - (int32_t)va * ha / 8, step_w, (int32_t)va * ha / 8, 1, ha_on ? T_TEXT : c, bg);
+            else cv_rrect(sx, ya + ha - (2 + ((int32_t)va - 1) * (ha - 2) / 7), step_w, 2 + ((int32_t)va - 1) * (ha - 2) / 7, 1,
+                          ha_on ? T_TEXT : c, bg);
             if (i >= lb) cv_rect(sx, yb + hb - 1, step_w, 1, dim);
             else if (!vb) cv_rect(sx, yb + hb - 2, step_w, 2, hb_on ? T_TEXT : dim);
-            else cv_rrect(sx, yb + hb - (int32_t)vb * hb / 7, step_w, (int32_t)vb * hb / 7, 1, hb_on ? T_TEXT : T_MID, bg);
+            else cv_rrect(sx, yb + hb - (2 + ((int32_t)vb - 1) * (hb - 2) / 6), step_w, 2 + ((int32_t)vb - 1) * (hb - 2) / 6, 1,
+                          hb_on ? T_TEXT : c, bg);
             if (a->edit && (a->edit & 15u) == i) {         /* the step picked (ui_awake.c): framed */
                 int32_t fy = (a->edit & 0x10u) ? yb : ya, fh = (a->edit & 0x10u) ? hb : ha;
                 cv_rect(sx - 1, fy - 2, step_w + 2, 1, T_TEXT);
@@ -300,7 +302,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
          * step playing framed, the tick lit when it fires there (OFF: a dim lane; the one RHY picks, its label lit).
          * Under them the four notes, a bar each at its pitch, the one playing lit */
         const gen_poly_t *p = tessera_poly(tr);
-        uint32_t n = p->span == 2u ? 14u : 7u, now = (p->tick + GEN_POLY_WRAP - 1u) % GEN_POLY_WRAP, base = now - now % 16u;
+        uint32_t n = 7u * (p->span >= 1u && p->span <= 3u ? p->span : 1u), now = (p->tick + GEN_POLY_WRAP - 1u) % GEN_POLY_WRAP, base = now - now % 16u;
         int32_t top = is_panel ? 6 : y_base, lane = is_panel ? 13 : 5, x0 = is_panel ? 46 : 40, cw = is_panel ? 11 : 12;
         int32_t ny = top + 4 * lane + (is_panel ? 6 : 2), nh = is_panel ? 112 - ny - 6 : 8;
         for (uint32_t r = 0; r < 4u; r++) {

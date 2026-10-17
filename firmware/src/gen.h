@@ -86,8 +86,8 @@ typedef struct {
  * four-step pitch sequence; rhythms that land together play once, louder. The pitches come from the seed (ROLL) */
 typedef struct {
     uint8_t  div[4];      /* 0 = off, 1..16: a rhythm advances the sequence every div steps */
-    uint8_t  pitch[4];    /* scale degrees, 0..13 */
-    uint8_t  span;        /* 1..2: octaves the pitches spread over */
+    uint8_t  pitch[4];    /* scale degrees, 0..20 */
+    uint8_t  span;        /* 1..3: octaves the pitches spread over */
     uint8_t  pos;         /* the step playing, 0..3 */
     uint8_t  sel;         /* the rhythm GEN's DIV edits (the page's, not saved) */
     uint32_t tick;        /* steps since PLAY, modulo 720720 (every divider's multiple) */
@@ -97,9 +97,9 @@ typedef struct {
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
     uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8; Bounce:
-                           * balls; Poly: the pitches, 4 bits each */
+                           * balls; Poly: the pitches' low 4 bits each */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos; Bounce: angle, speed; Awake: the
-                           * lengths; Poly: span */
+                           * lengths; Poly: span, the pitches' fifth bits from bit 4 */
 } gen_sec_t;
 
 /* One step of an input phrase (phase 6: STEP as seed) */

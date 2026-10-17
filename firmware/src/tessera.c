@@ -866,9 +866,9 @@ static void tess_knob_body(uint32_t k, int32_t s)
         } else if (k == 2u) {
             int32_t v = (int32_t)p->div[p->sel & 3u] + s;
             p->div[p->sel & 3u] = (uint8_t)(v < 0 ? 0 : v > 16 ? 16 : v);
-        } else if (k == 3u) {                               /* SPAN: the seed's pitches over 1 or 2 octaves */
+        } else if (k == 3u) {                               /* SPAN: the seed's pitches over 1 to 3 octaves */
             int32_t v = (int32_t)p->span + (s > 0 ? 1 : -1);
-            v = v < 1 ? 1 : v > 2 ? 2 : v;
+            v = v < 1 ? 1 : v > 3 ? 3 : v;
             if ((uint8_t)v != p->span) {
                 p->span = (uint8_t)v;
                 gen_poly_fill(p, tessera.seed[tr]);
@@ -1015,8 +1015,10 @@ static uint8_t *tess_put_v4(uint8_t *o, const tessera_bounce_t *b, const tessera
     for (i = 0; i < 8u; i++) *o++ = a->a[i];
     for (i = 0; i < 8u; i++) *o++ = a->b[i];
     for (i = 0; i < 4u; i++) *o++ = p->div[i];
-    *o++ = (uint8_t)(p->pitch[0] | p->pitch[1] << 4); *o++ = (uint8_t)(p->pitch[2] | p->pitch[3] << 4);
-    *o++ = p->span;
+    *o++ = (uint8_t)((p->pitch[0] & 15u) | (p->pitch[1] & 15u) << 4);
+    *o++ = (uint8_t)((p->pitch[2] & 15u) | (p->pitch[3] & 15u) << 4);
+    *o++ = (uint8_t)(p->span | (p->pitch[0] >> 4) << 4 | (p->pitch[1] >> 4) << 5 | (p->pitch[2] >> 4) << 6 |
+                     (p->pitch[3] >> 4) << 7);   /* (SPAN, and the pitches' fifth bits: 3 octaves are 21 degrees) */
     return o;
 }
 uint32_t tessera_pack(uint8_t *o)
@@ -1094,9 +1096,9 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
         if ((awk[3 + i] & 0xFu) > 8u || awk[3 + i] >> 4 > 8u || (awk[11 + i] & 0xFu) > 7u || awk[11 + i] >> 4 > 7u) return 0;
     for (i = 0; i < 4u; i++)
         if (pol[i] > 16u) return 0;
-    for (i = 0; i < 2u; i++)
-        if ((pol[4 + i] & 0xFu) > 13u || pol[4 + i] >> 4 > 13u) return 0;
-    if (pol[6] < 1u || pol[6] > 2u) return 0;
+    for (i = 0; i < 4u; i++)                         /* (a pitch: its nibble and its fifth bit in SPAN's byte) */
+        if ((((pol[4 + i / 2u] >> ((i & 1u) * 4u)) & 0xFu) | ((pol[6] >> (4u + i)) & 1u) << 4) > 20u) return 0;
+    if ((pol[6] & 15u) < 1u || (pol[6] & 15u) > 3u) return 0;
     if (!apply) return 1;
 
     tessera.mode[tr] = (uint8_t)mode;
@@ -1130,8 +1132,9 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     tessera.awake[tr].len_a = awk[0]; tessera.awake[tr].len_b = awk[1]; tessera.awake[tr].prob = awk[2];
     for (i = 0; i < 8u; i++) tessera.awake[tr].a[i] = awk[3 + i], tessera.awake[tr].b[i] = awk[11 + i];
     for (i = 0; i < 4u; i++) tessera.poly[tr].div[i] = pol[i];
-    for (i = 0; i < 4u; i++) tessera.poly[tr].pitch[i] = (uint8_t)((pol[4 + i / 2u] >> ((i & 1u) * 4u)) & 0xFu);
-    tessera.poly[tr].span = pol[6];
+    for (i = 0; i < 4u; i++)
+        tessera.poly[tr].pitch[i] = (uint8_t)(((pol[4 + i / 2u] >> ((i & 1u) * 4u)) & 0xFu) | ((pol[6] >> (4u + i)) & 1u) << 4);
+    tessera.poly[tr].span = pol[6] & 15u;
     return 1;
 }
 
@@ -1365,7 +1368,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_POL_DIV1: case TX_POL_DIV2: case TX_POL_DIV3: case TX_POL_DIV4:
         tessera.poly[tr].div[x - TX_POL_DIV1] = (uint8_t)tess_clampi(v, 0, 16); eng = TESS_ENG_POLY; break;
     case TX_POL_SPAN:
-        v = tess_clampi(v, 1, 2);
+        v = tess_clampi(v, 1, 3);
         if ((uint8_t)v != tessera.poly[tr].span) {
             tessera.poly[tr].span = (uint8_t)v;
             gen_poly_fill(&tessera.poly[tr], tessera.seed[tr]);

@@ -89,20 +89,22 @@ static void gen_awake_put(uint8_t *v, uint32_t i, uint32_t x)
     uint32_t sh = (i & 1u) * 4u;
     v[(i >> 1) & 7u] = (uint8_t)((v[(i >> 1) & 7u] & ~(0xFu << sh)) | ((x & 0xFu) << sh));
 }
-/* Awake's 32 values from a seed (ROLL; a track's first): A a melody with rests (about one in four), B mostly 0, now and
- * then a step up the scale, as Awake's own defaults are */
+/* Awake's 32 values from a seed (ROLL; a track's first): A a melody with rests (about one in four), B half its steps a
+ * lift of 1..5 degrees (the rest 0), so the lower loop is heard at once */
 static void gen_awake_fill(gen_awake_t *g, uint32_t seed)
 {
     uint32_t s = gen_stream(seed * 13u + 5u), i;
     for (i = 0; i < 16u; i++) {
         gen_awake_put(g->a, i, gen_rnd(&s, 4u) ? 1u + gen_rnd(&s, 8u) : 0u);
-        gen_awake_put(g->b, i, gen_rnd(&s, 4u) ? 0u : gen_rnd(&s, 6u));
+        gen_awake_put(g->b, i, gen_rnd(&s, 2u) ? 0u : 1u + gen_rnd(&s, 5u));
     }
 }
+/* Poly's degrees over SPAN octaves (1..3) */
+static uint32_t gen_poly_degs(const gen_poly_t *g) { return 7u * (g->span >= 1u && g->span <= 3u ? g->span : 1u); }
 /* Poly's four pitches from a seed (ROLL; a track's first), over SPAN octaves */
 static void gen_poly_fill(gen_poly_t *g, uint32_t seed)
 {
-    uint32_t s = gen_stream(seed * 29u + 11u), i, n = 7u * (g->span == 2u ? 2u : 1u);
+    uint32_t s = gen_stream(seed * 29u + 11u), i, n = gen_poly_degs(g);
     for (i = 0; i < 4u; i++)
         g->pitch[i] = (uint8_t)gen_rnd(&s, n);
 }
@@ -369,7 +371,7 @@ static void gen_poly_tick(gen_poly_t *g, const gen_clock_t *clk, uint32_t *rnd, 
     if (n) {
         uint32_t deg;
         g->pos = (uint8_t)((g->pos + 1u) & 3u);
-        deg = g->pitch[g->pos] > 13u ? 13u : g->pitch[g->pos];
+        deg = g->pitch[g->pos] > 20u ? 20u : g->pitch[g->pos];
         out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
         out->vel = (uint8_t)(88u + 13u * (n - 1u));
         out->gate = 1;
@@ -465,7 +467,8 @@ static void gen_bounce_mutate(gen_bounce_t *g, uint32_t amt, uint32_t *rnd)
     g->angle = (uint8_t)(v < 0 ? 0 : v > 90 ? 90 : v);
 }
 
-/* Awake: 1 + AMOUNT/200 of A's loop's values drawn again (a rest one in four), at AMOUNT % one of B's too */
+/* Awake: 1 + AMOUNT/200 of A's loop's values drawn again (a rest one in four), as many of B's at AMOUNT % each (0 one
+ * in two, else a lift of 1..5) */
 static void gen_awake_mutate(gen_awake_t *g, uint32_t amt, uint32_t *rnd)
 {
     uint32_t la = g->len_a >= 1u && g->len_a <= 16u ? g->len_a : 16u, lb = g->len_b >= 1u && g->len_b <= 16u ? g->len_b : 16u;
@@ -475,16 +478,18 @@ static void gen_awake_mutate(gen_awake_t *g, uint32_t amt, uint32_t *rnd)
         uint32_t i = gen_rnd(rnd, la);
         gen_awake_put(g->a, i, gen_rnd(rnd, 4u) ? 1u + gen_rnd(rnd, 8u) : 0u);
     }
-    if (gen_rnd(rnd, 100u) < amt) {
-        uint32_t i = gen_rnd(rnd, lb);
-        gen_awake_put(g->b, i, gen_rnd(rnd, 6u));
-    }
+    n = 1u + amt * lb / 200u;
+    while (n--)
+        if (gen_rnd(rnd, 100u) < amt) {
+            uint32_t i = gen_rnd(rnd, lb);
+            gen_awake_put(g->b, i, gen_rnd(rnd, 2u) ? 0u : 1u + gen_rnd(rnd, 5u));
+        }
 }
 
 /* Poly: each pitch at AMOUNT % moves a degree or two, turning back at the span's ends; the rhythms stay */
 static void gen_poly_mutate(gen_poly_t *g, uint32_t amt, uint32_t *rnd)
 {
-    int32_t top = 7 * (g->span == 2u ? 2 : 1) - 1;
+    int32_t top = (int32_t)gen_poly_degs(g) - 1;
     for (uint32_t i = 0; i < 4u; i++) {
         int32_t v;
         if (gen_rnd(rnd, 100u) >= amt) continue;
@@ -527,14 +532,15 @@ static void gen_awake_load(gen_awake_t *g, const gen_sec_t *s)
 }
 static void gen_poly_save(const gen_poly_t *g, gen_sec_t *s)
 {
-    s->reg = (uint16_t)(g->pitch[0] | g->pitch[1] << 4 | g->pitch[2] << 8 | g->pitch[3] << 12);
-    s->p0 = g->span;
+    s->reg = (uint16_t)((g->pitch[0] & 15u) | (g->pitch[1] & 15u) << 4 | (g->pitch[2] & 15u) << 8 | (g->pitch[3] & 15u) << 12);
+    s->p0 = (uint8_t)(g->span | (g->pitch[0] >> 4) << 4 | (g->pitch[1] >> 4) << 5 | (g->pitch[2] >> 4) << 6 |
+                      (g->pitch[3] >> 4) << 7);
 }
 static void gen_poly_load(gen_poly_t *g, const gen_sec_t *s)
 {
     for (uint32_t i = 0; i < 4u; i++) {
-        uint32_t v = (s->reg >> (i * 4u)) & 0xFu;
-        g->pitch[i] = (uint8_t)(v > 13u ? 13u : v);
+        uint32_t v = ((s->reg >> (i * 4u)) & 0xFu) | ((s->p0 >> (4u + i)) & 1u) << 4;
+        g->pitch[i] = (uint8_t)(v > 20u ? 20u : v);
     }
-    g->span = s->p0 == 2u ? 2u : 1u;
+    g->span = (s->p0 & 15u) >= 1u && (s->p0 & 15u) <= 3u ? s->p0 & 15u : 1u;
 }

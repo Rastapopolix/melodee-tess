@@ -176,7 +176,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x222 | POLY RHYTHM 2 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | /3 | Every how many steps rhythm 2 moves the four notes on (OFF: never). |
 | 0x223 | POLY RHYTHM 3 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | OFF | Every how many steps rhythm 3 moves the four notes on (OFF: never). |
 | 0x224 | POLY RHYTHM 4 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | OFF | Every how many steps rhythm 4 moves the four notes on (OFF: never). |
-| 0x225 | POLY SPAN | 1 to 2 | 1 | Octaves the four notes spread over; ROLL draws them, EVOLVE moves them a little. |
+| 0x225 | POLY SPAN | 1 to 3 | 1 | Octaves the four notes spread over; ROLL draws them, EVOLVE moves them a little. |
 
 ## Mods
 

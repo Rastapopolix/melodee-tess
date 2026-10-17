@@ -564,14 +564,14 @@ static void poly_tests(void)
 {
     int range = 1, draws = 1, hits = 1, fill = 1, mut = 1, loud = 1, off = 1, wrap = 1;
     for (uint32_t d = 0; d <= 16; d++)
-        for (uint32_t span = 1; span <= 2; span++) {
+        for (uint32_t span = 1; span <= 3; span++) {
             gen_poly_t g = poly_at(d, 16u - d, d / 2u, 7, span, d * 7u + 1u);
             for (uint32_t i = 0; i < 200; i++) {
                 gen_out_t o = step_out();
                 uint32_t c = rng_state;
                 gen_poly_tick(&g, &CLK0, &rng_state, &o);
                 draws &= draws_since(c) == 0u;
-                range &= o.gate ? o.note >= 48 && o.note <= 70 && o.vel >= 88 && o.vel <= 127 : o.note == 60 && o.vel == 100;
+                range &= o.gate ? o.note >= 48 && o.note <= 82 && o.vel >= 88 && o.vel <= 127 : o.note == 60 && o.vel == 100;
                 range &= g.pos < 4u && o.cv >= 0;
             }
         }
@@ -598,12 +598,12 @@ static void poly_tests(void)
         wrap &= n == 1u && g.tick == 2u;
     }
     for (uint32_t sd = 0; sd < 300; sd++)
-        for (uint32_t span = 1; span <= 2; span++) {
+        for (uint32_t span = 1; span <= 3; span++) {
             gen_poly_t g = poly_at(4, 3, 0, 0, span, sd);
             for (uint32_t i = 0; i < 4; i++) fill &= g.pitch[i] < 7u * span;
         }
     for (uint32_t amt = 0; amt <= 100; amt += 25)
-        for (uint32_t span = 1; span <= 2; span++) {
+        for (uint32_t span = 1; span <= 3; span++) {
             gen_poly_t g = poly_at(5, 2, 9, 0, span, 4), g0 = g;
             for (uint32_t n = 0; n < 200; n++) {
                 gen_poly_mutate(&g, amt, &rng_state);
@@ -611,11 +611,20 @@ static void poly_tests(void)
             }
             if (!amt) mut &= !memcmp(g.pitch, g0.pitch, 4);
         }
-    check("poly: notes 48..70, louder (88 + 13 a rhythm more) where rhythms land together; else a rest as ever", range);
+    check("poly: notes 48..82, louder (88 + 13 a rhythm more) where rhythms land together; else a rest as ever", range);
     check("poly: no random draw a step", draws);
     check("poly: 4 against 3 plays steps 0 3 4 6 8 9 of every 12, step 0 louder; all OFF silent", hits && loud && off);
     check("poly: its count wraps at 720720 with no step lost or doubled", wrap);
-    check("poly: the seed's pitches and mutation's stay inside SPAN; the rhythms stay as set", fill && mut);
+    {   /* a FORM section keeps pitches above 15 (their fifth bits beside SPAN) */
+        gen_poly_t g = poly_at(4, 3, 0, 0, 3, 1), h;
+        gen_sec_t s;
+        g.pitch[0] = 20, g.pitch[1] = 16, g.pitch[2] = 5, g.pitch[3] = 15;
+        gen_poly_save(&g, &s);
+        memset(&h, 0, sizeof h);
+        gen_poly_load(&h, &s);
+        mut &= h.span == 3u && !memcmp(h.pitch, g.pitch, 4);
+    }
+    check("poly: the seed's pitches and mutation's stay inside SPAN (1..3); a section keeps them; the rhythms stay", fill && mut);
 }
 
 /* ------------------------------------------------------------------ sections --- */
