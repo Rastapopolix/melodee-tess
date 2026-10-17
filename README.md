@@ -28,43 +28,30 @@ The build outputs `melodee-tess.fwsc` (standard, dual core) and `melodee-tess-1c
 
 ---
 
-## Engines & Workflow
+## Using it
 
-On the **PATTERN** page, the **MODE** knob switches a track between the original step sequencer (`STEP`) inherited from upstream Melodee and one of four new generative engines:
+**[Read the manual](MANUAL.md)** for every Tess page, knob and shortcut, and recipes such as
+[Grids variations that repeat](MANUAL.md#recipe-grids-variations-that-repeat).
 
-* **Turing**: A looping shift register in the style of a Turing Machine (`LEN`, `PROB`, `SPAN`).
-* **Euclid**: Euclidean rhythms (`STEPS`, `PULSE`, `ROT`) using track-saved seed pitches.
-* **Markov**: A random walk over 8 scale degrees (`LEAP`, `DENS`, `SPAN`).
-* **Morph**: A rhythm blended between two preset patterns (`POS`, `SNP A`, `SNP B`).
+The short version:
 
----
-
-## Control Pages
-
-* **Evolve Page**: 
-  * `LOCK`: Deja vu control determining how much of the phrase repeats.
-  * `EVERY`: Mutates the phrase every (`OFF`, `1`, `2`, `4`, `8`, or `16` bars).
-  * `AMOUNT`: Degree of change per mutation.
-  * `ROLL`: Instantly triggers a mutation.
-
-* **Form Page**: 
-  * Builds sections from mutated phrases (`AB`, `ABAC`, `ABCB`, `AABA`, `ABCA`, or `AABC`). 
-  * `CONTRAST`: Varies new sections relative to previous ones.
-  * `CLEAR`: Forgets B and C, resetting the current phrase to A.
-
-* **Tweak Page**: 
-  * `SHIFT`: Transposes up to 24 semitones.
-  * `DROP`: Probability of dropping a hit across any engine.
-  * `HUMAN`: Adds velocity and gate variation.
-  * `FOLLOW`: Plays another Tessera track's pitch, shifted, in this track's scale.
-
-*(Note: The **FLOURISH** knob is located on the FORM page, shifting the last beat of the last bar of each phrase into section transitions).*
+* **Tap ARP** for the generator pages: **GEN**, **EVOLVE**, **FORM**, **TWEAK**, then the arpeggiator's ARP and ARP 2. Tap again for the next page.
+* **GEN, KNOB 1 (MODE)** switches a track between the step sequencer (`STEP`) and a generator:
+  * **Turing**: a looping shift register in the style of a Turing Machine (`LENGTH`, `PROB`, `SPAN`).
+  * **Euclid**: Euclidean rhythms (`STEPS`, `PULSE`, `ROT`) on pitches picked by the track's seed.
+  * **Markov**: a random walk over 8 scale degrees (`LEAP`, `DENS`, `SPAN`).
+  * **Morph**: a rhythm blended between two preset patterns (`POS`, `SNP A`, `SNP B`).
+  * **Grids**: Mutable Instruments Grids' drum map, kick, snare and hat (`X`, `Y`, `DENS`).
+* **EVOLVE** mutates the phrase every few bars (`LOCK`, `EVERY`, `AMOUNT`); **ROLL** picks the track's seed, a line you can always come back to.
+* **FORM** builds sections A, B and C into forms such as `AABA`; **TWEAK** transposes, thins, humanises or follows another track.
+* **Tap LFO to MODS** for 16 modulation cords between any source and destination on any track, generators included.
+* **Hold ARP and turn a knob** to see what that knob does.
 
 ---
 
 ## Saving & Storage
 
-Tessera state is saved with the project into its own dedicated flash object (`OBJ_TESSERA` at `0x9D000`, utilizing the free sector pair) because the main project record is near capacity. 
+Generator settings, seeds, FORM sections and the cords are saved with the project, in their own flash object (`OBJ_TESSERA` at `0x9D000`) because the main project record is near capacity. The current block format is version 3 ("TSR3", with Grids); projects and backups saved by earlier Tess versions still load and convert.
 
 * **Tagging & Validation**: Each slot's block carries a hash of its parent project record. If hashes mismatch, the project loads with Tessera `OFF` to prevent stale data. Every field is range-checked.
 * **Compatibility**: Projects saved by stock Melodee load normally with Tessera `OFF`, and projects saved by this fork remain readable.
@@ -72,6 +59,8 @@ Tessera state is saved with the project into its own dedicated flash object (`OB
 ---
 
 ## Visual Reference Gallery
+
+*Screens from v1.1: the generator settings were on SEQ's PATTERN page then; they are on GEN now.*
 
 ### 1. Turing Engine
 ![Turing Engine](assets/02_Pattern_Turing.jpg)
