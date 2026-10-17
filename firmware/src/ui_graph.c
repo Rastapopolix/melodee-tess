@@ -291,10 +291,11 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             else if (!vb) cv_rect(sx, yb + hb - 2, step_w, 2, hb_on ? T_TEXT : dim);
             else cv_rrect(sx, yb + hb - (2 + ((int32_t)vb - 1) * (hb - 2) / 6), step_w, 2 + ((int32_t)vb - 1) * (hb - 2) / 6, 1,
                           hb_on ? T_TEXT : c, bg);
-            if (a->edit && (a->edit & 15u) == i) {         /* the step picked (ui_awake.c): framed */
-                int32_t fy = (a->edit & 0x10u) ? yb : ya, fh = (a->edit & 0x10u) ? hb : ha;
-                cv_rect(sx - 1, fy - 2, step_w + 2, 1, T_TEXT);
-                cv_rect(sx - 1, fy + fh + 1, step_w + 2, 1, T_TEXT);
+            if (a->edit && (a->edit & 15u) == i) {         /* the step picked (ui_awake.c): framed, A's and B's */
+                cv_rect(sx - 1, ya - 2, step_w + 2, 1, T_TEXT);
+                cv_rect(sx - 1, ya + ha + 1, step_w + 2, 1, T_TEXT);
+                cv_rect(sx - 1, yb - 2, step_w + 2, 1, T_TEXT);
+                cv_rect(sx - 1, yb + hb + 1, step_w + 2, 1, T_TEXT);
             }
         }
     } else if (mode == TESS_ENG_POLY) {

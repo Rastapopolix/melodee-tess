@@ -79,7 +79,7 @@ typedef struct {
     uint8_t  prob;        /* 0..100 */
     uint8_t  pos_a, pos_b; /* the steps playing */
     uint8_t  a[8], b[8];  /* 16 values each, 4 bits (low nibble first): A 0..8, B 0..7 */
-    uint8_t  edit;        /* the step the keys picked (GEN's KNOB 1 sets it): 0 none, else 0x20 | row B 0x10 | step */
+    uint8_t  edit;        /* the step the keys picked (GEN's KNOB 1 sets its A, KNOB 2 its B): 0 none, else 0x20 | step */
 } gen_awake_t;
 
 /* 8. Poly (EuroPi's Polyrhythmic Sequencer, after the Subharmonicon): four rhythms, each a clock divider, advance a

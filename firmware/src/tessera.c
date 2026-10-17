@@ -729,9 +729,9 @@ static void tess_knob_body(uint32_t k, int32_t s)
 
     uint32_t mode = tessera.mode[tr];
 
-    if (k == 0u && mode == TESS_ENG_AWAKE && tessera.awake[tr].edit) {   /* a step picked: KNOB 1 is its value */
+    if (k <= 1u && mode == TESS_ENG_AWAKE && tessera.awake[tr].edit) {   /* a step picked: KNOB 1 its A, KNOB 2 its B */
         tessera_awake_t *a = &tessera.awake[tr];
-        uint32_t i = a->edit & 15u, b = (a->edit >> 4) & 1u;
+        uint32_t i = a->edit & 15u, b = k;
         int32_t v = (int32_t)(b ? gen_awake_b(a, i) : gen_awake_a(a, i)) + (s > 0 ? 1 : -1);
         v = v < 0 ? 0 : v > (b ? 7 : 8) ? (b ? 7 : 8) : v;
         gen_awake_put(b ? a->b : a->a, i, (uint32_t)v);
@@ -1430,10 +1430,10 @@ const gen_grids_t *tessera_grids(uint32_t tr) { return &tessera.grids[tr % TESSE
 const gen_bounce_t *tessera_bounce(uint32_t tr) { return &tessera.bounce[tr % TESSERA_TRACKS]; }
 const gen_awake_t *tessera_awake(uint32_t tr) { return &tessera.awake[tr % TESSERA_TRACKS]; }
 const gen_poly_t *tessera_poly(uint32_t tr) { return &tessera.poly[tr % TESSERA_TRACKS]; }
-void tessera_awake_select(uint32_t tr, uint32_t row, uint32_t step)
+void tessera_awake_select(uint32_t tr, uint32_t step)
 {
     uint8_t e;
     if (tr >= TESSERA_TRACKS) return;
-    e = step < 16u ? (uint8_t)(0x20u | (row ? 0x10u : 0u) | step) : 0u;
+    e = step < 16u ? (uint8_t)(0x20u | step) : 0u;
     tessera.awake[tr].edit = tessera.awake[tr].edit == e ? 0u : e;   /* (the same again: none) */
 }

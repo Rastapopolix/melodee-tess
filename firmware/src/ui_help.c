@@ -51,10 +51,12 @@ static void help_find(uint32_t k)
     } else if (pg->graph == GR_STEPS && pg->fam == FAM_GEN && tr < TESSERA_TRACKS && (k == 0u || tessera.mode[tr] != TESS_ENG_OFF))
     {
         x = k == 0u ? (uint32_t)TX_MODE : ENG[tessera.mode[tr] % TESS_ENG_COUNT][k - 1u];
-        if (tessera.mode[tr] == TESS_ENG_AWAKE && k == 0u && tessera_awake(tr)->edit) {   /* (a step picked) */
-            help.name = "AWAKE STEP";
-            help.text = "The step picked with a key (black key 9 held: B's): A a rest or a degree of the scale, 1 to 8; B "
-                        "lifts A by 0 to 7 degrees. The same key again lets the step go.";
+        if (tessera.mode[tr] == TESS_ENG_AWAKE && k <= 1u && tessera_awake(tr)->edit) {   /* (a step picked) */
+            help.name = k ? "AWAKE STEP B" : "AWAKE STEP A";
+            help.text = k ? "The picked step of loop B: it lifts A's note by 0 to 7 degrees of the scale. The same key "
+                            "again lets the step go (KNOB 2 is LEN A again)."
+                          : "The picked step of loop A: a rest, or a degree of the scale, 1 to 8. KNOB 2 sets the same "
+                            "step of B. The same key again lets the step go (KNOB 1 is MODE again).";
             return;
         }
         if (tessera.mode[tr] == TESS_ENG_POLY && k == 1u) {   /* (RHY: the page's choice, no setting of its own) */

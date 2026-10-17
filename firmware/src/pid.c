@@ -258,9 +258,9 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_BNC_BALLS, "BOUNCE BALLS", "How many balls: each one more starts from a place and an angle of its own, so they "
                                      "cross; balls hitting on the same step play together, three notes at most."),
     X_(TX_AWK_LENA, "AWAKE LENGTH A", "Steps in loop A, the melody: its values are degrees of the scale or rests. ROLL "
-                                      "draws them, EVOLVE changes a few; a step key picks a step for KNOB 1 to set."),
+                                      "draws them, EVOLVE changes a few; a white key picks a step: KNOB 1 its A, KNOB 2 its B."),
     X_(TX_AWK_LENB, "AWAKE LENGTH B", "Steps in loop B, which lifts the melody up the scale; a length other than A's "
-                                      "shifts it against A. Black key 9 held, a step key picks one of B's steps."),
+                                      "shifts it against A."),
     X_(TX_AWK_PROB, "AWAKE PROB", "The chance each of A's notes plays: 100 every one, lower leaves gaps."),
     X_(TX_POL_DIV1, "POLY RHYTHM 1", "Every how many steps rhythm 1 moves the four notes on (OFF: never). Rhythms that land "
                                      "together play once, louder: 4 against 3 is a polyrhythm."),

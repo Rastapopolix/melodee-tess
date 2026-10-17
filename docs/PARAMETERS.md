@@ -169,8 +169,8 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x21B | BOUNCE SPEED | 1 to 64 | 24 | How far the ball travels each step: faster, more wall hits, more notes. |
 | 0x21C | BOUNCE ANGLE | 0 to 90 | 37 | The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle between draws a longer loop. EVOLVE nudges it. |
 | 0x21D | BOUNCE BALLS | 1 to 4 | 1 | How many balls: each one more starts from a place and an angle of its own, so they cross; balls hitting on the same step play together, three notes at most. |
-| 0x21E | AWAKE LENGTH A | 1 to 16 | 8 | Steps in loop A, the melody: its values are degrees of the scale or rests. ROLL draws them, EVOLVE changes a few; a step key picks a step for KNOB 1 to set. |
-| 0x21F | AWAKE LENGTH B | 1 to 16 | 7 | Steps in loop B, which lifts the melody up the scale; a length other than A's shifts it against A. Black key 9 held, a step key picks one of B's steps. |
+| 0x21E | AWAKE LENGTH A | 1 to 16 | 8 | Steps in loop A, the melody: its values are degrees of the scale or rests. ROLL draws them, EVOLVE changes a few; a white key picks a step: KNOB 1 its A, KNOB 2 its B. |
+| 0x21F | AWAKE LENGTH B | 1 to 16 | 7 | Steps in loop B, which lifts the melody up the scale; a length other than A's shifts it against A. |
 | 0x220 | AWAKE PROB | 0 to 100 % | 100 | The chance each of A's notes plays: 100 every one, lower leaves gaps. |
 | 0x221 | POLY RHYTHM 1 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | /4 | Every how many steps rhythm 1 moves the four notes on (OFF: never). Rhythms that land together play once, louder: 4 against 3 is a polyrhythm. |
 | 0x222 | POLY RHYTHM 2 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | /3 | Every how many steps rhythm 2 moves the four notes on (OFF: never). |

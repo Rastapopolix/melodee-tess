@@ -846,19 +846,22 @@ static void draw_columns(void)
                 draw_column(3, "BALLS", v3, "", VAL(3u), (int32_t)(b->balls - 1u) * 1000 / (GEN_BOUNCE_MAX - 1u), ICON_AUTO);
             } else if (m == TESS_ENG_AWAKE) {
                 const gen_awake_t *a = tessera_awake(tr);
-                if (a->edit) {                                  /* a step picked (ui_awake.c): KNOB 1 its value */
-                    uint32_t i = a->edit & 15u, b = (a->edit >> 4) & 1u, v = b ? gen_awake_b(a, i) : gen_awake_a(a, i);
-                    char l0[8] = {b ? 'B' : 'A', ' ', 0}, v0[8];
+                if (a->edit) {                                  /* a step picked (ui_awake.c): KNOB 1 its A, KNOB 2 its B */
+                    uint32_t i = a->edit & 15u, va = gen_awake_a(a, i), vb = gen_awake_b(a, i);
+                    char l0[8] = {'A', ' ', 0}, l1[8] = {'B', ' ', 0}, v0[8];
                     fmt_int(l0 + 2, i + 1u);
-                    if (b) v0[0] = '+', fmt_int(v0 + 1, v);
-                    else if (v) fmt_int(v0, v);
+                    fmt_int(l1 + 2, i + 1u);
+                    if (va) fmt_int(v0, va);
                     else str_cpy(v0, "REST", sizeof v0);
-                    draw_column(0, l0, v0, "", VAL(0u), (int32_t)v * 1000 / (b ? 7 : 8), ICON_AUTO);
+                    draw_column(0, l0, v0, "", VAL(0u), (int32_t)va * 1000 / 8, ICON_AUTO);
+                    v1[0] = '+';
+                    fmt_int(v1 + 1, vb);
+                    draw_column(1, l1, v1, "", VAL(1u), (int32_t)vb * 1000 / 7, ICON_AUTO);
                 } else {
                     draw_column(0, "MODE", "AWAKE", "", VAL(0u), TESS_ENG_AWAKE * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                    fmt_int(v1, a->len_a);
+                    draw_column(1, "LEN A", v1, "", VAL(1u), (int32_t)(a->len_a - 1u) * 1000 / 15, ICON_AUTO);
                 }
-                fmt_int(v1, a->len_a);
-                draw_column(1, "LEN A", v1, "", VAL(1u), (int32_t)(a->len_a - 1u) * 1000 / 15, ICON_AUTO);
                 fmt_int(v2, a->len_b);
                 draw_column(2, "LEN B", v2, "", VAL(2u), (int32_t)(a->len_b - 1u) * 1000 / 15, ICON_AUTO);
                 fmt_int(v3, a->prob);
