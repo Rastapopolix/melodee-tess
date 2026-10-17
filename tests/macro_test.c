@@ -72,6 +72,9 @@ int main(void)
           mc_bytes() < 40000u);
 
     models = (uint32_t)ENGINES[ENGI_MACRO]->edit[0].max + 1u;
+    for (k = 0, ok = 1; k < sizeof MC_MODEL; k++)      /* (Plaits' 6, 7, 14: string machine, chiptune, chords) */
+        ok &= MC_MODEL[k] != 6u && MC_MODEL[k] != 7u && MC_MODEL[k] != 14u;
+    check("no chord model: each note plays one pitch (2026-10-17)", ok && models == sizeof MC_MODEL);
     for (k = 0; k < models; k++) {                    /* every model, from INIT VA's settings, struck and held */
         sound(0);
         trk[0].p[P_E0] = (int16_t)k;
@@ -91,7 +94,7 @@ int main(void)
     ok = play(69, 1.5, 1.4, &peak, &rms, &zc, &tail);
     check("...an octave and more up (A4: 440 Hz within 3 %)", ok && zc > 426.8 && zc < 453.2);
 
-    sound(11);                                        /* PLUCK: HIT ON, struck: it dies away though held */
+    sound(8);                                         /* PLUCK: HIT ON, struck: it dies away though held */
     trk[0].p[P_E4] = 30;                              /* (a short DECAY) */
     ok = play(60, 2.0, 1.9, &peak, &rms, &zc, &tail);
     check("HIT ON (PLUCK, DECAY short): struck, it dies away though the key is held", ok && rms > 50.0 && tail < 0.05 * peak);
@@ -105,7 +108,7 @@ int main(void)
         double r1, r2;
         if (k == 6u) continue;                        /* (HIT: above) */
         sound(0);
-        trk[0].p[P_E0 + k] = (int16_t)(k == 0u ? 8 : k == 7u ? 127 : 10);
+        trk[0].p[P_E0 + k] = (int16_t)(k == 0u ? 6 : k == 7u ? 127 : 10);
         play(60, 0.5, 0.45, &peak, &r1, &zc, &tail);
         sound(0);
         trk[0].p[P_E0 + k] = (int16_t)(k == 0u ? 4 : 120);

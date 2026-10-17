@@ -15,4 +15,6 @@ Changes (each marked `melodee-tess` in the code):
 - `plaits/dsp/dsp.h`: `PLAITS_SAMPLE_RATE_EXACT` tunes by the true rate (Plaits' own corrects for its chip's
   47,872 Hz); `PLAITS_BLOCK_SIZE` (16 on the FM-1: two renders a block of 32).
 - `plaits/dsp/voice.h`, `voice.cc`: `PLAITS_LEAN` leaves out the wavetable, chords, wave terrain, speech and
-  6-OP models (their 85 KB of tables), the others in Plaits' own order.
+  6-OP models (their 85 KB of tables), and since 2026-10-17 also the string machine and chiptune (they play chords),
+  the waveshaper, grains, swarm, noise, particles and the three drums; the seven left (VA-VCF, phase distortion, VA,
+  FM, additive, string, modal) keep Plaits' own numbers.
