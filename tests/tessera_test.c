@@ -446,6 +446,23 @@ static void s_evolve_bounce(void)
     turns(tessera_form_knob, 0, 1);                   /* FORM AB */
 }
 
+static void s_awake(void) { gen(0, TESS_ENG_AWAKE); }
+static void s_awake_var(void)
+{
+    gen(0, TESS_ENG_AWAKE);
+    knob(tessera_knob, 1, 4);                         /* LEN A 12 */
+    knob(tessera_knob, 2, -2);                        /* LEN B 5 */
+    knob(tessera_knob, 3, -15);                       /* PROB 70 */
+    knob(tessera_tweak_knob, 0, 2);                   /* SHIFT +2 */
+}
+static void s_evolve_awake(void)
+{
+    gen(0, TESS_ENG_AWAKE);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 20);                 /* AMOUNT 70 */
+    turns(tessera_form_knob, 0, 2);                   /* FORM ABAC: A's values come back */
+}
+
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
     {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
@@ -485,6 +502,9 @@ static const scen_t SCEN[] = {
     {"bounce", 8, 0x1023u, s_bounce, 0},
     {"bounce_speed40_angle60_paddle30_drop20", 8, 0x1024u, s_bounce_var, 0},
     {"evolve_bounce_every1_amount60_ab", 16, 0x1025u, s_evolve_bounce, 0},
+    {"awake", 8, 0x1026u, s_awake, 0},
+    {"awake_lena12_lenb5_prob70_shift2", 8, 0x1027u, s_awake_var, 0},
+    {"evolve_awake_every1_amount70_abac", 16, 0x1028u, s_evolve_awake, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 

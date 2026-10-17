@@ -17,6 +17,7 @@ enum {
     TESS_ENG_MORPH,       /* Vector/Morph interpolation */
     TESS_ENG_GRIDS,       /* Grids' drum map: kick, snare, hat */
     TESS_ENG_BOUNCE,      /* a ball in a box: a wall hit plays */
+    TESS_ENG_AWAKE,       /* two loops added (norns' Awake) */
     TESS_ENG_COUNT
 };
 
@@ -135,6 +136,7 @@ enum {
     TX_TW_SHIFT, TX_TW_DROP, TX_TW_HUMAN, TX_TW_FOLLOW,
     TX_GRD_X, TX_GRD_Y, TX_GRD_DENS,
     TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_PADDLE,
+    TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -148,5 +150,6 @@ const gen_markov_t *tessera_markov(uint32_t tr);
 const gen_morph_t *tessera_morph(uint32_t tr);
 const gen_grids_t *tessera_grids(uint32_t tr);
 const gen_bounce_t *tessera_bounce(uint32_t tr);
+const gen_awake_t *tessera_awake(uint32_t tr);
 
 #endif

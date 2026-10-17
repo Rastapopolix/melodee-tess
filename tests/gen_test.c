@@ -457,6 +457,73 @@ static void bounce_tests(void)
     check("bounce: mutation moves only the angle, inside 0..90", mut);
 }
 
+/* ------------------------------------------------------------------ Awake --- */
+static gen_awake_t awake_at(uint32_t la, uint32_t lb, uint32_t prob, uint32_t seed)
+{
+    gen_awake_t g;
+    memset(&g, 0, sizeof g);
+    g.len_a = (uint8_t)la, g.len_b = (uint8_t)lb, g.prob = (uint8_t)prob;
+    gen_awake_fill(&g, seed);
+    return g;
+}
+static void awake_tests(void)
+{
+    int range = 1, draws = 1, loop = 1, silent = 1, fill = 1, mut = 1, same = 1;
+    for (uint32_t sd = 1; sd <= 128; sd += 7)
+        for (uint32_t la = 1; la <= 16; la += 5)
+            for (uint32_t prob = 0; prob <= 100; prob += 50) {
+                gen_awake_t g = awake_at(la, 17u - la, prob, sd);
+                for (uint32_t i = 0; i < 64; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state, a = gen_awake_a(&g, g.pos_a);
+                    gen_awake_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == (a && prob < 100u ? 1u : 0u);
+                    range &= o.gate ? o.note >= 48 && o.note <= 72 && o.vel == 100 : o.note == 60 && o.vel == 100;
+                    silent &= prob || !o.gate;
+                    range &= g.pos_a < la && g.pos_b < 17u - la && o.cv >= 0;
+                }
+            }
+    for (uint32_t sd = 0; sd < 200; sd++) {                 /* the values in their ranges, A with rests and notes */
+        gen_awake_t g = awake_at(16, 16, 100, sd);
+        uint32_t rests = 0;
+        for (uint32_t i = 0; i < 16; i++) {
+            fill &= gen_awake_a(&g, i) <= 8u && gen_awake_b(&g, i) <= 7u;
+            rests += !gen_awake_a(&g, i);
+        }
+        fill &= rests < 16u;
+    }
+    {   /* lengths 4 and 3 at PROB 100: the steps repeat every 12 */
+        gen_awake_t g = awake_at(4, 3, 100, 5);
+        gen_out_t a[12], b[12];
+        for (uint32_t i = 0; i < 12; i++) { a[i] = step_out(); gen_awake_tick(&g, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 12; i++) { b[i] = step_out(); gen_awake_tick(&g, &CLK0, &rng_state, &b[i]); }
+        loop &= out_eq(a, b, 12);
+    }
+    {
+        gen_awake_t g1 = awake_at(9, 5, 60, 77), g2 = awake_at(9, 5, 60, 77);
+        uint32_t r1 = 9, r2 = 9;
+        gen_out_t a[60], b[60];
+        for (uint32_t i = 0; i < 60; i++) { a[i] = step_out(); gen_awake_tick(&g1, &CLK0, &r1, &a[i]); }
+        for (uint32_t i = 0; i < 60; i++) { b[i] = step_out(); gen_awake_tick(&g2, &CLK0, &r2, &b[i]); }
+        same &= out_eq(a, b, 60);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_awake_t g = awake_at(6, 11, 80, 3), g0 = g;
+        for (uint32_t n = 0; n < 200; n++) {
+            gen_awake_mutate(&g, amt, &rng_state);
+            for (uint32_t i = 0; i < 16; i++) mut &= gen_awake_a(&g, i) <= 8u && gen_awake_b(&g, i) <= 7u;
+            for (uint32_t i = 6; i < 16; i++) mut &= gen_awake_a(&g, i) == gen_awake_a(&g0, i);   /* (past LEN A: kept) */
+            mut &= g.len_a == 6u && g.len_b == 11u && g.prob == 80u;
+        }
+        if (!amt) mut &= !memcmp(g.a, g0.a, 8) && !memcmp(g.b, g0.b, 8);
+    }
+    check("awake: notes 48..72 at 100 (A's degree plus B's); a rest keeps note 60, vel 100; PROB 0 silent", range && silent);
+    check("awake: a draw a step only for one of A's notes below PROB 100", draws);
+    check("awake: the seed's values in range (A 0..8 with notes, B 0..7)", fill);
+    check("awake: lengths 4 and 3 repeat every 12 steps; the same seed and stream, the same steps", loop && same);
+    check("awake: mutation changes values inside A's and B's loops only (AMOUNT 0: none)", mut);
+}
+
 /* ------------------------------------------------------------------ sections --- */
 static void section_tests(void)
 {
@@ -479,6 +546,12 @@ static void section_tests(void)
         gen_bounce_load(&bo, &b2); ok &= bo.paddle == 7u && bo.angle == 80u && bo.speed == 5u;
     }
     {
+        gen_awake_t aw = awake_at(9, 4, 50, 1);
+        gen_sec_t a2 = {0x5555u, 3, 12};
+        gen_awake_save(&aw, &s); ok &= s.reg == 40u && s.p0 == 9 && s.p1 == 4;
+        gen_awake_load(&aw, &a2); ok &= aw.len_a == 3u && aw.len_b == 12u && aw.prob == 50u;
+    }
+    {
         gen_sec_t e = {42, 6, 2}, m = {0x8888u, 10, 0}, k = {0, 33, 0}, t = {0xACE1u, 0, 0};
         gen_euclid_load(&eu, &e); ok &= eu.pulses == 6 && eu.rot == 2 && eu.pitch_seed == 42 && eu.steps == 16;
         gen_morph_load(&mo, &m);  ok &= mo.snap_a == 0x8888u && mo.morph_pos == 10 && mo.snap_b == 0xAAAAu;
@@ -498,6 +571,7 @@ static double ns_per_step(int kind)
     gen_morph_t mo = {64, 0x8888u, 0xA5A5u, 0x0F, 2};
     gen_grids_t gr = {77, 190, 70, 60, 0, {0, 0, 0}};
     gen_bounce_t bo = bounce_at(37, 61, 30);
+    gen_awake_t aw = awake_at(9, 5, 70, 3);
     const uint32_t N = 2000000u;
     volatile uint32_t sink = 0;
     struct timespec a, b;
@@ -509,7 +583,8 @@ static double ns_per_step(int kind)
         else if (kind == 2) gen_markov_tick(&mk, &CLK0, &rng_state, &o);
         else if (kind == 3) gen_morph_tick(&mo, &CLK0, &rng_state, &o);
         else if (kind == 4) gen_grids_tick(&gr, &CLK0, &rng_state, &o);
-        else gen_bounce_tick(&bo, &CLK0, &rng_state, &o);
+        else if (kind == 5) gen_bounce_tick(&bo, &CLK0, &rng_state, &o);
+        else gen_awake_tick(&aw, &CLK0, &rng_state, &o);
         sink += o.note + o.gate;
     }
     clock_gettime(CLOCK_MONOTONIC, &b);
@@ -545,9 +620,11 @@ int main(void)
     morph_tests();
     grids_tests();
     bounce_tests();
+    awake_tests();
     section_tests();
     printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns, "
-           "Bounce %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3), ns_per_step(4), ns_per_step(5));
+           "Bounce %.1f ns, Awake %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3), ns_per_step(4),
+           ns_per_step(5), ns_per_step(6));
     printf(bad ? "gen: %d FAILED\n" : "gen: all passed\n", bad);
     return bad != 0;
 }

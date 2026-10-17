@@ -60,6 +60,7 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_GRD_DENS] = S_(CD_GRD_DENS, TX_GRD_DENS, "G DENS", "Grids' density: how full its parts are"),
     [CD_BNC_SPEED] = S_(CD_BNC_SPEED, TX_BNC_SPEED, "B SPEED", "Bounce's speed: how far the ball moves a step"),
     [CD_BNC_ANGLE] = S_(CD_BNC_ANGLE, TX_BNC_ANGLE, "B ANGLE", "Bounce's angle: the ball's path"),
+    [CD_AWK_PROB] = S_(CD_AWK_PROB, TX_AWK_PROB, "A PROB", "Awake's PROB: the chance a note plays"),
 };
 #undef V_
 #undef B_

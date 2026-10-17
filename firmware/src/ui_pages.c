@@ -771,6 +771,7 @@ static void pv_picture(void)
             else if (m == TESS_ENG_MARKOV) pp = tessera_markov(tr)->cur_state;
             else if (m == TESS_ENG_MORPH) pp = tessera_morph(tr)->step_idx;
             else if (m == TESS_ENG_GRIDS) pp = tessera_grids(tr)->step_idx;
+            else if (m == TESS_ENG_AWAKE) pp = tessera_awake(tr)->pos_a ^ tessera_awake(tr)->pos_b << 8;
             else if (m == TESS_ENG_BOUNCE) pp = tessera_bounce(tr)->x ^ tessera_bounce(tr)->y << 8;
         } else {
             pp = (int32_t)(TSEL->seq_idx % (uint32_t)clamp(TSEL->p[P_SLEN], 1, NSTEP));

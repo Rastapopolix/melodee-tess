@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE | STEP | STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE | STEP | STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths. |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -152,7 +152,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x20A | MORPH POSITION | 0 to 127 | 0 | Blends rhythm A (0) into rhythm B (full). |
 | 0x20B | MORPH RHYTHM A | 0 to 7 | 0 | Rhythm A: one of eight preset patterns. |
 | 0x20C | MORPH RHYTHM B | 0 to 7 | 2 | Rhythm B: one of eight preset patterns. |
-| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid and Bounce have none. |
+| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid, Bounce and Awake have none. |
 | 0x20E | EVOLVE EVERY | OFF, 1, 2, 4, 8, 16 | OFF | Bars between mutations; OFF keeps the phrase as it is. |
 | 0x20F | EVOLVE AMOUNT | 0 to 100 % | 30 | How much changes at each mutation. |
 | 0x210 | EVOLVE ROLL | 1 to 128 | 1 | The track's seed, 1 to 128: each one a line of its own, the same every time. Playing, a new one starts on the next bar line. |
@@ -169,6 +169,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x21B | BOUNCE SPEED | 1 to 64 | 24 | How far the ball travels each step: faster, more wall hits, more notes. |
 | 0x21C | BOUNCE ANGLE | 0 to 90 | 37 | The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle between draws a longer loop. EVOLVE nudges it. |
 | 0x21D | BOUNCE PADDLE | 0 to 100 % | 0 | OFF: no paddle. On: a paddle on the floor this wide follows the ball; a ball it misses rests and is served again (Pong). |
+| 0x21E | AWAKE LENGTH A | 1 to 16 | 8 | Steps in loop A, the melody (its values are degrees of the scale, some rests; ROLL draws them, EVOLVE changes a few). |
+| 0x21F | AWAKE LENGTH B | 1 to 16 | 7 | Steps in loop B, which moves the melody up the scale; a length other than A's shifts it against A, a longer pattern from two short ones. |
+| 0x220 | AWAKE PROB | 0 to 100 % | 100 | The chance each of A's notes plays: 100 every one, lower leaves gaps. |
 
 ## Mods
 
@@ -239,3 +242,4 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | G DENS | the generator's step | Grids' density: how full its parts are |
 | B SPEED | the generator's step | Bounce's speed: how far the ball moves a step |
 | B ANGLE | the generator's step | Bounce's angle: the ball's path |
+| A PROB | the generator's step | Awake's PROB: the chance a note plays |

@@ -849,6 +849,15 @@ static void draw_columns(void)
                     str_cpy(v3, "OFF", sizeof v3);
                 }
                 draw_column(3, "PADDLE", v3, u3, VAL(3u), (int32_t)b->paddle * 10, ICON_AUTO);
+            } else if (m == TESS_ENG_AWAKE) {
+                const gen_awake_t *a = tessera_awake(tr);
+                draw_column(0, "MODE", "AWAKE", "", VAL(0u), TESS_ENG_AWAKE * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                fmt_int(v1, a->len_a);
+                draw_column(1, "LEN A", v1, "", VAL(1u), (int32_t)(a->len_a - 1u) * 1000 / 15, ICON_AUTO);
+                fmt_int(v2, a->len_b);
+                draw_column(2, "LEN B", v2, "", VAL(2u), (int32_t)(a->len_b - 1u) * 1000 / 15, ICON_AUTO);
+                fmt_int(v3, a->prob);
+                draw_column(3, "PROB", v3, "%", VAL(3u), (int32_t)a->prob * 10, ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
                 draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);

@@ -320,6 +320,24 @@ static void gen_bounce_tick(gen_bounce_t *g, const gen_clock_t *clk, uint32_t *r
     }
 }
 
+/* Awake: A's step and B's, each on its own loop: A's value a scale degree (0 a rest), B's added to it, two octaves in
+ * all; PROB the chance a step plays (a draw only below 100). The CV is A's value */
+static void gen_awake_tick(gen_awake_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    uint32_t la = g->len_a >= 1u && g->len_a <= 16u ? g->len_a : 16u, lb = g->len_b >= 1u && g->len_b <= 16u ? g->len_b : 16u;
+    uint32_t a = gen_awake_a(g, g->pos_a % la), b = gen_awake_b(g, g->pos_b % lb);
+    (void)clk;
+    g->pos_a = (uint8_t)((g->pos_a % la + 1u) % la);
+    g->pos_b = (uint8_t)((g->pos_b % lb + 1u) % lb);
+    out->cv = (int16_t)((a > 8u ? 8u : a) * 32767u / 8u);
+    if (a && (g->prob >= 100u || gen_rnd(rnd, 100u) < g->prob)) {
+        uint32_t deg = a - 1u + (b > 7u ? 7u : b);
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = 100;
+        out->gate = 1;
+    }
+}
+
 /* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
@@ -408,6 +426,22 @@ static void gen_bounce_mutate(gen_bounce_t *g, uint32_t amt, uint32_t *rnd)
     g->angle = (uint8_t)(v < 0 ? 0 : v > 90 ? 90 : v);
 }
 
+/* Awake: 1 + AMOUNT/200 of A's loop's values drawn again (a rest one in four), at AMOUNT % one of B's too */
+static void gen_awake_mutate(gen_awake_t *g, uint32_t amt, uint32_t *rnd)
+{
+    uint32_t la = g->len_a >= 1u && g->len_a <= 16u ? g->len_a : 16u, lb = g->len_b >= 1u && g->len_b <= 16u ? g->len_b : 16u;
+    uint32_t n = 1u + amt * la / 200u;
+    if (!amt) return;
+    while (n--) {
+        uint32_t i = gen_rnd(rnd, la);
+        gen_awake_put(g->a, i, gen_rnd(rnd, 4u) ? 1u + gen_rnd(rnd, 8u) : 0u);
+    }
+    if (gen_rnd(rnd, 100u) < amt) {
+        uint32_t i = gen_rnd(rnd, lb);
+        gen_awake_put(g->b, i, gen_rnd(rnd, 6u));
+    }
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -430,4 +464,11 @@ static void gen_bounce_load(gen_bounce_t *g, const gen_sec_t *s)
     g->angle = s->p0 > 90u ? 90u : s->p0;
     g->speed = s->p1 < 1u ? 1u : s->p1 > 64u ? 64u : s->p1;
     g->paddle = (uint8_t)(s->reg > 100u ? 100u : s->reg);
+}
+/* Awake: its lengths here; its 32 values in the section's phrase buffer (tessera.c tess_save_sec) */
+static void gen_awake_save(const gen_awake_t *g, gen_sec_t *s) { s->p0 = g->len_a; s->p1 = g->len_b; }
+static void gen_awake_load(gen_awake_t *g, const gen_sec_t *s)
+{
+    g->len_a = s->p0 < 1u ? 1u : s->p0 > 16u ? 16u : s->p0;
+    g->len_b = s->p1 < 1u ? 1u : s->p1 > 16u ? 16u : s->p1;
 }

@@ -272,6 +272,25 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rect(px - half, top + bh - 4, half * 2, 2, c);
         }
         cv_rrect(bx, by, 4, 4, 1, song.playing ? T_TEXT : c, bg);
+    } else if (mode == TESS_ENG_AWAKE) {
+        /* loop A over loop B, 16 cells each: a value a bar its height (A: 1..8, B: 0..7), a rest a dash; past the loop's
+         * length dim; the step playing lit */
+        const gen_awake_t *a = tessera_awake(tr);
+        int32_t ha = is_panel ? 44 : 12, hb = is_panel ? 28 : 6, ya = is_panel ? 10 : y_base, yb = ya + ha + (is_panel ? 14 : 4);
+        uint32_t la = a->len_a ? a->len_a : 1u, lb = a->len_b ? a->len_b : 1u;
+        uint32_t ca = (a->pos_a + la - 1u) % la, cb = (a->pos_b + lb - 1u) % lb;
+        int step_w = is_panel ? 10 : 11;
+        for (uint32_t i = 0; i < 16u; i++) {
+            int32_t sx = is_panel ? (18 + (int32_t)i * 12 + (int32_t)(i / 4u) * 4) : (13 + (int32_t)i * 13 + (int32_t)(i / 4u) * 4);
+            uint32_t va = gen_awake_a(a, i), vb = gen_awake_b(a, i);
+            int ha_on = song.playing && i == ca, hb_on = song.playing && i == cb;
+            if (i >= la) cv_rect(sx, ya + ha - 1, step_w, 1, dim);
+            else if (!va) cv_rect(sx, ya + ha - 2, step_w, 2, ha_on ? T_TEXT : dim);
+            else cv_rrect(sx, ya + ha - (int32_t)va * ha / 8, step_w, (int32_t)va * ha / 8, 1, ha_on ? T_TEXT : c, bg);
+            if (i >= lb) cv_rect(sx, yb + hb - 1, step_w, 1, dim);
+            else if (!vb) cv_rect(sx, yb + hb - 2, step_w, 2, hb_on ? T_TEXT : dim);
+            else cv_rrect(sx, yb + hb - (int32_t)vb * hb / 7, step_w, (int32_t)vb * hb / 7, 1, hb_on ? T_TEXT : T_MID, bg);
+        }
     }
 }
 
