@@ -291,29 +291,35 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             else cv_rrect(sx, yb + hb - (int32_t)vb * hb / 7, step_w, (int32_t)vb * hb / 7, 1, hb_on ? T_TEXT : T_MID, bg);
         }
     } else if (mode == TESS_ENG_POLY) {
-        /* left, the four notes, a bar its pitch, the one playing lit; right, the four rhythms over the next 16 steps, a
-         * tick where each lands (the one RHY picks brighter), the steps where any lands marked under them */
+        /* the four rhythms, a lane each: its divider, then the 16 steps of the bar's window, a tick where it lands, the
+         * step playing framed, the tick lit when it fires there (OFF: a dim lane; the one RHY picks, its label lit).
+         * Under them the four notes, a bar each at its pitch, the one playing lit */
         const gen_poly_t *p = tessera_poly(tr);
-        int32_t top = is_panel ? 10 : y_base, hh = is_panel ? 80 : 18, nx = is_panel ? 18 : 13, rx = is_panel ? 82 : 78;
-        int32_t lane = hh / 5, rw = is_panel ? 8 : 9;
-        uint32_t n = p->span == 2u ? 14u : 7u, t0 = p->tick;
-        for (uint32_t i = 0; i < 4u; i++) {
-            int32_t bh = 4 + (int32_t)(p->pitch[i] > n - 1u ? n - 1u : p->pitch[i]) * (hh - 6) / (int32_t)(n - 1u);
-            cv_rrect(nx + (int32_t)i * 14, top + hh - bh, 11, bh, 1, i == p->pos ? T_TEXT : c, bg);
-        }
+        uint32_t n = p->span == 2u ? 14u : 7u, now = (p->tick + GEN_POLY_WRAP - 1u) % GEN_POLY_WRAP, base = now - now % 16u;
+        int32_t top = is_panel ? 6 : y_base, lane = is_panel ? 13 : 5, x0 = is_panel ? 46 : 40, cw = is_panel ? 11 : 12;
+        int32_t ny = top + 4 * lane + (is_panel ? 6 : 2), nh = is_panel ? 112 - ny - 6 : 8;
         for (uint32_t r = 0; r < 4u; r++) {
             uint32_t d = p->div[r];
-            uint16_t col = r == (p->sel & 3u) ? T_TEXT : c;
+            int32_t ly = top + (int32_t)r * lane;
+            if (is_panel) {
+                char lb[4] = "OFF";
+                if (d) lb[0] = '/', fmt_int(lb + 1, d);
+                cv_text(14, ly, &AF_X, lb, r == (p->sel & 3u) ? T_TEXT : d ? c : dim);
+            }
             for (uint32_t i = 0; i < 16u; i++) {
-                int32_t sx = rx + (int32_t)i * (rw + 1);
-                if (d && (t0 + i) % d == 0u) cv_rect(sx, top + (int32_t)r * lane, rw, lane - 2, col);
-                else cv_rect(sx, top + (int32_t)r * lane + lane - 3, rw, 1, dim);
+                int32_t sx = x0 + (int32_t)i * cw + (int32_t)(i / 4u) * 2;
+                uint32_t st = base + i, on = d && st % d == 0u, cur = song.playing && st == now;
+                if (!d) cv_rect(sx, ly + lane - 3, cw - 2, 1, dim);
+                else if (on) cv_rect(sx, ly + 1, cw - 2, lane - 3, cur ? T_TEXT : c);
+                else cv_rect(sx, ly + lane - 3, cw - 2, 1, dim);
+                if (cur && r == 0u) cv_rect(sx, top + 4 * lane - 1, cw - 2, 2, T_TEXT);   /* (the step playing, under all four) */
             }
         }
-        for (uint32_t i = 0; i < 16u; i++) {
-            uint32_t any = 0;
-            for (uint32_t r = 0; r < 4u; r++) any |= p->div[r] && (t0 + i) % p->div[r] == 0u;
-            if (any) cv_rect(rx + (int32_t)i * (rw + 1), top + 4 * lane, rw, 2, T_TEXT);
+        for (uint32_t i = 0; i < 4u; i++) {
+            int32_t bw = is_panel ? 44 : 40, bx = (is_panel ? 18 : 13) + (int32_t)i * (bw + 8);
+            int32_t bh = 3 + (int32_t)(p->pitch[i] > n - 1u ? n - 1u : p->pitch[i]) * (nh - 3) / (int32_t)(n - 1u);
+            cv_rect(bx, ny + nh - 1, bw, 1, dim);
+            cv_rrect(bx, ny + nh - bh, bw, bh, 2, i == p->pos ? T_TEXT : c, bg);
         }
     }
 }

@@ -172,10 +172,10 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x21E | AWAKE LENGTH A | 1 to 16 | 8 | Steps in loop A, the melody (its values are degrees of the scale, some rests; ROLL draws them, EVOLVE changes a few). |
 | 0x21F | AWAKE LENGTH B | 1 to 16 | 7 | Steps in loop B, which moves the melody up the scale; a length other than A's shifts it against A, a longer pattern from two short ones. |
 | 0x220 | AWAKE PROB | 0 to 100 % | 100 | The chance each of A's notes plays: 100 every one, lower leaves gaps. |
-| 0x221 | POLY RHYTHM 1 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | 4 | Every how many steps rhythm 1 moves the four notes on (OFF: never). Rhythms that land together play once, louder: 4 against 3 is a polyrhythm. |
-| 0x222 | POLY RHYTHM 2 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | 3 | Every how many steps rhythm 2 moves the four notes on (OFF: never). |
-| 0x223 | POLY RHYTHM 3 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | OFF | Every how many steps rhythm 3 moves the four notes on (OFF: never). |
-| 0x224 | POLY RHYTHM 4 | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | OFF | Every how many steps rhythm 4 moves the four notes on (OFF: never). |
+| 0x221 | POLY RHYTHM 1 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | /4 | Every how many steps rhythm 1 moves the four notes on (OFF: never). Rhythms that land together play once, louder: 4 against 3 is a polyrhythm. |
+| 0x222 | POLY RHYTHM 2 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | /3 | Every how many steps rhythm 2 moves the four notes on (OFF: never). |
+| 0x223 | POLY RHYTHM 3 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | OFF | Every how many steps rhythm 3 moves the four notes on (OFF: never). |
+| 0x224 | POLY RHYTHM 4 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | OFF | Every how many steps rhythm 4 moves the four notes on (OFF: never). |
 | 0x225 | POLY SPAN | 1 to 2 | 1 | Octaves the four notes spread over; ROLL draws them, EVOLVE moves them a little. |
 
 ## Mods

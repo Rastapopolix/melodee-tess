@@ -1099,7 +1099,8 @@ static void setup(int s)
         tessera_knob(1, 1);                         /* RHY 3 */
         tessera_knob(2, 5);
         tessera_knob(3, 1);
-        tessera.poly[0].tick = 7, tessera.poly[0].pos = 1;
+        tessera.poly[0].tick = 9, tessera.poly[0].pos = 1;
+        song.playing = 1;
         go_title("GEN");
         break;
     case S_GEN_AWAKE:                                /* lengths 8 and 5, playing: A's step 3 and B's 3 lit */

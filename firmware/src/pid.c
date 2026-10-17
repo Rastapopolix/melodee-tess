@@ -7,8 +7,8 @@
 #include "pid.h"
 
 static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY"};
-static const char *const TX_N_DIV[] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
-                                         "15", "16"};
+static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10", "/11", "/12",
+                                         "/13", "/14", "/15", "/16"};   /* (every n steps: no unit, "st" read as semitones) */
 static const char *const TX_N_EVERY[] = {"OFF", "1", "2", "4", "8", "16"};
 static const char *const TX_N_FORM[] = {"OFF", "AB", "ABAC", "ABCB", "AABA", "ABCA", "AABC"};
 static const char *const TX_N_FOLLOW[] = {"OFF", "T1", "T2", "T3", "T4"};
@@ -48,10 +48,10 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_AWK_LENA] = PD("LEN A", F_INT, 1, 16, 8),
     [TX_AWK_LENB] = PD("LEN B", F_INT, 1, 16, 7),
     [TX_AWK_PROB] = PD("PROB", F_PCT, 0, 100, 100),
-    [TX_POL_DIV1] = {"DIV 1", F_ENUM, 0, 16, 4, TX_N_DIV, "st"},
-    [TX_POL_DIV2] = {"DIV 2", F_ENUM, 0, 16, 3, TX_N_DIV, "st"},
-    [TX_POL_DIV3] = {"DIV 3", F_ENUM, 0, 16, 0, TX_N_DIV, "st"},
-    [TX_POL_DIV4] = {"DIV 4", F_ENUM, 0, 16, 0, TX_N_DIV, "st"},
+    [TX_POL_DIV1] = {"DIV 1", F_ENUM, 0, 16, 4, TX_N_DIV, ""},
+    [TX_POL_DIV2] = {"DIV 2", F_ENUM, 0, 16, 3, TX_N_DIV, ""},
+    [TX_POL_DIV3] = {"DIV 3", F_ENUM, 0, 16, 0, TX_N_DIV, ""},
+    [TX_POL_DIV4] = {"DIV 4", F_ENUM, 0, 16, 0, TX_N_DIV, ""},
     [TX_POL_SPAN] = PD("SPAN", F_INT, 1, 2, 1),
 };
 

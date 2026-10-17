@@ -859,7 +859,7 @@ static void draw_columns(void)
                 draw_column(0, "MODE", "POLY", "", VAL(0u), TESS_ENG_POLY * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, (p->sel & 3u) + 1u);
                 draw_column(1, "RHY", v1, "/4", VAL(1u), (int32_t)(p->sel & 3u) * 1000 / 3, ICON_AUTO);
-                if (d) fmt_int(v2, d), str_cpy(u2, "st", sizeof u2);
+                if (d) v2[0] = '/', fmt_int(v2 + 1, d);    /* (every d steps: "/4", no unit) */
                 else str_cpy(v2, "OFF", sizeof v2);
                 draw_column(2, "DIV", v2, u2, VAL(2u), (int32_t)d * 1000 / 16, ICON_AUTO);
                 fmt_int(v3, p->span);
