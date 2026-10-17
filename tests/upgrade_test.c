@@ -109,7 +109,7 @@ static int tess_side(const char *path, const uint8_t *b, uint32_t n)
     fclose(f);
     return 0;
 }
-/* PATH.tess -> want, in this build's version (a version 1 block converted as the firmware converts it); 0 = read */
+/* PATH.tess -> want, in this build's version (an older block converted as the firmware converts it); 0 = read */
 static int tess_side_read(const char *path)
 {
     char p[512];
@@ -121,7 +121,16 @@ static int tess_side_read(const char *path)
     n = fread(b, 1, sizeof b, f);
     fclose(f);
     if (n == TESSERA_PK_BYTES) { memcpy(want, b, n); return 0; }
-#ifdef TESSERA_PK_BYTES_V1
+#ifdef TESSERA_PK_BYTES_V3                              /* (a build with tessera_track_up: every older version) */
+    for (uint32_t v = 1; v < 4u; v++)
+        if (n == tessera_pk_bytes(v)) {
+            for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
+                tessera_track_up(v, b + tr * (n / TESSERA_TRACKS), want + tr * (TESSERA_PK_BYTES / TESSERA_TRACKS));
+            printf("upgrade: the older build saved a version %u block (%u bytes): compared as converted\n", (unsigned)v,
+                   (unsigned)n);
+            return 0;
+        }
+#elif defined TESSERA_PK_BYTES_V1
     if (n == TESSERA_PK_BYTES_V1) {
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
             tessera_v1_track(b + tr * (TESSERA_PK_BYTES_V1 / TESSERA_TRACKS), want + tr * (TESSERA_PK_BYTES / TESSERA_TRACKS));

@@ -689,7 +689,7 @@ static void pack_run(char *res, size_t cap)
         const uint32_t n2 = TESSERA_PK_BYTES / TESSERA_TRACKS, n1 = TESSERA_PK_BYTES_V1 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v1 + tr * n1, a + tr * n2, n1);
         tessera_reset();
-        ok &= tessera_unpack_v1(v1) == 1;
+        ok &= tessera_unpack_ver(1u, v1) == 1;
         tessera_pack(b);
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
             memcpy(v1b + tr * n1, b + tr * n2, n1);
@@ -697,7 +697,7 @@ static void pack_run(char *res, size_t cap)
         }
         ok &= !memcmp(v1, v1b, sizeof v1);            /* every version 1 setting as it was */
         tessera_reset();
-        ok &= tessera_unpack_v1(v1) == 1;
+        ok &= tessera_unpack_ver(1u, v1) == 1;
         tessera_pack(c);
         ok &= !memcmp(b, c, sizeof c);                /* the same block: the same seeds */
     }
@@ -707,7 +707,7 @@ static void pack_run(char *res, size_t cap)
         const uint32_t n3 = TESSERA_PK_BYTES / TESSERA_TRACKS, n2 = TESSERA_PK_BYTES_V2 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v2 + tr * n2, a + tr * n3, n2);
         tessera_reset();
-        ok &= tessera_unpack_v2(v2) == 1;
+        ok &= tessera_unpack_ver(2u, v2) == 1;
         tessera_pack(b);
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
             memcpy(v2b + tr * n2, b + tr * n3, n2);
@@ -721,6 +721,41 @@ static void pack_run(char *res, size_t cap)
         memcpy(c, a, sizeof c);
         c[n2 + 3u] = 101u;                            /* track 1's Grids CHAOS */
         ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+    }
+    {   /* a version 3 block (before BOUNCE, AWAKE, POLY: each track 29 bytes shorter) loads every setting, theirs a fresh
+         * track's with Awake's values and Poly's pitches from the track's seed (as ROLL gives them); each new setting
+         * out of range is refused */
+        static uint8_t v3[TESSERA_PK_BYTES_V3], v3b[TESSERA_PK_BYTES_V3];
+        static const uint8_t BAD[][2] = {{0, 0}, {0, 65}, {1, 91}, {2, 101}, {3, 0}, {4, 17}, {5, 101}, {6, 0x09},
+                                         {13, 0x90}, {14, 0x08}, {21, 0x80}, {22, 17}, {26, 0x0E}, {27, 0xE0},
+                                         {28, 0}, {28, 3}};   /* (Bounce 0..2, Awake 3..21, Poly 22..28) */
+        const uint32_t n4 = TESSERA_PK_BYTES / TESSERA_TRACKS, n3 = TESSERA_PK_BYTES_V3 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v3 + tr * n3, a + tr * n4, n3);
+        tessera_reset();
+        ok &= tessera_unpack_ver(3u, v3) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            gen_awake_t aw;
+            gen_poly_t po;
+            memset(&aw, 0, sizeof aw);
+            memset(&po, 0, sizeof po);
+            po.span = 1;
+            gen_awake_fill(&aw, tessera.seed[tr]);
+            gen_poly_fill(&po, tessera.seed[tr]);
+            memcpy(v3b + tr * n3, b + tr * n4, n3);
+            ok &= tessera.bounce[tr].speed == 24u && tessera.bounce[tr].angle == 37u && !tessera.bounce[tr].paddle;
+            ok &= tessera.awake[tr].len_a == 8u && tessera.awake[tr].len_b == 7u && tessera.awake[tr].prob == 100u &&
+                  !memcmp(aw.a, tessera.awake[tr].a, 8) && !memcmp(aw.b, tessera.awake[tr].b, 8);
+            ok &= tessera.poly[tr].div[0] == 4u && tessera.poly[tr].div[1] == 3u && !tessera.poly[tr].div[2] &&
+                  !tessera.poly[tr].div[3] && tessera.poly[tr].span == 1u && !memcmp(po.pitch, tessera.poly[tr].pitch, 4);
+        }
+        ok &= !memcmp(v3, v3b, sizeof v3);            /* every version 3 setting as it was */
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[3u * n4 + n3 + BAD[k][0]] = BAD[k][1];  /* (track 4's) */
+            ok &= tessera_unpack(c) == 0;
+        }
         tessera_unpack(a);
     }
     snprintf(res, cap, "0x%08x %u", ha, ok);

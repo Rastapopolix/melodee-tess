@@ -81,6 +81,32 @@ static void gen_markov_row(uint8_t tens, uint32_t s, uint8_t out[8])
     }
 }
 
+/* Awake's values: A's i-th (0 a rest, 1..8 a degree), B's (0..7); set */
+static uint32_t gen_awake_a(const gen_awake_t *g, uint32_t i) { return (g->a[(i >> 1) & 7u] >> ((i & 1u) * 4u)) & 0xFu; }
+static uint32_t gen_awake_b(const gen_awake_t *g, uint32_t i) { return (g->b[(i >> 1) & 7u] >> ((i & 1u) * 4u)) & 0xFu; }
+static void gen_awake_put(uint8_t *v, uint32_t i, uint32_t x)
+{
+    uint32_t sh = (i & 1u) * 4u;
+    v[(i >> 1) & 7u] = (uint8_t)((v[(i >> 1) & 7u] & ~(0xFu << sh)) | ((x & 0xFu) << sh));
+}
+/* Awake's 32 values from a seed (ROLL; a track's first): A a melody with rests (about one in four), B mostly 0, now and
+ * then a step up the scale, as Awake's own defaults are */
+static void gen_awake_fill(gen_awake_t *g, uint32_t seed)
+{
+    uint32_t s = gen_stream(seed * 13u + 5u), i;
+    for (i = 0; i < 16u; i++) {
+        gen_awake_put(g->a, i, gen_rnd(&s, 4u) ? 1u + gen_rnd(&s, 8u) : 0u);
+        gen_awake_put(g->b, i, gen_rnd(&s, 4u) ? 0u : gen_rnd(&s, 6u));
+    }
+}
+/* Poly's four pitches from a seed (ROLL; a track's first), over SPAN octaves */
+static void gen_poly_fill(gen_poly_t *g, uint32_t seed)
+{
+    uint32_t s = gen_stream(seed * 29u + 11u), i, n = 7u * (g->span == 2u ? 2u : 1u);
+    for (i = 0; i < 4u; i++)
+        g->pitch[i] = (uint8_t)gen_rnd(&s, n);
+}
+
 /* ------------------------------------------------------------------ the generators, one step each --- */
 /* Each fills only what it plays: out arrives as {gate 0, note 60, vel 100, cv 0} (tessera.c), which a rest
  * keeps, so LOCK's recording sees exactly what it did before phase 1. The CV (the cords' source CV, Q15 0..32767)

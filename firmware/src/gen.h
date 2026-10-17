@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* The note generators (Turing, Euclid, Markov, Morph, Grids) behind one interface: each knows only its own state, the
+/* The note generators (Turing, Euclid, Markov, Morph, Grids, Bounce, Awake, Poly) behind one interface: each knows only its own state, the
  * clock and the input phrase, nothing of tracks, scales, the UI or Melodee. tessera.c is the adapter between them
  * and the sequencer (tessera-notes/docs/analysis/phase1-plan.md). Randomness: each draw from the track's own stream
  * (gen.c gen_rnd), handed in by the adapter, which starts it from the track's SEED. */
@@ -58,11 +58,45 @@ typedef struct {
     uint8_t  perturb[3];  /* this bar's random push per part, 0..63 (drawn on the bar's first step) */
 } gen_grids_t;
 
+/* 6. Bounce (Theo's): a ball crossing a 256 x 256 box a fixed distance a step, no gravity; a wall it hits plays a note
+ * (which wall, and where along it). PADDLE adds Pong: a paddle on the floor, a miss rests and serves again */
+typedef struct {
+    uint8_t  speed;       /* 1..64: how far the ball moves a step */
+    uint8_t  angle;       /* 0..90: degrees from the floor */
+    uint8_t  paddle;      /* 0 = no paddle; 1..100: its width, % of the floor */
+    uint8_t  x, y;        /* the ball, 0..255 (y 0: the floor) */
+    uint8_t  dir;         /* bit 0: moving left, bit 1: moving down */
+    uint8_t  pad_x;       /* the paddle's middle */
+    uint8_t  wall;        /* the wall it last hit + 1 (0 floor, 1 left, 2 right, 3 top), 0 none; 5: a miss */
+} gen_bounce_t;
+
+/* 7. Awake (norns, tehn): two looping sequences of their own lengths, added: A's value a scale degree (0 a rest), B's
+ * a transposition; PROB the chance a step plays. The values come from the seed (ROLL) */
+typedef struct {
+    uint8_t  len_a, len_b; /* 1..16 */
+    uint8_t  prob;        /* 0..100 */
+    uint8_t  pos_a, pos_b; /* the steps playing */
+    uint8_t  a[8], b[8];  /* 16 values each, 4 bits (low nibble first): A 0..8, B 0..7 */
+} gen_awake_t;
+
+/* 8. Poly (EuroPi's Polyrhythmic Sequencer, after the Subharmonicon): four rhythms, each a clock divider, advance a
+ * four-step pitch sequence; rhythms that land together play once, louder. The pitches come from the seed (ROLL) */
+typedef struct {
+    uint8_t  div[4];      /* 0 = off, 1..16: a rhythm advances the sequence every div steps */
+    uint8_t  pitch[4];    /* scale degrees, 0..13 */
+    uint8_t  span;        /* 1..2: octaves the pitches spread over */
+    uint8_t  pos;         /* the step playing, 0..3 */
+    uint8_t  sel;         /* the rhythm GEN's DIV edits (the page's, not saved) */
+    uint32_t tick;        /* steps since PLAY, modulo 720720 (every divider's multiple) */
+} gen_poly_t;
+
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
-    uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8 */
-    uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos */
+    uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8; Bounce:
+                           * paddle; Poly: the pitches, 4 bits each */
+    uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos; Bounce: angle, speed; Awake: the
+                           * lengths; Poly: span */
 } gen_sec_t;
 
 /* One step of an input phrase (phase 6: STEP as seed) */

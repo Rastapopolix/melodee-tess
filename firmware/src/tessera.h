@@ -25,6 +25,9 @@ typedef gen_euclid_t tessera_euclid_t;
 typedef gen_markov_t tessera_markov_t;
 typedef gen_morph_t  tessera_morph_t;
 typedef gen_grids_t  tessera_grids_t;
+typedef gen_bounce_t tessera_bounce_t;
+typedef gen_awake_t  tessera_awake_t;
+typedef gen_poly_t   tessera_poly_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
@@ -70,6 +73,9 @@ typedef struct {
     tessera_markov_t markov[TESSERA_TRACKS];
     tessera_morph_t  morph[TESSERA_TRACKS];
     tessera_grids_t  grids[TESSERA_TRACKS];
+    tessera_bounce_t bounce[TESSERA_TRACKS];
+    tessera_awake_t  awake[TESSERA_TRACKS];
+    tessera_poly_t   poly[TESSERA_TRACKS];
     tessera_evolve_t evolve[TESSERA_TRACKS];
     tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
@@ -105,15 +111,15 @@ void tessera_tweak_knob(uint32_t k, int32_t s);
 void tessera_form_knob(uint32_t k, int32_t s);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 204u                       /* the saved state, version 3 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
-#define TESSERA_PK_BYTES_V2 188u                    /* version 2 (before GRIDS): older projects and backups */
+#define TESSERA_PK_BYTES 320u                       /* the saved state, version 4 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V3 204u                    /* version 3 (before BOUNCE, AWAKE, POLY): older projects and backups */
+#define TESSERA_PK_BYTES_V2 188u                    /* version 2 (before GRIDS) */
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_v2(const uint8_t *in);           /* the same for a version 2 block */
-int tessera_unpack_v1(const uint8_t *in);           /* the same for a version 1 block */
-void tessera_v2_track(const uint8_t *in, uint8_t *out);   /* one track's record, version 2 -> 3 */
-void tessera_v1_track(const uint8_t *in, uint8_t *out);   /* one track's record, version 1 -> 3 */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..4) */
+uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 4 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
