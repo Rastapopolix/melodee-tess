@@ -2,8 +2,8 @@
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* The Mono look (MELODEE_LOOK 1, a build of its own; tessera-notes/docs/design/MONO_UI.md): Monomachine and Squares &
  * Circles' face. The screen as 120 x 120 cells of 2 x 2 pixels, one ink on the palette's background, a 5 x 7 font. Header 0..9 (the page,
- * the engine, the four tracks as dots), the four knobs as dials 11..49, the picture 51..109, the footer's page tabs
- * 110..119. Step 1, the prototype: every knob page (draw_page's own branch) gets the header, the dials and the
+ * the engine, the four tracks as dots), the four knobs as dials 11..49, the picture 51..108, the footer's line 109 and
+ * page tabs 111..119 (a clear row between them). Step 1, the prototype: every knob page (draw_page's own branch) gets the header, the dials and the
  * footer; GEN, PATTERN and LFO their pictures, the other pictures a stand-in. Stage, lists, popups, the browser and
  * the other screens of their own keep the detailed look for now. The knobs' labels and values come from
  * draw_columns as ever: draw_column hands them here (mo_capture) while a Mono page is drawn. The page is drawn whole
@@ -372,7 +372,7 @@ static void mo_foot(void)
     uint32_t i, n = 0, cur = 0, first = 0;
     uint16_t idx[16];
     int32_t x = 1, w = 0;
-    mo_hl(0, 110, 120, MO_INK);
+    mo_hl(0, 109, 120, MO_INK);                         /* (row 110 clear: the selected tab's block below it) */
     for (i = 0; i < NPAGES && n < 16u; i++)             /* the family's pages, as the button turns through them */
         if (PAGES[i].fam == pg->fam && page_visible(i)) {
             if (&PAGES[i] == pg) cur = n;
