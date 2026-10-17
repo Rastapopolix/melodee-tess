@@ -1,0 +1,8 @@
+{
+  "version": "1.2.9",
+  "product": "FM-1_91029",
+  "pkg": {
+    "dual": "../../firmware/melodee-tess-1.2.9.fwsc",
+    "single": "../../firmware/melodee-tess-1.2.9-1core.fwsc"
+  }
+}
