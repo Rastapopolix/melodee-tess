@@ -1572,6 +1572,53 @@ async function installerBuilds() {
   await element("go").listeners.click();
   ok(installed.at(-1)[1] === "FM-1_91002" && fetched.length === 6, "installer: returning from synth only restores the release without refetching");
 }
+async function localBuild() {
+  const script = readFileSync(join(HERE, "index_pkg.html"), "utf8").match(/<script type="module">([\s\S]*?)<\/script>/)[1]
+    .replace("/*META*/", JSON.stringify({version:"1.0.2",product:"FM-1_91002",pkg:{dual:"dual",single:"single"}}));
+  const mark = [...Buffer.from("FELUCCA-LOADER-1")];
+  const file = (name, product, {loader = true, crc = true} = {}) => ({name,
+    arrayBuffer:async () => new Uint8Array([crc ? 1 : 0, ...Buffer.from(product), 0, ...(loader ? mark : [])]).buffer});
+  async function run(pick, {answer = true} = {}) {
+    const installed = [], asked = [], elements = new Map();
+    const element = (id) => {
+      if (!elements.has(id)) elements.set(id, {checked:id === "build-dual", disabled:false, textContent:"", value:0, files:[], listeners:{},
+        addEventListener(k, fn) { this.listeners[k] = fn; }});
+      return elements.get(id);
+    };
+    const context = vm.createContext({
+      navigator:{language:"en", requestMIDIAccess:async () => ({})},
+      document:{documentElement:{}, querySelectorAll:() => [], getElementById:element},
+      window:{addEventListener() {}},
+      fetch:async () => ({ok:true, arrayBuffer:async () => new Uint8Array([1, ...Buffer.from("FM-1_91002"), 0]).buffer}),
+      Package:class { constructor(raw) { if (!raw[0]) throw new Error("not an FM-1 .fwsc (UFW header CRC mismatch)"); } },
+      productOf:(raw) => Buffer.from(raw.subarray(1, raw.indexOf(0, 1))).toString(), logicalImage:(raw) => "image:" + raw.length,
+      confirm:(message) => { asked.push(message); return answer; },
+      Updater:class { async find() { return null; } async install(image, product) { installed.push([image, product]); } },
+    });
+    vm.runInContext(script, context);
+    await new Promise(resolve => setImmediate(resolve));
+    const before = element("local-go").disabled;
+    element("local-file").files = [pick];
+    await element("local-file").listeners.change();
+    const status = element("status").textContent, enabled = !element("local-go").disabled;
+    await element("local-go").listeners.click();
+    return {before, status, enabled, installed, asked, unlocked:!element("local-file").disabled && !element("go").disabled};
+  }
+  let r = await run(file("melodee-tess-1.2.9-test.fwsc", "FM-1_91029"));
+  ok(r.before && r.enabled && r.status === "Test build checked: melodee-tess-1.2.9-test.fwsc (FM-1_91029)",
+    "local: Install test build stays off until a picked file checks out");
+  ok(r.asked.length === 1 && r.asked[0].includes("melodee-tess-1.2.9-test.fwsc (FM-1_91029)") && r.installed.length === 1
+    && r.installed[0][1] === "FM-1_91029" && r.installed[0][0].startsWith("image:") && r.unlocked,
+    "local: confirmed test build installs with the identity read from the file");
+  r = await run(file("t.fwsc", "FM-1_91029"), {answer:false});
+  ok(r.enabled && r.installed.length === 0 && r.unlocked, "local: cancelling the confirmation never flashes");
+  r = await run(file("FM-1.fwsc", "FM-1_015"));
+  ok(!r.enabled && r.status.startsWith("Cannot use this file: identity") && r.installed.length === 0, "local: official firmware is refused");
+  r = await run(file("patched.fwsc", "FM-1_91029", {loader:false}));
+  ok(!r.enabled && r.status.includes("no Melodee loader") && r.installed.length === 0, "local: a package without Melodee's loader is refused");
+  r = await run(file("broken.fwsc", "FM-1_91029", {crc:false}));
+  ok(!r.enabled && r.status.includes("CRC mismatch") && r.installed.length === 0, "local: a damaged package is refused");
+}
 async function installerBuildRaces() {
   const script = readFileSync(join(HERE, "index_pkg.html"), "utf8").match(/<script type="module">([\s\S]*?)<\/script>/)[1]
     .replace("/*META*/", JSON.stringify({version:"1.0.2",product:"FM-1_91002",pkg:{dual:"dual",single:"single"}}));
@@ -1605,6 +1652,7 @@ async function installerBuildRaces() {
 }
 await stockRestore();
 await installerBuilds();
+await localBuild();
 await installerBuildRaces();
 await patternProtocol();
 await editorMock();
