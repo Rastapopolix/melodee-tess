@@ -18,3 +18,7 @@ Changes (each marked `melodee-tess` in the code):
   6-OP models (their 85 KB of tables), and since 2026-10-17 also the string machine and chiptune (they play chords),
   the waveshaper, grains, swarm, noise, particles and the three drums; the seven left (VA-VCF, phase distortion, VA,
   FM, additive, string, modal) keep Plaits' own numbers.
+- `plaits/dsp/fx/low_pass_gate.h`, `physical_modelling/resonator.h`, `string.cc`, `string.h`, `string_voice.cc`
+  (2026-10-17): no denormals in dying notes (the AC79's FPU is slow on them; Plaits' Cortex-M4 flushes them): the
+  resonator's mode states are flushed, a -400 dB square wave rides into the gate's, the string's and its exciter's
+  filters.

@@ -55,6 +55,7 @@ void String::Reset() {
   stretch_.Reset();
   iir_damping_filter_.Init();
   dc_blocker_.Init(1.0f - 20.0f / kSampleRate);
+  anti_denormal_ = 1e-20f;
   dispersion_noise_ = 0.0f;
   curved_bridge_ = 0.0f;
   out_sample_[0] = out_sample_[1] = 0.0f;
@@ -173,6 +174,10 @@ void String::ProcessInternal(
       }
     
       s += *in;
+      // melodee-tess: a -400 dB square wave keeps the loop (delay, DC blocker, damping) off denormals, which the
+      // AC79's FPU is slow on
+      anti_denormal_ = -anti_denormal_;
+      s += anti_denormal_;
       CONSTRAIN(s, -20.0f, +20.0f);
       
       dc_blocker_.Process(&s, 1);

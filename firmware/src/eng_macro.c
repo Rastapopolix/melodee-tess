@@ -61,7 +61,11 @@ static void mc_render(struct track *t, voice_t *v, int32_t *out, uint32_t n, con
     }
 }
 
-static uint32_t mc_units(const struct track *t) { (void)t; return 4u; }   /* (one to two Prophet voices: measured) */
+/* the voice budget units of a model: VA's 4 measured on the device (one to two Prophet voices), the others by their
+ * cost against VA on the host (2026-10-17: FM 3.3x, PLUCK 2.7x, HARM and BELL 2.1x, VCF and PHASE 1.2x) */
+static const uint8_t MC_UNITS[] = {5, 5, 4, 13, 8, 11, 8};
+_Static_assert(sizeof MC_UNITS == sizeof MC_MODEL, "MC_UNITS / MC_MODEL");
+static uint32_t mc_units(const struct track *t) { return MC_UNITS[clamp(t->p[P_E0], 0, (int32_t)sizeof MC_MODEL - 1)]; }
 
 #define MCP(n, mo, ha, ti, mr, de, co, hit, ax, a, d, s, r) {n, {mo, ha, ti, mr, de, co, hit, ax}, {a, d, s, r}, 0, 1}
 static const preset_t MC_PRESETS[] = {

@@ -117,6 +117,51 @@ int main(void)
     }
     check("MODEL, HARM, TIMBR, MORPH, DECAY, COLOR, AUX: each moves the sound", ok);
 
+    {                                                 /* no denormal tails (they cost 3-30x: the AC79's FPU, x86 without
+                                                       * FTZ): struck every 70 ms, a model at the settings that had them
+                                                       * against a held VA note */
+        static const struct { uint8_t m, g; float h, t, mo, lim; } c[] = {
+            {2, 0, 0.5f, 0.5f, 0.5f, 0.0f},           /* (VA held: the measure) */
+            {2, 1, 0.0f, 0.0f, 1.0f, 2.5f},           /* VA HIT ON: the gate's tail */
+            {5, 1, 0.5f, 0.5f, 0.5f, 6.0f},           /* PLUCK (2.7x VA without denormals) */
+            {5, 0, 0.0f, 0.25f, 0.5f, 6.0f},
+            {6, 0, 0.5f, 0.0f, 0.0f, 5.0f},           /* BELL (2.1x VA) */
+            {6, 1, 0.25f, 0.0f, 0.0f, 5.0f},
+        };
+        static uint32_t mem[(40000 + 3) / 4];
+        mg_params_t q;
+        int16_t o[MG_BLOCK], a[MG_BLOCK];
+        uint32_t j, i, r;
+        double base = 0;
+        ok = mg_size() <= sizeof mem;
+        for (j = 0; ok && j < NELEM(c); j++) {
+            double best = 1e9;
+            memset(&q, 0, sizeof q);
+            q.model = MC_MODEL[c[j].m];
+            q.note = 48.0f;
+            q.harmonics = c[j].h;
+            q.timbre = c[j].t;
+            q.morph = c[j].mo;
+            q.decay = 0.7f;
+            q.lpg_colour = 0.5f;
+            q.gated = c[j].g;
+            mg_init(mem);
+            for (i = 0; i < 400u; i++) { q.trigger = i % 50u == 0; mg_render(mem, &q, o, a); }
+            for (r = 0; r < 3u; r++) {                /* (the least of three: this computer's noise) */
+                double t0 = now_s();
+                for (i = 0; i < 1000u; i++) { q.trigger = i % 200u == 0; mg_render(mem, &q, o, a); }
+                t0 = now_s() - t0;
+                if (t0 < best) best = t0;
+            }
+            if (!j) base = best;
+            else if (best > c[j].lim * base) {
+                ok = 0;
+                printf("    %s (%s): %.1f x a held VA note\n", N_MC_MODEL[c[j].m], c[j].g ? "HIT ON" : "HIT OFF",
+                       best / base);
+            }
+        }
+        check("no denormal tails: VA (HIT ON), PLUCK and BELL struck again and again stay near their cost", ok);
+    }
     {                                                 /* the cost against SID's, one note, on this computer */
         double t0, mc, sid, idle;
         int32_t o[2 * CTL];
