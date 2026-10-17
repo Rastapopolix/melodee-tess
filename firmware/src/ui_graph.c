@@ -272,13 +272,14 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rrect(bx, by, r, r, 1, T_TEXT, bg);
         }
     } else if (mode == TESS_ENG_AWAKE) {
-        /* loop A (the notes) over loop B (their lift), 16 cells each: a value a bar its height (A: 1..8, B: 0..7; 1 two
-         * pixels at least), a rest (A) or no lift (B) a dash; past the loop's length dim; the steps playing lit; the step the keys picked framed */
+        /* loop A (the notes) over loop B (their lift), 16 cells each: A's value a bar its height (1..8; 1 two pixels at
+         * least), a rest a dash; B's the lift, "+" and a number on the panel, a bar on the strip (0 a dash); past the loop's length dim; the steps playing lit; the step the keys picked framed */
         const gen_awake_t *a = tessera_awake(tr);
         int32_t ha = is_panel ? 44 : 12, hb = is_panel ? 28 : 6, ya = is_panel ? 10 : y_base, yb = ya + ha + (is_panel ? 14 : 4);
         uint32_t la = a->len_a ? a->len_a : 1u, lb = a->len_b ? a->len_b : 1u;
         uint32_t ca = (a->pos_a + la - 1u) % la, cb = (a->pos_b + lb - 1u) % lb;
         int step_w = is_panel ? 10 : 11;
+        if (is_panel) cv_text_c(9, yb + (hb - 12) / 2, &AF_S, "+", T_MID, bg);   /* (row B lifts row A) */
         for (uint32_t i = 0; i < 16u; i++) {
             int32_t sx = is_panel ? (18 + (int32_t)i * 12 + (int32_t)(i / 4u) * 4) : (13 + (int32_t)i * 13 + (int32_t)(i / 4u) * 4);
             uint32_t va = gen_awake_a(a, i), vb = gen_awake_b(a, i);
@@ -288,6 +289,10 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             else cv_rrect(sx, ya + ha - (2 + ((int32_t)va - 1) * (ha - 2) / 7), step_w, 2 + ((int32_t)va - 1) * (ha - 2) / 7, 1,
                           ha_on ? T_TEXT : c, bg);
             if (i >= lb) cv_rect(sx, yb + hb - 1, step_w, 1, dim);
+            else if (is_panel) {                            /* B's lift as its number (0 dim), after the row's "+" */
+                char d[2] = {(char)('0' + (vb > 7u ? 7u : vb)), 0};
+                cv_text_c(sx + step_w / 2, yb + (hb - 12) / 2, &AF_S, d, hb_on ? T_TEXT : vb ? c : dim, bg);
+            }
             else if (!vb) cv_rect(sx, yb + hb - 2, step_w, 2, hb_on ? T_TEXT : dim);
             else cv_rrect(sx, yb + hb - (2 + ((int32_t)vb - 1) * (hb - 2) / 6), step_w, 2 + ((int32_t)vb - 1) * (hb - 2) / 6, 1,
                           hb_on ? T_TEXT : c, bg);
