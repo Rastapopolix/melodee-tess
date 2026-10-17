@@ -188,7 +188,11 @@ static void mo_inv(const char *s, int32_t x, int32_t y)   /* ink on a filled box
     mo_fill(x - 1, y - 1, mo_tw(s) + 2, 9, MO_INK);
     mo_text(s, x, y, MO_BG);
 }
-static int mo_vowel(char c) { return c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U'; }
+static int mo_vowel(char c)
+{
+    c = c >= 'a' && c <= 'z' ? (char)(c - 32) : c;
+    return c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U';
+}
 /* four letters at most: the spaces out (SNP A: SNPA); longer, the first letter and the consonants after it (EVERY:
  * EVRY, PULSE: PLS); fewer than three of those, the first four letters */
 static void mo_abbr(char *d, const char *s)
@@ -261,37 +265,105 @@ static void mo_head(void)
         mo_hl(97 + (int32_t)song.sel * 6, 8, 5, MO_INK);
     mo_hl(0, 9, 120, MO_INK);
 }
+/* a value as its column shows it: five characters at most (MORPH, 0.25); longer, a number loses its last decimals
+ * (128.00: 128.0) and a word its vowels from the end (MARKOV: MARKV, REVERB: REVRB); still longer, cut (1: the Mono
+ * lint reports it) */
+static int mo_fit(char *d, const char *s)
+{
+    uint32_t n, i, j;
+    str_cpy(d, s, 16);
+    n = str_len(d);
+    if (n > 5u && (d[0] == '-' || d[0] == '+' || (d[0] >= '0' && d[0] <= '9'))) {
+        for (i = 0; d[i] && d[i] != '.'; i++) ;
+        while (d[i] && n > 5u && n > i + 1u)
+            d[--n] = 0;
+        if (d[i] && n == i + 1u)
+            d[--n] = 0;                                 /* (no decimal left: no point) */
+    }
+    for (i = n; n > 5u && i-- > 1u;)
+        if (mo_vowel(d[i])) {
+            for (j = i; j < n; j++) d[j] = d[j + 1u];
+            n--;
+        }
+    if (n <= 5u)
+        return 0;
+    d[5] = 0;
+    return 1;
+}
+/* the four knobs' values as drawn, for the Mono lint (tests/ui_render.c): the frame (a box, a filled box or the
+ * inverted block; -1 none), the text, the kind */
+enum { MV_DIAL, MV_BOX, MV_KEY, MV_INV };
+static struct { int16_t fx0, fx1, tx0, tx1; uint8_t kind, cut, used; char s[8]; } mo_vals[4];
+static uint8_t mo_vals_new;                             /* mo_cols drew them since the lint last looked */
+#define MO_BOX_W 27                                     /* a boxed value's outline: 4 characters and a clear cell each side */
 static void mo_cols(void)
 {
+    char v[4][16];
+    uint8_t wide[4], kind[4], cut[4];
     uint32_t i;
+    for (i = 0; i < 4u; i++) {                          /* what each column shows, first: a wide one narrows its neighbours' margins */
+        const char *s = mo_col[i].val;
+        uint32_t n;
+        wide[i] = kind[i] = cut[i] = 0;
+        v[i][0] = 0;
+        if (!mo_col[i].used)
+            continue;
+        if (s[0] == '[') {                              /* "[OCT+]": the key that acts, a filled box */
+            str_cpy(v[i], s + 1, sizeof v[i]);
+            n = str_len(v[i]);
+            if (n && v[i][n - 1u] == ']') v[i][n - 1u] = 0;
+            cut[i] = (uint8_t)mo_fit(v[i], v[i]);
+            kind[i] = MV_KEY;
+        } else {
+            char b[24];
+            str_cpy(b, s, sizeof b);
+            if (mo_col[i].ratio >= 0 && str_len(b) + str_len(mo_col[i].unit) <= 5u)
+                str_cpy(b + str_len(b), mo_col[i].unit, sizeof b - str_len(b));
+            cut[i] = (uint8_t)mo_fit(v[i], b);
+            kind[i] = mo_col[i].ratio < 0 ? MV_BOX : MV_DIAL;
+        }
+        if (str_len(v[i]) > 4u && kind[i] != MV_KEY)   /* five: no box, inverted at full length */
+            wide[i] = 1, kind[i] = MV_INV;
+    }
     for (i = 0; i < 4u; i++) {
-        int32_t cx = 15 + (int32_t)i * 30;
+        int32_t cx = 15 + (int32_t)i * 30, tw = mo_tw(v[i]), tx = cx - tw / 2, ty, fx0 = -1, fx1 = -1;
         uint16_t ink = mo_col[i].dim ? MO_DIM : MO_INK;
-        char v[16], l[8];
+        char l[8];
+        mo_vals[i].used = mo_col[i].used;
         if (!mo_col[i].used)
             continue;
         mo_abbr(l, mo_col[i].label);
         mo_textc(l, cx, 12, mo_col[i].hot ? MO_INK : MO_DIM);
-        if (mo_col[i].val[0] == '[') {                  /* "[OCT+]": the key that acts, inverted */
-            mo_cut(v, mo_col[i].val + 1, 4);
-            if (v[0] && v[str_len(v) - 1] == ']') v[str_len(v) - 1] = 0;
-            mo_box(cx - 13, 21, 27, 15, ink);
-            mo_inv(v, cx - mo_tw(v) / 2, 25);
-        } else if (mo_col[i].ratio < 0) {               /* a list value: boxed, no dial */
-            mo_cut(v, mo_col[i].val, 4);
-            mo_box(cx - 13, 21, 27, 15, ink);
-            mo_textc(v, cx + 1, 25, ink);
-        } else {
-            str_cpy(v, mo_col[i].val, sizeof v);
-            if (str_len(v) + str_len(mo_col[i].unit) <= 4u)
-                str_cpy(v + str_len(v), mo_col[i].unit, sizeof v - str_len(v));
-            v[4] = 0;
+        ty = mo_col[i].ratio >= 0 && mo_col[i].val[0] != '[' ? 39 : 25;
+        if (mo_col[i].ratio >= 0 && mo_col[i].val[0] != '[')
             mo_dial(cx, 28, 7, mo_col[i].ratio, ink);
-            mo_textc(v, cx, 39, ink);
+        if (kind[i] == MV_KEY) {
+            fx0 = cx - MO_BOX_W / 2, fx1 = cx + MO_BOX_W / 2;
+            mo_fill(fx0, 21, MO_BOX_W, 15, ink);
+            mo_text(v[i], tx, ty, MO_BG);
+        } else if (kind[i] == MV_BOX) {
+            fx0 = cx - MO_BOX_W / 2, fx1 = cx + MO_BOX_W / 2;
+            mo_box(fx0, 21, MO_BOX_W, 15, ink);
+            mo_text(v[i], tx, ty, ink);
+        } else if (kind[i] == MV_INV) {                 /* a cell of margin each side, but none toward another wide one
+                                                         * (they keep a cell between them) or past the screen's edge */
+            fx0 = tx - (i > 0u && wide[i - 1u] ? 0 : 1);
+            fx1 = tx + tw - 1 + (i < 3u && wide[i + 1u] ? 0 : 1);
+            fx0 = fx0 < 0 ? 0 : fx0;
+            fx1 = fx1 > 119 ? 119 : fx1;
+            mo_fill(fx0, ty - 1, fx1 - fx0 + 1, 9, ink);
+            mo_text(v[i], tx, ty, MO_BG);
+        } else {
+            mo_text(v[i], tx, ty, ink);
         }
+        mo_vals[i].fx0 = (int16_t)fx0, mo_vals[i].fx1 = (int16_t)fx1;
+        mo_vals[i].tx0 = (int16_t)tx, mo_vals[i].tx1 = (int16_t)(tx + tw - 1);
+        mo_vals[i].kind = kind[i], mo_vals[i].cut = cut[i];
+        str_cpy(mo_vals[i].s, v[i], sizeof mo_vals[i].s);
         if (mo_col[i].hot)
             mo_hl(cx - 12, 48, 25, MO_INK);
     }
+    mo_vals_new = 1;
     mo_dash(0, 50, 120, MO_DIM);
 }
 static void mo_foot(void)

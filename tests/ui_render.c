@@ -305,9 +305,44 @@ static void hk_blit(uint32_t x, uint32_t y, uint32_t r0, uint32_t w, uint32_t h)
     npend = 0;
 }
 
+#if MELODEE_LOOK
+/* the Mono lint (ui_mono.c's knob values, in cells): no value cut; a boxed value's text a clear cell inside its box;
+ * the values on the screen, a clear cell between neighbours */
+static uint32_t nmono;                                  /* knob values the Mono lint looked at */
+static void mono_lint(void)
+{
+    uint32_t i;
+    int32_t prev = -2;
+    if (!mo_vals_new)
+        return;
+    mo_vals_new = 0;
+    for (i = 0; i < 4u; i++) {
+        rbox_t b;
+        int32_t x0, x1;
+        if (!mo_vals[i].used)
+            continue;
+        nmono++;
+        x0 = mo_vals[i].fx0 >= 0 ? mo_vals[i].fx0 : mo_vals[i].tx0;
+        x1 = mo_vals[i].fx0 >= 0 ? mo_vals[i].fx1 : mo_vals[i].tx1;
+        memset(&b, 0, sizeof b);
+        b.x0 = (int16_t)(x0 * 2), b.x1 = (int16_t)(x1 * 2 + 2), b.y0 = 42, b.y1 = 72;
+        snprintf(b.s, sizeof b.s, "%s", mo_vals[i].s);
+        if (mo_vals[i].cut) finding("Mono: value cut", &b, 0);
+        if ((mo_vals[i].kind == MV_BOX || mo_vals[i].kind == MV_KEY) &&
+            (mo_vals[i].tx0 < mo_vals[i].fx0 + 2 || mo_vals[i].tx1 > mo_vals[i].fx1 - 2))
+            finding("Mono: no clear cell in its box", &b, 0);
+        if (x0 < 0 || x1 > 119) finding("Mono: off the screen", &b, 0);
+        if (x0 - prev < 2) finding("Mono: touches its neighbour", &b, 0);
+        prev = x1;
+    }
+}
+#endif
 static void lint(void)
 {
     uint32_t i, j;
+#if MELODEE_LOOK
+    mono_lint();
+#endif
     for (i = 0; i < nscr; i++) {
         const rbox_t *b = &scr[i];
         if (b->x0 < 0 || b->y0 < 0 || b->x1 > 240 || b->y1 > 240) finding("off the screen", b, 0);
@@ -1365,7 +1400,11 @@ static void sweep_columns(void)
                         *vp = (int16_t)v;
                     nscr = npend = 0;
                     ui.force = 1;
+#if MELODEE_LOOK
+                    draw_page();                         /* (Mono: its knob pages are drawn whole, ui_mono.c) */
+#else
                     draw_columns();
+#endif
                     lint();
                     nsweep++;
                     if (v - d->min > 300) v = d->max - 1;      /* wide ranges: the ends */
@@ -1779,6 +1818,22 @@ int main(int argc, char **argv)
         fprintf(rep, "(self-test: %u findings above are expected)\n\n", nfind);
         nfind = 0;
     }
+#if MELODEE_LOOK
+    {   /* the Mono lint itself: a value cut, a text against its box, two values touching */
+        uint32_t n0 = nmono;
+        cur_name = "Mono self-test";
+        memset(mo_vals, 0, sizeof mo_vals);
+        mo_vals[0].used = mo_vals[1].used = mo_vals[2].used = 1;
+        mo_vals[0].kind = MV_INV, mo_vals[0].cut = 1, mo_vals[0].fx0 = 0, mo_vals[0].fx1 = 30;
+        mo_vals[1].kind = MV_BOX, mo_vals[1].fx0 = 32, mo_vals[1].fx1 = 58, mo_vals[1].tx0 = 34, mo_vals[1].tx1 = 57;
+        mo_vals[2].kind = MV_DIAL, mo_vals[2].fx0 = -1, mo_vals[2].tx0 = 59, mo_vals[2].tx1 = 70;
+        mo_vals_new = 1;
+        mono_lint();
+        if (nfind != 3u) { fprintf(stderr, "ui_render: the Mono lint missed its self-test (%u of 3)\n", nfind); return 1; }
+        fprintf(rep, "(Mono self-test: %u findings above are expected)\n\n", nfind);
+        nfind = 0, nmono = n0;
+    }
+#endif
     for (p = 0; p < UI_PAL_ENTRIES; p++)
         for (s = 0; s < S_COUNT; s++) {
             char name[64];
@@ -1912,6 +1967,10 @@ int main(int argc, char **argv)
         }
     }
     if (audf) fclose(audf);
+#if MELODEE_LOOK
+    fprintf(rep, "\nMono lint: %u knob values\n", nmono);
+    if (!nmono) { fprintf(stderr, "ui_render: the Mono lint saw no knob value\n"); nfind++; }
+#endif
     fprintf(rep, "\n%u lint findings, %u ellipsised free texts, %u MONO pixels off gray; %u column values swept; "
             "%u FM6 charts linted\n", nfind, nfree, mono_bad, nsweep, fmp_charts);
     fclose(rep);
