@@ -435,7 +435,7 @@ static void s_bounce_var(void)
     gen(0, TESS_ENG_BOUNCE);
     knob(tessera_knob, 1, 16);                        /* SPEED 40 */
     knob(tessera_knob, 2, 23);                        /* ANGLE 60 */
-    knob(tessera_knob, 3, 15);                        /* PADDLE 30 */
+    turns(tessera_knob, 3, 2);                        /* BALLS 3 */
     knob(tessera_tweak_knob, 1, 10);                  /* DROP 20 */
 }
 static void s_evolve_bounce(void)
@@ -519,7 +519,7 @@ static const scen_t SCEN[] = {
     {"grids_x48_y228_dens80_chaos40_drop_human", 8, 0x1021u, s_grids_var, 0},
     {"evolve_grids_every1_amount70_abac", 16, 0x1022u, s_evolve_grids, 0},
     {"bounce", 8, 0x1023u, s_bounce, 0},
-    {"bounce_speed40_angle60_paddle30_drop20", 8, 0x1024u, s_bounce_var, 0},
+    {"bounce_speed40_angle60_balls3_drop20", 8, 0x1024u, s_bounce_var, 0},
     {"evolve_bounce_every1_amount60_ab", 16, 0x1025u, s_evolve_bounce, 0},
     {"awake", 8, 0x1026u, s_awake, 0},
     {"awake_lena12_lenb5_prob70_shift2", 8, 0x1027u, s_awake_var, 0},
@@ -789,7 +789,7 @@ static void pack_run(char *res, size_t cap)
          * track's with Awake's values and Poly's pitches from the track's seed (as ROLL gives them); each new setting
          * out of range is refused */
         static uint8_t v3[TESSERA_PK_BYTES_V3], v3b[TESSERA_PK_BYTES_V3];
-        static const uint8_t BAD[][2] = {{0, 0}, {0, 65}, {1, 91}, {2, 101}, {3, 0}, {4, 17}, {5, 101}, {6, 0x09},
+        static const uint8_t BAD[][2] = {{0, 0}, {0, 65}, {1, 91}, {2, 0}, {2, 5}, {3, 0}, {4, 17}, {5, 101}, {6, 0x09},
                                          {13, 0x90}, {14, 0x08}, {21, 0x80}, {22, 17}, {26, 0x0E}, {27, 0xE0},
                                          {28, 0}, {28, 3}};   /* (Bounce 0..2, Awake 3..21, Poly 22..28) */
         const uint32_t n4 = TESSERA_PK_BYTES / TESSERA_TRACKS, n3 = TESSERA_PK_BYTES_V3 / TESSERA_TRACKS;
@@ -806,7 +806,7 @@ static void pack_run(char *res, size_t cap)
             gen_awake_fill(&aw, tessera.seed[tr]);
             gen_poly_fill(&po, tessera.seed[tr]);
             memcpy(v3b + tr * n3, b + tr * n4, n3);
-            ok &= tessera.bounce[tr].speed == 24u && tessera.bounce[tr].angle == 37u && !tessera.bounce[tr].paddle;
+            ok &= tessera.bounce[tr].speed == 24u && tessera.bounce[tr].angle == 37u && tessera.bounce[tr].balls == 1u;
             ok &= tessera.awake[tr].len_a == 8u && tessera.awake[tr].len_b == 7u && tessera.awake[tr].prob == 100u &&
                   !memcmp(aw.a, tessera.awake[tr].a, 8) && !memcmp(aw.b, tessera.awake[tr].b, 8);
             ok &= tessera.poly[tr].div[0] == 4u && tessera.poly[tr].div[1] == 3u && !tessera.poly[tr].div[2] &&

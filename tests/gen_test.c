@@ -32,13 +32,14 @@ static void check(const char *what, int ok)
 }
 
 static const gen_clock_t CLK0 = {0, 16, 0};
-static gen_out_t step_out(void) { gen_out_t o = {0, 60, 100, 0, 0, 0}; return o; }   /* as tessera.c starts each step */
+static gen_out_t step_out(void) { gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0}; return o; }   /* as tessera.c starts each step */
 /* field by field: gen_out_t has a padding byte (before cv), which memcmp would compare too */
 static int out_eq(const gen_out_t *a, const gen_out_t *b, uint32_t n)
 {
     for (uint32_t i = 0; i < n; i++)
         if (a[i].gate != b[i].gate || a[i].note != b[i].note || a[i].vel != b[i].vel || a[i].cv != b[i].cv ||
-            a[i].parts != b[i].parts || a[i].accent != b[i].accent) return 0;
+            a[i].parts != b[i].parts || a[i].accent != b[i].accent || a[i].more_n != b[i].more_n ||
+            (a[i].more_n && memcmp(a[i].more, b[i].more, a[i].more_n))) return 0;
     return 1;
 }
 
@@ -381,79 +382,104 @@ static void grids_tests(void)
 }
 
 /* ------------------------------------------------------------------ Bounce --- */
-static gen_bounce_t bounce_at(uint32_t speed, uint32_t angle, uint32_t paddle)
+static gen_bounce_t bounce_at(uint32_t speed, uint32_t angle, uint32_t balls, uint32_t seed)
 {
     gen_bounce_t g;
     memset(&g, 0, sizeof g);
-    g.speed = (uint8_t)speed, g.angle = (uint8_t)angle, g.paddle = (uint8_t)paddle;
-    gen_bounce_serve(&g, 0u);
+    g.speed = (uint8_t)speed, g.angle = (uint8_t)angle, g.balls = (uint8_t)balls;
+    gen_bounce_serve(&g, seed);
     return g;
 }
 static void bounce_tests(void)
 {
-    int range = 1, draws = 1, walls = 1, loop = 1, miss = 1, mut = 1, same = 1;
+    int range = 1, draws = 1, walls = 1, loop = 1, mut = 1, same = 1, order = 1, apart = 1, one = 1;
+    uint32_t chords = 0;
     for (uint32_t sp = 1; sp <= 64; sp += 9)
         for (uint32_t an = 0; an <= 90; an += 15)
-            for (uint32_t pd = 0; pd <= 100; pd += 50) {
-                gen_bounce_t g = bounce_at(sp, an, pd);
+            for (uint32_t nb = 1; nb <= 4; nb++) {
+                gen_bounce_t g = bounce_at(sp, an, nb, sp * 7u + an);
                 for (uint32_t i = 0; i < 400; i++) {
                     gen_out_t o = step_out();
-                    uint32_t c = rng_state;
+                    uint32_t c = rng_state, k;
                     gen_bounce_tick(&g, &CLK0, &rng_state, &o);
                     draws &= draws_since(c) == 0u;
-                    range &= o.gate ? o.note >= 48 && o.note <= 48 + 12 + 10 && (o.vel == 100 || o.vel == 115) :
-                                      o.note == 60 && o.vel == 100;
-                    range &= o.cv >= 0 && g.wall <= 5u && (g.wall != 5u || pd) && (o.gate == (g.wall >= 1u && g.wall <= 4u));
+                    range &= o.gate ? o.note >= 48 && o.note <= 70 && (o.vel == 100 || o.vel == 115) :
+                                      o.note == 60 && o.vel == 100 && !o.more_n;
+                    range &= o.cv >= 0 && o.more_n <= 2u && o.gate == (g.hit != 0) && (nb > 1u || !o.more_n);
+                    for (k = 0; k < o.more_n; k++) range &= o.more[k] >= 48 && o.more[k] <= 70 && o.more[k] != o.note;
+                    chords += o.more_n != 0;
                 }
             }
     {   /* straight up (90 degrees), 64 a step: floor and top in turn, every 4 steps a hit (0 128 255 127 0 ...) */
-        gen_bounce_t g = bounce_at(64, 90, 0);
+        gen_bounce_t g = bounce_at(64, 90, 1, 0);
         uint32_t hits = 0, top = 0;
         for (uint32_t i = 0; i < 16; i++) {
             gen_out_t o = step_out();
             gen_bounce_tick(&g, &CLK0, &rng_state, &o);
             hits += o.gate;
             top += o.gate && o.vel == 115;
-            walls &= g.x == 128u;
+            walls &= g.x[0] == 128u;
         }
         walls &= hits == 4u && top == 2u;
     }
-    {   /* at 45 degrees and 43 a step (30 each way: 510 / 30 = 17) the path comes back to its start every 17 steps */
-        gen_bounce_t g = bounce_at(43, 45, 0);
+    {   /* at 45 degrees and 43 a step (30 each way: 510 / 30 = 17) ball 1's path comes back to its start every 17 steps */
+        gen_bounce_t g = bounce_at(43, 45, 1, 5);
         gen_out_t a[17], b[17];
         for (uint32_t i = 0; i < 17; i++) { a[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &a[i]); }
         for (uint32_t i = 0; i < 17; i++) { b[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &b[i]); }
-        loop &= out_eq(a, b, 17) && g.x == 128u && g.y == 0u;
+        loop &= out_eq(a, b, 17) && g.x[0] == 128u && g.y[0] == 0u;
     }
-    {   /* the narrowest paddle misses a fast ball now and then: a rest, the ball served from the middle */
-        gen_bounce_t g = bounce_at(64, 20, 1);
-        uint32_t misses = 0;
-        for (uint32_t i = 0; i < 400; i++) {
-            gen_out_t o = step_out();
-            gen_bounce_tick(&g, &CLK0, &rng_state, &o);
-            if (g.wall == 5u) { misses++; miss &= !o.gate && g.x == 128u && g.y == 128u && (g.dir & 2u); }
-        }
-        miss &= misses > 0u;
-    }
-    {   /* the same settings give the same steps */
-        gen_bounce_t g1 = bounce_at(37, 61, 30), g2 = bounce_at(37, 61, 30);
+    {   /* the same settings and seed give the same steps */
+        gen_bounce_t g1 = bounce_at(37, 61, 3, 9), g2 = bounce_at(37, 61, 3, 9);
         gen_out_t a[100], b[100];
         for (uint32_t i = 0; i < 100; i++) { a[i] = step_out(); gen_bounce_tick(&g1, &CLK0, &rng_state, &a[i]); }
         for (uint32_t i = 0; i < 100; i++) { b[i] = step_out(); gen_bounce_tick(&g2, &CLK0, &rng_state, &b[i]); }
         same &= out_eq(a, b, 100);
     }
-    for (uint32_t amt = 0; amt <= 100; amt += 25) {
-        gen_bounce_t g = bounce_at(20, 3, 0);
-        for (uint32_t n = 0; n < 200; n++) {
-            gen_bounce_mutate(&g, amt, &rng_state);
-            mut &= g.angle <= 90u && g.speed == 20u && !g.paddle;
+    for (uint32_t sd = 0; sd < 200; sd++) {             /* the balls start apart, at angles of their own */
+        gen_bounce_t g = bounce_at(20, 40, 4, sd);
+        for (uint32_t k = 1; k < 4u; k++) {
+            int32_t o = g.off[k] < 0 ? -g.off[k] : g.off[k];
+            apart &= o >= 8 && o <= 30 && (g.x[k] != g.x[0] || g.y[k] != g.y[0]);
+        }
+        apart &= !g.off[0] && g.x[0] == 128u && !g.y[0];
+    }
+    {   /* ball 1 alone plays as it would with the others there: they add notes, they take none of its */
+        gen_bounce_t g1 = bounce_at(29, 52, 1, 3), g4 = bounce_at(29, 52, 4, 3);
+        for (uint32_t i = 0; i < 300; i++) {
+            gen_out_t a = step_out(), b = step_out();
+            gen_bounce_tick(&g1, &CLK0, &rng_state, &a);
+            gen_bounce_tick(&g4, &CLK0, &rng_state, &b);
+            one &= g1.x[0] == g4.x[0] && g1.y[0] == g4.y[0];
+            if (a.gate) {
+                uint32_t k, in = b.note == a.note;
+                for (k = 0; k < b.more_n; k++) in |= b.more[k] == a.note;
+                one &= b.gate && (in || b.more_n == 2u);
+            }
         }
     }
-    check("bounce: a wall hit plays 48..70 at 100 (the top 115); else a rest keeps note 60, vel 100", range);
+    {   /* hits on one step: the lowest wall's note first (a ball on the floor and one on the top, the same step) */
+        gen_bounce_t g = bounce_at(64, 90, 2, 0);
+        gen_out_t o = step_out();
+        g.off[1] = 0, g.x[1] = 40, g.y[1] = 250, g.dir &= (uint8_t)~0xCu;   /* ball 2 going up, ball 1 coming down */
+        g.y[0] = 6, g.dir |= 2u;
+        gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+        order &= o.gate && o.more_n == 1u && g.hit == 9u && o.note < o.more[0] && o.vel == 100;
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_bounce_t g = bounce_at(20, 3, 2, 1);
+        for (uint32_t n = 0; n < 200; n++) {
+            gen_bounce_mutate(&g, amt, &rng_state);
+            mut &= g.angle <= 90u && g.speed == 20u && g.balls == 2u;
+        }
+    }
+    check("bounce: a wall hit plays 48..70 at 100 (the top 115), up to 3 notes; else a rest keeps note 60, vel 100", range);
+    check("bounce: several balls hit on one step now and then (chords)", chords > 0u);
     check("bounce: no random draw a step", draws);
     check("bounce: straight up at 64 a step hits the floor and the top in turn, every 4 steps", walls);
     check("bounce: at 45 degrees the path loops (17 steps); the same settings give the same steps", loop && same);
-    check("bounce: a paddle that misses rests and serves again from the middle, going down", miss);
+    check("bounce: the other balls start apart, 8..30 degrees off ANGLE; ball 1 plays as alone", apart && one);
+    check("bounce: hits on one step sound the lowest wall's note first", order);
     check("bounce: mutation moves only the angle, inside 0..90", mut);
 }
 
@@ -608,15 +634,15 @@ static void section_tests(void)
     gen_morph_save(&mo, &s);  ok &= s.reg == 0x2222u && s.p0 == 99 && s.p1 == 3;
     gen_grids_save(&gr, &s);  ok &= s.reg == (40u | 200u << 8) && s.p0 == 99 && s.p1 == 3;
     {
-        gen_bounce_t bo = bounce_at(33, 61, 40);
-        gen_sec_t b2 = {7, 80, 5};
-        gen_bounce_save(&bo, &s); ok &= s.reg == 40u && s.p0 == 61 && s.p1 == 33;
-        gen_bounce_load(&bo, &b2); ok &= bo.paddle == 7u && bo.angle == 80u && bo.speed == 5u;
+        gen_bounce_t bo = bounce_at(33, 61, 3, 1);
+        gen_sec_t b2 = {2, 80, 5};
+        gen_bounce_save(&bo, &s); ok &= s.reg == 3u && s.p0 == 61 && s.p1 == 33;
+        gen_bounce_load(&bo, &b2); ok &= bo.balls == 2u && bo.angle == 80u && bo.speed == 5u;
     }
     {
         gen_awake_t aw = awake_at(9, 4, 50, 1);
         gen_sec_t a2 = {0x5555u, 3, 12};
-        gen_awake_save(&aw, &s); ok &= s.reg == 40u && s.p0 == 9 && s.p1 == 4;
+        gen_awake_save(&aw, &s); ok &= s.reg == 3u && s.p0 == 9 && s.p1 == 4;
         gen_awake_load(&aw, &a2); ok &= aw.len_a == 3u && aw.len_b == 12u && aw.prob == 50u;
     }
     {
@@ -646,7 +672,7 @@ static double ns_per_step(int kind)
     gen_markov_t mk = {0, 0, 40, 80, 2};
     gen_morph_t mo = {64, 0x8888u, 0xA5A5u, 0x0F, 2};
     gen_grids_t gr = {77, 190, 70, 60, 0, {0, 0, 0}};
-    gen_bounce_t bo = bounce_at(37, 61, 30);
+    gen_bounce_t bo = bounce_at(37, 61, 3, 4);
     gen_awake_t aw = awake_at(9, 5, 70, 3);
     gen_poly_t po = poly_at(4, 3, 5, 0, 2, 3);
     const uint32_t N = 2000000u;

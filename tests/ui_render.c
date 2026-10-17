@@ -1111,12 +1111,13 @@ static void setup(int s)
         song.playing = 1;
         go_title("GEN");
         break;
-    case S_GEN_BOUNCE:                               /* a paddle of 40 %, the ball on its way up from the left wall */
+    case S_GEN_BOUNCE:                               /* three balls, the first on its way up from the left wall */
         tessera_reset();
         song.sel = 0;
         tessera_knob(0, TESS_ENG_BOUNCE);
-        tessera_knob(3, 20);
-        tessera.bounce[0].x = 40, tessera.bounce[0].y = 150, tessera.bounce[0].pad_x = 90, tessera.bounce[0].wall = 2;
+        tessera_knob(3, 1);
+        tessera_knob(3, 1);
+        tessera.bounce[0].x[0] = 40, tessera.bounce[0].y[0] = 150, tessera.bounce[0].hit = 2;
         go_title("GEN");
         break;
     case S_GEN_TURING: case S_GEN_EUCLID: case S_GEN_MARKOV: case S_GEN_MORPH: case S_GEN_EVOLVE: case S_GEN_GRIDS:

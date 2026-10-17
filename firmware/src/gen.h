@@ -58,16 +58,17 @@ typedef struct {
     uint8_t  perturb[3];  /* this bar's random push per part, 0..63 (drawn on the bar's first step) */
 } gen_grids_t;
 
-/* 6. Bounce (Theo's): a ball crossing a 256 x 256 box a fixed distance a step, no gravity; a wall it hits plays a note
- * (which wall, and where along it). PADDLE adds Pong: a paddle on the floor, a miss rests and serves again */
+/* 6. Bounce (Theo's): balls crossing a 256 x 256 box a fixed distance a step, no gravity; a wall a ball hits plays a
+ * note (which wall, and where along it). BALLS 1..4: each one more from a place and an angle of its own (the seed's) */
+#define GEN_BOUNCE_MAX 4u
 typedef struct {
-    uint8_t  speed;       /* 1..64: how far the ball moves a step */
-    uint8_t  angle;       /* 0..90: degrees from the floor */
-    uint8_t  paddle;      /* 0 = no paddle; 1..100: its width, % of the floor */
-    uint8_t  x, y;        /* the ball, 0..255 (y 0: the floor) */
-    uint8_t  dir;         /* bit 0: moving left, bit 1: moving down */
-    uint8_t  pad_x;       /* the paddle's middle */
-    uint8_t  wall;        /* the wall it last hit + 1 (0 floor, 1 left, 2 right, 3 top), 0 none; 5: a miss */
+    uint8_t  speed;       /* 1..64: how far a ball moves a step */
+    uint8_t  angle;       /* 0..90: degrees from the floor (ball 1's; the others' offset from it) */
+    uint8_t  balls;       /* 1..4 */
+    uint8_t  x[GEN_BOUNCE_MAX], y[GEN_BOUNCE_MAX];   /* the balls, 0..255 (y 0: the floor) */
+    uint8_t  dir;         /* 2 bits a ball: bit 0 moving left, bit 1 moving down */
+    uint8_t  hit;         /* the walls hit on the last step, a bit each: 0 floor, 1 left, 2 right, 3 top */
+    int8_t   off[GEN_BOUNCE_MAX];   /* each ball's angle from ANGLE (ball 1: 0) */
 } gen_bounce_t;
 
 /* 7. Awake (norns, tehn): two looping sequences of their own lengths, added: A's value a scale degree (0 a rest), B's
@@ -94,7 +95,7 @@ typedef struct {
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
     uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8; Bounce:
-                           * paddle; Poly: the pitches, 4 bits each */
+                           * balls; Poly: the pitches, 4 bits each */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos; Bounce: angle, speed; Awake: the
                            * lengths; Poly: span */
 } gen_sec_t;
@@ -117,6 +118,8 @@ typedef struct {
     int16_t cv;             /* the generator's CV for the signal bus (phase 2; 0 until then) */
     uint8_t parts;          /* Grids: the drum parts that hit, bit 0 kick, 1 snare, 2 hat (gate: any); else 0 */
     uint8_t accent;         /* Grids: the parts among them accented */
+    uint8_t more[2];        /* Bounce: notes after `note` on the same step (raw, as note), more_n of them */
+    uint8_t more_n;
 } gen_out_t;
 
 #endif

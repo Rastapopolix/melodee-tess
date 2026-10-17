@@ -36,6 +36,7 @@ static void tess_seed_apply(uint32_t tr)
     tessera.markov[tr].cur_state = 0;
     gen_awake_fill(&tessera.awake[tr], sd);
     gen_poly_fill(&tessera.poly[tr], sd);
+    gen_bounce_serve(&tessera.bounce[tr], sd);
 }
 /* A track still without a seed (never played, nor loaded from a project) gets a random one now. Saved projects
  * bring their own seed and material, so their music stays as it was saved */
@@ -114,10 +115,11 @@ void tessera_init(void)
         tessera.grids[i].y = 128;
         tessera.grids[i].dens = 50;
 
-        /* 6. Bounce: a slow ball at 37 degrees, no paddle; 7. Awake: lengths 8 and 7 (its own); 8. Poly: rhythms of 4 and
+        /* 6. Bounce: one slow ball at 37 degrees; 7. Awake: lengths 8 and 7 (its own); 8. Poly: rhythms of 4 and
          * 3 steps, one octave (their values: the seed's, tess_seed_apply) */
         tessera.bounce[i].speed = 24;
         tessera.bounce[i].angle = 37;
+        tessera.bounce[i].balls = 1;
         tessera.awake[i].len_a = 8;
         tessera.awake[i].len_b = 7;
         tessera.awake[i].prob = 100;
@@ -205,7 +207,7 @@ static void tess_realign(uint32_t tr)
     tess_rearm(tr);
     tessera.euclid[tr].step_idx = 0;
     tessera.grids[tr].step_idx = 0;
-    gen_bounce_serve(&tessera.bounce[tr], 0u);
+    gen_bounce_serve(&tessera.bounce[tr], tessera.seed[tr]);
     tessera.awake[tr].pos_a = tessera.awake[tr].pos_b = 0;
     tessera.poly[tr].pos = 3;                                /* (the first rhythm's hit plays step 1) */
     tessera.poly[tr].tick = 0;
@@ -704,6 +706,13 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         tessera.active_gate[tr] = 1;
         t->seq_notes[0] = (uint8_t)final_note;
         t->seq_n = 1;
+        for (uint32_t i = 0; i < out.more_n && i < 2u; i++) {   /* (Bounce: balls hitting on the same step) */
+            int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
+            m = m < 0 ? 0 : m > 127 ? 127 : m;
+            if (m == final_note) continue;
+            trk_note_on(t, (uint32_t)m, vel);
+            t->seq_notes[t->seq_n++] = (uint8_t)m;
+        }
 
         uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]);
         t->seq_off = period * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
@@ -825,8 +834,8 @@ static void tess_knob_body(uint32_t k, int32_t s)
             int32_t v = (int32_t)b->angle + s;
             b->angle = (uint8_t)(v < 0 ? 0 : v > 90 ? 90 : v);
         } else if (k == 3u) {
-            int32_t v = (int32_t)b->paddle + s * 2;
-            b->paddle = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
+            int32_t v = (int32_t)b->balls + (s > 0 ? 1 : -1);
+            b->balls = (uint8_t)(v < 1 ? 1 : v > (int32_t)GEN_BOUNCE_MAX ? (int32_t)GEN_BOUNCE_MAX : v);
         }
     } else if (mode == TESS_ENG_AWAKE) {
         tessera_awake_t *a = &tessera.awake[tr];
@@ -898,7 +907,9 @@ uint32_t tessera_sig(uint32_t tr)
     case TESS_ENG_GRIDS:  { const tessera_grids_t *a = &tessera.grids[tr];
         h ^= a->x * 31u + a->y * 7919u + a->dens * 131u + a->chaos * 977u + a->step_idx * 17u; break; }
     case TESS_ENG_BOUNCE: { const tessera_bounce_t *a = &tessera.bounce[tr];
-        h ^= a->x * 31u + a->y * 7919u + a->speed * 131u + a->angle * 977u + a->paddle * 17u + a->pad_x * 3u + a->wall * 104729u; break; }
+        h ^= a->speed * 131u + a->angle * 977u + a->balls * 17u + a->dir * 3u + a->hit * 104729u;
+        for (uint32_t i = 0; i < GEN_BOUNCE_MAX; i++) h = (h ^ a->x[i] ^ (uint32_t)a->y[i] << 8) * 16777619u;
+        break; }
     case TESS_ENG_AWAKE:  { const tessera_awake_t *a = &tessera.awake[tr];
         h ^= a->pos_a * 31u + a->pos_b * 7919u + a->len_a * 131u + a->len_b * 977u + a->prob * 17u;
         for (uint32_t i = 0; i < 8u; i++) h = (h ^ a->a[i] ^ (uint32_t)a->b[i] << 8) * 16777619u;
@@ -989,7 +1000,7 @@ static uint32_t tess_get16(const uint8_t *p) { return (uint32_t)p[0] | ((uint32_
 static uint8_t *tess_put_v4(uint8_t *o, const tessera_bounce_t *b, const tessera_awake_t *a, const tessera_poly_t *p)
 {
     uint32_t i;
-    *o++ = b->speed; *o++ = b->angle; *o++ = b->paddle;
+    *o++ = b->speed; *o++ = b->angle; *o++ = b->balls;
     *o++ = a->len_a; *o++ = a->len_b; *o++ = a->prob;
     for (i = 0; i < 8u; i++) *o++ = a->a[i];
     for (i = 0; i < 8u; i++) *o++ = a->b[i];
@@ -1067,7 +1078,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     if (v_shift < -24 || v_shift > 24 || v_drop > 100u || v_human > 100u || v_follow > TESSERA_TRACKS) return 0;
     if (v_flour < -12 || v_flour > 12 || v_visited > 7u) return 0;
     if (grd[2] > 100u || grd[3] > 100u) return 0;
-    if (bnc[0] < 1u || bnc[0] > 64u || bnc[1] > 90u || bnc[2] > 100u) return 0;
+    if (bnc[0] < 1u || bnc[0] > 64u || bnc[1] > 90u || bnc[2] < 1u || bnc[2] > GEN_BOUNCE_MAX) return 0;
     if (awk[0] < 1u || awk[0] > 16u || awk[1] < 1u || awk[1] > 16u || awk[2] > 100u) return 0;
     for (i = 0; i < 8u; i++)
         if ((awk[3 + i] & 0xFu) > 8u || awk[3 + i] >> 4 > 8u || (awk[11 + i] & 0xFu) > 7u || awk[11 + i] >> 4 > 7u) return 0;
@@ -1105,7 +1116,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     tessera.rnd[tr] = gen_stream(tessera.seed[tr]);       /* the stream from the top; the material is the block's */
     tessera.grids[tr].x = grd[0]; tessera.grids[tr].y = grd[1];
     tessera.grids[tr].dens = grd[2]; tessera.grids[tr].chaos = grd[3];
-    tessera.bounce[tr].speed = bnc[0]; tessera.bounce[tr].angle = bnc[1]; tessera.bounce[tr].paddle = bnc[2];
+    tessera.bounce[tr].speed = bnc[0]; tessera.bounce[tr].angle = bnc[1]; tessera.bounce[tr].balls = bnc[2];
     tessera.awake[tr].len_a = awk[0]; tessera.awake[tr].len_b = awk[1]; tessera.awake[tr].prob = awk[2];
     for (i = 0; i < 8u; i++) tessera.awake[tr].a[i] = awk[3 + i], tessera.awake[tr].b[i] = awk[11 + i];
     for (i = 0; i < 4u; i++) tessera.poly[tr].div[i] = pol[i];
@@ -1125,7 +1136,7 @@ static void tess_v3_track(const uint8_t *in, uint8_t *out)
     memset(&b, 0, sizeof b);
     memset(&a, 0, sizeof a);
     memset(&p, 0, sizeof p);
-    b.speed = 24, b.angle = 37;
+    b.speed = 24, b.angle = 37, b.balls = 1;
     a.len_a = 8, a.len_b = 7, a.prob = 100;
     p.div[0] = 4, p.div[1] = 3, p.span = 1;
     gen_awake_fill(&a, sd);
@@ -1240,7 +1251,7 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_GRD_DENS: return tessera.grids[tr].dens;
     case TX_BNC_SPEED: return tessera.bounce[tr].speed;
     case TX_BNC_ANGLE: return tessera.bounce[tr].angle;
-    case TX_BNC_PADDLE: return tessera.bounce[tr].paddle;
+    case TX_BNC_BALLS: return tessera.bounce[tr].balls;
     case TX_AWK_LENA: return tessera.awake[tr].len_a;
     case TX_AWK_LENB: return tessera.awake[tr].len_b;
     case TX_AWK_PROB: return tessera.awake[tr].prob;
@@ -1337,7 +1348,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_GRD_DENS: tessera.grids[tr].dens = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_GRIDS; break;
     case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); eng = TESS_ENG_BOUNCE; break;
     case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); eng = TESS_ENG_BOUNCE; break;
-    case TX_BNC_PADDLE: tessera.bounce[tr].paddle = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_BOUNCE; break;
+    case TX_BNC_BALLS: tessera.bounce[tr].balls = (uint8_t)tess_clampi(v, 1, GEN_BOUNCE_MAX); eng = TESS_ENG_BOUNCE; break;
     case TX_AWK_LENA: tessera.awake[tr].len_a = (uint8_t)tess_clampi(v, 1, 16); eng = TESS_ENG_AWAKE; break;
     case TX_AWK_LENB: tessera.awake[tr].len_b = (uint8_t)tess_clampi(v, 1, 16); eng = TESS_ENG_AWAKE; break;
     case TX_AWK_PROB: tessera.awake[tr].prob = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_AWAKE; break;

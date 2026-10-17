@@ -270,53 +270,70 @@ static uint32_t gen_sin90(uint32_t a)
     i = a / 6u, f = a % 6u;
     return (GEN_SIN90[i] * (6u - f) + GEN_SIN90[i < 15u ? i + 1u : 15u] * f) / 6u;
 }
-/* Bounce's ball back to its start: the floor's middle, going up and right; after a miss, the box's middle, going down,
- * the other way across. The paddle under it */
-static void gen_bounce_serve(gen_bounce_t *g, uint32_t miss)
+/* Bounce's balls back to their start: ball 1 the floor's middle, going up and right; each other one from a place,
+ * a direction and an angle offset (8..30 degrees, either way) of the seed's, so they never move as one */
+static void gen_bounce_serve(gen_bounce_t *g, uint32_t seed)
 {
-    g->x = 128;
-    g->y = miss ? 128 : 0;
-    g->dir = (uint8_t)(miss ? ((g->dir & 1u) ^ 1u) | 2u : 0u);
-    g->pad_x = 128;
+    uint32_t s = gen_stream(seed * 37u + 3u), k;
+    g->x[0] = 128, g->y[0] = 0, g->dir = 0, g->off[0] = 0, g->hit = 0;
+    for (k = 1; k < GEN_BOUNCE_MAX; k++) {
+        int32_t o = 8 + (int32_t)gen_rnd(&s, 23u);
+        g->x[k] = (uint8_t)(16u + gen_rnd(&s, 224u));
+        g->y[k] = (uint8_t)(16u + gen_rnd(&s, 224u));
+        g->dir |= (uint8_t)(gen_rnd(&s, 4u) << (2u * k));
+        g->off[k] = (int8_t)(gen_rnd(&s, 2u) ? o : -o);
+    }
 }
-/* The paddle's half width: PADDLE % of the floor, 8 at least */
-static uint32_t gen_bounce_half(const gen_bounce_t *g) { uint32_t h = (uint32_t)g->paddle * 128u / 100u; return h < 8u ? 8u : h; }
-/* Bounce: the ball moves SPEED at ANGLE from the floor, off the walls as a mirror. A wall hit plays its note: the wall
- * (floor 0, left 1, right 2, top 3) two scale degrees apart, where along it eight more (two octaves in all; the top's
- * accented). In a corner the floor or top wins. With a PADDLE the floor is the paddle's: it follows the ball, 16 a
- * step at most, and a ball it misses rests, and is served again from the middle */
+/* Bounce: each ball moves SPEED at its angle (ANGLE and its offset, folded into 0..90), off the walls as a mirror.
+ * A wall hit plays its note: the wall (floor 0, left 1, right 2, top 3) two scale degrees apart, where along it eight
+ * more (two octaves in all; the top's accented); a ball in a corner plays the floor's or the top's. Hits on the same
+ * step play together, three at most, the lowest wall first (a note twice: once); no random draw */
 static void gen_bounce_tick(gen_bounce_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
-    int32_t sp = g->speed ? g->speed : 1, a = g->angle > 90u ? 90 : g->angle, wall = -1, at = 0, d;
-    int32_t dx = sp * (int32_t)gen_sin90((uint32_t)(90 - a)) / 127, dy = sp * (int32_t)gen_sin90((uint32_t)a) / 127;
-    int32_t x = (int32_t)g->x + (g->dir & 1u ? -dx : dx), y = (int32_t)g->y + (g->dir & 2u ? -dy : dy);
+    int32_t sp = g->speed ? g->speed : 1;
+    uint32_t n = g->balls >= 1u && g->balls <= GEN_BOUNCE_MAX ? g->balls : 1u, k, w, got = 0;
+    uint8_t note[GEN_BOUNCE_MAX], wall[GEN_BOUNCE_MAX];
     (void)clk;
     (void)rnd;
-    if (dx && (g->dir & 1u) && x <= 0) x = -x, g->dir ^= 1u, wall = 1, at = y;   /* (reaching a wall is a hit) */
-    else if (dx && !(g->dir & 1u) && x >= 255) x = 510 - x, g->dir ^= 1u, wall = 2, at = y;
-    if (dy && (g->dir & 2u) && y <= 0) y = -y, g->dir ^= 2u, wall = 0, at = x;
-    else if (dy && !(g->dir & 2u) && y >= 255) y = 510 - y, g->dir ^= 2u, wall = 3, at = x;
-    x = x < 0 ? 0 : x > 255 ? 255 : x;
-    y = y < 0 ? 0 : y > 255 ? 255 : y;
-    if (g->paddle) {
-        d = x - (int32_t)g->pad_x;
-        g->pad_x = (uint8_t)((int32_t)g->pad_x + (d > 16 ? 16 : d < -16 ? -16 : d));
-        if (wall == 0 && (uint32_t)(x > g->pad_x ? x - g->pad_x : g->pad_x - x) > gen_bounce_half(g)) {
-            gen_bounce_serve(g, 1u);                    /* a miss: a rest, served again */
-            g->wall = 5;
-            out->cv = 0;
-            return;
+    g->hit = 0;
+    for (k = 0; k < n; k++) {
+        int32_t a = (int32_t)g->angle + g->off[k], hw = -1, at = 0;
+        uint32_t d = (g->dir >> (2u * k)) & 3u;
+        int32_t dx, dy, x, y;
+        if (a < 0) a = -a;
+        if (a > 90) a = 180 - a;
+        dx = sp * (int32_t)gen_sin90((uint32_t)(90 - a)) / 127, dy = sp * (int32_t)gen_sin90((uint32_t)a) / 127;
+        x = (int32_t)g->x[k] + (d & 1u ? -dx : dx), y = (int32_t)g->y[k] + (d & 2u ? -dy : dy);
+        if (dx && (d & 1u) && x <= 0) x = -x, d ^= 1u, hw = 1, at = y;   /* (reaching a wall is a hit) */
+        else if (dx && !(d & 1u) && x >= 255) x = 510 - x, d ^= 1u, hw = 2, at = y;
+        if (dy && (d & 2u) && y <= 0) y = -y, d ^= 2u, hw = 0, at = x;
+        else if (dy && !(d & 2u) && y >= 255) y = 510 - y, d ^= 2u, hw = 3, at = x;
+        g->x[k] = (uint8_t)(x < 0 ? 0 : x > 255 ? 255 : x);
+        g->y[k] = (uint8_t)(y < 0 ? 0 : y > 255 ? 255 : y);
+        g->dir = (uint8_t)((g->dir & ~(3u << (2u * k))) | d << (2u * k));
+        if (hw >= 0) {
+            uint32_t deg = (uint32_t)hw * 2u + (uint32_t)(at < 0 ? 0 : at > 255 ? 255 : at) * 8u / 256u, i;
+            g->hit |= (uint8_t)(1u << hw);
+            for (i = got; i > 0 && wall[i - 1u] > (uint32_t)hw; i--)   /* (in wall order, ball order within a wall) */
+                note[i] = note[i - 1u], wall[i] = wall[i - 1u];
+            note[i] = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+            wall[i] = (uint8_t)hw;
+            got++;
         }
     }
-    g->x = (uint8_t)x;
-    g->y = (uint8_t)y;
-    g->wall = (uint8_t)(wall + 1);
-    out->cv = (int16_t)(y * 32767 / 255);               /* the ball's height */
-    if (wall >= 0) {
-        uint32_t deg = (uint32_t)wall * 2u + (uint32_t)(at < 0 ? 0 : at > 255 ? 255 : at) * 8u / 256u;
-        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
-        out->vel = wall == 3 ? 115 : 100;
-        out->gate = 1;
+    out->cv = (int16_t)(g->y[0] * 32767 / 255);         /* ball 1's height */
+    for (k = 0, w = 0; k < got && w < 3u; k++) {
+        uint32_t i, dup = 0;
+        for (i = 0; i < k; i++) dup |= note[i] == note[k];
+        if (dup) continue;
+        if (!w) {
+            out->note = note[k];
+            out->vel = wall[k] == 3u ? 115 : 100;
+            out->gate = 1;
+        } else {
+            out->more[out->more_n++] = note[k];
+        }
+        w++;
     }
 }
 
@@ -494,12 +511,12 @@ static void gen_morph_save(const gen_morph_t *g, gen_sec_t *s) { s->reg = g->sna
 static void gen_morph_load(gen_morph_t *g, const gen_sec_t *s) { g->snap_a = s->reg; g->morph_pos = s->p0; }
 static void gen_grids_save(const gen_grids_t *g, gen_sec_t *s) { s->reg = (uint16_t)(g->x | g->y << 8); }
 static void gen_grids_load(gen_grids_t *g, const gen_sec_t *s) { g->x = (uint8_t)s->reg; g->y = (uint8_t)(s->reg >> 8); }
-static void gen_bounce_save(const gen_bounce_t *g, gen_sec_t *s) { s->p0 = g->angle; s->p1 = g->speed; s->reg = g->paddle; }
+static void gen_bounce_save(const gen_bounce_t *g, gen_sec_t *s) { s->p0 = g->angle; s->p1 = g->speed; s->reg = g->balls; }
 static void gen_bounce_load(gen_bounce_t *g, const gen_sec_t *s)
 {
     g->angle = s->p0 > 90u ? 90u : s->p0;
     g->speed = s->p1 < 1u ? 1u : s->p1 > 64u ? 64u : s->p1;
-    g->paddle = (uint8_t)(s->reg > 100u ? 100u : s->reg);
+    g->balls = (uint8_t)(s->reg < 1u ? 1u : s->reg > GEN_BOUNCE_MAX ? GEN_BOUNCE_MAX : s->reg);
 }
 /* Awake: its lengths here; its 32 values in the section's phrase buffer (tessera.c tess_save_sec) */
 static void gen_awake_save(const gen_awake_t *g, gen_sec_t *s) { s->p0 = g->len_a; s->p1 = g->len_b; }

@@ -785,7 +785,7 @@ static void draw_columns(void)
         uint32_t tr = song.sel;
         if (tr < TESSERA_TRACKS) {
             uint32_t m = tessera.mode[tr];
-            char v1[16], v2[16], v3[16], u2[8] = "", u3[8] = "";
+            char v1[16], v2[16], v3[16], u2[8] = "";
             if (m == TESS_ENG_OFF) {
                 draw_column(0, "MODE", "STEP", "", VAL(0u), -1, ICON_AUTO);
                 for (c = 1u; c < 4u; c++) {
@@ -842,13 +842,8 @@ static void draw_columns(void)
                 draw_column(1, "SPEED", v1, "", VAL(1u), (int32_t)(b->speed - 1u) * 1000 / 63, ICON_AUTO);
                 fmt_int(v2, b->angle);
                 draw_column(2, "ANGLE", v2, "DEG", VAL(2u), (int32_t)b->angle * 1000 / 90, ICON_AUTO);
-                if (b->paddle) {
-                    fmt_int(v3, b->paddle);
-                    str_cpy(u3, "%", sizeof u3);
-                } else {
-                    str_cpy(v3, "OFF", sizeof v3);
-                }
-                draw_column(3, "PADDLE", v3, u3, VAL(3u), (int32_t)b->paddle * 10, ICON_AUTO);
+                fmt_int(v3, b->balls);
+                draw_column(3, "BALLS", v3, "", VAL(3u), (int32_t)(b->balls - 1u) * 1000 / (GEN_BOUNCE_MAX - 1u), ICON_AUTO);
             } else if (m == TESS_ENG_AWAKE) {
                 const gen_awake_t *a = tessera_awake(tr);
                 draw_column(0, "MODE", "AWAKE", "", VAL(0u), TESS_ENG_AWAKE * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);

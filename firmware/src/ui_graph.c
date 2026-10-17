@@ -256,22 +256,21 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rect(sx, y_base + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
         }
     } else if (mode == TESS_ENG_BOUNCE) {
-        /* the box (its 256 x 256 the panel's; on the older page squeezed into a strip), the ball, the paddle on the floor (PADDLE); the wall the ball
-         * has just hit lit, a miss's floor in the accent colour */
+        /* the box (its 256 x 256 the panel's; on the older page squeezed into a strip), the balls (the first one
+         * larger), the walls hit on the last step lit */
         const gen_bounce_t *b = tessera_bounce(tr);
         int h = is_panel ? 14 : 18;
         int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 8 : y_base - 2, bh = is_panel ? 96 : h + 8;
-        int32_t bx = x0 + 2 + (int32_t)b->x * (sw - 8) / 255, by = top + bh - 6 - (int32_t)b->y * (bh - 8) / 255;
-        uint32_t w = b->wall;
-        cv_rect(x0, top, sw, w == 4u ? 2 : 1, w == 4u ? T_TEXT : dim);                 /* top */
-        cv_rect(x0, top + bh - 1, sw, w == 1u || w == 5u ? 2 : 1, w == 5u ? T_ACCENT : w == 1u ? T_TEXT : dim);   /* floor */
-        cv_rect(x0, top, w == 2u ? 2 : 1, bh, w == 2u ? T_TEXT : dim);                  /* left */
-        cv_rect(x0 + sw - (w == 3u ? 2 : 1), top, w == 3u ? 2 : 1, bh, w == 3u ? T_TEXT : dim);   /* right */
-        if (b->paddle) {
-            int32_t half = (int32_t)gen_bounce_half(b) * (sw - 4) / 256, px = x0 + 2 + (int32_t)b->pad_x * (sw - 4) / 255;
-            cv_rect(px - half, top + bh - 4, half * 2, 2, c);
+        uint32_t w = b->hit, n = b->balls >= 1u && b->balls <= GEN_BOUNCE_MAX ? b->balls : 1u;
+        cv_rect(x0, top, sw, w & 8u ? 2 : 1, w & 8u ? T_TEXT : dim);                     /* top */
+        cv_rect(x0, top + bh - (w & 1u ? 2 : 1), sw, w & 1u ? 2 : 1, w & 1u ? T_TEXT : dim);   /* floor */
+        cv_rect(x0, top, w & 2u ? 2 : 1, bh, w & 2u ? T_TEXT : dim);                     /* left */
+        cv_rect(x0 + sw - (w & 4u ? 2 : 1), top, w & 4u ? 2 : 1, bh, w & 4u ? T_TEXT : dim);   /* right */
+        for (uint32_t k = n; k-- > 0;) {
+            int32_t r = k ? 3 : 5;
+            int32_t bx = x0 + 2 + (int32_t)b->x[k] * (sw - 4 - r) / 255, by = top + bh - 2 - r - (int32_t)b->y[k] * (bh - 4 - r) / 255;
+            cv_rrect(bx, by, r, r, 1, k ? c : song.playing ? T_TEXT : c, bg);
         }
-        cv_rrect(bx, by, 4, 4, 1, song.playing ? T_TEXT : c, bg);
     } else if (mode == TESS_ENG_AWAKE) {
         /* loop A over loop B, 16 cells each: a value a bar its height (A: 1..8, B: 0..7), a rest a dash; past the loop's
          * length dim; the step playing lit */

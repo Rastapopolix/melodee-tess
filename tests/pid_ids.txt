@@ -150,7 +150,7 @@
 0x21a GRIDS DENSITY            track 0..100 def 50
 0x21b BOUNCE SPEED             track 1..64 def 24
 0x21c BOUNCE ANGLE             track 0..90 def 37
-0x21d BOUNCE PADDLE            track 0..100 def 0
+0x21d BOUNCE BALLS             track 1..4 def 1
 0x21e AWAKE LENGTH A           track 1..16 def 8
 0x21f AWAKE LENGTH B           track 1..16 def 7
 0x220 AWAKE PROB               track 0..100 def 100

@@ -168,7 +168,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x21A | GRIDS DENSITY | 0 to 100 % | 50 | How full the kick, snare and hat are: 0 silent, 100 every hit the map offers. |
 | 0x21B | BOUNCE SPEED | 1 to 64 | 24 | How far the ball travels each step: faster, more wall hits, more notes. |
 | 0x21C | BOUNCE ANGLE | 0 to 90 | 37 | The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle between draws a longer loop. EVOLVE nudges it. |
-| 0x21D | BOUNCE PADDLE | 0 to 100 % | 0 | OFF: no paddle. On: a paddle on the floor this wide follows the ball; a ball it misses rests and is served again (Pong). |
+| 0x21D | BOUNCE BALLS | 1 to 4 | 1 | How many balls: each one more starts from a place and an angle of its own, so they cross; balls hitting on the same step play together, three notes at most. |
 | 0x21E | AWAKE LENGTH A | 1 to 16 | 8 | Steps in loop A, the melody (its values are degrees of the scale, some rests; ROLL draws them, EVOLVE changes a few). |
 | 0x21F | AWAKE LENGTH B | 1 to 16 | 7 | Steps in loop B, which moves the melody up the scale; a length other than A's shifts it against A, a longer pattern from two short ones. |
 | 0x220 | AWAKE PROB | 0 to 100 % | 100 | The chance each of A's notes plays: 100 every one, lower leaves gaps. |
@@ -245,6 +245,6 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | G X | the generator's step | Grids' X: across its map of drum patterns |
 | G Y | the generator's step | Grids' Y: down its map of drum patterns |
 | G DENS | the generator's step | Grids' density: how full its parts are |
-| B SPEED | the generator's step | Bounce's speed: how far the ball moves a step |
-| B ANGLE | the generator's step | Bounce's angle: the ball's path |
+| B SPEED | the generator's step | Bounce's speed: how far the balls move a step |
+| B ANGLE | the generator's step | Bounce's angle: the balls' paths |
 | A PROB | the generator's step | Awake's PROB: the chance a note plays |

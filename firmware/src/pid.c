@@ -44,7 +44,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_DENS] = PD("DENS", F_PCT, 0, 100, 50),
     [TX_BNC_SPEED] = PD("SPEED", F_INT, 1, 64, 24),
     [TX_BNC_ANGLE] = PD("ANGLE", F_INT, 0, 90, 37),
-    [TX_BNC_PADDLE] = PD("PADDLE", F_PCT, 0, 100, 0),
+    [TX_BNC_BALLS] = PD("BALLS", F_INT, 1, 4, 1),
     [TX_AWK_LENA] = PD("LEN A", F_INT, 1, 16, 8),
     [TX_AWK_LENB] = PD("LEN B", F_INT, 1, 16, 7),
     [TX_AWK_PROB] = PD("PROB", F_PCT, 0, 100, 100),
@@ -255,8 +255,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_BNC_SPEED, "BOUNCE SPEED", "How far the ball travels each step: faster, more wall hits, more notes."),
     X_(TX_BNC_ANGLE, "BOUNCE ANGLE", "The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle "
                                      "between draws a longer loop. EVOLVE nudges it."),
-    X_(TX_BNC_PADDLE, "BOUNCE PADDLE", "OFF: no paddle. On: a paddle on the floor this wide follows the ball; a ball it "
-                                       "misses rests and is served again (Pong)."),
+    X_(TX_BNC_BALLS, "BOUNCE BALLS", "How many balls: each one more starts from a place and an angle of its own, so they "
+                                     "cross; balls hitting on the same step play together, three notes at most."),
     X_(TX_AWK_LENA, "AWAKE LENGTH A", "Steps in loop A, the melody (its values are degrees of the scale, some rests; "
                                       "ROLL draws them, EVOLVE changes a few)."),
     X_(TX_AWK_LENB, "AWAKE LENGTH B", "Steps in loop B, which moves the melody up the scale; a length other than A's "
