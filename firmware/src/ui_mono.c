@@ -294,6 +294,12 @@ static int mo_fit(char *d, const char *s)
  * inverted block; -1 none), the text, the kind */
 enum { MV_DIAL, MV_BOX, MV_KEY, MV_INV };
 static struct { int16_t fx0, fx1, tx0, tx1; uint8_t kind, cut, used; char s[8]; } mo_vals[4];
+static uint8_t mo_flash_col, mo_flash_t;               /* a one-shot knob's value inverted a moment (CLEAR) */
+static void mo_flash(uint32_t c)
+{
+    mo_flash_col = (uint8_t)c;
+    mo_flash_t = 13;                                    /* frames: about 200 ms */
+}
 static uint8_t mo_vals_new;                             /* mo_cols drew them since the lint last looked */
 #define MO_BOX_W 27                                     /* a boxed value's outline: 4 characters and a clear cell each side */
 static void mo_cols(void)
@@ -337,7 +343,11 @@ static void mo_cols(void)
         ty = mo_col[i].ratio >= 0 && mo_col[i].val[0] != '[' ? 39 : 25;
         if (mo_col[i].ratio >= 0 && mo_col[i].val[0] != '[')
             mo_dial(cx, 28, 7, mo_col[i].ratio, ink);
-        if (kind[i] == MV_KEY) {
+        if (mo_flash_t && i == mo_flash_col && (kind[i] == MV_BOX || kind[i] == MV_KEY)) {   /* it acted: inverted */
+            fx0 = cx - MO_BOX_W / 2, fx1 = cx + MO_BOX_W / 2;
+            mo_fill(fx0, 21, MO_BOX_W, 15, MO_INK);
+            mo_text(v[i], tx, ty, MO_BG);
+        } else if (kind[i] == MV_KEY) {
             fx0 = cx - MO_BOX_W / 2, fx1 = cx + MO_BOX_W / 2;
             mo_fill(fx0, 21, MO_BOX_W, 15, ink);
             mo_text(v[i], tx, ty, MO_BG);
@@ -644,7 +654,9 @@ static void mono_page(void)
     mo_on = 1;
     draw_columns();                                     /* (its draw_column calls land in mo_capture) */
     mo_on = 0;
-    sig = mo_signature();
+    if (mo_flash_t)
+        mo_flash_t--;
+    sig = mo_signature() ^ (mo_flash_t ? 0x5A5A5A5Au : 0u);
     if (!ui.force && sig == mo_sig)
         return;
     mo_sig = sig;

@@ -483,6 +483,13 @@ static int test_gen_family(void)
     bad += check("no FEEL page: PATTERN's DIV SWING GATE are reachable again", n == 0);
     go_title("EVOLVE");
     bad += check("GEN's pages are not step pages: the keys play, they write no step", !song.seq_mode);
+    go_title("FORM");                             /* CLEAR says what it did, or why it did nothing */
+    tessera.evolve[song.sel].form = 0;
+    turn(EN_K1 + 2u, 1);
+    bad += check("FORM: CLEAR with FORM off says FORM OFF", ui.msg_t && str_eq(ui.msg, "FORM OFF"));
+    turn(EN_K1, 1);
+    turn(EN_K1 + 2u, 1);
+    bad += check("FORM: CLEAR with a form says CLEARED", tessera.evolve[song.sel].form && ui.msg_t && str_eq(ui.msg, "CLEARED"));
     return bad;
 }
 

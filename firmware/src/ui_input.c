@@ -806,6 +806,12 @@ static void edit_param(uint32_t slot, int32_t steps)
     }
     if (pg->graph == GR_FORM) {
         tessera_form_knob(slot, steps);
+        if (slot == 2u && song.sel < TESSERA_TRACKS) {   /* CLEAR: say it acted, or why not */
+            ui_message(tessera.evolve[song.sel].form ? "CLEARED" : "FORM OFF");
+#if MELODEE_LOOK
+            mo_flash(2u);
+#endif
+        }
         ui.force = 1;
         return;
     }
