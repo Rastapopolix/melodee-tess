@@ -343,6 +343,7 @@ static void page_entered(void)
     seq_midi_reset();
     ui.hot_t = 0;                                /* clear the previous page's emphasis */
     ui.act = 0;
+    if (song.sel < TESSERA_TRACKS) tessera_awake_select(song.sel, 0u, 16u);   /* (AWAKE's step picked: let go) */
     ui.proj_new = 0;
     ui.ptc_on = 0;
     if (pg->graph == GR_BROWSE) {                /* (OCT- goes back to the sound from before: its loads, a level */

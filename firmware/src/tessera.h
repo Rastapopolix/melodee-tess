@@ -153,6 +153,8 @@ const gen_morph_t *tessera_morph(uint32_t tr);
 const gen_grids_t *tessera_grids(uint32_t tr);
 const gen_bounce_t *tessera_bounce(uint32_t tr);
 const gen_awake_t *tessera_awake(uint32_t tr);
+void tessera_awake_select(uint32_t tr, uint32_t row, uint32_t step);   /* the step KNOB 1 sets (row 0 A, 1 B; the same
+                                                                     * again, or step 16: none) */
 const gen_poly_t *tessera_poly(uint32_t tr);
 
 #endif

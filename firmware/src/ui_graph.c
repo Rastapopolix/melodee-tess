@@ -272,8 +272,8 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rrect(bx, by, r, r, 1, k ? c : song.playing ? T_TEXT : c, bg);
         }
     } else if (mode == TESS_ENG_AWAKE) {
-        /* loop A over loop B, 16 cells each: a value a bar its height (A: 1..8, B: 0..7), a rest a dash; past the loop's
-         * length dim; the step playing lit */
+        /* loop A (the notes) over loop B (their lift), 16 cells each: a value a bar its height (A: 1..8, B: 0..7), a rest
+         * a dash; past the loop's length dim; the steps playing lit; the step the keys picked framed */
         const gen_awake_t *a = tessera_awake(tr);
         int32_t ha = is_panel ? 44 : 12, hb = is_panel ? 28 : 6, ya = is_panel ? 10 : y_base, yb = ya + ha + (is_panel ? 14 : 4);
         uint32_t la = a->len_a ? a->len_a : 1u, lb = a->len_b ? a->len_b : 1u;
@@ -289,6 +289,11 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             if (i >= lb) cv_rect(sx, yb + hb - 1, step_w, 1, dim);
             else if (!vb) cv_rect(sx, yb + hb - 2, step_w, 2, hb_on ? T_TEXT : dim);
             else cv_rrect(sx, yb + hb - (int32_t)vb * hb / 7, step_w, (int32_t)vb * hb / 7, 1, hb_on ? T_TEXT : T_MID, bg);
+            if (a->edit && (a->edit & 15u) == i) {         /* the step picked (ui_awake.c): framed */
+                int32_t fy = (a->edit & 0x10u) ? yb : ya, fh = (a->edit & 0x10u) ? hb : ha;
+                cv_rect(sx - 1, fy - 2, step_w + 2, 1, T_TEXT);
+                cv_rect(sx - 1, fy + fh + 1, step_w + 2, 1, T_TEXT);
+            }
         }
     } else if (mode == TESS_ENG_POLY) {
         /* the four rhythms, a lane each: its divider, then the 16 steps of the bar's window, a tick where it lands, the

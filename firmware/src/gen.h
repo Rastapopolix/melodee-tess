@@ -71,13 +71,15 @@ typedef struct {
     int8_t   off[GEN_BOUNCE_MAX];   /* each ball's angle from ANGLE (ball 1: 0) */
 } gen_bounce_t;
 
-/* 7. Awake (norns, tehn): two looping sequences of their own lengths, added: A's value a scale degree (0 a rest), B's
- * a transposition; PROB the chance a step plays. The values come from the seed (ROLL) */
+/* 7. Awake (norns, tehn): two looping sequences of their own lengths: A (upper) plays, its value a scale degree (0 a
+ * rest); B (lower) transposes A by its value. PROB the chance a step plays. The values come from the seed (ROLL) and
+ * the step keys (GEN's step entry, ui_awake.c) */
 typedef struct {
     uint8_t  len_a, len_b; /* 1..16 */
     uint8_t  prob;        /* 0..100 */
     uint8_t  pos_a, pos_b; /* the steps playing */
     uint8_t  a[8], b[8];  /* 16 values each, 4 bits (low nibble first): A 0..8, B 0..7 */
+    uint8_t  edit;        /* the step the keys picked (GEN's KNOB 1 sets it): 0 none, else 0x20 | row B 0x10 | step */
 } gen_awake_t;
 
 /* 8. Poly (EuroPi's Polyrhythmic Sequencer, after the Subharmonicon): four rhythms, each a clock divider, advance a

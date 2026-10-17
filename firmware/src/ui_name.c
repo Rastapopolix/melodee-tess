@@ -56,8 +56,9 @@ static void name_close(void)
         ui.force = 1;
     nm.kind = NK_NONE; ui.name_active = 0;
 }
-/* the keys: 2 = NAME's (silent), 1 = the DRUM grid, 0 = notes (seq.c keyboard_block reads song.grid) */
-static uint32_t keys_mode(void) { return name_on() ? 2u : designer_on() ? 0u : (uint32_t)grid_on(); }
+/* the keys: 2 = NAME's or AWAKE's (silent), 1 = the DRUM grid, 0 = notes (seq.c keyboard_block reads song.grid) */
+static uint32_t keys_mode(void) { return name_on() || awake_entry_on() ? 2u : designer_on() ? 0u : (uint32_t)grid_on(); }   /* (AWAKE's
+                                                         * step entry, ui_awake.c: silent too) */
 
 static const char *nm_group(uint32_t p)                /* white key place p's characters */
 {

@@ -51,6 +51,12 @@ static void help_find(uint32_t k)
     } else if (pg->graph == GR_STEPS && pg->fam == FAM_GEN && tr < TESSERA_TRACKS && (k == 0u || tessera.mode[tr] != TESS_ENG_OFF))
     {
         x = k == 0u ? (uint32_t)TX_MODE : ENG[tessera.mode[tr] % TESS_ENG_COUNT][k - 1u];
+        if (tessera.mode[tr] == TESS_ENG_AWAKE && k == 0u && tessera_awake(tr)->edit) {   /* (a step picked) */
+            help.name = "AWAKE STEP";
+            help.text = "The step picked with a key (black key 9 held: B's): A a rest or a degree of the scale, 1 to 8; B "
+                        "lifts A by 0 to 7 degrees. The same key again lets the step go.";
+            return;
+        }
         if (tessera.mode[tr] == TESS_ENG_POLY && k == 1u) {   /* (RHY: the page's choice, no setting of its own) */
             help.name = "POLY RHY";
             help.text = "Which of the four rhythms DIV sets.";
