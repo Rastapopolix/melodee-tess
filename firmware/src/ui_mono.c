@@ -531,18 +531,38 @@ static void mo_pic_grids(const gen_grids_t *g, const track_t *t)
         }
     }
 }
+/* Markov (as the detailed picture, ui_graph.c): the eight degrees, each bar the chance it comes next from the one
+ * playing (gen_markov_row, so TENSION reshapes them); the one playing solid on a solid underline, a rest hollow on a
+ * dashed one; the others outlined */
 static void mo_pic_markov(const gen_markov_t *g)
 {
-    uint32_t d;
+    uint8_t row[8];
+    uint32_t d, cur = g->cur_state & 7u, prev = 0;
     char b[16];
-    for (d = 0; d < 8u; d++) {                          /* the scale degrees, the one playing filled */
-        int32_t h = 8 + (int32_t)d * 5, x = 6 + (int32_t)d * 14;
-        if (d == g->cur_state % 8u) mo_fill(x, 98 - h, 10, h, MO_INK);
-        else mo_box(x, 98 - h, 10, h, MO_DIM);
+    gen_markov_row(g->tension, cur, row);
+    for (d = 0; d < 8u; d++) {
+        uint32_t pr = row[d] > prev ? row[d] - prev : 0u;   /* (the row is cumulative) */
+        int32_t h, x = 5 + (int32_t)d * 14;
+        prev = row[d];
+        pr = pr > 40u ? 40u : pr;
+        h = 3 + (int32_t)(pr * 37u / 40u);
+        if (d == cur && g->last_hit) {
+            mo_fill(x, 95 - h, 10, h, MO_INK);
+            mo_fill(x, 97, 10, 2, MO_INK);
+        } else if (d == cur) {
+            mo_box(x, 95 - h, 10, h, MO_INK);
+            mo_dash(x, 98, 10, MO_INK);
+        } else {
+            mo_box(x, 95 - h, 10, h, MO_INK);
+            mo_hl(x, 97, 10, MO_DIM);
+        }
     }
     str_cpy(b, "DEGREE ", sizeof b);
-    fmt_int(b + 7, g->cur_state % 8u + 1u);
+    fmt_int(b + 7, cur + 1u);
     mo_text(b, 1, 101, MO_DIM);
+    str_cpy(b, "LEAP ", sizeof b);                      /* (KNOB 2: the tension) */
+    fmt_int(b + 5, g->tension);
+    mo_textr(b, 118, 101, MO_DIM);
 }
 static void mo_pic_morph(const gen_morph_t *g)
 {
@@ -639,6 +659,7 @@ static uint32_t mo_signature(void)
         h = (h ^ tessera.mode[song.sel] ^ (uint32_t)tessera.euclid[song.sel].step_idx << 8 ^
              (uint32_t)tessera.grids[song.sel].step_idx << 16 ^ (uint32_t)tessera.turing[song.sel].reg << 24) * 16777619u;
         h = (h ^ tessera.morph[song.sel].step_idx ^ (uint32_t)tessera.markov[song.sel].cur_state << 8) * 16777619u;
+        h = (h ^ tessera.markov[song.sel].last_hit ^ (uint32_t)tessera.markov[song.sel].tension << 8) * 16777619u;
     }
     if (cur_page()->graph == GR_LFO)                    /* the LFO's dot: 58 places a cycle */
         h = (h ^ (t->lfo_ph / (0xFFFFFFFFu / 58u))) * 16777619u;
