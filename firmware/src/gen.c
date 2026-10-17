@@ -81,6 +81,32 @@ static void gen_markov_row(uint8_t tens, uint32_t s, uint8_t out[8])
     }
 }
 
+/* Awake's values: A's i-th (0 a rest, 1..8 a degree), B's (0..7); set */
+static uint32_t gen_awake_a(const gen_awake_t *g, uint32_t i) { return (g->a[(i >> 1) & 7u] >> ((i & 1u) * 4u)) & 0xFu; }
+static uint32_t gen_awake_b(const gen_awake_t *g, uint32_t i) { return (g->b[(i >> 1) & 7u] >> ((i & 1u) * 4u)) & 0xFu; }
+static void gen_awake_put(uint8_t *v, uint32_t i, uint32_t x)
+{
+    uint32_t sh = (i & 1u) * 4u;
+    v[(i >> 1) & 7u] = (uint8_t)((v[(i >> 1) & 7u] & ~(0xFu << sh)) | ((x & 0xFu) << sh));
+}
+/* Awake's 32 values from a seed (ROLL; a track's first): A a melody with rests (about one in four), B mostly 0, now and
+ * then a step up the scale, as Awake's own defaults are */
+static void gen_awake_fill(gen_awake_t *g, uint32_t seed)
+{
+    uint32_t s = gen_stream(seed * 13u + 5u), i;
+    for (i = 0; i < 16u; i++) {
+        gen_awake_put(g->a, i, gen_rnd(&s, 4u) ? 1u + gen_rnd(&s, 8u) : 0u);
+        gen_awake_put(g->b, i, gen_rnd(&s, 4u) ? 0u : gen_rnd(&s, 6u));
+    }
+}
+/* Poly's four pitches from a seed (ROLL; a track's first), over SPAN octaves */
+static void gen_poly_fill(gen_poly_t *g, uint32_t seed)
+{
+    uint32_t s = gen_stream(seed * 29u + 11u), i, n = 7u * (g->span == 2u ? 2u : 1u);
+    for (i = 0; i < 4u; i++)
+        g->pitch[i] = (uint8_t)gen_rnd(&s, n);
+}
+
 /* ------------------------------------------------------------------ the generators, one step each --- */
 /* Each fills only what it plays: out arrives as {gate 0, note 60, vel 100, cv 0} (tessera.c), which a rest
  * keeps, so LOCK's recording sees exactly what it did before phase 1. The CV (the cords' source CV, Q15 0..32767)
@@ -235,6 +261,122 @@ static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd
     out->gate = out->parts != 0;
 }
 
+/* Bounce: sin of 0..90 degrees, x 127 (every 6 degrees, the rest between) */
+static const uint8_t GEN_SIN90[16] = {0, 13, 26, 39, 52, 64, 75, 85, 94, 103, 110, 116, 121, 124, 126, 127};
+static uint32_t gen_sin90(uint32_t a)
+{
+    uint32_t i, f;
+    a = a > 90u ? 90u : a;
+    i = a / 6u, f = a % 6u;
+    return (GEN_SIN90[i] * (6u - f) + GEN_SIN90[i < 15u ? i + 1u : 15u] * f) / 6u;
+}
+/* Bounce's balls back to their start: ball 1 the floor's middle, going up and right; each other one from a place,
+ * a direction and an angle offset (8..30 degrees, either way) of the seed's, so they never move as one */
+static void gen_bounce_serve(gen_bounce_t *g, uint32_t seed)
+{
+    uint32_t s = gen_stream(seed * 37u + 3u), k;
+    g->x[0] = 128, g->y[0] = 0, g->dir = 0, g->off[0] = 0, g->hit = 0;
+    for (k = 1; k < GEN_BOUNCE_MAX; k++) {
+        int32_t o = 8 + (int32_t)gen_rnd(&s, 23u);
+        g->x[k] = (uint8_t)(16u + gen_rnd(&s, 224u));
+        g->y[k] = (uint8_t)(16u + gen_rnd(&s, 224u));
+        g->dir |= (uint8_t)(gen_rnd(&s, 4u) << (2u * k));
+        g->off[k] = (int8_t)(gen_rnd(&s, 2u) ? o : -o);
+    }
+}
+/* Bounce: each ball moves SPEED at its angle (ANGLE and its offset, folded into 0..90), off the walls as a mirror.
+ * A wall hit plays its note: the wall (floor 0, left 1, right 2, top 3) two scale degrees apart, where along it eight
+ * more (two octaves in all; the top's accented); a ball in a corner plays the floor's or the top's. Hits on the same
+ * step play together, three at most, the lowest wall first (a note twice: once); no random draw */
+static void gen_bounce_tick(gen_bounce_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    int32_t sp = g->speed ? g->speed : 1;
+    uint32_t n = g->balls >= 1u && g->balls <= GEN_BOUNCE_MAX ? g->balls : 1u, k, w, got = 0;
+    uint8_t note[GEN_BOUNCE_MAX], wall[GEN_BOUNCE_MAX];
+    (void)clk;
+    (void)rnd;
+    g->hit = 0;
+    for (k = 0; k < n; k++) {
+        int32_t a = (int32_t)g->angle + g->off[k], hw = -1, at = 0;
+        uint32_t d = (g->dir >> (2u * k)) & 3u;
+        int32_t dx, dy, x, y;
+        if (a < 0) a = -a;
+        if (a > 90) a = 180 - a;
+        dx = sp * (int32_t)gen_sin90((uint32_t)(90 - a)) / 127, dy = sp * (int32_t)gen_sin90((uint32_t)a) / 127;
+        x = (int32_t)g->x[k] + (d & 1u ? -dx : dx), y = (int32_t)g->y[k] + (d & 2u ? -dy : dy);
+        if (dx && (d & 1u) && x <= 0) x = -x, d ^= 1u, hw = 1, at = y;   /* (reaching a wall is a hit) */
+        else if (dx && !(d & 1u) && x >= 255) x = 510 - x, d ^= 1u, hw = 2, at = y;
+        if (dy && (d & 2u) && y <= 0) y = -y, d ^= 2u, hw = 0, at = x;
+        else if (dy && !(d & 2u) && y >= 255) y = 510 - y, d ^= 2u, hw = 3, at = x;
+        g->x[k] = (uint8_t)(x < 0 ? 0 : x > 255 ? 255 : x);
+        g->y[k] = (uint8_t)(y < 0 ? 0 : y > 255 ? 255 : y);
+        g->dir = (uint8_t)((g->dir & ~(3u << (2u * k))) | d << (2u * k));
+        if (hw >= 0) {
+            uint32_t deg = (uint32_t)hw * 2u + (uint32_t)(at < 0 ? 0 : at > 255 ? 255 : at) * 8u / 256u, i;
+            g->hit |= (uint8_t)(1u << hw);
+            for (i = got; i > 0 && wall[i - 1u] > (uint32_t)hw; i--)   /* (in wall order, ball order within a wall) */
+                note[i] = note[i - 1u], wall[i] = wall[i - 1u];
+            note[i] = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+            wall[i] = (uint8_t)hw;
+            got++;
+        }
+    }
+    out->cv = (int16_t)(g->y[0] * 32767 / 255);         /* ball 1's height */
+    for (k = 0, w = 0; k < got && w < 3u; k++) {
+        uint32_t i, dup = 0;
+        for (i = 0; i < k; i++) dup |= note[i] == note[k];
+        if (dup) continue;
+        if (!w) {
+            out->note = note[k];
+            out->vel = wall[k] == 3u ? 115 : 100;
+            out->gate = 1;
+        } else {
+            out->more[out->more_n++] = note[k];
+        }
+        w++;
+    }
+}
+
+/* Awake: A's step and B's, each on its own loop: A's value a scale degree (0 a rest), B's added to it, two octaves in
+ * all; PROB the chance a step plays (a draw only below 100). The CV is A's value */
+static void gen_awake_tick(gen_awake_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    uint32_t la = g->len_a >= 1u && g->len_a <= 16u ? g->len_a : 16u, lb = g->len_b >= 1u && g->len_b <= 16u ? g->len_b : 16u;
+    uint32_t a = gen_awake_a(g, g->pos_a % la), b = gen_awake_b(g, g->pos_b % lb);
+    (void)clk;
+    g->pos_a = (uint8_t)((g->pos_a % la + 1u) % la);
+    g->pos_b = (uint8_t)((g->pos_b % lb + 1u) % lb);
+    out->cv = (int16_t)((a > 8u ? 8u : a) * 32767u / 8u);
+    if (a && (g->prob >= 100u || gen_rnd(rnd, 100u) < g->prob)) {
+        uint32_t deg = a - 1u + (b > 7u ? 7u : b);
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = 100;
+        out->gate = 1;
+    }
+}
+
+/* Poly: the rhythms that land on this step (its count a multiple of their divider) advance the sequence a step and play
+ * it, louder for each one more that lands with it; no draw. The CV: the step, a ramp over the four */
+#define GEN_POLY_WRAP 720720u                           /* (every divider 1..16 divides it: the count wraps unheard) */
+static void gen_poly_tick(gen_poly_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    uint32_t i, n = 0;
+    (void)clk;
+    (void)rnd;
+    for (i = 0; i < 4u; i++)
+        n += g->div[i] && g->div[i] <= 16u && g->tick % g->div[i] == 0u;
+    g->tick = (g->tick + 1u) % GEN_POLY_WRAP;
+    if (n) {
+        uint32_t deg;
+        g->pos = (uint8_t)((g->pos + 1u) & 3u);
+        deg = g->pitch[g->pos] > 13u ? 13u : g->pitch[g->pos];
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = (uint8_t)(88u + 13u * (n - 1u));
+        out->gate = 1;
+    }
+    out->cv = (int16_t)((g->pos & 3u) * 32767u / 3u);
+}
+
 /* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
@@ -314,6 +456,45 @@ static void gen_grids_mutate(gen_grids_t *g, uint32_t amt, uint32_t *rnd)
     g->y = gen_grids_walk(g->y, amt, rnd);
 }
 
+/* Bounce: the angle nudged by up to +-AMOUNT/100 of 15 degrees (one at least), turning back at 0 and 90 */
+static void gen_bounce_mutate(gen_bounce_t *g, uint32_t amt, uint32_t *rnd)
+{
+    int32_t r = (int32_t)(amt * 15u / 100u) + 1, v = (int32_t)g->angle + (int32_t)gen_rnd(rnd, (uint32_t)(2 * r + 1)) - r;
+    if (v < 0) v = -v;
+    if (v > 90) v = 180 - v;
+    g->angle = (uint8_t)(v < 0 ? 0 : v > 90 ? 90 : v);
+}
+
+/* Awake: 1 + AMOUNT/200 of A's loop's values drawn again (a rest one in four), at AMOUNT % one of B's too */
+static void gen_awake_mutate(gen_awake_t *g, uint32_t amt, uint32_t *rnd)
+{
+    uint32_t la = g->len_a >= 1u && g->len_a <= 16u ? g->len_a : 16u, lb = g->len_b >= 1u && g->len_b <= 16u ? g->len_b : 16u;
+    uint32_t n = 1u + amt * la / 200u;
+    if (!amt) return;
+    while (n--) {
+        uint32_t i = gen_rnd(rnd, la);
+        gen_awake_put(g->a, i, gen_rnd(rnd, 4u) ? 1u + gen_rnd(rnd, 8u) : 0u);
+    }
+    if (gen_rnd(rnd, 100u) < amt) {
+        uint32_t i = gen_rnd(rnd, lb);
+        gen_awake_put(g->b, i, gen_rnd(rnd, 6u));
+    }
+}
+
+/* Poly: each pitch at AMOUNT % moves a degree or two, turning back at the span's ends; the rhythms stay */
+static void gen_poly_mutate(gen_poly_t *g, uint32_t amt, uint32_t *rnd)
+{
+    int32_t top = 7 * (g->span == 2u ? 2 : 1) - 1;
+    for (uint32_t i = 0; i < 4u; i++) {
+        int32_t v;
+        if (gen_rnd(rnd, 100u) >= amt) continue;
+        v = (int32_t)g->pitch[i] + (int32_t)(1u + gen_rnd(rnd, 2u)) * (gen_rnd(rnd, 2u) ? 1 : -1);
+        if (v < 0) v = -v;
+        if (v > top) v = 2 * top - v;
+        g->pitch[i] = (uint8_t)(v < 0 ? 0 : v > top ? top : v);
+    }
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -330,3 +511,30 @@ static void gen_morph_save(const gen_morph_t *g, gen_sec_t *s) { s->reg = g->sna
 static void gen_morph_load(gen_morph_t *g, const gen_sec_t *s) { g->snap_a = s->reg; g->morph_pos = s->p0; }
 static void gen_grids_save(const gen_grids_t *g, gen_sec_t *s) { s->reg = (uint16_t)(g->x | g->y << 8); }
 static void gen_grids_load(gen_grids_t *g, const gen_sec_t *s) { g->x = (uint8_t)s->reg; g->y = (uint8_t)(s->reg >> 8); }
+static void gen_bounce_save(const gen_bounce_t *g, gen_sec_t *s) { s->p0 = g->angle; s->p1 = g->speed; s->reg = g->balls; }
+static void gen_bounce_load(gen_bounce_t *g, const gen_sec_t *s)
+{
+    g->angle = s->p0 > 90u ? 90u : s->p0;
+    g->speed = s->p1 < 1u ? 1u : s->p1 > 64u ? 64u : s->p1;
+    g->balls = (uint8_t)(s->reg < 1u ? 1u : s->reg > GEN_BOUNCE_MAX ? GEN_BOUNCE_MAX : s->reg);
+}
+/* Awake: its lengths here; its 32 values in the section's phrase buffer (tessera.c tess_save_sec) */
+static void gen_awake_save(const gen_awake_t *g, gen_sec_t *s) { s->p0 = g->len_a; s->p1 = g->len_b; }
+static void gen_awake_load(gen_awake_t *g, const gen_sec_t *s)
+{
+    g->len_a = s->p0 < 1u ? 1u : s->p0 > 16u ? 16u : s->p0;
+    g->len_b = s->p1 < 1u ? 1u : s->p1 > 16u ? 16u : s->p1;
+}
+static void gen_poly_save(const gen_poly_t *g, gen_sec_t *s)
+{
+    s->reg = (uint16_t)(g->pitch[0] | g->pitch[1] << 4 | g->pitch[2] << 8 | g->pitch[3] << 12);
+    s->p0 = g->span;
+}
+static void gen_poly_load(gen_poly_t *g, const gen_sec_t *s)
+{
+    for (uint32_t i = 0; i < 4u; i++) {
+        uint32_t v = (s->reg >> (i * 4u)) & 0xFu;
+        g->pitch[i] = (uint8_t)(v > 13u ? 13u : v);
+    }
+    g->span = s->p0 == 2u ? 2u : 1u;
+}

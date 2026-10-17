@@ -202,9 +202,9 @@ static void ui_leds(void)
     k = oct_leds();
     led_put(nl, panel.btn[B_OCTDN], (int)(k & 1u));
     led_put(nl, panel.btn[B_OCTUP], (int)(k >> 1));
-    play = !pattern_keys_on() && !(name_on() && !ui.menu) && !ui.layer && !grid_on();
+    play = !pattern_keys_on() && !(name_on() && !ui.menu) && !ui.layer && !grid_on() && !awake_entry_on();
     c = pattern_keys_on() ? pattern_leds(&pdim, &pbr) : name_on() && !ui.menu ? name_leds() : ui.layer ? layer_leds() :
-        grid_on() ? grid_leds() : fm1_in.notes & ~kb_layer;   /* the patterns, NAME's keys, the map, the grid, the keys held */
+        grid_on() ? grid_leds() : awake_entry_on() ? awake_leds() : fm1_in.notes & ~kb_layer;   /* the patterns, NAME's keys, the map, the grid, the keys held */
 #if MELODEE_SLICE
     if (!ui.layer && !ui.menu && !name_on() && slice_page_on())
         c |= slice_leds();                              /* SLICES: and the keys of the selected slice */
@@ -2045,6 +2045,9 @@ static void ui_input(void)
 #endif
     pattern_keys(bank_notes);
     if (pattern_keys_on() || ui.pat_key) {
+        seq_midi_events(0);
+    } else if (awake_entry_on()) {                     /* AWAKE's steps (ui_awake.c) */
+        awake_keys(notes);
         seq_midi_events(0);
     } else if (song.grid) {
         if (!seq_erase_active(TSEL)) grid_keys(notes);

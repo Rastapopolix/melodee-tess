@@ -19,7 +19,8 @@ static void help_find(uint32_t k)
     static const uint8_t TW[4] = {TX_TW_SHIFT, TX_TW_DROP, TX_TW_HUMAN, TX_TW_FOLLOW};
     static const uint8_t ENG[TESS_ENG_COUNT][3] = {{0xFF, 0xFF, 0xFF}, {TX_TUR_LEN, TX_TUR_PROB, TX_TUR_SPAN},
         {TX_EUC_STEPS, TX_EUC_PULSES, TX_EUC_ROT}, {TX_MKV_LEAP, TX_MKV_DENS, TX_MKV_SPAN}, {TX_MRP_POS, TX_MRP_SNPA, TX_MRP_SNPB},
-        {TX_GRD_X, TX_GRD_Y, TX_GRD_DENS}};
+        {TX_GRD_X, TX_GRD_Y, TX_GRD_DENS}, {TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_BALLS},
+        {TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB}, {0xFF, TX_POL_DIV1, TX_POL_SPAN}};
     static const char *const CORD_TEXT[4] = {
         "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
         "or CV, or DRIFT, a slow wander. -- leaves the mod a fixed move.",
@@ -48,7 +49,21 @@ static void help_find(uint32_t k)
             return;
         }
     } else if (pg->graph == GR_STEPS && pg->fam == FAM_GEN && tr < TESSERA_TRACKS && (k == 0u || tessera.mode[tr] != TESS_ENG_OFF))
+    {
         x = k == 0u ? (uint32_t)TX_MODE : ENG[tessera.mode[tr] % TESS_ENG_COUNT][k - 1u];
+        if (tessera.mode[tr] == TESS_ENG_AWAKE && k == 0u && tessera_awake(tr)->edit) {   /* (a step picked) */
+            help.name = "AWAKE STEP";
+            help.text = "The step picked with a key (black key 9 held: B's): A a rest or a degree of the scale, 1 to 8; B "
+                        "lifts A by 0 to 7 degrees. The same key again lets the step go.";
+            return;
+        }
+        if (tessera.mode[tr] == TESS_ENG_POLY && k == 1u) {   /* (RHY: the page's choice, no setting of its own) */
+            help.name = "POLY RHY";
+            help.text = "Which of the four rhythms DIV sets.";
+            return;
+        }
+        if (tessera.mode[tr] == TESS_ENG_POLY && k == 2u) x += tessera_poly(tr)->sel & 3u;
+    }
     if (x != 0xFFu) {
         help.pid = (uint16_t)PID_TESS(x);
         return;

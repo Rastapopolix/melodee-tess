@@ -486,6 +486,52 @@ static int test_gen_family(void)
     return bad;
 }
 
+/* AWAKE's step entry (ui_awake.c): on GEN the keys are its steps, silent; a white key picks A's step, with black key 9
+ * held B's; KNOB 1 sets it; the same key lets it go (KNOB 1 is MODE again); a page change lets it go too */
+static uint32_t key_at(int black, uint32_t p);
+static void tap_key(uint32_t k);
+static int test_awake_entry(void)
+{
+    int bad = 0;
+    const gen_awake_t *a;
+    uint32_t v, leds;
+    ui_power_on();
+    go_title("GEN");
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_AWAKE);
+    frame();
+    a = tessera_awake(song.sel);
+    bad += check("AWAKE on GEN: the keys are its steps, silent (keys mode 2)", awake_entry_on() && song.grid == 2u && !a->edit);
+    tap_key(key_at(0, 2));
+    v = gen_awake_a(a, 2);
+    turn(EN_K1, 1);
+    bad += check("white key 3: A's step 3 picked; KNOB 1 raises it (MODE untouched)",
+                 a->edit == 0x22u && gen_awake_a(a, 2) == (v < 8u ? v + 1u : 8u) && tessera.mode[song.sel] == TESS_ENG_AWAKE);
+    turn(EN_K1, -1); turn(EN_K1, -1); turn(EN_K1, -1); turn(EN_K1, -1); turn(EN_K1, -1);
+    turn(EN_K1, -1); turn(EN_K1, -1); turn(EN_K1, -1); turn(EN_K1, -1); turn(EN_K1, -1);
+    bad += check("KNOB 1 down to A's floor: a rest (0)", gen_awake_a(a, 2) == 0u);
+    fm1_in.notes |= 1u << key_at(1, GK_ACC);
+    frame();
+    tap_key(key_at(0, 4));
+    fm1_in.notes |= 1u << key_at(1, GK_ACC);
+    for (v = 0; v < 9u; v++) turn(EN_K1, 1);
+    leds = awake_leds();
+    bad += check("black key 9 held, white key 5: B's step 5 picked, KNOB 1 up to its ceiling (7), its LED lit",
+                 a->edit == 0x34u && gen_awake_b(a, 4) == 7u && (leds >> key_at(0, 4) & 1u) && (leds >> key_at(1, GK_ACC) & 1u));
+    tap_key(key_at(0, 4));
+    fm1_in.notes = 0;
+    frame();
+    turn(EN_K1, 1);
+    bad += check("the same key again: let go; KNOB 1 is MODE again (AWAKE to POLY)",
+                 !tessera_awake(0)->edit && tessera.mode[song.sel] == TESS_ENG_POLY);
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_AWAKE);
+    tap_key(key_at(0, 7));
+    go_title("EVOLVE");
+    frame();
+    bad += check("a step picked, then another page: let go, the keys play again", !tessera_awake(song.sel)->edit &&
+                 !awake_entry_on() && song.grid != 2u);
+    return bad;
+}
+
 /* CORDS (ui_cords.c): KNOB 2 the cord, 1 its source, 3 its destination, 4 the move (a fixed cord's: its OFFSET) */
 static int test_cords_page(void)
 {
@@ -4802,6 +4848,7 @@ int main(void)
     bad += test_actions();
     bad += test_tracks();
     bad += test_grid();
+    bad += test_awake_entry();
     bad += test_screen();
     bad += test_favorites();
     bad += test_browser();

@@ -255,6 +255,77 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             }
             cv_rect(sx, y_base + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
         }
+    } else if (mode == TESS_ENG_BOUNCE) {
+        /* the box (its 256 x 256 the panel's; on the older page squeezed into a strip), the balls (the first one
+         * larger), the walls hit on the last step lit */
+        const gen_bounce_t *b = tessera_bounce(tr);
+        int h = is_panel ? 14 : 18;
+        int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 8 : y_base - 2, bh = is_panel ? 96 : h + 8;
+        uint32_t w = b->hit, n = b->balls >= 1u && b->balls <= GEN_BOUNCE_MAX ? b->balls : 1u;
+        cv_rect(x0, top, sw, w & 8u ? 2 : 1, w & 8u ? T_TEXT : dim);                     /* top */
+        cv_rect(x0, top + bh - (w & 1u ? 2 : 1), sw, w & 1u ? 2 : 1, w & 1u ? T_TEXT : dim);   /* floor */
+        cv_rect(x0, top, w & 2u ? 2 : 1, bh, w & 2u ? T_TEXT : dim);                     /* left */
+        cv_rect(x0 + sw - (w & 4u ? 2 : 1), top, w & 4u ? 2 : 1, bh, w & 4u ? T_TEXT : dim);   /* right */
+        for (uint32_t k = n; k-- > 0;) {
+            int32_t r = k ? 3 : 5;
+            int32_t bx = x0 + 2 + (int32_t)b->x[k] * (sw - 4 - r) / 255, by = top + bh - 2 - r - (int32_t)b->y[k] * (bh - 4 - r) / 255;
+            cv_rrect(bx, by, r, r, 1, k ? c : song.playing ? T_TEXT : c, bg);
+        }
+    } else if (mode == TESS_ENG_AWAKE) {
+        /* loop A (the notes) over loop B (their lift), 16 cells each: a value a bar its height (A: 1..8, B: 0..7), a rest
+         * a dash; past the loop's length dim; the steps playing lit; the step the keys picked framed */
+        const gen_awake_t *a = tessera_awake(tr);
+        int32_t ha = is_panel ? 44 : 12, hb = is_panel ? 28 : 6, ya = is_panel ? 10 : y_base, yb = ya + ha + (is_panel ? 14 : 4);
+        uint32_t la = a->len_a ? a->len_a : 1u, lb = a->len_b ? a->len_b : 1u;
+        uint32_t ca = (a->pos_a + la - 1u) % la, cb = (a->pos_b + lb - 1u) % lb;
+        int step_w = is_panel ? 10 : 11;
+        for (uint32_t i = 0; i < 16u; i++) {
+            int32_t sx = is_panel ? (18 + (int32_t)i * 12 + (int32_t)(i / 4u) * 4) : (13 + (int32_t)i * 13 + (int32_t)(i / 4u) * 4);
+            uint32_t va = gen_awake_a(a, i), vb = gen_awake_b(a, i);
+            int ha_on = song.playing && i == ca, hb_on = song.playing && i == cb;
+            if (i >= la) cv_rect(sx, ya + ha - 1, step_w, 1, dim);
+            else if (!va) cv_rect(sx, ya + ha - 2, step_w, 2, ha_on ? T_TEXT : dim);
+            else cv_rrect(sx, ya + ha - (int32_t)va * ha / 8, step_w, (int32_t)va * ha / 8, 1, ha_on ? T_TEXT : c, bg);
+            if (i >= lb) cv_rect(sx, yb + hb - 1, step_w, 1, dim);
+            else if (!vb) cv_rect(sx, yb + hb - 2, step_w, 2, hb_on ? T_TEXT : dim);
+            else cv_rrect(sx, yb + hb - (int32_t)vb * hb / 7, step_w, (int32_t)vb * hb / 7, 1, hb_on ? T_TEXT : T_MID, bg);
+            if (a->edit && (a->edit & 15u) == i) {         /* the step picked (ui_awake.c): framed */
+                int32_t fy = (a->edit & 0x10u) ? yb : ya, fh = (a->edit & 0x10u) ? hb : ha;
+                cv_rect(sx - 1, fy - 2, step_w + 2, 1, T_TEXT);
+                cv_rect(sx - 1, fy + fh + 1, step_w + 2, 1, T_TEXT);
+            }
+        }
+    } else if (mode == TESS_ENG_POLY) {
+        /* the four rhythms, a lane each: its divider, then the 16 steps of the bar's window, a tick where it lands, the
+         * step playing framed, the tick lit when it fires there (OFF: a dim lane; the one RHY picks, its label lit).
+         * Under them the four notes, a bar each at its pitch, the one playing lit */
+        const gen_poly_t *p = tessera_poly(tr);
+        uint32_t n = p->span == 2u ? 14u : 7u, now = (p->tick + GEN_POLY_WRAP - 1u) % GEN_POLY_WRAP, base = now - now % 16u;
+        int32_t top = is_panel ? 6 : y_base, lane = is_panel ? 13 : 5, x0 = is_panel ? 46 : 40, cw = is_panel ? 11 : 12;
+        int32_t ny = top + 4 * lane + (is_panel ? 6 : 2), nh = is_panel ? 112 - ny - 6 : 8;
+        for (uint32_t r = 0; r < 4u; r++) {
+            uint32_t d = p->div[r];
+            int32_t ly = top + (int32_t)r * lane;
+            if (is_panel) {
+                char lb[4] = "OFF";
+                if (d) lb[0] = '/', fmt_int(lb + 1, d);
+                cv_text(14, ly, &AF_X, lb, r == (p->sel & 3u) ? T_TEXT : d ? c : dim);
+            }
+            for (uint32_t i = 0; i < 16u; i++) {
+                int32_t sx = x0 + (int32_t)i * cw + (int32_t)(i / 4u) * 2;
+                uint32_t st = base + i, on = d && st % d == 0u, cur = song.playing && st == now;
+                if (!d) cv_rect(sx, ly + lane - 3, cw - 2, 1, dim);
+                else if (on) cv_rect(sx, ly + 1, cw - 2, lane - 3, cur ? T_TEXT : c);
+                else cv_rect(sx, ly + lane - 3, cw - 2, 1, dim);
+                if (cur && r == 0u) cv_rect(sx, top + 4 * lane - 1, cw - 2, 2, T_TEXT);   /* (the step playing, under all four) */
+            }
+        }
+        for (uint32_t i = 0; i < 4u; i++) {
+            int32_t bw = is_panel ? 44 : 40, bx = (is_panel ? 18 : 13) + (int32_t)i * (bw + 8);
+            int32_t bh = 3 + (int32_t)(p->pitch[i] > n - 1u ? n - 1u : p->pitch[i]) * (nh - 3) / (int32_t)(n - 1u);
+            cv_rect(bx, ny + nh - 1, bw, 1, dim);
+            cv_rrect(bx, ny + nh - bh, bw, bh, 2, i == p->pos ? T_TEXT : c, bg);
+        }
     }
 }
 

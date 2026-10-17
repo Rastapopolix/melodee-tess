@@ -802,7 +802,7 @@ static void draw_columns(void)
             } else if (m == TESS_ENG_TURING) {
                 const gen_turing_t *tur = tessera_turing(tr);
                 uint8_t tlen = tur->len ? tur->len : 16;
-                draw_column(0, "MODE", "TURING", "", VAL(0u), 1 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "TURING", "", VAL(0u), 1 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, tlen);
                 draw_column(1, "LEN", v1, "/16", VAL(1u), (int32_t)(tlen - 1u) * 1000 / 15, ICON_AUTO);
                 if (tur->prob == 0) {
@@ -817,7 +817,7 @@ static void draw_columns(void)
             } else if (m == TESS_ENG_EUCLID) {
                 const gen_euclid_t *euc = tessera_euclid(tr);
                 uint32_t esteps = euc->steps ? euc->steps : 16;
-                draw_column(0, "MODE", "EUCLID", "", VAL(0u), 2 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "EUCLID", "", VAL(0u), 2 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, esteps);
                 draw_column(1, "STEPS", v1, "", VAL(1u), (int32_t)(esteps - 1u) * 1000 / 31, ICON_AUTO);
                 fmt_int(v2, euc->pulses);
@@ -828,16 +828,55 @@ static void draw_columns(void)
                 const gen_markov_t *mk = tessera_markov(tr);
                 uint32_t moct = mk->oct_span ? mk->oct_span : 1;
                 uint32_t dens = (mk->density >= 5 && mk->density <= 100) ? mk->density : 100;
-                draw_column(0, "MODE", "MARKOV", "", VAL(0u), 3 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "MARKOV", "", VAL(0u), 3 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, mk->tension);
                 draw_column(1, "LEAP", v1, "%", VAL(1u), (int32_t)mk->tension * 10, ICON_AUTO);
                 fmt_int(v2, dens);
                 draw_column(2, "DENS", v2, "%", VAL(2u), (int32_t)dens * 10, ICON_AUTO);
                 fmt_int(v3, moct);
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(moct - 1u) * 1000 / 2, ICON_AUTO);
+            } else if (m == TESS_ENG_BOUNCE) {
+                const gen_bounce_t *b = tessera_bounce(tr);
+                draw_column(0, "MODE", "BOUNCE", "", VAL(0u), TESS_ENG_BOUNCE * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                fmt_int(v1, b->speed);
+                draw_column(1, "SPEED", v1, "", VAL(1u), (int32_t)(b->speed - 1u) * 1000 / 63, ICON_AUTO);
+                fmt_int(v2, b->angle);
+                draw_column(2, "ANGLE", v2, "DEG", VAL(2u), (int32_t)b->angle * 1000 / 90, ICON_AUTO);
+                fmt_int(v3, b->balls);
+                draw_column(3, "BALLS", v3, "", VAL(3u), (int32_t)(b->balls - 1u) * 1000 / (GEN_BOUNCE_MAX - 1u), ICON_AUTO);
+            } else if (m == TESS_ENG_AWAKE) {
+                const gen_awake_t *a = tessera_awake(tr);
+                if (a->edit) {                                  /* a step picked (ui_awake.c): KNOB 1 its value */
+                    uint32_t i = a->edit & 15u, b = (a->edit >> 4) & 1u, v = b ? gen_awake_b(a, i) : gen_awake_a(a, i);
+                    char l0[8] = {b ? 'B' : 'A', ' ', 0}, v0[8];
+                    fmt_int(l0 + 2, i + 1u);
+                    if (b) v0[0] = '+', fmt_int(v0 + 1, v);
+                    else if (v) fmt_int(v0, v);
+                    else str_cpy(v0, "REST", sizeof v0);
+                    draw_column(0, l0, v0, "", VAL(0u), (int32_t)v * 1000 / (b ? 7 : 8), ICON_AUTO);
+                } else {
+                    draw_column(0, "MODE", "AWAKE", "", VAL(0u), TESS_ENG_AWAKE * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                }
+                fmt_int(v1, a->len_a);
+                draw_column(1, "LEN A", v1, "", VAL(1u), (int32_t)(a->len_a - 1u) * 1000 / 15, ICON_AUTO);
+                fmt_int(v2, a->len_b);
+                draw_column(2, "LEN B", v2, "", VAL(2u), (int32_t)(a->len_b - 1u) * 1000 / 15, ICON_AUTO);
+                fmt_int(v3, a->prob);
+                draw_column(3, "PROB", v3, "%", VAL(3u), (int32_t)a->prob * 10, ICON_AUTO);
+            } else if (m == TESS_ENG_POLY) {
+                const gen_poly_t *p = tessera_poly(tr);
+                uint32_t d = p->div[p->sel & 3u];
+                draw_column(0, "MODE", "POLY", "", VAL(0u), TESS_ENG_POLY * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                fmt_int(v1, (p->sel & 3u) + 1u);
+                draw_column(1, "RHY", v1, "/4", VAL(1u), (int32_t)(p->sel & 3u) * 1000 / 3, ICON_AUTO);
+                if (d) v2[0] = '/', fmt_int(v2 + 1, d);    /* (every d steps: "/4", no unit) */
+                else str_cpy(v2, "OFF", sizeof v2);
+                draw_column(2, "DIV", v2, u2, VAL(2u), (int32_t)d * 1000 / 16, ICON_AUTO);
+                fmt_int(v3, p->span);
+                draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(p->span - 1u) * 1000, ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
-                draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, g->x);
                 draw_column(1, "X", v1, "", VAL(1u), (int32_t)g->x * 1000 / 255, ICON_AUTO);
                 fmt_int(v2, g->y);
@@ -848,7 +887,7 @@ static void draw_columns(void)
                 const gen_morph_t *mo = tessera_morph(tr);
                 int32_t pa = (int32_t)(mo->step_idx >> 4) & 7;
                 int32_t pb = (int32_t)mo->oct_span & 7;
-                draw_column(0, "MODE", "MORPH", "", VAL(0u), 4 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "MORPH", "", VAL(0u), 4 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, mo->morph_pos);
                 draw_column(1, "POS", v1, "/127", VAL(1u), (int32_t)mo->morph_pos * 1000 / 127, ICON_AUTO);
                 fmt_int(v2, pa + 1);
@@ -1181,6 +1220,7 @@ static void draw_confirm(void)
 #include "ui_motion.c"                                  /* MOTION: its lanes */
 #include "ui_scales.c"                                  /* SCALES: a screen of its own */
 #include "ui_designer.c"                                /* guided native sound creation */
+#include "ui_awake.c"                                   /* AWAKE's step entry on GEN */
 static int own_screen(void)                             /* a page drawn whole by its own code, no cards or footer */
 {
     uint32_t g = cur_page()->graph;

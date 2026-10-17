@@ -429,6 +429,59 @@ static void s_evolve_grids(void)
     turns(tessera_form_knob, 0, 2);                   /* FORM ABAC */
 }
 
+static void s_bounce(void) { gen(0, TESS_ENG_BOUNCE); }
+static void s_bounce_var(void)
+{
+    gen(0, TESS_ENG_BOUNCE);
+    knob(tessera_knob, 1, 16);                        /* SPEED 40 */
+    knob(tessera_knob, 2, 23);                        /* ANGLE 60 */
+    turns(tessera_knob, 3, 2);                        /* BALLS 3 */
+    knob(tessera_tweak_knob, 1, 10);                  /* DROP 20 */
+}
+static void s_evolve_bounce(void)
+{
+    gen(0, TESS_ENG_BOUNCE);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 15);                 /* AMOUNT 60 */
+    turns(tessera_form_knob, 0, 1);                   /* FORM AB */
+}
+
+static void s_awake(void) { gen(0, TESS_ENG_AWAKE); }
+static void s_awake_var(void)
+{
+    gen(0, TESS_ENG_AWAKE);
+    knob(tessera_knob, 1, 4);                         /* LEN A 12 */
+    knob(tessera_knob, 2, -2);                        /* LEN B 5 */
+    knob(tessera_knob, 3, -15);                       /* PROB 70 */
+    knob(tessera_tweak_knob, 0, 2);                   /* SHIFT +2 */
+}
+static void s_evolve_awake(void)
+{
+    gen(0, TESS_ENG_AWAKE);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 20);                 /* AMOUNT 70 */
+    turns(tessera_form_knob, 0, 2);                   /* FORM ABAC: A's values come back */
+}
+
+static void s_poly(void) { gen(0, TESS_ENG_POLY); }
+static void s_poly_var(void)
+{
+    gen(0, TESS_ENG_POLY);
+    turns(tessera_knob, 1, 2);                        /* RHY 3 */
+    knob(tessera_knob, 2, 5);                         /* its DIV 5 */
+    turns(tessera_knob, 1, 1);                        /* RHY 4 */
+    knob(tessera_knob, 2, 7);                         /* its DIV 7 */
+    knob(tessera_knob, 3, 1);                         /* SPAN 2 */
+    knob(tessera_tweak_knob, 2, 20);                  /* HUMAN 40 */
+}
+static void s_evolve_poly(void)
+{
+    gen(0, TESS_ENG_POLY);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 35);                 /* AMOUNT 100 */
+    turns(tessera_form_knob, 0, 1);                   /* FORM AB */
+}
+
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
     {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
@@ -465,6 +518,15 @@ static const scen_t SCEN[] = {
     {"grids", 4, 0x1020u, s_grids, 0},
     {"grids_x48_y228_dens80_chaos40_drop_human", 8, 0x1021u, s_grids_var, 0},
     {"evolve_grids_every1_amount70_abac", 16, 0x1022u, s_evolve_grids, 0},
+    {"bounce", 8, 0x1023u, s_bounce, 0},
+    {"bounce_speed40_angle60_balls3_drop20", 8, 0x1024u, s_bounce_var, 0},
+    {"evolve_bounce_every1_amount60_ab", 16, 0x1025u, s_evolve_bounce, 0},
+    {"awake", 8, 0x1026u, s_awake, 0},
+    {"awake_lena12_lenb5_prob70_shift2", 8, 0x1027u, s_awake_var, 0},
+    {"evolve_awake_every1_amount70_abac", 16, 0x1028u, s_evolve_awake, 0},
+    {"poly", 4, 0x1029u, s_poly, 0},
+    {"poly_div_4_3_5_7_span2_human40", 8, 0x102Au, s_poly_var, 0},
+    {"evolve_poly_every1_amount100_ab", 16, 0x102Bu, s_evolve_poly, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -689,7 +751,7 @@ static void pack_run(char *res, size_t cap)
         const uint32_t n2 = TESSERA_PK_BYTES / TESSERA_TRACKS, n1 = TESSERA_PK_BYTES_V1 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v1 + tr * n1, a + tr * n2, n1);
         tessera_reset();
-        ok &= tessera_unpack_v1(v1) == 1;
+        ok &= tessera_unpack_ver(1u, v1) == 1;
         tessera_pack(b);
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
             memcpy(v1b + tr * n1, b + tr * n2, n1);
@@ -697,7 +759,7 @@ static void pack_run(char *res, size_t cap)
         }
         ok &= !memcmp(v1, v1b, sizeof v1);            /* every version 1 setting as it was */
         tessera_reset();
-        ok &= tessera_unpack_v1(v1) == 1;
+        ok &= tessera_unpack_ver(1u, v1) == 1;
         tessera_pack(c);
         ok &= !memcmp(b, c, sizeof c);                /* the same block: the same seeds */
     }
@@ -707,7 +769,7 @@ static void pack_run(char *res, size_t cap)
         const uint32_t n3 = TESSERA_PK_BYTES / TESSERA_TRACKS, n2 = TESSERA_PK_BYTES_V2 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v2 + tr * n2, a + tr * n3, n2);
         tessera_reset();
-        ok &= tessera_unpack_v2(v2) == 1;
+        ok &= tessera_unpack_ver(2u, v2) == 1;
         tessera_pack(b);
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
             memcpy(v2b + tr * n2, b + tr * n3, n2);
@@ -721,6 +783,41 @@ static void pack_run(char *res, size_t cap)
         memcpy(c, a, sizeof c);
         c[n2 + 3u] = 101u;                            /* track 1's Grids CHAOS */
         ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+    }
+    {   /* a version 3 block (before BOUNCE, AWAKE, POLY: each track 29 bytes shorter) loads every setting, theirs a fresh
+         * track's with Awake's values and Poly's pitches from the track's seed (as ROLL gives them); each new setting
+         * out of range is refused */
+        static uint8_t v3[TESSERA_PK_BYTES_V3], v3b[TESSERA_PK_BYTES_V3];
+        static const uint8_t BAD[][2] = {{0, 0}, {0, 65}, {1, 91}, {2, 0}, {2, 5}, {3, 0}, {4, 17}, {5, 101}, {6, 0x09},
+                                         {13, 0x90}, {14, 0x08}, {21, 0x80}, {22, 17}, {26, 0x0E}, {27, 0xE0},
+                                         {28, 0}, {28, 3}};   /* (Bounce 0..2, Awake 3..21, Poly 22..28) */
+        const uint32_t n4 = TESSERA_PK_BYTES / TESSERA_TRACKS, n3 = TESSERA_PK_BYTES_V3 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v3 + tr * n3, a + tr * n4, n3);
+        tessera_reset();
+        ok &= tessera_unpack_ver(3u, v3) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            gen_awake_t aw;
+            gen_poly_t po;
+            memset(&aw, 0, sizeof aw);
+            memset(&po, 0, sizeof po);
+            po.span = 1;
+            gen_awake_fill(&aw, tessera.seed[tr]);
+            gen_poly_fill(&po, tessera.seed[tr]);
+            memcpy(v3b + tr * n3, b + tr * n4, n3);
+            ok &= tessera.bounce[tr].speed == 24u && tessera.bounce[tr].angle == 37u && tessera.bounce[tr].balls == 1u;
+            ok &= tessera.awake[tr].len_a == 8u && tessera.awake[tr].len_b == 7u && tessera.awake[tr].prob == 100u &&
+                  !memcmp(aw.a, tessera.awake[tr].a, 8) && !memcmp(aw.b, tessera.awake[tr].b, 8);
+            ok &= tessera.poly[tr].div[0] == 4u && tessera.poly[tr].div[1] == 3u && !tessera.poly[tr].div[2] &&
+                  !tessera.poly[tr].div[3] && tessera.poly[tr].span == 1u && !memcmp(po.pitch, tessera.poly[tr].pitch, 4);
+        }
+        ok &= !memcmp(v3, v3b, sizeof v3);            /* every version 3 setting as it was */
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[3u * n4 + n3 + BAD[k][0]] = BAD[k][1];  /* (track 4's) */
+            ok &= tessera_unpack(c) == 0;
+        }
         tessera_unpack(a);
     }
     snprintf(res, cap, "0x%08x %u", ha, ok);

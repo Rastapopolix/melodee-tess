@@ -32,13 +32,14 @@ static void check(const char *what, int ok)
 }
 
 static const gen_clock_t CLK0 = {0, 16, 0};
-static gen_out_t step_out(void) { gen_out_t o = {0, 60, 100, 0, 0, 0}; return o; }   /* as tessera.c starts each step */
+static gen_out_t step_out(void) { gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0}; return o; }   /* as tessera.c starts each step */
 /* field by field: gen_out_t has a padding byte (before cv), which memcmp would compare too */
 static int out_eq(const gen_out_t *a, const gen_out_t *b, uint32_t n)
 {
     for (uint32_t i = 0; i < n; i++)
         if (a[i].gate != b[i].gate || a[i].note != b[i].note || a[i].vel != b[i].vel || a[i].cv != b[i].cv ||
-            a[i].parts != b[i].parts || a[i].accent != b[i].accent) return 0;
+            a[i].parts != b[i].parts || a[i].accent != b[i].accent || a[i].more_n != b[i].more_n ||
+            (a[i].more_n && memcmp(a[i].more, b[i].more, a[i].more_n))) return 0;
     return 1;
 }
 
@@ -380,6 +381,243 @@ static void grids_tests(void)
     check("grids: mutation moves only X and Y, inside the map (AMOUNT 0: not at all)", mut);
 }
 
+/* ------------------------------------------------------------------ Bounce --- */
+static gen_bounce_t bounce_at(uint32_t speed, uint32_t angle, uint32_t balls, uint32_t seed)
+{
+    gen_bounce_t g;
+    memset(&g, 0, sizeof g);
+    g.speed = (uint8_t)speed, g.angle = (uint8_t)angle, g.balls = (uint8_t)balls;
+    gen_bounce_serve(&g, seed);
+    return g;
+}
+static void bounce_tests(void)
+{
+    int range = 1, draws = 1, walls = 1, loop = 1, mut = 1, same = 1, order = 1, apart = 1, one = 1;
+    uint32_t chords = 0;
+    for (uint32_t sp = 1; sp <= 64; sp += 9)
+        for (uint32_t an = 0; an <= 90; an += 15)
+            for (uint32_t nb = 1; nb <= 4; nb++) {
+                gen_bounce_t g = bounce_at(sp, an, nb, sp * 7u + an);
+                for (uint32_t i = 0; i < 400; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state, k;
+                    gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == 0u;
+                    range &= o.gate ? o.note >= 48 && o.note <= 70 && (o.vel == 100 || o.vel == 115) :
+                                      o.note == 60 && o.vel == 100 && !o.more_n;
+                    range &= o.cv >= 0 && o.more_n <= 2u && o.gate == (g.hit != 0) && (nb > 1u || !o.more_n);
+                    for (k = 0; k < o.more_n; k++) range &= o.more[k] >= 48 && o.more[k] <= 70 && o.more[k] != o.note;
+                    chords += o.more_n != 0;
+                }
+            }
+    {   /* straight up (90 degrees), 64 a step: floor and top in turn, every 4 steps a hit (0 128 255 127 0 ...) */
+        gen_bounce_t g = bounce_at(64, 90, 1, 0);
+        uint32_t hits = 0, top = 0;
+        for (uint32_t i = 0; i < 16; i++) {
+            gen_out_t o = step_out();
+            gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+            hits += o.gate;
+            top += o.gate && o.vel == 115;
+            walls &= g.x[0] == 128u;
+        }
+        walls &= hits == 4u && top == 2u;
+    }
+    {   /* at 45 degrees and 43 a step (30 each way: 510 / 30 = 17) ball 1's path comes back to its start every 17 steps */
+        gen_bounce_t g = bounce_at(43, 45, 1, 5);
+        gen_out_t a[17], b[17];
+        for (uint32_t i = 0; i < 17; i++) { a[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 17; i++) { b[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &b[i]); }
+        loop &= out_eq(a, b, 17) && g.x[0] == 128u && g.y[0] == 0u;
+    }
+    {   /* the same settings and seed give the same steps */
+        gen_bounce_t g1 = bounce_at(37, 61, 3, 9), g2 = bounce_at(37, 61, 3, 9);
+        gen_out_t a[100], b[100];
+        for (uint32_t i = 0; i < 100; i++) { a[i] = step_out(); gen_bounce_tick(&g1, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 100; i++) { b[i] = step_out(); gen_bounce_tick(&g2, &CLK0, &rng_state, &b[i]); }
+        same &= out_eq(a, b, 100);
+    }
+    for (uint32_t sd = 0; sd < 200; sd++) {             /* the balls start apart, at angles of their own */
+        gen_bounce_t g = bounce_at(20, 40, 4, sd);
+        for (uint32_t k = 1; k < 4u; k++) {
+            int32_t o = g.off[k] < 0 ? -g.off[k] : g.off[k];
+            apart &= o >= 8 && o <= 30 && (g.x[k] != g.x[0] || g.y[k] != g.y[0]);
+        }
+        apart &= !g.off[0] && g.x[0] == 128u && !g.y[0];
+    }
+    {   /* ball 1 alone plays as it would with the others there: they add notes, they take none of its */
+        gen_bounce_t g1 = bounce_at(29, 52, 1, 3), g4 = bounce_at(29, 52, 4, 3);
+        for (uint32_t i = 0; i < 300; i++) {
+            gen_out_t a = step_out(), b = step_out();
+            gen_bounce_tick(&g1, &CLK0, &rng_state, &a);
+            gen_bounce_tick(&g4, &CLK0, &rng_state, &b);
+            one &= g1.x[0] == g4.x[0] && g1.y[0] == g4.y[0];
+            if (a.gate) {
+                uint32_t k, in = b.note == a.note;
+                for (k = 0; k < b.more_n; k++) in |= b.more[k] == a.note;
+                one &= b.gate && (in || b.more_n == 2u);
+            }
+        }
+    }
+    {   /* hits on one step: the lowest wall's note first (a ball on the floor and one on the top, the same step) */
+        gen_bounce_t g = bounce_at(64, 90, 2, 0);
+        gen_out_t o = step_out();
+        g.off[1] = 0, g.x[1] = 40, g.y[1] = 250, g.dir &= (uint8_t)~0xCu;   /* ball 2 going up, ball 1 coming down */
+        g.y[0] = 6, g.dir |= 2u;
+        gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+        order &= o.gate && o.more_n == 1u && g.hit == 9u && o.note < o.more[0] && o.vel == 100;
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_bounce_t g = bounce_at(20, 3, 2, 1);
+        for (uint32_t n = 0; n < 200; n++) {
+            gen_bounce_mutate(&g, amt, &rng_state);
+            mut &= g.angle <= 90u && g.speed == 20u && g.balls == 2u;
+        }
+    }
+    check("bounce: a wall hit plays 48..70 at 100 (the top 115), up to 3 notes; else a rest keeps note 60, vel 100", range);
+    check("bounce: several balls hit on one step now and then (chords)", chords > 0u);
+    check("bounce: no random draw a step", draws);
+    check("bounce: straight up at 64 a step hits the floor and the top in turn, every 4 steps", walls);
+    check("bounce: at 45 degrees the path loops (17 steps); the same settings give the same steps", loop && same);
+    check("bounce: the other balls start apart, 8..30 degrees off ANGLE; ball 1 plays as alone", apart && one);
+    check("bounce: hits on one step sound the lowest wall's note first", order);
+    check("bounce: mutation moves only the angle, inside 0..90", mut);
+}
+
+/* ------------------------------------------------------------------ Awake --- */
+static gen_awake_t awake_at(uint32_t la, uint32_t lb, uint32_t prob, uint32_t seed)
+{
+    gen_awake_t g;
+    memset(&g, 0, sizeof g);
+    g.len_a = (uint8_t)la, g.len_b = (uint8_t)lb, g.prob = (uint8_t)prob;
+    gen_awake_fill(&g, seed);
+    return g;
+}
+static void awake_tests(void)
+{
+    int range = 1, draws = 1, loop = 1, silent = 1, fill = 1, mut = 1, same = 1;
+    for (uint32_t sd = 1; sd <= 128; sd += 7)
+        for (uint32_t la = 1; la <= 16; la += 5)
+            for (uint32_t prob = 0; prob <= 100; prob += 50) {
+                gen_awake_t g = awake_at(la, 17u - la, prob, sd);
+                for (uint32_t i = 0; i < 64; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state, a = gen_awake_a(&g, g.pos_a);
+                    gen_awake_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == (a && prob < 100u ? 1u : 0u);
+                    range &= o.gate ? o.note >= 48 && o.note <= 72 && o.vel == 100 : o.note == 60 && o.vel == 100;
+                    silent &= prob || !o.gate;
+                    range &= g.pos_a < la && g.pos_b < 17u - la && o.cv >= 0;
+                }
+            }
+    for (uint32_t sd = 0; sd < 200; sd++) {                 /* the values in their ranges, A with rests and notes */
+        gen_awake_t g = awake_at(16, 16, 100, sd);
+        uint32_t rests = 0;
+        for (uint32_t i = 0; i < 16; i++) {
+            fill &= gen_awake_a(&g, i) <= 8u && gen_awake_b(&g, i) <= 7u;
+            rests += !gen_awake_a(&g, i);
+        }
+        fill &= rests < 16u;
+    }
+    {   /* lengths 4 and 3 at PROB 100: the steps repeat every 12 */
+        gen_awake_t g = awake_at(4, 3, 100, 5);
+        gen_out_t a[12], b[12];
+        for (uint32_t i = 0; i < 12; i++) { a[i] = step_out(); gen_awake_tick(&g, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 12; i++) { b[i] = step_out(); gen_awake_tick(&g, &CLK0, &rng_state, &b[i]); }
+        loop &= out_eq(a, b, 12);
+    }
+    {
+        gen_awake_t g1 = awake_at(9, 5, 60, 77), g2 = awake_at(9, 5, 60, 77);
+        uint32_t r1 = 9, r2 = 9;
+        gen_out_t a[60], b[60];
+        for (uint32_t i = 0; i < 60; i++) { a[i] = step_out(); gen_awake_tick(&g1, &CLK0, &r1, &a[i]); }
+        for (uint32_t i = 0; i < 60; i++) { b[i] = step_out(); gen_awake_tick(&g2, &CLK0, &r2, &b[i]); }
+        same &= out_eq(a, b, 60);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_awake_t g = awake_at(6, 11, 80, 3), g0 = g;
+        for (uint32_t n = 0; n < 200; n++) {
+            gen_awake_mutate(&g, amt, &rng_state);
+            for (uint32_t i = 0; i < 16; i++) mut &= gen_awake_a(&g, i) <= 8u && gen_awake_b(&g, i) <= 7u;
+            for (uint32_t i = 6; i < 16; i++) mut &= gen_awake_a(&g, i) == gen_awake_a(&g0, i);   /* (past LEN A: kept) */
+            mut &= g.len_a == 6u && g.len_b == 11u && g.prob == 80u;
+        }
+        if (!amt) mut &= !memcmp(g.a, g0.a, 8) && !memcmp(g.b, g0.b, 8);
+    }
+    check("awake: notes 48..72 at 100 (A's degree plus B's); a rest keeps note 60, vel 100; PROB 0 silent", range && silent);
+    check("awake: a draw a step only for one of A's notes below PROB 100", draws);
+    check("awake: the seed's values in range (A 0..8 with notes, B 0..7)", fill);
+    check("awake: lengths 4 and 3 repeat every 12 steps; the same seed and stream, the same steps", loop && same);
+    check("awake: mutation changes values inside A's and B's loops only (AMOUNT 0: none)", mut);
+}
+
+/* ------------------------------------------------------------------ Poly --- */
+static gen_poly_t poly_at(uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t span, uint32_t seed)
+{
+    gen_poly_t g;
+    memset(&g, 0, sizeof g);
+    g.div[0] = (uint8_t)d0, g.div[1] = (uint8_t)d1, g.div[2] = (uint8_t)d2, g.div[3] = (uint8_t)d3, g.span = (uint8_t)span;
+    g.pos = 3;
+    gen_poly_fill(&g, seed);
+    return g;
+}
+static void poly_tests(void)
+{
+    int range = 1, draws = 1, hits = 1, fill = 1, mut = 1, loud = 1, off = 1, wrap = 1;
+    for (uint32_t d = 0; d <= 16; d++)
+        for (uint32_t span = 1; span <= 2; span++) {
+            gen_poly_t g = poly_at(d, 16u - d, d / 2u, 7, span, d * 7u + 1u);
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_out_t o = step_out();
+                uint32_t c = rng_state;
+                gen_poly_tick(&g, &CLK0, &rng_state, &o);
+                draws &= draws_since(c) == 0u;
+                range &= o.gate ? o.note >= 48 && o.note <= 70 && o.vel >= 88 && o.vel <= 127 : o.note == 60 && o.vel == 100;
+                range &= g.pos < 4u && o.cv >= 0;
+            }
+        }
+    {   /* 4 against 3: a note on steps 0 3 4 6 8 9 (twelve a cycle: 6 notes), step 0 louder (both land) */
+        gen_poly_t g = poly_at(4, 3, 0, 0, 1, 1);
+        static const uint8_t WANT[12] = {1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0};
+        for (uint32_t i = 0; i < 24; i++) {
+            gen_out_t o = step_out();
+            gen_poly_tick(&g, &CLK0, &rng_state, &o);
+            hits &= o.gate == WANT[i % 12u];
+            if (i % 12u == 0u) loud &= o.vel == 101u;
+            else if (o.gate) loud &= o.vel == 88u;
+        }
+    }
+    {   /* every rhythm OFF: silent */
+        gen_poly_t g = poly_at(0, 0, 0, 0, 2, 3);
+        for (uint32_t i = 0; i < 64; i++) { gen_out_t o = step_out(); gen_poly_tick(&g, &CLK0, &rng_state, &o); off &= !o.gate; }
+    }
+    {   /* the count wraps where every divider lands: no step lost or doubled across it */
+        gen_poly_t g = poly_at(7, 11, 13, 16, 1, 9);
+        uint32_t n = 0;
+        g.tick = GEN_POLY_WRAP - 2u;
+        for (uint32_t i = 0; i < 4; i++) { gen_out_t o = step_out(); gen_poly_tick(&g, &CLK0, &rng_state, &o); n += o.gate; }
+        wrap &= n == 1u && g.tick == 2u;
+    }
+    for (uint32_t sd = 0; sd < 300; sd++)
+        for (uint32_t span = 1; span <= 2; span++) {
+            gen_poly_t g = poly_at(4, 3, 0, 0, span, sd);
+            for (uint32_t i = 0; i < 4; i++) fill &= g.pitch[i] < 7u * span;
+        }
+    for (uint32_t amt = 0; amt <= 100; amt += 25)
+        for (uint32_t span = 1; span <= 2; span++) {
+            gen_poly_t g = poly_at(5, 2, 9, 0, span, 4), g0 = g;
+            for (uint32_t n = 0; n < 200; n++) {
+                gen_poly_mutate(&g, amt, &rng_state);
+                for (uint32_t i = 0; i < 4; i++) mut &= g.pitch[i] < 7u * span && g.div[i] == g0.div[i];
+            }
+            if (!amt) mut &= !memcmp(g.pitch, g0.pitch, 4);
+        }
+    check("poly: notes 48..70, louder (88 + 13 a rhythm more) where rhythms land together; else a rest as ever", range);
+    check("poly: no random draw a step", draws);
+    check("poly: 4 against 3 plays steps 0 3 4 6 8 9 of every 12, step 0 louder; all OFF silent", hits && loud && off);
+    check("poly: its count wraps at 720720 with no step lost or doubled", wrap);
+    check("poly: the seed's pitches and mutation's stay inside SPAN; the rhythms stay as set", fill && mut);
+}
+
 /* ------------------------------------------------------------------ sections --- */
 static void section_tests(void)
 {
@@ -395,6 +633,26 @@ static void section_tests(void)
     gen_euclid_save(&eu, &s); ok &= s.reg == 42 && s.p0 == 5 && s.p1 == 3;
     gen_morph_save(&mo, &s);  ok &= s.reg == 0x2222u && s.p0 == 99 && s.p1 == 3;
     gen_grids_save(&gr, &s);  ok &= s.reg == (40u | 200u << 8) && s.p0 == 99 && s.p1 == 3;
+    {
+        gen_bounce_t bo = bounce_at(33, 61, 3, 1);
+        gen_sec_t b2 = {2, 80, 5};
+        gen_bounce_save(&bo, &s); ok &= s.reg == 3u && s.p0 == 61 && s.p1 == 33;
+        gen_bounce_load(&bo, &b2); ok &= bo.balls == 2u && bo.angle == 80u && bo.speed == 5u;
+    }
+    {
+        gen_awake_t aw = awake_at(9, 4, 50, 1);
+        gen_sec_t a2 = {0x5555u, 3, 12};
+        gen_awake_save(&aw, &s); ok &= s.reg == 3u && s.p0 == 9 && s.p1 == 4;
+        gen_awake_load(&aw, &a2); ok &= aw.len_a == 3u && aw.len_b == 12u && aw.prob == 50u;
+    }
+    {
+        gen_poly_t po = poly_at(4, 3, 0, 0, 2, 1);
+        gen_sec_t p2 = {0xD210u, 1, 77};
+        po.pitch[0] = 1, po.pitch[1] = 2, po.pitch[2] = 3, po.pitch[3] = 13;
+        gen_poly_save(&po, &s); ok &= s.reg == 0xD321u && s.p0 == 2 && s.p1 == 4;
+        gen_poly_load(&po, &p2); ok &= po.pitch[0] == 0 && po.pitch[1] == 1 && po.pitch[2] == 2 && po.pitch[3] == 13 &&
+                                       po.span == 1 && po.div[0] == 4;
+    }
     {
         gen_sec_t e = {42, 6, 2}, m = {0x8888u, 10, 0}, k = {0, 33, 0}, t = {0xACE1u, 0, 0};
         gen_euclid_load(&eu, &e); ok &= eu.pulses == 6 && eu.rot == 2 && eu.pitch_seed == 42 && eu.steps == 16;
@@ -414,6 +672,9 @@ static double ns_per_step(int kind)
     gen_markov_t mk = {0, 0, 40, 80, 2};
     gen_morph_t mo = {64, 0x8888u, 0xA5A5u, 0x0F, 2};
     gen_grids_t gr = {77, 190, 70, 60, 0, {0, 0, 0}};
+    gen_bounce_t bo = bounce_at(37, 61, 3, 4);
+    gen_awake_t aw = awake_at(9, 5, 70, 3);
+    gen_poly_t po = poly_at(4, 3, 5, 0, 2, 3);
     const uint32_t N = 2000000u;
     volatile uint32_t sink = 0;
     struct timespec a, b;
@@ -424,7 +685,10 @@ static double ns_per_step(int kind)
         else if (kind == 1) gen_euclid_tick(&eu, &CLK0, &rng_state, &o);
         else if (kind == 2) gen_markov_tick(&mk, &CLK0, &rng_state, &o);
         else if (kind == 3) gen_morph_tick(&mo, &CLK0, &rng_state, &o);
-        else gen_grids_tick(&gr, &CLK0, &rng_state, &o);
+        else if (kind == 4) gen_grids_tick(&gr, &CLK0, &rng_state, &o);
+        else if (kind == 5) gen_bounce_tick(&bo, &CLK0, &rng_state, &o);
+        else if (kind == 6) gen_awake_tick(&aw, &CLK0, &rng_state, &o);
+        else gen_poly_tick(&po, &CLK0, &rng_state, &o);
         sink += o.note + o.gate;
     }
     clock_gettime(CLOCK_MONOTONIC, &b);
@@ -459,9 +723,13 @@ int main(void)
     markov_tests();
     morph_tests();
     grids_tests();
+    bounce_tests();
+    awake_tests();
+    poly_tests();
     section_tests();
-    printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns\n",
-           ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3), ns_per_step(4));
+    printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns, "
+           "Bounce %.1f ns, Awake %.1f ns, Poly %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3),
+           ns_per_step(4), ns_per_step(5), ns_per_step(6), ns_per_step(7));
     printf(bad ? "gen: %d FAILED\n" : "gen: all passed\n", bad);
     return bad != 0;
 }
