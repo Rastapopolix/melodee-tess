@@ -10,10 +10,11 @@
 #if MELODEE_PLAITS
 #include "macro_glue.h"
 
-/* the models one can pick: Plaits' engine numbers (voice.cc's order), named in five letters */
-static const uint8_t MC_MODEL[] = {0, 1, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23};
-static const char *const N_MC_MODEL[] = {"VCF", "PHASE", "PAD", "CHIP", "VA", "SHAPE", "FM", "GRAIN", "HARM", "SWARM",
-                                         "NOISE", "DUST", "PLUCK", "BELL", "KICK", "SNARE", "HIHAT"};
+/* the models one can pick: Plaits' engine numbers (voice.cc's order), named in five letters. 2026-10-17: the chord
+ * models (STRING MACHINE, CHIPTUNE: HARM picks a chord), the harsh ones (waveshaper, grains, swarm, noise, particles)
+ * and the drums (the DRUM engine has its own) are out */
+static const uint8_t MC_MODEL[] = {0, 1, 8, 10, 12, 19, 20};
+static const char *const N_MC_MODEL[] = {"VCF", "PHASE", "VA", "FM", "HARM", "PLUCK", "BELL"};
 _Static_assert(sizeof MC_MODEL == NELEM(N_MC_MODEL), "MC_MODEL / N_MC_MODEL");
 static const char *const N_MC_HIT[] = {"OFF", "ON"};
 #define MC_MAGIC 0x4F52434Du                            /* "MCRO": the part's voice made (the arena gives zeros) */
@@ -60,26 +61,25 @@ static void mc_render(struct track *t, voice_t *v, int32_t *out, uint32_t n, con
     }
 }
 
-static uint32_t mc_units(const struct track *t) { (void)t; return 4u; }   /* (one to two Prophet voices: measured) */
+/* the voice budget units of a model: VA's 4 measured on the device (one to two Prophet voices), the others by their
+ * cost against VA on the host (2026-10-17: FM 3.3x, PLUCK 2.7x, HARM and BELL 2.1x, VCF and PHASE 1.2x) */
+static const uint8_t MC_UNITS[] = {5, 5, 4, 13, 8, 11, 8};
+_Static_assert(sizeof MC_UNITS == sizeof MC_MODEL, "MC_UNITS / MC_MODEL");
+static uint32_t mc_units(const struct track *t) { return MC_UNITS[clamp(t->p[P_E0], 0, (int32_t)sizeof MC_MODEL - 1)]; }
 
 #define MCP(n, mo, ha, ti, mr, de, co, hit, ax, a, d, s, r) {n, {mo, ha, ti, mr, de, co, hit, ax}, {a, d, s, r}, 0, 1}
 static const preset_t MC_PRESETS[] = {
-    MCP("INIT VA",      4, 64, 64, 64, 64, 64, 0,  0,   0, 64, 127, 30),
+    MCP("INIT VA",      2, 64, 64, 64, 64, 64, 0,  0,   0, 64, 127, 30),
     MCP("VCF BASS",     0, 30, 70, 40, 40, 90, 1,  0,   0, 64, 127, 20),
+    MCP("VA PAD",       2, 70, 40, 70, 64, 64, 0,  0,  60, 64, 127, 80),
+    MCP("SAW LEAD",     2, 66, 90, 100, 64, 64, 0, 0,   0, 64, 127, 25),
     MCP("PHASE KEYS",   1, 50, 60, 50, 60, 70, 1,  0,   0, 64, 127, 40),
-    MCP("STRING PAD",   2, 70, 64, 80, 64, 64, 0,  0,  60, 64, 127, 80),
-    MCP("CHIP LEAD",    3, 40, 64, 30, 64, 64, 0,  0,   0, 64, 127, 20),
-    MCP("FOLD LEAD",    5, 50, 80, 40, 64, 64, 0, 30,   0, 64, 127, 30),
-    MCP("FM BELL",      6, 80, 60, 30, 80, 40, 1,  0,   0, 64, 127, 60),
-    MCP("GRAIN VOX",    7, 64, 50, 70, 64, 64, 0,  0,  20, 64, 127, 50),
-    MCP("ORGAN HARM",   8, 40, 64, 64, 64, 64, 0,  0,   0, 64, 127, 30),
-    MCP("SWARM PAD",    9, 64, 50, 64, 64, 64, 0,  0,  70, 64, 127, 90),
-    MCP("DUST",        11, 60, 64, 64, 64, 64, 0,  0,   0, 64, 127, 70),
-    MCP("PLUCK",       12, 64, 70, 50, 70, 64, 1,  0,   0, 64, 127, 60),
-    MCP("MALLET",      13, 50, 64, 60, 70, 64, 1,  0,   0, 64, 127, 70),
-    MCP("KICK",        14, 60, 50, 40, 50, 64, 1,  0,   0, 64, 127, 30),
-    MCP("SNARE",       15, 60, 60, 50, 50, 64, 1,  0,   0, 64, 127, 30),
-    MCP("HIHAT",       16, 60, 70, 40, 40, 64, 1,  0,   0, 64, 127, 20),
+    MCP("FM BELL",      3, 80, 60, 30, 80, 40, 1,  0,   0, 64, 127, 60),
+    MCP("FM BASS",      3, 20, 50, 40, 50, 90, 1,  0,   0, 64, 127, 20),
+    MCP("ORGAN HARM",   4, 40, 64, 64, 64, 64, 0,  0,   0, 64, 127, 30),
+    MCP("PLUCK",        5, 64, 70, 50, 70, 64, 1,  0,   0, 64, 127, 60),
+    MCP("MALLET",       6, 50, 64, 60, 70, 64, 1,  0,   0, 64, 127, 70),
+    MCP("SOFT BELL",    6, 30, 40, 50, 90, 64, 1,  0,   0, 64, 127, 80),
 };
 #undef MCP
 
@@ -87,7 +87,7 @@ static const engine_t ENG_MACRO = {
     .name = "MACRO",
     .page_title = {"MACRO", "GATE"},
     .edit = {
-        {"MODEL", F_ENUM, 0, (int16_t)(sizeof MC_MODEL - 1), 4, N_MC_MODEL, 0},
+        {"MODEL", F_ENUM, 0, (int16_t)(sizeof MC_MODEL - 1), 2, N_MC_MODEL, 0},
         {"HARM", F_PCT, 0, 127, 64, 0, 0},
         {"TIMBR", F_PCT, 0, 127, 64, 0, 0},
         {"MORPH", F_PCT, 0, 127, 64, 0, 0},

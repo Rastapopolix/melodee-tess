@@ -72,6 +72,9 @@ int main(void)
           mc_bytes() < 40000u);
 
     models = (uint32_t)ENGINES[ENGI_MACRO]->edit[0].max + 1u;
+    for (k = 0, ok = 1; k < sizeof MC_MODEL; k++)      /* (Plaits' 6, 7, 14: string machine, chiptune, chords) */
+        ok &= MC_MODEL[k] != 6u && MC_MODEL[k] != 7u && MC_MODEL[k] != 14u;
+    check("no chord model: each note plays one pitch (2026-10-17)", ok && models == sizeof MC_MODEL);
     for (k = 0; k < models; k++) {                    /* every model, from INIT VA's settings, struck and held */
         sound(0);
         trk[0].p[P_E0] = (int16_t)k;
@@ -91,7 +94,7 @@ int main(void)
     ok = play(69, 1.5, 1.4, &peak, &rms, &zc, &tail);
     check("...an octave and more up (A4: 440 Hz within 3 %)", ok && zc > 426.8 && zc < 453.2);
 
-    sound(11);                                        /* PLUCK: HIT ON, struck: it dies away though held */
+    sound(8);                                         /* PLUCK: HIT ON, struck: it dies away though held */
     trk[0].p[P_E4] = 30;                              /* (a short DECAY) */
     ok = play(60, 2.0, 1.9, &peak, &rms, &zc, &tail);
     check("HIT ON (PLUCK, DECAY short): struck, it dies away though the key is held", ok && rms > 50.0 && tail < 0.05 * peak);
@@ -105,7 +108,7 @@ int main(void)
         double r1, r2;
         if (k == 6u) continue;                        /* (HIT: above) */
         sound(0);
-        trk[0].p[P_E0 + k] = (int16_t)(k == 0u ? 8 : k == 7u ? 127 : 10);
+        trk[0].p[P_E0 + k] = (int16_t)(k == 0u ? 6 : k == 7u ? 127 : 10);
         play(60, 0.5, 0.45, &peak, &r1, &zc, &tail);
         sound(0);
         trk[0].p[P_E0 + k] = (int16_t)(k == 0u ? 4 : 120);
@@ -114,6 +117,51 @@ int main(void)
     }
     check("MODEL, HARM, TIMBR, MORPH, DECAY, COLOR, AUX: each moves the sound", ok);
 
+    {                                                 /* no denormal tails (they cost 3-30x: the AC79's FPU, x86 without
+                                                       * FTZ): struck every 70 ms, a model at the settings that had them
+                                                       * against a held VA note */
+        static const struct { uint8_t m, g; float h, t, mo, lim; } c[] = {
+            {2, 0, 0.5f, 0.5f, 0.5f, 0.0f},           /* (VA held: the measure) */
+            {2, 1, 0.0f, 0.0f, 1.0f, 2.5f},           /* VA HIT ON: the gate's tail */
+            {5, 1, 0.5f, 0.5f, 0.5f, 6.0f},           /* PLUCK (2.7x VA without denormals) */
+            {5, 0, 0.0f, 0.25f, 0.5f, 6.0f},
+            {6, 0, 0.5f, 0.0f, 0.0f, 5.0f},           /* BELL (2.1x VA) */
+            {6, 1, 0.25f, 0.0f, 0.0f, 5.0f},
+        };
+        static uint32_t mem[(40000 + 3) / 4];
+        mg_params_t q;
+        int16_t o[MG_BLOCK], a[MG_BLOCK];
+        uint32_t j, i, r;
+        double base = 0;
+        ok = mg_size() <= sizeof mem;
+        for (j = 0; ok && j < NELEM(c); j++) {
+            double best = 1e9;
+            memset(&q, 0, sizeof q);
+            q.model = MC_MODEL[c[j].m];
+            q.note = 48.0f;
+            q.harmonics = c[j].h;
+            q.timbre = c[j].t;
+            q.morph = c[j].mo;
+            q.decay = 0.7f;
+            q.lpg_colour = 0.5f;
+            q.gated = c[j].g;
+            mg_init(mem);
+            for (i = 0; i < 400u; i++) { q.trigger = i % 50u == 0; mg_render(mem, &q, o, a); }
+            for (r = 0; r < 3u; r++) {                /* (the least of three: this computer's noise) */
+                double t0 = now_s();
+                for (i = 0; i < 1000u; i++) { q.trigger = i % 200u == 0; mg_render(mem, &q, o, a); }
+                t0 = now_s() - t0;
+                if (t0 < best) best = t0;
+            }
+            if (!j) base = best;
+            else if (best > c[j].lim * base) {
+                ok = 0;
+                printf("    %s (%s): %.1f x a held VA note\n", N_MC_MODEL[c[j].m], c[j].g ? "HIT ON" : "HIT OFF",
+                       best / base);
+            }
+        }
+        check("no denormal tails: VA (HIT ON), PLUCK and BELL struck again and again stay near their cost", ok);
+    }
     {                                                 /* the cost against SID's, one note, on this computer */
         double t0, mc, sid, idle;
         int32_t o[2 * CTL];

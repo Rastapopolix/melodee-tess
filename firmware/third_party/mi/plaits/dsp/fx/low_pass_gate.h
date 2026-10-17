@@ -44,6 +44,7 @@ class LowPassGate {
   
   void Init() {
     previous_gain_ = 0.0f;
+    anti_denormal_ = 1e-20f;
     filter_.Init();
   }
   
@@ -56,7 +57,8 @@ class LowPassGate {
     stmlib::ParameterInterpolator gain_modulation(&previous_gain_, gain, size);
     filter_.set_f_q<stmlib::FREQUENCY_DIRTY>(frequency, 0.4f);
     while (size--) {
-      const float s = *in_out * gain_modulation.Next();
+      const float s = *in_out * gain_modulation.Next() + anti_denormal_;
+      anti_denormal_ = -anti_denormal_;
       const float lp = filter_.Process<stmlib::FILTER_MODE_LOW_PASS>(s);
       *in_out++ = lp + (s - lp) * hf_bleed;
     }
@@ -73,7 +75,8 @@ class LowPassGate {
     stmlib::ParameterInterpolator gain_modulation(&previous_gain_, gain, size);
     filter_.set_f_q<stmlib::FREQUENCY_DIRTY>(frequency, 0.4f);
     while (size--) {
-      const float s = *in++ * gain_modulation.Next();
+      const float s = *in++ * gain_modulation.Next() + anti_denormal_;
+      anti_denormal_ = -anti_denormal_;
       const float lp = filter_.Process<stmlib::FILTER_MODE_LOW_PASS>(s);
       *out = stmlib::Clip16(1 + static_cast<int32_t>(lp + (s - lp) * hf_bleed));
       out += stride;
@@ -82,6 +85,8 @@ class LowPassGate {
   
  private:
   float previous_gain_;
+  // melodee-tess: a -400 dB square wave in keeps the closed gate's filter off denormals (the AC79's FPU is slow on them)
+  float anti_denormal_;
   stmlib::Svf filter_;
   
   DISALLOW_COPY_AND_ASSIGN(LowPassGate);

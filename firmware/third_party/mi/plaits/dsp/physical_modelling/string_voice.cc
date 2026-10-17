@@ -99,6 +99,10 @@ void StringVoice::Render(
     fill(&temp[0], &temp[size], 0.0f);
   }
   
+  // melodee-tess: a -400 dB square wave keeps the filter's states off denormals (the AC79's FPU is slow on them)
+  for (size_t i = 0; i < size; ++i) {
+    temp[i] += i & 1 ? -1e-20f : 1e-20f;
+  }
   excitation_filter_.Process<FILTER_MODE_LOW_PASS>(temp, temp, size);
   for (size_t i = 0; i < size; ++i) {
     aux[i] += temp[i];
