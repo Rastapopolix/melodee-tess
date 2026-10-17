@@ -58,6 +58,8 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_GRD_X] = S_(CD_GRD_X, TX_GRD_X, "G X", "Grids' X: across its map of drum patterns"),
     [CD_GRD_Y] = S_(CD_GRD_Y, TX_GRD_Y, "G Y", "Grids' Y: down its map of drum patterns"),
     [CD_GRD_DENS] = S_(CD_GRD_DENS, TX_GRD_DENS, "G DENS", "Grids' density: how full its parts are"),
+    [CD_BNC_SPEED] = S_(CD_BNC_SPEED, TX_BNC_SPEED, "B SPEED", "Bounce's speed: how far the ball moves a step"),
+    [CD_BNC_ANGLE] = S_(CD_BNC_ANGLE, TX_BNC_ANGLE, "B ANGLE", "Bounce's angle: the ball's path"),
 };
 #undef V_
 #undef B_

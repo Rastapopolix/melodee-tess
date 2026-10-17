@@ -429,6 +429,23 @@ static void s_evolve_grids(void)
     turns(tessera_form_knob, 0, 2);                   /* FORM ABAC */
 }
 
+static void s_bounce(void) { gen(0, TESS_ENG_BOUNCE); }
+static void s_bounce_var(void)
+{
+    gen(0, TESS_ENG_BOUNCE);
+    knob(tessera_knob, 1, 16);                        /* SPEED 40 */
+    knob(tessera_knob, 2, 23);                        /* ANGLE 60 */
+    knob(tessera_knob, 3, 15);                        /* PADDLE 30 */
+    knob(tessera_tweak_knob, 1, 10);                  /* DROP 20 */
+}
+static void s_evolve_bounce(void)
+{
+    gen(0, TESS_ENG_BOUNCE);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 15);                 /* AMOUNT 60 */
+    turns(tessera_form_knob, 0, 1);                   /* FORM AB */
+}
+
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
     {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
@@ -465,6 +482,9 @@ static const scen_t SCEN[] = {
     {"grids", 4, 0x1020u, s_grids, 0},
     {"grids_x48_y228_dens80_chaos40_drop_human", 8, 0x1021u, s_grids_var, 0},
     {"evolve_grids_every1_amount70_abac", 16, 0x1022u, s_evolve_grids, 0},
+    {"bounce", 8, 0x1023u, s_bounce, 0},
+    {"bounce_speed40_angle60_paddle30_drop20", 8, 0x1024u, s_bounce_var, 0},
+    {"evolve_bounce_every1_amount60_ab", 16, 0x1025u, s_evolve_bounce, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 

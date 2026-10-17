@@ -785,7 +785,7 @@ static void draw_columns(void)
         uint32_t tr = song.sel;
         if (tr < TESSERA_TRACKS) {
             uint32_t m = tessera.mode[tr];
-            char v1[16], v2[16], v3[16], u2[8] = "";
+            char v1[16], v2[16], v3[16], u2[8] = "", u3[8] = "";
             if (m == TESS_ENG_OFF) {
                 draw_column(0, "MODE", "STEP", "", VAL(0u), -1, ICON_AUTO);
                 for (c = 1u; c < 4u; c++) {
@@ -802,7 +802,7 @@ static void draw_columns(void)
             } else if (m == TESS_ENG_TURING) {
                 const gen_turing_t *tur = tessera_turing(tr);
                 uint8_t tlen = tur->len ? tur->len : 16;
-                draw_column(0, "MODE", "TURING", "", VAL(0u), 1 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "TURING", "", VAL(0u), 1 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, tlen);
                 draw_column(1, "LEN", v1, "/16", VAL(1u), (int32_t)(tlen - 1u) * 1000 / 15, ICON_AUTO);
                 if (tur->prob == 0) {
@@ -817,7 +817,7 @@ static void draw_columns(void)
             } else if (m == TESS_ENG_EUCLID) {
                 const gen_euclid_t *euc = tessera_euclid(tr);
                 uint32_t esteps = euc->steps ? euc->steps : 16;
-                draw_column(0, "MODE", "EUCLID", "", VAL(0u), 2 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "EUCLID", "", VAL(0u), 2 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, esteps);
                 draw_column(1, "STEPS", v1, "", VAL(1u), (int32_t)(esteps - 1u) * 1000 / 31, ICON_AUTO);
                 fmt_int(v2, euc->pulses);
@@ -828,16 +828,30 @@ static void draw_columns(void)
                 const gen_markov_t *mk = tessera_markov(tr);
                 uint32_t moct = mk->oct_span ? mk->oct_span : 1;
                 uint32_t dens = (mk->density >= 5 && mk->density <= 100) ? mk->density : 100;
-                draw_column(0, "MODE", "MARKOV", "", VAL(0u), 3 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "MARKOV", "", VAL(0u), 3 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, mk->tension);
                 draw_column(1, "LEAP", v1, "%", VAL(1u), (int32_t)mk->tension * 10, ICON_AUTO);
                 fmt_int(v2, dens);
                 draw_column(2, "DENS", v2, "%", VAL(2u), (int32_t)dens * 10, ICON_AUTO);
                 fmt_int(v3, moct);
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(moct - 1u) * 1000 / 2, ICON_AUTO);
+            } else if (m == TESS_ENG_BOUNCE) {
+                const gen_bounce_t *b = tessera_bounce(tr);
+                draw_column(0, "MODE", "BOUNCE", "", VAL(0u), TESS_ENG_BOUNCE * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                fmt_int(v1, b->speed);
+                draw_column(1, "SPEED", v1, "", VAL(1u), (int32_t)(b->speed - 1u) * 1000 / 63, ICON_AUTO);
+                fmt_int(v2, b->angle);
+                draw_column(2, "ANGLE", v2, "DEG", VAL(2u), (int32_t)b->angle * 1000 / 90, ICON_AUTO);
+                if (b->paddle) {
+                    fmt_int(v3, b->paddle);
+                    str_cpy(u3, "%", sizeof u3);
+                } else {
+                    str_cpy(v3, "OFF", sizeof v3);
+                }
+                draw_column(3, "PADDLE", v3, u3, VAL(3u), (int32_t)b->paddle * 10, ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
-                draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, g->x);
                 draw_column(1, "X", v1, "", VAL(1u), (int32_t)g->x * 1000 / 255, ICON_AUTO);
                 fmt_int(v2, g->y);
@@ -848,7 +862,7 @@ static void draw_columns(void)
                 const gen_morph_t *mo = tessera_morph(tr);
                 int32_t pa = (int32_t)(mo->step_idx >> 4) & 7;
                 int32_t pb = (int32_t)mo->oct_span & 7;
-                draw_column(0, "MODE", "MORPH", "", VAL(0u), 4 * 1000 / 5, ICON_AUTO);
+                draw_column(0, "MODE", "MORPH", "", VAL(0u), 4 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, mo->morph_pos);
                 draw_column(1, "POS", v1, "/127", VAL(1u), (int32_t)mo->morph_pos * 1000 / 127, ICON_AUTO);
                 fmt_int(v2, pa + 1);

@@ -261,6 +261,65 @@ static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd
     out->gate = out->parts != 0;
 }
 
+/* Bounce: sin of 0..90 degrees, x 127 (every 6 degrees, the rest between) */
+static const uint8_t GEN_SIN90[16] = {0, 13, 26, 39, 52, 64, 75, 85, 94, 103, 110, 116, 121, 124, 126, 127};
+static uint32_t gen_sin90(uint32_t a)
+{
+    uint32_t i, f;
+    a = a > 90u ? 90u : a;
+    i = a / 6u, f = a % 6u;
+    return (GEN_SIN90[i] * (6u - f) + GEN_SIN90[i < 15u ? i + 1u : 15u] * f) / 6u;
+}
+/* Bounce's ball back to its start: the floor's middle, going up and right; after a miss, the box's middle, going down,
+ * the other way across. The paddle under it */
+static void gen_bounce_serve(gen_bounce_t *g, uint32_t miss)
+{
+    g->x = 128;
+    g->y = miss ? 128 : 0;
+    g->dir = (uint8_t)(miss ? ((g->dir & 1u) ^ 1u) | 2u : 0u);
+    g->pad_x = 128;
+}
+/* The paddle's half width: PADDLE % of the floor, 8 at least */
+static uint32_t gen_bounce_half(const gen_bounce_t *g) { uint32_t h = (uint32_t)g->paddle * 128u / 100u; return h < 8u ? 8u : h; }
+/* Bounce: the ball moves SPEED at ANGLE from the floor, off the walls as a mirror. A wall hit plays its note: the wall
+ * (floor 0, left 1, right 2, top 3) two scale degrees apart, where along it eight more (two octaves in all; the top's
+ * accented). In a corner the floor or top wins. With a PADDLE the floor is the paddle's: it follows the ball, 16 a
+ * step at most, and a ball it misses rests, and is served again from the middle */
+static void gen_bounce_tick(gen_bounce_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    int32_t sp = g->speed ? g->speed : 1, a = g->angle > 90u ? 90 : g->angle, wall = -1, at = 0, d;
+    int32_t dx = sp * (int32_t)gen_sin90((uint32_t)(90 - a)) / 127, dy = sp * (int32_t)gen_sin90((uint32_t)a) / 127;
+    int32_t x = (int32_t)g->x + (g->dir & 1u ? -dx : dx), y = (int32_t)g->y + (g->dir & 2u ? -dy : dy);
+    (void)clk;
+    (void)rnd;
+    if (dx && (g->dir & 1u) && x <= 0) x = -x, g->dir ^= 1u, wall = 1, at = y;   /* (reaching a wall is a hit) */
+    else if (dx && !(g->dir & 1u) && x >= 255) x = 510 - x, g->dir ^= 1u, wall = 2, at = y;
+    if (dy && (g->dir & 2u) && y <= 0) y = -y, g->dir ^= 2u, wall = 0, at = x;
+    else if (dy && !(g->dir & 2u) && y >= 255) y = 510 - y, g->dir ^= 2u, wall = 3, at = x;
+    x = x < 0 ? 0 : x > 255 ? 255 : x;
+    y = y < 0 ? 0 : y > 255 ? 255 : y;
+    if (g->paddle) {
+        d = x - (int32_t)g->pad_x;
+        g->pad_x = (uint8_t)((int32_t)g->pad_x + (d > 16 ? 16 : d < -16 ? -16 : d));
+        if (wall == 0 && (uint32_t)(x > g->pad_x ? x - g->pad_x : g->pad_x - x) > gen_bounce_half(g)) {
+            gen_bounce_serve(g, 1u);                    /* a miss: a rest, served again */
+            g->wall = 5;
+            out->cv = 0;
+            return;
+        }
+    }
+    g->x = (uint8_t)x;
+    g->y = (uint8_t)y;
+    g->wall = (uint8_t)(wall + 1);
+    out->cv = (int16_t)(y * 32767 / 255);               /* the ball's height */
+    if (wall >= 0) {
+        uint32_t deg = (uint32_t)wall * 2u + (uint32_t)(at < 0 ? 0 : at > 255 ? 255 : at) * 8u / 256u;
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = wall == 3 ? 115 : 100;
+        out->gate = 1;
+    }
+}
+
 /* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
@@ -340,6 +399,15 @@ static void gen_grids_mutate(gen_grids_t *g, uint32_t amt, uint32_t *rnd)
     g->y = gen_grids_walk(g->y, amt, rnd);
 }
 
+/* Bounce: the angle nudged by up to +-AMOUNT/100 of 15 degrees (one at least), turning back at 0 and 90 */
+static void gen_bounce_mutate(gen_bounce_t *g, uint32_t amt, uint32_t *rnd)
+{
+    int32_t r = (int32_t)(amt * 15u / 100u) + 1, v = (int32_t)g->angle + (int32_t)gen_rnd(rnd, (uint32_t)(2 * r + 1)) - r;
+    if (v < 0) v = -v;
+    if (v > 90) v = 180 - v;
+    g->angle = (uint8_t)(v < 0 ? 0 : v > 90 ? 90 : v);
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -356,3 +424,10 @@ static void gen_morph_save(const gen_morph_t *g, gen_sec_t *s) { s->reg = g->sna
 static void gen_morph_load(gen_morph_t *g, const gen_sec_t *s) { g->snap_a = s->reg; g->morph_pos = s->p0; }
 static void gen_grids_save(const gen_grids_t *g, gen_sec_t *s) { s->reg = (uint16_t)(g->x | g->y << 8); }
 static void gen_grids_load(gen_grids_t *g, const gen_sec_t *s) { g->x = (uint8_t)s->reg; g->y = (uint8_t)(s->reg >> 8); }
+static void gen_bounce_save(const gen_bounce_t *g, gen_sec_t *s) { s->p0 = g->angle; s->p1 = g->speed; s->reg = g->paddle; }
+static void gen_bounce_load(gen_bounce_t *g, const gen_sec_t *s)
+{
+    g->angle = s->p0 > 90u ? 90u : s->p0;
+    g->speed = s->p1 < 1u ? 1u : s->p1 > 64u ? 64u : s->p1;
+    g->paddle = (uint8_t)(s->reg > 100u ? 100u : s->reg);
+}

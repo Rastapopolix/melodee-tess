@@ -6,7 +6,7 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS"};
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE"};
 static const char *const TX_N_EVERY[] = {"OFF", "1", "2", "4", "8", "16"};
 static const char *const TX_N_FORM[] = {"OFF", "AB", "ABAC", "ABCB", "AABA", "ABCA", "AABC"};
 static const char *const TX_N_FOLLOW[] = {"OFF", "T1", "T2", "T3", "T4"};
@@ -40,6 +40,9 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_X] = PD("X", F_INT, 0, 255, 128),
     [TX_GRD_Y] = PD("Y", F_INT, 0, 255, 128),
     [TX_GRD_DENS] = PD("DENS", F_PCT, 0, 100, 50),
+    [TX_BNC_SPEED] = PD("SPEED", F_INT, 1, 64, 24),
+    [TX_BNC_ANGLE] = PD("ANGLE", F_INT, 0, 90, 37),
+    [TX_BNC_PADDLE] = PD("PADDLE", F_PCT, 0, 100, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -206,7 +209,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     G_(G_BUDGET, PID_F_DEVICE, "VOICE BUDGET",
        "How much sound work the FM-1 shares out between the tracks; lower leaves more headroom, higher allows more voices."),
     X_(TX_MODE, "GENERATOR MODE", "STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; "
-                                  "GRIDS plays kick, snare and hat (best on a DRUM track)."),
+                                  "GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball "
+                                  "hits the walls of its box."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
@@ -222,7 +226,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_MRP_SNPA, "MORPH RHYTHM A", "Rhythm A: one of eight preset patterns."),
     X_(TX_MRP_SNPB, "MORPH RHYTHM B", "Rhythm B: one of eight preset patterns."),
     X_(TX_EV_LOCK, "EVOLVE LOCK", "How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every "
-                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid has none."),
+                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid and Bounce have none."),
     X_(TX_EV_EVERY, "EVOLVE EVERY", "Bars between mutations; OFF keeps the phrase as it is."),
     X_(TX_EV_AMOUNT, "EVOLVE AMOUNT", "How much changes at each mutation."),
     X_(TX_EV_SEED, "EVOLVE ROLL", "The track's seed, 1 to 128: each one a line of its own, the same every time. "
@@ -238,6 +242,11 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_GRD_X, "GRIDS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
     X_(TX_GRD_Y, "GRIDS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
     X_(TX_GRD_DENS, "GRIDS DENSITY", "How full the kick, snare and hat are: 0 silent, 100 every hit the map offers."),
+    X_(TX_BNC_SPEED, "BOUNCE SPEED", "How far the ball travels each step: faster, more wall hits, more notes."),
+    X_(TX_BNC_ANGLE, "BOUNCE ANGLE", "The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle "
+                                     "between draws a longer loop. EVOLVE nudges it."),
+    X_(TX_BNC_PADDLE, "BOUNCE PADDLE", "OFF: no paddle. On: a paddle on the floor this wide follows the ball; a ball it "
+                                       "misses rests and is served again (Pong)."),
 };
 #undef T_
 #undef G_

@@ -45,3 +45,5 @@
 42 G X      step  GRIDS X
 43 G Y      step  GRIDS Y
 44 G DENS   step  GRIDS DENSITY
+45 B SPEED  step  BOUNCE SPEED
+46 B ANGLE  step  BOUNCE ANGLE

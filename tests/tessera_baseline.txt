@@ -70,4 +70,10 @@ grids_x48_y228_dens80_chaos40_drop_human 0x9c5b1b25 235
 grids_x48_y228_dens80_chaos40_drop_human.state 0x1da804e4
 evolve_grids_every1_amount70_abac 0x1f06b032 237
 evolve_grids_every1_amount70_abac.state 0x447c32d5
+bounce 0x40d8e6ed 16
+bounce.state 0x8d54e214
+bounce_speed40_angle60_paddle30_drop20 0xba8a8a53 16
+bounce_speed40_angle60_paddle30_drop20.state 0xaeb87847
+evolve_bounce_every1_amount60_ab 0x1e1ba1a0 24
+evolve_bounce_every1_amount60_ab.state 0xad4cc779
 saved_block 0x4b6fad25 320

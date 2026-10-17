@@ -380,6 +380,83 @@ static void grids_tests(void)
     check("grids: mutation moves only X and Y, inside the map (AMOUNT 0: not at all)", mut);
 }
 
+/* ------------------------------------------------------------------ Bounce --- */
+static gen_bounce_t bounce_at(uint32_t speed, uint32_t angle, uint32_t paddle)
+{
+    gen_bounce_t g;
+    memset(&g, 0, sizeof g);
+    g.speed = (uint8_t)speed, g.angle = (uint8_t)angle, g.paddle = (uint8_t)paddle;
+    gen_bounce_serve(&g, 0u);
+    return g;
+}
+static void bounce_tests(void)
+{
+    int range = 1, draws = 1, walls = 1, loop = 1, miss = 1, mut = 1, same = 1;
+    for (uint32_t sp = 1; sp <= 64; sp += 9)
+        for (uint32_t an = 0; an <= 90; an += 15)
+            for (uint32_t pd = 0; pd <= 100; pd += 50) {
+                gen_bounce_t g = bounce_at(sp, an, pd);
+                for (uint32_t i = 0; i < 400; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state;
+                    gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == 0u;
+                    range &= o.gate ? o.note >= 48 && o.note <= 48 + 12 + 10 && (o.vel == 100 || o.vel == 115) :
+                                      o.note == 60 && o.vel == 100;
+                    range &= o.cv >= 0 && g.wall <= 5u && (g.wall != 5u || pd) && (o.gate == (g.wall >= 1u && g.wall <= 4u));
+                }
+            }
+    {   /* straight up (90 degrees), 64 a step: floor and top in turn, every 4 steps a hit (0 128 255 127 0 ...) */
+        gen_bounce_t g = bounce_at(64, 90, 0);
+        uint32_t hits = 0, top = 0;
+        for (uint32_t i = 0; i < 16; i++) {
+            gen_out_t o = step_out();
+            gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+            hits += o.gate;
+            top += o.gate && o.vel == 115;
+            walls &= g.x == 128u;
+        }
+        walls &= hits == 4u && top == 2u;
+    }
+    {   /* at 45 degrees and 43 a step (30 each way: 510 / 30 = 17) the path comes back to its start every 17 steps */
+        gen_bounce_t g = bounce_at(43, 45, 0);
+        gen_out_t a[17], b[17];
+        for (uint32_t i = 0; i < 17; i++) { a[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 17; i++) { b[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &b[i]); }
+        loop &= out_eq(a, b, 17) && g.x == 128u && g.y == 0u;
+    }
+    {   /* the narrowest paddle misses a fast ball now and then: a rest, the ball served from the middle */
+        gen_bounce_t g = bounce_at(64, 20, 1);
+        uint32_t misses = 0;
+        for (uint32_t i = 0; i < 400; i++) {
+            gen_out_t o = step_out();
+            gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+            if (g.wall == 5u) { misses++; miss &= !o.gate && g.x == 128u && g.y == 128u && (g.dir & 2u); }
+        }
+        miss &= misses > 0u;
+    }
+    {   /* the same settings give the same steps */
+        gen_bounce_t g1 = bounce_at(37, 61, 30), g2 = bounce_at(37, 61, 30);
+        gen_out_t a[100], b[100];
+        for (uint32_t i = 0; i < 100; i++) { a[i] = step_out(); gen_bounce_tick(&g1, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 100; i++) { b[i] = step_out(); gen_bounce_tick(&g2, &CLK0, &rng_state, &b[i]); }
+        same &= out_eq(a, b, 100);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_bounce_t g = bounce_at(20, 3, 0);
+        for (uint32_t n = 0; n < 200; n++) {
+            gen_bounce_mutate(&g, amt, &rng_state);
+            mut &= g.angle <= 90u && g.speed == 20u && !g.paddle;
+        }
+    }
+    check("bounce: a wall hit plays 48..70 at 100 (the top 115); else a rest keeps note 60, vel 100", range);
+    check("bounce: no random draw a step", draws);
+    check("bounce: straight up at 64 a step hits the floor and the top in turn, every 4 steps", walls);
+    check("bounce: at 45 degrees the path loops (17 steps); the same settings give the same steps", loop && same);
+    check("bounce: a paddle that misses rests and serves again from the middle, going down", miss);
+    check("bounce: mutation moves only the angle, inside 0..90", mut);
+}
+
 /* ------------------------------------------------------------------ sections --- */
 static void section_tests(void)
 {
@@ -395,6 +472,12 @@ static void section_tests(void)
     gen_euclid_save(&eu, &s); ok &= s.reg == 42 && s.p0 == 5 && s.p1 == 3;
     gen_morph_save(&mo, &s);  ok &= s.reg == 0x2222u && s.p0 == 99 && s.p1 == 3;
     gen_grids_save(&gr, &s);  ok &= s.reg == (40u | 200u << 8) && s.p0 == 99 && s.p1 == 3;
+    {
+        gen_bounce_t bo = bounce_at(33, 61, 40);
+        gen_sec_t b2 = {7, 80, 5};
+        gen_bounce_save(&bo, &s); ok &= s.reg == 40u && s.p0 == 61 && s.p1 == 33;
+        gen_bounce_load(&bo, &b2); ok &= bo.paddle == 7u && bo.angle == 80u && bo.speed == 5u;
+    }
     {
         gen_sec_t e = {42, 6, 2}, m = {0x8888u, 10, 0}, k = {0, 33, 0}, t = {0xACE1u, 0, 0};
         gen_euclid_load(&eu, &e); ok &= eu.pulses == 6 && eu.rot == 2 && eu.pitch_seed == 42 && eu.steps == 16;
@@ -414,6 +497,7 @@ static double ns_per_step(int kind)
     gen_markov_t mk = {0, 0, 40, 80, 2};
     gen_morph_t mo = {64, 0x8888u, 0xA5A5u, 0x0F, 2};
     gen_grids_t gr = {77, 190, 70, 60, 0, {0, 0, 0}};
+    gen_bounce_t bo = bounce_at(37, 61, 30);
     const uint32_t N = 2000000u;
     volatile uint32_t sink = 0;
     struct timespec a, b;
@@ -424,7 +508,8 @@ static double ns_per_step(int kind)
         else if (kind == 1) gen_euclid_tick(&eu, &CLK0, &rng_state, &o);
         else if (kind == 2) gen_markov_tick(&mk, &CLK0, &rng_state, &o);
         else if (kind == 3) gen_morph_tick(&mo, &CLK0, &rng_state, &o);
-        else gen_grids_tick(&gr, &CLK0, &rng_state, &o);
+        else if (kind == 4) gen_grids_tick(&gr, &CLK0, &rng_state, &o);
+        else gen_bounce_tick(&bo, &CLK0, &rng_state, &o);
         sink += o.note + o.gate;
     }
     clock_gettime(CLOCK_MONOTONIC, &b);
@@ -459,9 +544,10 @@ int main(void)
     markov_tests();
     morph_tests();
     grids_tests();
+    bounce_tests();
     section_tests();
-    printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns\n",
-           ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3), ns_per_step(4));
+    printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns, "
+           "Bounce %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3), ns_per_step(4), ns_per_step(5));
     printf(bad ? "gen: %d FAILED\n" : "gen: all passed\n", bad);
     return bad != 0;
 }

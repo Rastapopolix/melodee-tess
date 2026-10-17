@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* Tessera: the note generators of tracks 1-4 (Turing, Euclid, Markov, Morph, Grids), EVOLVE, FORM and TWEAK, clocked by the
+/* Tessera: the note generators of tracks 1-4 (Turing, Euclid, Markov, Morph, Grids, Bounce), EVOLVE, FORM and TWEAK, clocked by the
  * sequencer (seq.c) in place of a track's steps; their state is saved with the project (project.c, OBJ_TESSERA). */
 #include "tessera.h"
 
@@ -73,7 +73,6 @@ void tessera_seed_turn(uint32_t tr, int32_t s)
     if (!song.playing) tess_roll_apply(tr);
 }
 
-static void tess_bounce_serve(tessera_bounce_t *b, uint32_t miss);
 void tessera_markov_recalc(uint32_t tr) { (void)tr; }   /* matrix is derived per step now */
 
 void tessera_init(void)
@@ -125,7 +124,7 @@ void tessera_init(void)
         tessera.poly[i].div[1] = 3;
         tessera.poly[i].span = 1;
         tessera.poly[i].pos = 3;
-        tess_bounce_serve(&tessera.bounce[i], 0u);
+        gen_bounce_serve(&tessera.bounce[i], 0u);
 
         /* 9. Evolve */
         tessera.evolve[i].amount = 30;
@@ -199,22 +198,13 @@ static void tess_rearm(uint32_t tr)
     tessera.evolve[tr].valid &= (uint8_t)~(1u << (tessera.evolve[tr].sec % 3u));   /* this section's phrase is being rewritten */
 }
 
-/* Bounce's ball from its start: the floor's middle, going up and right (away: a miss's serve, from the box's middle,
- * down, each the other way); the paddle under it */
-static void tess_bounce_serve(tessera_bounce_t *b, uint32_t miss)
-{
-    b->x = 128;
-    b->y = miss ? 128 : 0;
-    b->dir = (uint8_t)(miss ? ((b->dir & 1u) ^ 1u) | 2u : 0u);
-    b->pad_x = 128;
-}
 /* A phrase boundary (mutation, SEED, stop): rearm AND put the engines' own playheads back on step 1 */
 static void tess_realign(uint32_t tr)
 {
     tess_rearm(tr);
     tessera.euclid[tr].step_idx = 0;
     tessera.grids[tr].step_idx = 0;
-    tess_bounce_serve(&tessera.bounce[tr], 0u);
+    gen_bounce_serve(&tessera.bounce[tr], 0u);
     tessera.awake[tr].pos_a = tessera.awake[tr].pos_b = 0;
     tessera.poly[tr].pos = 3;                                /* (the first rhythm's hit plays step 1) */
     tessera.poly[tr].tick = 0;
@@ -234,6 +224,7 @@ void tessera_mutate(uint32_t tr)
     case TESS_ENG_MARKOV: gen_markov_mutate(&tessera.markov[tr], amt, &tessera.rnd[tr]); break;
     case TESS_ENG_MORPH:  gen_morph_mutate(&tessera.morph[tr], amt, &tessera.rnd[tr]); break;
     case TESS_ENG_GRIDS:  gen_grids_mutate(&tessera.grids[tr], amt, &tessera.rnd[tr]); break;
+    case TESS_ENG_BOUNCE: gen_bounce_mutate(&tessera.bounce[tr], amt, &tessera.rnd[tr]); break;
     }
     tessera.evolve[tr].flash = 4;
     tess_realign(tr);
@@ -278,6 +269,7 @@ static void tess_save_sec(uint32_t tr)
     case TESS_ENG_MARKOV: gen_markov_save(&tessera.markov[tr], &g); break;
     case TESS_ENG_MORPH:  gen_morph_save(&tessera.morph[tr], &g); break;
     case TESS_ENG_GRIDS:  gen_grids_save(&tessera.grids[tr], &g); break;
+    case TESS_ENG_BOUNCE: gen_bounce_save(&tessera.bounce[tr], &g); break;
     }
     s->reg = g.reg;
     s->p0 = g.p0;
@@ -297,6 +289,7 @@ static void tess_load_sec(uint32_t tr)
     case TESS_ENG_MARKOV: gen_markov_load(&tessera.markov[tr], &g); break;
     case TESS_ENG_MORPH:  gen_morph_load(&tessera.morph[tr], &g); break;
     case TESS_ENG_GRIDS:  gen_grids_load(&tessera.grids[tr], &g); break;
+    case TESS_ENG_BOUNCE: gen_bounce_load(&tessera.bounce[tr], &g); break;
     }
     tess_realign(tr);
     ev->valid = v;
@@ -464,7 +457,7 @@ int tessera_lock_get(uint32_t tr)
     if (tessera.mode[tr] == TESS_ENG_TURING) return 100 - (int)tessera.turing[tr].prob;
     if (tessera.mode[tr] == TESS_ENG_GRIDS) return 100 - (int)tessera.grids[tr].chaos;
     if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH) return tessera.evolve[tr].lock;
-    return -1;                                               /* Euclid is already a fixed loop: no LOCK */
+    return -1;                                               /* Euclid and Bounce are already fixed loops: no LOCK */
 }
 
 void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash)
@@ -636,6 +629,9 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         tessera.cv[tr] = out.cv;
         tess_grids_play(t, tr, &out);
         return;
+    case TESS_ENG_BOUNCE:
+        gen_bounce_tick(&tessera.bounce[tr], &clk, &tessera.rnd[tr], &out);
+        break;
     }
     uint8_t note = out.note, vel = out.vel;
     int should_trigger = out.gate;
@@ -794,6 +790,18 @@ static void tess_knob_body(uint32_t k, int32_t s)
             m->oct_span = (uint8_t)pb;
             m->snap_b = GEN_MORPH_PRESETS[pb];
         }
+    } else if (mode == TESS_ENG_BOUNCE) {
+        tessera_bounce_t *b = &tessera.bounce[tr];
+        if (k == 1u) {
+            int32_t v = (int32_t)b->speed + s;
+            b->speed = (uint8_t)(v < 1 ? 1 : v > 64 ? 64 : v);
+        } else if (k == 2u) {
+            int32_t v = (int32_t)b->angle + s;
+            b->angle = (uint8_t)(v < 0 ? 0 : v > 90 ? 90 : v);
+        } else if (k == 3u) {
+            int32_t v = (int32_t)b->paddle + s * 2;
+            b->paddle = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
+        }
     } else if (mode == TESS_ENG_GRIDS) {
         tessera_grids_t *g = &tessera.grids[tr];
         if (k == 1u || k == 2u) {                           /* X, Y: 4 a click, a turn across the map */
@@ -836,6 +844,8 @@ uint32_t tessera_sig(uint32_t tr)
         h ^= a->snap_a * 31u + a->snap_b * 7u + a->morph_pos * 131u + a->step_idx * 17u; break; }
     case TESS_ENG_GRIDS:  { const tessera_grids_t *a = &tessera.grids[tr];
         h ^= a->x * 31u + a->y * 7919u + a->dens * 131u + a->chaos * 977u + a->step_idx * 17u; break; }
+    case TESS_ENG_BOUNCE: { const tessera_bounce_t *a = &tessera.bounce[tr];
+        h ^= a->x * 31u + a->y * 7919u + a->speed * 131u + a->angle * 977u + a->paddle * 17u + a->pad_x * 3u + a->wall * 104729u; break; }
     }
     return h;
 }
@@ -1167,6 +1177,9 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_GRD_X: return tessera.grids[tr].x;
     case TX_GRD_Y: return tessera.grids[tr].y;
     case TX_GRD_DENS: return tessera.grids[tr].dens;
+    case TX_BNC_SPEED: return tessera.bounce[tr].speed;
+    case TX_BNC_ANGLE: return tessera.bounce[tr].angle;
+    case TX_BNC_PADDLE: return tessera.bounce[tr].paddle;
     }
     return 0;
 }
@@ -1223,7 +1236,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
             tessera.turing[tr].prob = (uint8_t)(100 - v);   /* (Turing's LOCK is its PROB turned round) */
         } else if (tessera.mode[tr] == TESS_ENG_GRIDS) {
             tessera.grids[tr].chaos = (uint8_t)(100 - v);   /* (Grids': its CHAOS turned round) */
-        } else if (tessera.mode[tr] != TESS_ENG_EUCLID) {   /* (Euclid has no LOCK) */
+        } else if (tessera.mode[tr] != TESS_ENG_EUCLID && tessera.mode[tr] != TESS_ENG_BOUNCE) {   /* (they have no LOCK) */
             uint8_t was = ev->lock;
             ev->lock = (uint8_t)v;
             if (!was && ev->lock) tess_rearm(tr);
@@ -1256,6 +1269,9 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_GRD_X: tessera.grids[tr].x = (uint8_t)tess_clampi(v, 0, 255); eng = TESS_ENG_GRIDS; break;
     case TX_GRD_Y: tessera.grids[tr].y = (uint8_t)tess_clampi(v, 0, 255); eng = TESS_ENG_GRIDS; break;
     case TX_GRD_DENS: tessera.grids[tr].dens = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_GRIDS; break;
+    case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); eng = TESS_ENG_BOUNCE; break;
+    case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); eng = TESS_ENG_BOUNCE; break;
+    case TX_BNC_PADDLE: tessera.bounce[tr].paddle = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_BOUNCE; break;
     default:
         return;
     }
@@ -1286,6 +1302,8 @@ void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v)
     case TX_GRD_X: tessera.grids[tr].x = (uint8_t)tess_clampi(v, 0, 255); break;
     case TX_GRD_Y: tessera.grids[tr].y = (uint8_t)tess_clampi(v, 0, 255); break;
     case TX_GRD_DENS: tessera.grids[tr].dens = (uint8_t)tess_clampi(v, 0, 100); break;
+    case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); break;
+    case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); break;
     default: break;                                 /* (the others are no cord's: cord.c's destinations) */
     }
 }
@@ -1304,3 +1322,4 @@ const gen_euclid_t *tessera_euclid(uint32_t tr) { return &tessera.euclid[tr % TE
 const gen_markov_t *tessera_markov(uint32_t tr) { return &tessera.markov[tr % TESSERA_TRACKS]; }
 const gen_morph_t *tessera_morph(uint32_t tr) { return &tessera.morph[tr % TESSERA_TRACKS]; }
 const gen_grids_t *tessera_grids(uint32_t tr) { return &tessera.grids[tr % TESSERA_TRACKS]; }
+const gen_bounce_t *tessera_bounce(uint32_t tr) { return &tessera.bounce[tr % TESSERA_TRACKS]; }
