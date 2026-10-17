@@ -57,6 +57,15 @@ extern const int16_t* const wavetables_table[];
 extern const uint8_t syx_bank_0[];
 extern const uint8_t syx_bank_1[];
 extern const uint8_t syx_bank_2[];
+// melodee-tess: on the FM-1 (build.py: MELODEE_PLAITS_RAM) the hot table and code run from RAM (app.ld .dsp_tables,
+// .dsp_text), not from the XIP flash, whose cache misses the per-sample lookups pay
+#ifdef MELODEE_PLAITS_RAM
+#define PLAITS_RAM_TABLE __attribute__((section(".dsp_tables")))
+#define PLAITS_RAM_CODE __attribute__((noinline, section(".dsp_text")))
+#else
+#define PLAITS_RAM_TABLE
+#define PLAITS_RAM_CODE
+#endif
 extern const float lut_sine[];
 extern const float lut_fm_frequency_quantizer[];
 extern const float lut_fold[];

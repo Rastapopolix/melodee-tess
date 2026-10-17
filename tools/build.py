@@ -256,6 +256,7 @@ def build_plaits(flags):
     cxx = [f for f in flags if f.startswith(("-m", "-f", "-O", "-D")) and f != "-fno-builtin"] + [   # (fabsf .. inline)
         "-x", "c++", "-std=c++11", "-fno-exceptions", "-fno-rtti", "-fno-threadsafe-statics", "-w",
         "-DTEST", "-DPLAITS_LEAN", "-DPLAITS_SAMPLE_RATE=44100.0f", "-DPLAITS_SAMPLE_RATE_EXACT", "-DPLAITS_BLOCK_SIZE=16",
+        "-DMELODEE_PLAITS_RAM",
         "-DM_PI=3.14159265358979323846", "-include", "stdio.h", "-I", mi / "shim", "-isystem", inc, "-I", mi,
         "-I", FW / "src"]
     srcs = sorted([*(mi / "plaits" / "dsp").rglob("*.cc"), mi / "plaits" / "resources.cc",

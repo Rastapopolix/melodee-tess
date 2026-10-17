@@ -3120,7 +3120,7 @@ const uint8_t* const fm_patches_table[] = {
   syx_bank_2,
 };
 
-const float lut_sine[] = {
+const float lut_sine[] PLAITS_RAM_TABLE = {  // melodee-tess: in RAM (resources.h)
    0.000000000e+00,  1.227153829e-02,  2.454122852e-02,  3.680722294e-02,
    4.906767433e-02,  6.132073630e-02,  7.356456360e-02,  8.579731234e-02,
    9.801714033e-02,  1.102222073e-01,  1.224106752e-01,  1.345807085e-01,

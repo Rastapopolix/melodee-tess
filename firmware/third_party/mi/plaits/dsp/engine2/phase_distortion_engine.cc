@@ -51,7 +51,7 @@ void PhaseDistortionEngine::Reset() {
   
 }
 
-void PhaseDistortionEngine::Render(
+PLAITS_RAM_CODE void PhaseDistortionEngine::Render(  // melodee-tess: from RAM (resources.h)
     const EngineParameters& parameters,
     float* out,
     float* aux,
