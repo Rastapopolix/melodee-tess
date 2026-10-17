@@ -44,7 +44,8 @@ EXTRACTED = {
     "track_render_audio": ("fm6_dc_samples", "p5_dc_samples"),
 }
 KERNEL_NAMES = {n for names in EXTRACTED.values() for n in names}
-FEATURE_OPTIONAL = {"p5_samples", "p5_mod_samples"}  # MELODEE_PROPHET=0 omits these
+FEATURE_OPTIONAL = {"p5_samples", "p5_mod_samples",          # MELODEE_PROPHET=0 omits these
+                    "fm6_render", "cz_native_render", "cz_native_wave"}   # and MELODEE_FM6=0, MELODEE_CZ=0 these
 TOL = 0.10                      # exact (no noise): small edits pass, a grown render loop does not
 DIV_W = 8                       # a divide weighs 1 + 8 instructions
 NEST = 4                        # an instruction in a loop inside a loop weighs 4, two deep 16, ...

@@ -271,6 +271,9 @@ def build_plaits(flags):
 def build_app(stub):
     subprocess.run([sys.executable, SRC / "tools/gen_909_tables.py", GEN / "x0x_drum_tables.h"], check=True)
     flags = [*CFLAGS, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
+    for flag, v in (("MELODEE_FM6", "0"), ("MELODEE_CZ", "0"), ("MELODEE_PROPHET", "0"), ("MELODEE_PLAITS", "1")):
+        os.environ.setdefault(flag, v)   # melodee-tess (phase 4): FM6, CZ-1 and Prophet retired, MACRO in; set =1 / =0
+                                         # to build the old set (the host tests keep all engines: firmware/src/core.h)
     for flag in ("MELODEE_FLASH", "MELODEE_OTA", "MELODEE_OTA_DRYRUN", "MELODEE_OTA_RAMONLY", "MELODEE_CDC",
                  "MELODEE_UART", "MELODEE_USB_AUDIO", "MELODEE_ICONS", "MELODEE_PROPHET_PROTOTYPE", "MELODEE_PROPHET", "MELODEE_FM6", "MELODEE_CZ", "MELODEE_PLAITS",
                  "MELODEE_BENCH_SILENT", "MELODEE_FX_PROFILE", "MELODEE_AUDIO_PROFILE", "MELODEE_BATCH_AUDIO", "MELODEE_ADMISSION", "MELODEE_AUDIO_BENCH", "MELODEE_DUAL_CORE", "MELODEE_CACHE_RAM", "MELODEE_CORE1_TEST", "MELODEE_RAM_AUDIO", "MELODEE_HW_EQ"):

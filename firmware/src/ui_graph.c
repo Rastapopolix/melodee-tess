@@ -302,6 +302,54 @@ static void graph_evolve(const track_t *t, uint16_t c)
     }
 }
 
+/* TWEAK page: one small picture under each card. SHIFT: the note moved off its written pitch (the dashed line);
+ * DROP: 8 hits, the share it drops hollow; HUMAN: 5 notes' gates and loudness, uneven as it rises; FOLLOW: the
+ * four tracks, the one followed filled, this one dashed. At their off positions: level, full, even, none lit */
+static void graph_tweak(const track_t *t, uint16_t c)
+{
+    static const uint8_t DROP_ORDER[8] = {3, 6, 0, 5, 2, 7, 1, 4};   /* which hits go first as DROP rises */
+    static const int8_t HUM_LEN[5] = {-2, 5, -5, 1, 4}, HUM_VEL[5] = {3, -4, 1, -2, 5};   /* fixed jitter shapes */
+    uint32_t tr = trk_index(t), i;
+    const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
+    int32_t x, y, sh = ev->shift, nd = ((int32_t)ev->drop * 8 + 50) / 100, hu = ev->human;
+    /* SHIFT: +-24 over +-40 px around the middle */
+    x = CARD_X(0u);
+    for (i = 0; i < 9u; i++)
+        cv_rect(x + 6 + (int32_t)i * 5, 61, 3, 1, T_MID);
+    y = 61 - sh * 40 / 24;
+    if (sh) cv_rect(x + 26, y < 61 ? y + 3 : 62, 2, y < 61 ? 61 - y - 3 : y - 62, T_LINE);
+    cv_rrect(x + 10, y - 2, 34, 5, 2, sh ? c : T_DIM, T_SURF);
+    /* DROP: two rows of four */
+    x = CARD_X(1u);
+    for (i = 0; i < 8u; i++) {
+        int32_t hx = x + 5 + (int32_t)(i % 4u) * 12, hy = 44 + (int32_t)(i / 4u) * 22, gone = 0, k;
+        for (k = 0; k < nd; k++)
+            if (DROP_ORDER[k] == i) gone = 1;
+        if (gone) cv_frame(hx, hy, 9, 14, T_LINE);
+        else cv_rrect(hx, hy, 9, 14, 2, c, T_SURF);
+    }
+    /* HUMAN: gates shortened by up to HUMAN / 2 %, loudness +-HUMAN / 5 as the bar's thickness */
+    x = CARD_X(2u);
+    for (i = 0; i < 5u; i++) {
+        int32_t w = 44 - 44 * (HUM_LEN[i] + 5) * hu / 1000, h = 5 + HUM_VEL[i] * hu / 100;
+        cv_rrect(x + 5, 36 + (int32_t)i * 12 + (8 - h) / 2, w, h, 1, hu ? c : T_DIM, T_SURF);
+    }
+    /* FOLLOW: the tracks as numbered cells */
+    x = CARD_X(3u);
+    for (i = 0; i < TESSERA_TRACKS; i++) {
+        int32_t cx = x + 4 + (int32_t)(i % 2u) * 25, cy = 40 + (int32_t)(i / 2u) * 25;
+        char n[2] = {(char)('1' + i), 0};
+        if (ev->follow == i + 1u) {
+            cv_rrect(cx, cy, 21, 21, 3, c, T_SURF);
+            cv_text_c(cx + 11, cy + 5, &AF_X, n, T_BG, c);
+        } else {
+            if (i == tr) cv_dashed(cx, cy, 21, 21, 3, ev->follow ? T_TEXT : T_MID);
+            else cv_rrect(cx, cy, 21, 21, 3, T_RAISE, T_SURF);
+            cv_text_c(cx + 11, cy + 5, &AF_X, n, i == tr ? T_TEXT : T_MID, i == tr ? T_SURF : T_RAISE);
+        }
+    }
+}
+
 static void graph_steps(const track_t *t, uint16_t c)
 {
     uint32_t tr = trk_index(t);
@@ -983,6 +1031,10 @@ static uint32_t graph_sig(int play)
         h ^= steps_hash(t) + ph * 31u + ui.cursor * 7919u + ui.lane * 104723u + ui.bank * 613u;
         h ^= tessera_sig(trk_index(t)) * 2654435761u;
     }
+    if (pg->graph == GR_TWEAK && trk_index(t) < TESSERA_TRACKS) {   /* (its values live outside the track's p[]) */
+        const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
+        h ^= ((uint32_t)(uint8_t)ev->shift | (uint32_t)ev->drop << 8 | (uint32_t)ev->human << 16 | (uint32_t)ev->follow << 24) * 2246822519u;
+    }
     return h;
 }
 static uint32_t graph_signature(void) { return graph_sig(1); }
@@ -1264,6 +1316,10 @@ static void draw_graph(void)
             break;
         case GR_EVOLVE:
             graph_evolve(t, c);
+            break;
+        case GR_TWEAK:
+            cv_oy = 0;
+            graph_tweak(t, c);
             break;
         case GR_STEPS:
             graph_steps(t, c);
