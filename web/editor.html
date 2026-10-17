@@ -1951,7 +1951,7 @@ function makeMockDevice(opt = {}) {
     ...Array.from({length:8},()=>D("",F.INT,0,127,0)),
     E("MIDI", ["USB", "TRS"], 0), E("DRUM", ["OFF", ...Array.from({ length: 16 }, (_, i) => String(i + 1))], 10), E("ROUT", ["CH1-4", "SEL", "CH5-8", "CH9-12", "CH13-16"], 0), D("CPU", F.INT, 0, 0, 0),
     D("SLOT", F.INT, 1, 5, 1), E("BOOT", ["OFF", "A", "B", "C", "D"], 0), E("LOAD", NGO, 0), E("SAVE", NGO, 0),
-    E("ENG", ["-", "-", "-", "SID", "-", "-", "-", "-",
+    E("ENG", ["-", "-", "-", "SID", "-", "-", "TRIO", "-",
       "-", "-", "DRUM", "-", "FM6", "-", "-", "CZ-1", "-", "-", "-", "PROPHET"], 0), D("A4", F.INT, 400, 480, 440, null, "Hz"),
     E("CLRSQ", NGO, 0), E("INIT", NGO, 0),
     ...Array.from({length:3},()=>D("",F.INT,0,127,0)),
@@ -1985,7 +1985,13 @@ function makeMockDevice(opt = {}) {
         P("NOISE SWEEP", [0,3,0,64,40,12,1,60], [63,97,40,97], 0), P("DATA STORM", [1,3,1,64,80,10,0,40], [0,85,60,78], 0)] },
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},   /* 5: retired VOICE; stored ID reserved */
-    {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
+    { name: "TRIO", titles: ["OSC", "TONE"], edit: [E("WAVE", ["SAW3", "PLS3", "PPT", "SST", "TRI3", "S&T", "P&S", "P+N", "NOIS", "SYNC",
+        "SYNCP", "SYNC3", "RING", "RING3", "R+S", "R+SP"], 0), D("INT2", F.SEMI, -24, 24, 0), D("INT3", F.SEMI, -24, 24, -12),
+        D("DTN", F.INT, 0, 50, 6, null, "ct"), E("MODE", ["LP", "BP", "HP", "NOT"], 0), D("CUT", F.CUTOFF, 0, 127, 80),
+        D("RES", F.PCT, 0, 127, 40), D("PW", F.PCT, 0, 127, 64)],
+      presets: [P("FAT BASS", [0,0,-12,9,0,62,45,64], [0,62,60,25], 1), P("ARP LEAD", [2,12,0,4,0,88,25,32], [0,60,90,30], 0),
+        P("SYNC LEAD", [9,9,0,0,0,82,30,64], [2,70,100,40], 1), P("RING BELL", [13,0,18,6,1,96,30,64], [0,92,0,80], 0),
+        P("CHIP CHOIR", [1,0,12,7,1,62,95,40], [70,90,110,85], 0)] },
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
@@ -2697,7 +2703,7 @@ function aliasOf(names, i) { const k = names ? names.indexOf(names[i]) : -1; ret
 /* the order the device shows its engines in (src/engines.c ENGINE_ORDER): the lists here follow it, the protocol keeps
    the engine numbers. engineOrder(names): the indices of names in that order, "-" (a reserved number) left out; a name
    the list does not know (another firmware) follows in index order */
-const ENGINE_ORDER = ["PROPHET", "ANALOG", "FM6", "DIGITAL", "PHASE", "CZ-1", "SID", "VOICE", "NOISE",
+const ENGINE_ORDER = ["PROPHET", "ANALOG", "FM6", "DIGITAL", "PHASE", "CZ-1", "SID", "TRIO", "VOICE", "NOISE",
   "DRUM"];
 function engineOrder(names) {
   const rank = (n) => { const k = ENGINE_ORDER.indexOf(n); return k < 0 ? ENGINE_ORDER.length : k; };

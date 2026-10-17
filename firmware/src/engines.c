@@ -111,7 +111,7 @@ static const engine_t *const ENGINES[NENGINES] = {
 #else
     &ENG_RETIRED,                /* 5: retired VOICE; stored ID reserved */
 #endif
-#if MELODEE_LEGACY_EXTRAS
+#if TRIO_ON
     &ENG_TRIO,
 #else
     &ENG_RETIRED,                /* 6: retired TRIO; stored ID reserved */
@@ -202,6 +202,9 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
     ENGI_CZ,                     /* CZ-1 */
 #endif
     3,                           /* SID */
+#if MELODEE_TRIO
+    6,                           /* TRIO */
+#endif
 #endif
 #if MELODEE_PLAITS
     ENGI_MACRO,                  /* MACRO */
@@ -219,7 +222,7 @@ static int eng_extra_retired(uint32_t e)
 #if !MELODEE_PROPHET_PROTOTYPE
     if (e == ENGI_ANALOG) return 1;
 #endif
-    return e == ENGI_DIGITAL || (!MELODEE_LEGACY_EXTRAS && (e == 2u || e == 5u || e == 6u || e == 7u || e == 9u || e == 11u));
+    return e == ENGI_DIGITAL || (!MELODEE_LEGACY_EXTRAS && (e == 2u || e == 5u || (e == 6u && !MELODEE_TRIO) || e == 7u || e == 9u || e == 11u));
 }
 /* the engines one can pick, in ENGINE_ORDER: eng_ok(e), the n-th of them
  * eng_vis(n), e's place among them eng_rank(e), the next / previous one eng_step(e, dir) (wraps) */
