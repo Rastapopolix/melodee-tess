@@ -333,6 +333,13 @@ static void sheet_input(int32_t k1, int32_t k2, uint32_t oct)
 /* knob c turned on a page: its picker when its value is a name from a long list; another knob: the picker goes.
  * Not on a screen of its own: SCALES is the scales' list itself (Kerem: the picker covered it) */
 static int own_screen(void);                            /* ui_draw.c */
+#if MELODEE_LOOK                                        /* the Mono look's lists (ui_mono.c) */
+static void mo_sheet(void);
+static void mo_pick(int32_t col, int32_t count, int32_t cur, int32_t first, int32_t rows,
+                    const char *(*name)(int32_t, int32_t *));
+static void mo_vlist(const char *title, const char *const *names, int32_t count, int32_t sel, int32_t now,
+                     int32_t first, int32_t rows);
+#endif
 /* a list of numbers (a MIDI channel, an algorithm, an envelope step; one name such as OFF among them): its value steps
  * on the card as MIDI's and ROUT's do, no picker (Kerem, 2026-10-11) */
 static int pick_numbers(const param_desc_t *d)
@@ -446,6 +453,19 @@ static void vlist_draw(void)
         return;
     pop.sig = sig;
     first = clamp(enum_rank(d,vl.sel) - 3, 0, enum_rows(d) - n);
+#if MELODEE_LOOK
+    {
+        char nm[7][20], t[20];
+        const char *np[7];
+        for (i = 0; i < n; i++) {
+            menu_words(nm[i], d->names[enum_value(d, first + i) - d->min], sizeof nm[i]);
+            np[i] = nm[i];
+        }
+        menu_words(t, d->label, sizeof t);
+        mo_vlist(t, np, enum_rows(d), enum_rank(d, vl.sel), enum_rank(d, *vp), first, n);
+        return;
+    }
+#endif
     h = 30 + n * 20 + 6;
     y0 = 236 - h;
     for (top = 0; top < h; ) {                          /* in slices between rows (a canvas holds 124 rows) */
@@ -491,6 +511,10 @@ static void sheet_draw(void)
     if (!ui.force && sig == pop.sig)
         return;
     pop.sig = sig;
+#if MELODEE_LOOK
+    mo_sheet();
+    return;
+#endif
     for (top = 0; top < h; ) {                          /* in slices between rows (a canvas holds 124 rows) */
         int32_t sh = h - top <= 124 ? h - top : 28 + (top + 124 - 28) / POP_ROW * POP_ROW - top;
         cv_begin(POP_W, (uint32_t)sh, T_BG);
@@ -567,6 +591,10 @@ static void pick_draw(void)
     int32_t first = clamp(cur - (rows - 1) / 2, 0, count - rows);   /* the names around it, the list's ends kept */
     x = 4 + 60 * (int32_t)(pop.col < 3u ? pop.col : 2u);   /* its column and the next (the last: the two last), whole:
                                                          * a neighbour's value is under it entirely or not at all */
+#if MELODEE_LOOK
+    mo_pick((int32_t)pop.col, count, cur, first, rows, pick_name);
+    return;
+#endif
     cv_begin(POP_PICK_W, (uint32_t)h, T_BG);
     cv_rrect(0, 0, POP_PICK_W, h, 10, T_LINE, T_BG);
     cv_rrect(1, 1, POP_PICK_W - 2, h - 2, 9, T_SURF, T_LINE);

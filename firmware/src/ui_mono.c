@@ -643,6 +643,120 @@ static void mo_picture(void)
     }
 }
 
+/* ---- lists over the page: a list knob's picker, OCT+'s whole list, the OCT+ sheets ---- */
+/* a frame of w x h cells at (x, y) on the screen, a title row (if any), the rows 10 cells each: the one picked
+ * inverted across the frame (a clear cell inside it), the value now a dot at the right, a value right-aligned; more
+ * above or below the rows shown: a notch on the frame. Drawn in slices of 120 px (a canvas's height) */
+typedef struct { char name[20], val[12]; uint8_t dim, warn; } mo_row_t;
+static void mo_ascii(char *d, const char *s, uint32_t n)   /* the 5 x 7 font's: an ellipsis (0x85) three dots, other
+                                                         * characters past it left out */
+{
+    uint32_t k = 0;
+    for (; *s && k + 1u < n; s++)
+        if ((uint8_t)*s == 0x85u)
+            for (uint32_t j = 0; j < 3u && k + 1u < n; j++) d[k++] = '.';
+        else if ((uint8_t)*s < 0x80u)
+            d[k++] = *s;
+    d[k] = 0;
+}
+static void mo_list(int32_t x, int32_t y, int32_t w, const char *title, const char *sub, const mo_row_t *row,
+                    int32_t rows, int32_t sel, int32_t now, int more_up, int more_down)
+{
+    int32_t y0 = title ? 12 : 2, h = y0 + rows * 10 + 1, top, i;
+    for (top = 0; top < h * 2; top += 120) {
+        int32_t sh = h * 2 - top < 120 ? h * 2 - top : 120;
+        cv_begin((uint32_t)w * 2u, (uint32_t)sh, MO_BG);
+        cv_oy = -top;
+        mo_box(0, 0, w, h, MO_INK);
+        if (title) {
+            char t[24];
+            mo_cut(t, title, (uint32_t)(w - 6) / 6u);
+            mo_text(t, 3, 2, MO_INK);
+            if (sub && sub[0] && mo_tw(t) + mo_tw(sub) + 10 < w)
+                mo_textr(sub, w - 3, 2, MO_DIM);
+            mo_hl(1, 10, w - 2, MO_INK);
+        }
+        for (i = 0; i < rows; i++) {
+            int32_t r = y0 + i * 10, on = i == sel;
+            uint16_t ink = on ? MO_BG : row[i].dim ? MO_DIM : MO_INK;
+            char t[24], a[24];
+            mo_ascii(a, row[i].name, sizeof a);
+            mo_cut(t, a, (uint32_t)(w - 8 - (row[i].val[0] ? mo_tw(row[i].val) + 4 : 0)) / 6u);
+            if (row[i].warn && str_len(t) + 2u < sizeof t)
+                str_cpy(t + str_len(t), " !", 3);   /* (a row that erases: red in the detailed look) */
+            if (on)
+                mo_fill(2, r, w - 4, 9, MO_INK);
+            mo_text(t, 4, r + 1, ink);
+            if (row[i].val[0])
+                mo_textr(row[i].val, w - 4, r + 1, on ? MO_BG : MO_DIM);
+            else if (i == now)
+                mo_disc(w - 7, r + 4, 2, ink);
+        }
+        if (more_up)
+            mo_hl(w / 2 - 3, 0, 7, MO_BG), mo_px(w / 2, 0, MO_INK);
+        if (more_down)
+            mo_hl(w / 2 - 3, h - 1, 7, MO_BG), mo_px(w / 2, h - 1, MO_INK);
+        cv_oy = 0;
+        cv_blit((uint32_t)x * 2u, (uint32_t)(y * 2 + top));
+    }
+}
+/* the picker (pick_draw): the names around the value, under its knob's label, over its column and the next */
+static void mo_pick(int32_t col, int32_t count, int32_t cur, int32_t first, int32_t rows,
+                    const char *(*name)(int32_t, int32_t *))
+{
+    mo_row_t r[8];
+    int32_t i, tr;
+    if (rows > 8) rows = 8;
+    for (i = 0; i < rows; i++) {
+        str_cpy(r[i].name, name(first + i, &tr), sizeof r[i].name);
+        r[i].val[0] = 0, r[i].warn = 0;
+        r[i].dim = first + i - cur > 1 || cur - first - i > 1;
+    }
+    mo_list(1 + 30 * (col < 3 ? col : 2), 20, 58, 0, 0, r, rows, cur - first, -1, first > 0, first + rows < count);
+}
+/* OCT+'s whole list (vlist_draw): the list's name, the names around the one picked, the value now a dot; at the
+ * bottom of the screen, its width */
+static void mo_vlist(const char *title, const char *const *names, int32_t count, int32_t sel, int32_t now,
+                     int32_t first, int32_t rows)
+{
+    mo_row_t r[8];
+    int32_t i;
+    char pos[12];
+    if (rows > 8) rows = 8;
+    for (i = 0; i < rows; i++) {
+        str_cpy(r[i].name, names[i], sizeof r[i].name);
+        r[i].val[0] = 0, r[i].dim = 0, r[i].warn = 0;
+    }
+    fmt_int(pos, sel + 1);                              /* where it is in the whole list: 3/12 */
+    str_cpy(pos + str_len(pos), "/", 2);
+    fmt_int(pos + str_len(pos), count);
+    mo_list(0, 120 - (12 + rows * 10 + 1), 120, title, pos, r, rows, sel - first, now - first, first > 0,
+            first + rows < count);
+}
+
+/* an OCT+ sheet (sheet_draw): its title and subtitle, a row an action, its value at the right */
+static void mo_sheet(void)
+{
+    mo_row_t r[10];
+    int32_t i, n = pop.n, first = 0, rows;
+    rows = n < 10 ? n : 10;
+    first = clamp((int32_t)pop.sel - (rows - 1) / 2, 0, n - rows);
+    for (i = 0; i < rows; i++) {
+        const sheet_row_t *sr = &pop.rows[first + i];
+        str_cpy(r[i].name, sr->label, sizeof r[i].name);
+        r[i].val[0] = 0;
+        if (sr->value) {
+            char v[20];
+            sr->value(v);
+            mo_ascii(r[i].val, v, sizeof r[i].val);
+        }
+        r[i].dim = 0;
+        r[i].warn = sr->cf != 0;
+    }
+    mo_list(0, 120 - (12 + rows * 10 + 1), 120, pop.title, pop.sub, r, rows, (int32_t)pop.sel - first, -1, first > 0,
+            first + rows < n);
+}
+
 /* what the page shows: drawn again only when it changes */
 static uint32_t mo_signature(void)
 {
