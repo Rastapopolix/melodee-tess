@@ -67,28 +67,65 @@ Generator settings, seeds, FORM sections and the cords are saved with the projec
 
 ## Visual Reference Gallery
 
-*Screens from v1.1: the generator settings were on SEQ's PATTERN page then; they are on GEN now.*
+*The pages as v1.3.1 draws them, rendered on the host from the firmware's own drawing code (`tests/gallery_render.c` in the firmware sources) and shown at 2x.*
 
-### 1. Turing Engine
-![Turing Engine](assets/02_Pattern_Turing.jpg)
+### Sequencing
 
-### 2. Euclidean Engine
-![Euclid Engine](assets/03_Pattern_Euclid.jpg)
+<table>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/seq_mode.png" alt="SEQ MODE" width="240"><br><b>SEQ MODE</b><br><sub>Tap SEQ for GEN: KNOB 1 picks STEP, ARP or a generator, and SEQ then shows only that mode's pages.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/home.png" alt="HOME" width="240"><br><b>HOME</b><br><sub>The four tracks, their sounds and knobs, with the scope below.</sub></td>
+</tr>
+</table>
 
-### 3. Markov Engine
-![Markov Engine](assets/04_Pattern_Markov.jpg)
+### Generators
 
-### 4. Morph Engine
-![Morph Engine](assets/05_Pattern_Morph.jpg)
+<table>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_turing.png" alt="Turing" width="240"><br><b>Turing</b><br><sub>A looping shift register: LENGTH, PROB (Lock holds the loop), SPAN.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_euclid.png" alt="Euclid" width="240"><br><b>Euclid</b><br><sub>Euclidean rhythms: STEPS, PULSE, ROT, on pitches from the track's seed.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_markov.png" alt="Markov" width="240"><br><b>Markov</b><br><sub>A random walk over 8 scale degrees: LEAP, DENS, SPAN.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_morph.png" alt="Morph" width="240"><br><b>Morph</b><br><sub>A rhythm blended between two preset patterns: POS, SNP A, SNP B.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_grids.png" alt="Grids" width="240"><br><b>Grids</b><br><sub>Grids' drum map, kick, snare and hat: X, Y, DENS.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_bounce.png" alt="Bounce (new)" width="240"><br><b>Bounce (new)</b><br><sub>Balls bouncing in a box, a note at each wall hit: SPEED, ANGLE, BALLS.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_awake.png" alt="Awake (new)" width="240"><br><b>Awake (new)</b><br><sub>Two loops in the style of norns' Awake, steps settable from the keys: LEN A, LEN B, PROB.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_poly.png" alt="Poly (new)" width="240"><br><b>Poly (new)</b><br><sub>Four notes stepped on by four rhythms over up to 3 octaves: RHY, DIVISION, SPAN.</sub></td>
+</tr>
+</table>
 
-### 5. Evolve Page
-![Evolve Page](assets/06_Evolve.jpg)
+### Shaping the phrase
 
-### 6. Form Page
-![Form Page](assets/07_Form.jpg)
+<table>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_evolve.png" alt="EVOLVE" width="240"><br><b>EVOLVE</b><br><sub>Mutates the phrase every few bars: LOCK, EVERY, AMOUNT; ROLL picks the seed.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_tweak.png" alt="TWEAK" width="240"><br><b>TWEAK</b><br><sub>SHIFT, DROP, HUMAN and FOLLOW, each drawn on the page.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/help.png" alt="Help card" width="240"><br><b>Help card</b><br><sub>Hold ARP and turn a knob to see what it does.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/cords.png" alt="MODS" width="240"><br><b>MODS</b><br><sub>Tap LFO for 16 modulation cords between any source and destination, generators included.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/mod_shortcut.png" alt="Mod shortcut" width="240"><br><b>Mod shortcut</b><br><sub>Hold FX and turn a knob to set how far a cord moves that parameter.</sub></td>
+</tr>
+</table>
 
-### 7. Tweak Page
-![Tweak Page](assets/08_Tweak.jpg)
+### Sound engines
+
+<table>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/edit_sid.png" alt="SID" width="240"><br><b>SID</b><br><sub>The C64 chip, 6581 or 8580 model.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/edit_trio.png" alt="TRIO" width="240"><br><b>TRIO</b><br><sub>Three oscillators: WAVE, INT2, INT3, DETUNE.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/edit_phys.png" alt="PHYS" width="240"><br><b>PHYS</b><br><sub>Physical modelling (Rings / DaisySP): MODEL, STRC, BRIT, DAMP.</sub></td>
+</tr>
+</table>
 
 ---
 
