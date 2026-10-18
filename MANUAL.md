@@ -1,18 +1,24 @@
 # Melodee (Tess) manual
 
-This covers what Tess adds to Melodee, as in **v1.2.7**: the generators, the GEN pages, seeds, the modulation
-cords (MODS) and the help card. Everything else (the sound engines, the step sequencer, the effects, saving)
-works as in upstream [Melodee](https://github.com/keremimo/melodee).
+This covers what Tess adds to Melodee, as in **v1.3.1**: the generators, the SEQ MODE pages, seeds, the modulation
+cords (MODS), the mod shortcut and the help card. Everything else (the step sequencer, the effects, saving) works as
+in upstream [Melodee](https://github.com/keremimo/melodee).
+
+**Sound engines.** v1.3.1 offers SID, TRIO, PHYS and DRUM. FM6, CZ-1 and Prophet are not in the build: a track
+saved with one of them loads SID INIT. [v1.2.7](https://github.com/Rastapopolix/melodee-tess/releases/tag/v1.2.7)
+still has them.
 
 Page and knob names are the ones on the screen. KNOB 1 to KNOB 4 are the four knobs left to right, and each
 page's four settings sit along the top of the screen in the same order.
 
 - [Shortcuts](#shortcuts)
+- [SEQ and the MODE](#seq-and-the-mode)
 - [The generators (GEN)](#the-generators-gen)
 - [EVOLVE: mutation, LOCK and ROLL](#evolve-mutation-lock-and-roll)
 - [FORM: sections](#form-sections)
 - [TWEAK: shift, drop, human, follow](#tweak-shift-drop-human-follow)
 - [MODS: the modulation cords](#mods-the-modulation-cords)
+- [Mod shortcut](#mod-shortcut)
 - [Saving](#saving)
 - [Recipe: Grids variations that repeat](#recipe-grids-variations-that-repeat)
 
@@ -22,11 +28,13 @@ page's four settings sit along the top of the screen in the same order.
 
 | Do this | And this happens |
 |---|---|
-| Tap **ARP** | Opens the GEN pages, on the one you used last (GEN the first time). |
-| Tap **ARP** again | Next page: **GEN**, **EVOLVE**, **FORM**, **TWEAK**, then the arpeggiator's **ARP** and **ARP 2**, and round again. |
+| Tap **SEQ** | Opens **GEN** first, then the pages of the track's MODE (see [SEQ and the MODE](#seq-and-the-mode)). |
+| **GEN**, KNOB 1 | **MODE**: STEP, ARP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE or POLY for the selected track. |
+| Tap **ARP** | Switches the track to ARP's MODE and opens **ARP**; tap again for **ARP 2**. |
 | Hold **ARP** and turn any knob | **Help**: a card with that knob's parameter, its value and what it does. The value is not changed. Let go of ARP to close it (no page opens). Works on every page. |
+| Hold **FX** and turn any knob | **Mod shortcut**: sets how far a cord moves that knob's parameter (see [Mod shortcut](#mod-shortcut)). |
+| **GEN** on an AWAKE track, a white key | Picks that step: KNOB 1 sets its A, KNOB 2 its B. The same key lets it go. |
 | Tap **LFO** until **MODS** | The cords page, after LFO, LFO 2 and LFO DEST. MODS replaces upstream's MOD page. |
-| **GEN**, KNOB 1 | **MODE**: STEP, TURING, EUCLID, MARKOV, MORPH or GRIDS for the selected track. |
 | **EVOLVE**, KNOB 4 (**ROLL**) | Each click is a new seed (1 to 128), so a new line. Turn back to hear the previous one again, note for note. A quick turn jumps further. While playing, the new line starts on the track's next bar line and the number blinks until then. |
 | **FORM**, KNOB 1 with EVERY OFF | Turning FORM on sets EVERY to 4 bars, so the sections have a length. |
 | **FORM**, KNOB 3 (**CLEAR**) | Turn it either way: B and C are forgotten and the section playing becomes A. |
@@ -36,10 +44,26 @@ page's four settings sit along the top of the screen in the same order.
 
 ---
 
+## SEQ and the MODE
+
+SEQ holds the step sequencer, the arpeggiator and the generators. Tap **SEQ** for **GEN**, where **KNOB 1, MODE**
+picks what the selected track plays. SEQ then shows only that mode's pages:
+
+| MODE | SEQ's pages |
+|---|---|
+| **STEP** | GEN, NOTES, PATTERN, TEMPO, PATTERNS, SONG |
+| **ARP** | ARP, ARP 2, NOTES, PATTERN, TEMPO, PATTERNS, SONG, GEN |
+| a generator | GEN, EVOLVE, FORM, TWEAK, PATTERN, TEMPO, PATTERNS, SONG |
+
+MOTION and DRUM HIT appear as in upstream. The **ARP** button switches the track to ARP and opens its page.
+Choosing STEP or a generator turns the arpeggiator off; choosing ARP again brings back its last setting.
+
+---
+
 ## The generators (GEN)
 
 Each of the four tracks can play its own steps (**STEP**, upstream's sequencer) or have its notes made by a
-generator. Tap **ARP** for the **GEN** page and pick one with **KNOB 1, MODE**. KNOB 2 to 4 are the
+generator. Tap **SEQ** for the **GEN** page and pick one with **KNOB 1, MODE**. KNOB 2 to 4 are the
 generator's own settings:
 
 | MODE | KNOB 2 | KNOB 3 | KNOB 4 | What it plays |
@@ -49,6 +73,13 @@ generator's own settings:
 | **MARKOV** | LEAP (0–100) | DENS (5–100) | SPAN (1–3 oct) | A random walk over 8 scale degrees. LEAP 0 moves to neighbours, 100 leaps widely. DENS is the chance a step plays. |
 | **MORPH** | POS (0–127) | SNP A (0–7) | SNP B (0–7) | A rhythm blended from preset A (POS 0) into preset B (POS full). |
 | **GRIDS** | X (0–255) | Y (0–255) | DENS (0–100) | Mutable Instruments Grids' drum map: kick, snare and closed hat (notes 36, 38, 42) from the point X, Y; between patterns, a blend. Best on a DRUM track. |
+| **BOUNCE** | SPEED (1–64) | ANGLE (0–90°) | BALLS (1–4) | Balls bouncing in a box: a note where a ball hits a wall. Faster means more hits. 0° and 90° go back and forth; an angle between draws a longer loop. Each extra ball starts from its own place and angle; balls hitting on the same step play together, three notes at most. |
+| **AWAKE** | LEN A (1–16) | LEN B (1–16) | PROB (0–100) | Two loops, as norns' Awake. A is the melody (scale degrees or rests); B lifts it up the scale. Lengths that differ shift B against A. PROB is the chance each of A's notes plays. ROLL draws the loops, EVOLVE changes a few steps. Set steps by hand from the keys (below). |
+| **POLY** | RHY (1–4) | DIV (OFF, 1–16) | SPAN (1–3 oct) | Four notes stepped on by four rhythms. RHY picks which rhythm DIV edits: every how many steps it moves the notes on. Rhythms that land together play once, louder: 4 against 3 is a polyrhythm. SPAN spreads the notes over up to 3 octaves. |
+
+**AWAKE step entry.** On GEN with an AWAKE track, the keys are its steps and play no sound. A white key picks a
+step: KNOB 1 sets its A value, KNOB 2 its B. Press the same key again, or leave the page, to go back to the usual
+knobs.
 
 With **STEP** selected, KNOB 2 to 4 are the step sequencer's DIV, SWING and GATE. SEQ's **PATTERN** page is
 upstream's (LEN, DIV, SWING, GATE). The generators run at the track's DIV and play in the track's scale (SCL).
@@ -93,6 +124,9 @@ first time they are reached. Changing MODE or ROLL starts the form again at A.
 
 ## TWEAK: shift, drop, human, follow
 
+The page draws its four settings: SHIFT as a bar raised from a dashed home line, DROP as eight hits with the dropped
+ones hollow, HUMAN as uneven velocity bars, and FOLLOW as the four tracks with the followed one lit.
+
 | Knob | Setting | What it does |
 |---|---|---|
 | 1 | **SHIFT** (±24) | Transposes by semitones; while following, by scale steps from the followed note. |
@@ -126,10 +160,24 @@ MODS is a modulation bus: 16 cords, each from a source on any track to a destina
 
 ---
 
+## Mod shortcut
+
+Hold **FX** and turn a knob on any page: a cord from the track's shortcut source (its LFO, unless you pick
+another by turning SELECT while FX is held) to that knob's parameter on the same track. Turning sets the cord's
+amount, −100 to +100 %, like the attenuverter beside a knob on a Mutable module.
+
+- The first turn makes the cord in a free MODS slot; back at 0 the slot is free again.
+- If a cord in MODS already reaches that parameter on this track, that cord is the one edited, whatever its source.
+- A parameter no cord can reach shows **no mod** and stays as it is.
+- While FX is held, the four knobs' amounts show over the page. Letting FX go closes them; no page opens.
+
+---
+
 ## Saving
 
 Generator settings, seeds, sections and cords are saved with the project, in their own block next to it.
-Projects saved by earlier Tess versions load and convert. Stock Melodee projects load with every track on STEP.
+Projects saved by earlier Tess versions load and convert (the format is TSR4 since v1.3.1; BOUNCE, AWAKE and POLY
+start from their defaults on older projects). Stock Melodee projects load with every track on STEP.
 
 ---
 

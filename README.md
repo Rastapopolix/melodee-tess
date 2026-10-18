@@ -35,23 +35,26 @@ The build outputs `melodee-tess.fwsc` (standard, dual core) and `melodee-tess-1c
 
 The short version:
 
-* **Tap ARP** for the generator pages: **GEN**, **EVOLVE**, **FORM**, **TWEAK**, then the arpeggiator's ARP and ARP 2. Tap again for the next page.
-* **GEN, KNOB 1 (MODE)** switches a track between the step sequencer (`STEP`) and a generator:
+* **Tap SEQ** for **GEN**, where **KNOB 1 (MODE)** picks what the track plays; SEQ then shows only that mode's pages. The modes are the step sequencer (`STEP`), the arpeggiator (`ARP`, also the ARP button) and the generators:
   * **Turing**: a looping shift register in the style of a Turing Machine (`LENGTH`, `PROB`, `SPAN`).
   * **Euclid**: Euclidean rhythms (`STEPS`, `PULSE`, `ROT`) on pitches picked by the track's seed.
   * **Markov**: a random walk over 8 scale degrees (`LEAP`, `DENS`, `SPAN`).
   * **Morph**: a rhythm blended between two preset patterns (`POS`, `SNP A`, `SNP B`).
   * **Grids**: Mutable Instruments Grids' drum map, kick, snare and hat (`X`, `Y`, `DENS`).
+  * **Bounce**: balls bouncing in a box, a note at each wall hit (`SPEED`, `ANGLE`, `BALLS`).
+  * **Awake**: two loops in the style of norns' Awake, steps settable from the keys (`LEN A`, `LEN B`, `PROB`).
+  * **Poly**: four notes stepped on by four rhythms (`RHY`, `DIV`, `SPAN`).
 * **EVOLVE** mutates the phrase every few bars (`LOCK`, `EVERY`, `AMOUNT`); **ROLL** picks the track's seed, a line you can always come back to.
 * **FORM** builds sections A, B and C into forms such as `AABA`; **TWEAK** transposes, thins, humanises or follows another track.
 * **Tap LFO to MODS** for 16 modulation cords between any source and destination on any track, generators included.
+* **Hold FX and turn a knob** to set how far a cord modulates that knob's parameter.
 * **Hold ARP and turn a knob** to see what that knob does.
 
 ---
 
 ## Saving & Storage
 
-Generator settings, seeds, FORM sections and the cords are saved with the project, in their own flash object (`OBJ_TESSERA` at `0x9D000`) because the main project record is near capacity. The current block format is version 3 ("TSR3", with Grids); projects and backups saved by earlier Tess versions still load and convert.
+Generator settings, seeds, FORM sections and the cords are saved with the project, in their own flash object (`OBJ_TESSERA` at `0x9D000`) because the main project record is near capacity. The current block format is version 4 ("TSR4", with Bounce, Awake and Poly); projects and backups saved by earlier Tess versions still load and convert.
 
 * **Tagging & Validation**: Each slot's block carries a hash of its parent project record. If hashes mismatch, the project loads with Tessera `OFF` to prevent stale data. Every field is range-checked.
 * **Compatibility**: Projects saved by stock Melodee load normally with Tessera `OFF`, and projects saved by this fork remain readable.
