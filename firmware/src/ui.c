@@ -233,8 +233,48 @@ static int native_page(uint32_t i, uint32_t fam)       /* page i: one of fam's n
     return 0;
 }
 
+/* Tessera: SEQ holds the generators' and ARP's pages too (they keep ARP's family, so the keys stay notes there) and
+ * shows the track's MODE's only: STEP (NOTES), ARP (ARP, ARP 2), a generator (EVOLVE, FORM, TWEAK); GEN (MODE) and the
+ * rest always. MODE: 0 STEP, 1 ARP (ARP's MODE not OFF), 2.. the generators (tessera.mode + 1) */
+static uint32_t fam_grp(uint32_t f) { return f == FAM_ARP ? FAM_SEQ : f; }
+static int in_fam(uint32_t i, uint32_t fam) { return fam_grp(PAGES[i].fam) == fam_grp(fam); }
+static uint32_t seqm_get(uint32_t tr)
+{
+    tr %= NTRK;
+    return tr < TESSERA_TRACKS && tessera.mode[tr] ? 1u + tessera.mode[tr] : trk[tr].p[P_AMODE] ? 1u : 0u;
+}
+static void seqm_set(uint32_t tr, int32_t v)
+{
+    static uint8_t arp_last[NTRK];                      /* ARP's MODE before STEP or a generator turned it OFF */
+    tr %= NTRK;
+    v = v < 0 ? 0 : v > TESS_ENG_COUNT ? TESS_ENG_COUNT : v;
+    if ((uint32_t)v == seqm_get(tr)) return;
+    if (tr < TESSERA_TRACKS) {
+        tessera_awake_select(tr, 16u);                  /* (AWAKE's step picked: let go) */
+        tessera_param_set(tr, TX_MODE, v >= 2 ? v - 1 : 0);
+    }
+    if (v == 1) {
+        if (!trk[tr].p[P_AMODE]) trk[tr].p[P_AMODE] = (int16_t)(arp_last[tr] ? arp_last[tr] : 1u);   /* (UP) */
+    } else if (trk[tr].p[P_AMODE]) {
+        arp_last[tr] = (uint8_t)trk[tr].p[P_AMODE];
+        trk[tr].p[P_AMODE] = 0;                         /* (seq.c lets its notes go) */
+    }
+}
+static int seqm_page_ok(uint32_t i)                     /* (the page shown stays until it is left, as MOTION) */
+{
+    const page_t *p = &PAGES[i];
+    uint32_t m = seqm_get(song.sel);
+    if (!ui.home && ui.page == i) return 1;
+    if (p->graph == GR_EVOLVE || p->graph == GR_FORM || p->graph == GR_TWEAK) return m >= 2u;
+    if (p->fam == FAM_ARP && (p->graph == GR_ARP || p->graph == GR_NONE)) return m == 1u;
+    if (p->fam == FAM_SEQ && p->graph == GR_ROLL) return m < 2u;
+    return 1;
+}
+
 static int page_visible(uint32_t i)
 {
+    if (!seqm_page_ok(i))
+        return 0;
     if (PAGES[i].graph == GR_MOD)                       /* Tessera: MODS (the cords) instead, MOD's routes become */
         return 0;                                       /* cords (cord.c cord_adopt) */
     if(PAGES[i].fam==FAM_FX && PAGES[i].scope==SC_TRACK && PAGES[i].id[0]==P_FXSEND)
@@ -272,7 +312,7 @@ static uint32_t page_first(uint32_t fam)
 {
     uint32_t i;
     for (i = 0; i < NPAGES; i++)
-        if (PAGES[i].fam == fam && page_visible(i))
+        if (in_fam(i, fam) && page_visible(i))
             return i;
     return 0;
 }
@@ -485,10 +525,10 @@ static void note_name(char *b, uint32_t n)
 /* SELECT: the open section's pages, both ways (wraps; pages the track does not show skipped) */
 static void page_scroll(int32_t dir)
 {
-    uint32_t fam = cur_page()->fam, n, i = ui.page;
+    uint32_t fam = fam_grp(cur_page()->fam), n, i = ui.page;
     for (n = 0; n < NPAGES; n++) {
         i = (i + (dir > 0 ? 1u : NPAGES - 1u)) % NPAGES;
-        if (PAGES[i].fam == fam && page_visible(i))
+        if (in_fam(i, fam) && page_visible(i))
             break;
     }
     if (i == ui.page)
@@ -527,11 +567,11 @@ static void open_family(uint32_t fam)
         ui.page = !ui.home && k < n ? pg[(k + 1u) % n]                 /* again: the next one; from elsewhere the */
                   : native_page(ui.fam_last[fam], fam) && fam_has(fam, ui.fam_last[fam]) ? ui.fam_last[fam] : pg[0];
                                                                         /* engine's page last used, else its first */
-    } else if (!ui.home && cur_page()->fam == fam) {   /* same button again: next page */
+    } else if (!ui.home && in_fam(ui.page, fam)) {   /* same button again: next page */
         uint32_t n, i = ui.page;
         for (n = 0; n < NPAGES; n++) {
             i = (i + 1u) % NPAGES;
-            if (PAGES[i].fam == fam && page_visible(i)) break;
+            if (in_fam(i, fam) && page_visible(i)) break;
         }
         ui.page = (uint8_t)i;
     } else if (fam == FAM_SAVE) {
@@ -540,7 +580,7 @@ static void open_family(uint32_t fam)
             if (PAGES[i].graph == GR_USER) break;
         ui.page = (uint8_t)i;                         /* SAVE enters the sound save screen directly */
     } else {
-        ui.page = ui.fam_last[fam] && PAGES[ui.fam_last[fam]].fam == fam && page_visible(ui.fam_last[fam]) ? ui.fam_last[fam]
+        ui.page = ui.fam_last[fam] && in_fam(ui.fam_last[fam], fam) && page_visible(ui.fam_last[fam]) ? ui.fam_last[fam]
                                                                           : (uint8_t)page_first(fam);
     }
     ui.fam_last[fam] = ui.page;

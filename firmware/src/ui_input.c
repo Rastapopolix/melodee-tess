@@ -189,6 +189,8 @@ static void ui_leds(void)
         led_pos_init();
         ready = 1;
     }
+    if (fam == FAM_ARP && cur_page()->graph != GR_ARP && cur_page()->graph != GR_NONE)
+        fam = FAM_SEQ;                                  /* (GEN EVOLVE FORM TWEAK: SEQ's, ui.c fam_grp) */
     if (!ui.layer || FAM_BTN[fam] != layer_btn())
         led_put(nl, panel.btn[FAM_BTN[fam]], 1);
     if ((k = arp_led()) != 2u && (!ui.layer || layer_btn() != B_ARP))
@@ -812,6 +814,11 @@ static void edit_param(uint32_t slot, int32_t steps)
     if (pg->graph == GR_STEPS && pg->fam == FAM_GEN) {   /* GEN: the generator's knobs (PATTERN: upstream's) */
         uint32_t sel_tr = song.sel;
         if (sel_tr < TESSERA_TRACKS) {
+            if (slot == 0u && !(tessera.mode[sel_tr] == TESS_ENG_AWAKE && tessera_awake(sel_tr)->edit)) {
+                seqm_set(sel_tr, (int32_t)seqm_get(sel_tr) + steps);   /* MODE: STEP ARP and the generators (ui.c) */
+                ui.force = 1;
+                return;
+            }
             if (slot == 0u || tessera.mode[sel_tr] != TESS_ENG_OFF) {
                 tessera_knob(slot, steps);
                 ui.force = 1;
@@ -1448,6 +1455,20 @@ static void page_tap(uint32_t b)
     if (b == B_EDIT && !ui.home && (cur_page()->graph == GR_USER || cur_page()->graph == GR_SLOTS)) {
         name_rename();                                  /* SAVE > USER / PROJECT: EDIT renames the slot */
         return;
+    }
+    if (b == B_ARP) {                                   /* ARP: SEQ in ARP's MODE, its page (again: ARP 2, ARP) */
+        uint32_t i, a = NPAGES, a2 = NPAGES;
+        for (i = 0; i < NPAGES; i++)
+            if (PAGES[i].fam == FAM_ARP && PAGES[i].graph == GR_ARP) a = i;
+            else if (PAGES[i].fam == FAM_ARP && PAGES[i].graph == GR_NONE) a2 = i;
+        if (a < NPAGES && a2 < NPAGES) {
+            seqm_set(song.sel, 1);
+            ui.page = (uint8_t)(!ui.home && ui.page == a ? a2 : a);
+            ui.fam_last[FAM_SEQ] = ui.page;
+            ui.home = 0;
+            page_entered();
+            return;
+        }
     }
     for (f = FAM_HOME + 1u; f < FAM_COUNT; f++)
         if (FAM_BTN[f] == b) {

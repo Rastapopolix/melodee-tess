@@ -787,7 +787,7 @@ static void draw_columns(void)
             uint32_t m = tessera.mode[tr];
             char v1[16], v2[16], v3[16], u2[8] = "";
             if (m == TESS_ENG_OFF) {
-                draw_column(0, "MODE", "STEP", "", VAL(0u), -1, ICON_AUTO);
+                draw_column(0, "MODE", seqm_get(tr) ? "ARP" : "STEP", "", VAL(0u), -1, ICON_AUTO);
                 for (c = 1u; c < 4u; c++) {
                     int16_t *vp;
                     const param_desc_t *d = page_desc(cur_page(), c, &vp);

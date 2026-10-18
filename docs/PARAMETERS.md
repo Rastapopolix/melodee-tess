@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY | STEP | STEP plays the track's own steps; TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms. |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |

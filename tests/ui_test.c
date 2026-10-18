@@ -442,34 +442,64 @@ static int test_no_phrases(void)
 }
 
 static void go_title(const char *title);
-/* GEN (Tessera, ARP's tap): the generator page, EVOLVE, FORM, TWEAK, then the arpeggiator; SEQ keeps the step pages */
+/* SEQ (Tessera): GEN's MODE first, then the MODE's pages only (STEP: NOTES; ARP: ARP, ARP 2; a generator: EVOLVE,
+ * FORM, TWEAK), PATTERN TEMPO PATTERNS SONG always; ARP's tap: SEQ in ARP's MODE, ARP then ARP 2 */
+static const char *seq_taps(char *got, size_t cap, uint32_t n)   /* n SEQ taps from HOME: the titles */
+{
+    size_t used = 0;
+    got[0] = 0;
+    go_home();
+    while (n--) {
+        press(B_SEQ);
+        used += (size_t)snprintf(got + used, cap - used, "%s%s", used ? " " : "", ui.home ? "HOME" : cur_page()->title);
+        if (used >= cap) used = cap - 1u;
+    }
+    return got;
+}
 static int test_gen_family(void)
 {
-    static const char *const WANT[] = {"GEN", "EVOLVE", "FORM", "TWEAK", "ARP", "ARP 2", "GEN"};
-    char got[96] = "";
+    static const char STEP[] = "GEN NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
+                      GEN[] = "GEN EVOLVE FORM TWEAK PATTERN TEMPO PATTERNS SONG GEN";
+    char got[128];
     int bad = 0, in_seq = 0, pattern_seq = 0;
-    uint32_t k, n = 0, used = 0;
+    uint32_t k, n = 0;
     ui_power_on();
-    for (k = 0; k < sizeof WANT / sizeof WANT[0]; k++) {
-        press(B_ARP);
-        if (!ui.home && str_eq(cur_page()->title, WANT[k]))
-            n++;
-        used += (uint32_t)snprintf(got + used, sizeof got - used, "%s%s", k ? " " : "", ui.home ? "HOME" : cur_page()->title);
-        if (used >= sizeof got) used = sizeof got - 1u;
-    }
-    bad += check("ARP's taps: GEN EVOLVE FORM TWEAK ARP ARP 2, then GEN again", n == k);
-    if (n != k) printf("    got: %s\n", got);
+    bad += check("SEQ in STEP: GEN NOTES PATTERN TEMPO PATTERNS SONG, then GEN again", str_eq(seq_taps(got, sizeof got, 7), STEP));
+    if (!str_eq(got, STEP)) printf("    got: %s\n", got);
+    press(B_ARP);
+    n = !ui.home && str_eq(cur_page()->title, "ARP") && seqm_get(song.sel) == 1u && TSEL->p[P_AMODE];
+    press(B_ARP);
+    n &= str_eq(cur_page()->title, "ARP 2");
+    press(B_ARP);
+    n &= str_eq(cur_page()->title, "ARP");
+    bad += check("ARP's taps: ARP's MODE on (UP), its page, then ARP 2, ARP", n);
+    bad += check("SEQ in ARP: back to ARP (its last page), ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN", str_eq(seq_taps(got, sizeof got, 9), ARP));
+    if (!str_eq(got, ARP)) printf("    got: %s\n", got);
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);
+    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 9), GEN));
+    if (!str_eq(got, GEN)) printf("    got: %s\n", got);
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
+    TSEL->p[P_AMODE] = 0;
     for (k = 0; k < NPAGES; k++)
         if (PAGES[k].fam == FAM_SEQ && (PAGES[k].graph == GR_EVOLVE || PAGES[k].graph == GR_FORM || PAGES[k].graph == GR_TWEAK))
             in_seq++;
         else if (PAGES[k].fam == FAM_SEQ && str_eq(PAGES[k].title, "PATTERN"))
             pattern_seq = 1;
-    bad += check("SEQ no longer holds EVOLVE, FORM or TWEAK; PATTERN stays there", !in_seq && pattern_seq);
+    bad += check("EVOLVE, FORM, TWEAK keep ARP's family (no step pages: SEQ shows them); PATTERN is SEQ's", !in_seq && pattern_seq);
     ui_power_on();
     go_title("GEN");
     k = tessera.mode[song.sel];
     turn(EN_K1, 1);
-    bad += check("GEN: KNOB 1 is MODE (one step on from STEP)", k == TESS_ENG_OFF && tessera.mode[song.sel] != k);
+    n = seqm_get(song.sel) == 1u && TSEL->p[P_AMODE] && tessera.mode[song.sel] == TESS_ENG_OFF;
+    TSEL->p[P_AMODE] = 3;                         /* (UPDN: kept for ARP's MODE again) */
+    turn(EN_K1, 1);
+    n &= tessera.mode[song.sel] == TESS_ENG_TURING && !TSEL->p[P_AMODE];
+    turn(EN_K1, -1);
+    n &= TSEL->p[P_AMODE] == 3 && tessera.mode[song.sel] == TESS_ENG_OFF;
+    turn(EN_K1, -1);
+    bad += check("GEN: KNOB 1 is MODE: STEP, ARP (its MODE kept), TURING ..; STEP turns ARP off",
+                 k == TESS_ENG_OFF && n && !TSEL->p[P_AMODE] && !seqm_get(song.sel));
+    turn(EN_K1, 2);
     go_title("PATTERN");                          /* (a generator on: PATTERN is upstream's all the same) */
     k = tessera.mode[song.sel];
     {
@@ -727,7 +757,7 @@ static int test_help_gesture(void)
     frame();
     frame();
     press(B_ARP);
-    bad += check("ARP tapped alone still opens GEN", !ui.home && str_eq(cur_page()->title, "GEN"));
+    bad += check("ARP tapped alone still opens ARP", !ui.home && str_eq(cur_page()->title, "ARP"));
     return bad;
 }
 
@@ -757,7 +787,7 @@ static int test_rec(void)
     bad += check("REC on HOME arms without changing the screen or starting PLAY", ui.home && song.rec == 1u && transport_req == 0u);
     /* STEP page: armed + playing -> the keys record live only */
     ui_power_on();
-    open_family(FAM_SEQ);
+    go_title("NOTES");                        /* (SEQ opens GEN, its MODE, first) */
     bad += check("SEQ opens STEP", cur_page()->scope == SC_STEP);
     press(B_REC);
     song.playing = 1;
@@ -1147,7 +1177,7 @@ static int test_grid(void)
     ui_power_on();
     set_engine_of(t, ENGI_DRUM);
     t->engine = t->eng_req;
-    open_family(FAM_SEQ);
+    go_title("NOTES");                        /* (SEQ opens GEN, its MODE, first) */
     frame();
     bad += check("SEQ > STEP on a DRUM track is the grid (keys to the UI), GRID in the footer", grid_on() && song.grid == 1u &&
                  cur_page()->scope == SC_STEP);
@@ -1283,7 +1313,7 @@ static int test_grid(void)
     for (i = 0; i < 16u; i++)
         ok &= t->step[i].n == 0u && !(t->step[i].flags & SF_ACCENT);
     bad += check("BEAT's GM notes into a DRUM track: the grid (hits, the accents on 1 5 9 13)", ok);
-    open_family(FAM_SEQ);
+    go_title("NOTES");                        /* (SEQ opens GEN, its MODE, first) */
     ui.lane = DV_KICK;
     cursor_set(0);
     leds = grid_leds();
