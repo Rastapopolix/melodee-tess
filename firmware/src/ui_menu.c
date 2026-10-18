@@ -25,14 +25,14 @@ static const char *const MI_NAME[MI_COUNT] = {"COLOR", "HOLD", "LIGHTS",
 static const char *const MI_USB_NAME[4] = {"IN+OUT", "IN", "OUT", "OFF"};
 #endif
 
-/* https://keremimo.github.io/melodee, QR version 3, correction M (segno; checked with a decoder).
+/* https://github.com/Rastapopolix/melodee-tess, QR version 3, correction L (segno; 44 bytes, over M's 42).
  * One row per word, leftmost module in bit 0; the constant matrix needs no encoder or RAM. */
 static const uint32_t ABOUT_QR[29] = {
-    0x1FC6EB7Fu, 0x104EF341u, 0x175C795Du, 0x1747C65Du, 0x174CB15Du, 0x10417241u,
-    0x1FD5557Fu, 0x001C5A00u, 0x1D23F9F9u, 0x0D8F5EA5u, 0x0557D275u, 0x137256B4u,
-    0x10C9E87Cu, 0x1FC7940Du, 0x143AD76Du, 0x15706E91u, 0x021C8767u, 0x0D1C8893u,
-    0x1309E463u, 0x07A1260Bu, 0x0FFBAC53u, 0x0316B300u, 0x035BAB7Fu, 0x011ABF41u,
-    0x1BF9275Du, 0x102DF35Du, 0x1DB1E85Du, 0x16A01241u, 0x00D06B7Fu,
+    0x1FC26E7Fu, 0x10515841u, 0x174D0E5Du, 0x1743AD5Du, 0x175D155Du, 0x10544641u,
+    0x1FD5557Fu, 0x00015200u, 0x030276E3u, 0x0DA8C4A5u, 0x0105DBF4u, 0x022D4C2Eu,
+    0x10C9C6C1u, 0x19D7B596u, 0x0733C4E9u, 0x15881788u, 0x06AA70D8u, 0x1DC9C08Fu,
+    0x130EB5DBu, 0x00558DADu, 0x1DFA7FE1u, 0x0317D300u, 0x075AD37Fu, 0x01185541u,
+    0x03F81E5Du, 0x163FD05Du, 0x0FF9A05Du, 0x16C51941u, 0x05CA617Fu,
 };
 
 static void draw_about_qr(int32_t x, int32_t y)
@@ -52,10 +52,14 @@ static void draw_about_qr(int32_t x, int32_t y)
 enum { MC_TEXT, MC_TITLE, MC_URL };
 typedef struct { const char *text; uint8_t kind; } menu_credit_t;
 static const menu_credit_t MENU_CREDITS[] = {
-    {"MELODEE(TESS) / THIS FORK", MC_TITLE},
-    {"Tessera engines and project save: Theo Dainis", MC_TEXT},
+    {"MELODEE (TESS) / THIS FORK", MC_TITLE},
+    {"TESS fork by Rastapopolix (Theo Dainis): Tessera generators, engines and project save / GPL-3.0", MC_TEXT},
+    {"Thanks: Inputsignwave", MC_TEXT},
     {"tess is short for tessera, the small tile of a mosaic: short phrases set side by side into a larger form", MC_TEXT},
-    {"Melodee: Kerem Kilic, Ellic Studio / GPL-3.0", MC_TEXT},
+    {"https://github.com/Rastapopolix/melodee-tess", MC_URL},
+    {"", MC_TEXT},
+    {"MELODEE / ORIGINAL", MC_TITLE},                  /* Tess is a modified Melodee */
+    {"Kerem Kilic (keremimo), Ellic Studio / GPL-3.0", MC_TEXT},
     {"https://github.com/keremimo/melodee", MC_URL},
     {"", MC_TEXT},
     {"FELUCCA / UPSTREAM", MC_TITLE},                  /* Melodee is a modified Felucca */
@@ -146,17 +150,20 @@ static int32_t menu_document(int32_t y, int draw)
     if (draw) {
         int32_t x;                                    /* (docs/design: mock/r6_pages About) */
         cv_text(6, y + 4, &AF_L, "Melodee", T_THEME);
-        cv_text(6, y + 40, &AF_S, "melodee(tess) fork", T_SEC);
+        cv_text(6, y + 36, &AF_M, "(Tess)", T_THEME);
         x = cv_text(6, y + 62, &AF_M, MELODEE_VERSION, T_TEXT);
         cv_text(x + 8, y + 67, &AF_X, __DATE__, T_MID);
         draw_about_qr(158, y + 4);
-        cv_text(6, y + 94, &AF_S, "\xA9 2026 Kerem Kilic, Ellic Studio", T_TEXT);
-        cv_text(6, y + 112, &AF_S, "Based on Felucca by Leo Kuroshita,", T_TEXT);
-        cv_text(6, y + 130, &AF_S, "H\xFCgelton Instruments", T_SEC);
-        cv_text(6, y + 148, &AF_S, "GPL-3.0-only", T_TEXT);
-        cv_text(6, y + 166, &AF_S, "keremimo.github.io/melodee", T_MID);
+        cv_text(6, y + 94, &AF_S, "MELODEE by Kerem Kilic (keremimo)", T_TEXT);
+        cv_text(6, y + 112, &AF_S, "\xA9 2026 Kerem Kilic, Ellic Studio", T_SEC);
+        cv_text(6, y + 130, &AF_S, "TESS fork by Rastapopolix", T_TEXT);
+        cv_text(6, y + 148, &AF_S, "Thanks: Inputsignwave", T_SEC);
+        cv_text(6, y + 166, &AF_S, "Based on Felucca by Leo Kuroshita,", T_TEXT);
+        cv_text(6, y + 184, &AF_S, "H\xFCgelton Instruments", T_SEC);
+        cv_text(6, y + 202, &AF_S, "GPL-3.0-only", T_TEXT);
+        cv_text(6, y + 220, &AF_S, "github.com/Rastapopolix/melodee-tess", T_MID);
     }
-    y = menu_text("CREDITS", y + 192, T_THEME, draw) + 8;
+    y = menu_text("CREDITS", y + 246, T_THEME, draw) + 8;
     for (i = 0; i < NELEM(MENU_CREDITS); i++) {
         const menu_credit_t *c = &MENU_CREDITS[i];
         const char *text = c->text;
@@ -171,7 +178,7 @@ static int32_t menu_document(int32_t y, int draw)
     y = menu_text("Fonts and icons: their licences travel with the source and the release files.", y, T_TEXT, draw);
     y = menu_text("NO WARRANTY", y, T_TEXT, draw);
     y = menu_text("Full notices in source:", y + 8, T_TEXT, draw);
-    y = menu_text("github.com/keremimo/melodee", y, T_MID, draw);
+    y = menu_text("github.com/Rastapopolix/melodee-tess", y, T_MID, draw);
     return y + 4;
 }
 static int32_t menu_scroll_max(void)

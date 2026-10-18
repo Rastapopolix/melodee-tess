@@ -1810,6 +1810,7 @@ static void library_note_sweep(const char *out)
         if(p==0u)write_ppm(out,"NIGHT",names[scene]);
     }
 }
+#ifndef UI_RENDER_NO_MAIN                           /* (tests/gallery_render.c: the scenes without this main) */
 int main(int argc, char **argv)
 {
     const char *out = argc > 1 ? argv[1] : "build/ui_new";
@@ -1978,3 +1979,4 @@ int main(int argc, char **argv)
            "%u MONO pixels off gray; report %s\n", (unsigned)(S_COUNT - (1 + S_OP_LEVEL - S_ALG1 + 1)), (unsigned)NPALETTES, nfind, nfree, nfree_seen, mono_bad, path);
     return nfind || mono_bad ? 1 : 0;
 }
+#endif
