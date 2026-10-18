@@ -1,5 +1,7 @@
 # Melodee (Tess)
 
+<p align="center"><img src="docs/media/splash_tess.png" alt="Melodee (Tess) boot splash: MELODEE, TESS, MULTI-ENGINE SYNTH" width="360"></p>
+
 A fork of the M-Vave FM-1 alt-firmware [Melodee](https://github.com/keremimo/melodee) developed by **keremimo** (itself built upon *Felucca* by **Leo Kuroshita / Hügelton Instruments**). GPL-3.0-only. **Status: Experimental.**
 
 Melodee (Tess) is the testbed for **Tessera**, a standalone FM-1 firmware in progress with its own generative character. Expect features to change between releases.
