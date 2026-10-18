@@ -65,6 +65,19 @@ Generator settings, seeds, FORM sections and the cords are saved with the projec
 
 ---
 
+## To come
+
+Planned for later Tess builds. Plans can change, and nothing here has a date yet.
+
+* **LOGIC and BRANCH**: new options on TWEAK. LOGIC combines the gates of two tracks, and BRANCH sends each note one of two ways by chance, like Mutable Instruments' Branches.
+* **Organic modulation**: SLOTH and OCHD, slowly drifting LFOs in the style of Nonlinearcircuits' Sloth and Instruō's ochd, as new sources for the cords.
+* **Live modulation feedback**: knob arcs and cord lights that move with what the cords are doing.
+* **More sounds**: a pad voice, a chord pad/drone mode that holds one chord a bar and changes it with the FORM sections, and our own pad, pluck and lead voices.
+* **More generators**: MATRIX, a 4x4 grid that links all four tracks, and a few smaller modes after it.
+* **A new UI**: an optional Monomachine-style look (black and white, shapes instead of colours) as a separate firmware build.
+
+---
+
 ## Visual Reference Gallery
 
 *The pages as v1.3.1 draws them, rendered on the host from the firmware's own drawing code (`tests/gallery_render.c` in the firmware sources) and shown at 2x.*
