@@ -265,7 +265,7 @@ static int seqm_page_ok(uint32_t i)                     /* (the page shown stays
     const page_t *p = &PAGES[i];
     uint32_t m = seqm_get(song.sel);
     if (!ui.home && ui.page == i) return 1;
-    if (p->graph == GR_EVOLVE || p->graph == GR_FORM || p->graph == GR_TWEAK) return m >= 2u;
+    if (p->graph == GR_EVOLVE || p->graph == GR_FORM || p->graph == GR_TWEAK || p->graph == GR_NOTELEN) return m >= 2u;
     if (p->fam == FAM_ARP && (p->graph == GR_ARP || p->graph == GR_NONE)) return m == 1u;
     if (p->fam == FAM_SEQ && p->graph == GR_ROLL) return m < 2u;
     return 1;

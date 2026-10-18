@@ -14,8 +14,9 @@
 static const uint8_t ED_BK_IDS[30] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29};
 #if MELODEE_FLASH
 #define ED_BK_TESS_OBJ TESS_OBJ_BYTES_CRD         /* (with the cords) */
-#define ED_BK_TESS_OK(len) ((len) == TESS_OBJ_BYTES_CRD || (len) == TESS_OBJ_BYTES || (len) == TESS_OBJ_BYTES_V3_CRD || \
-    (len) == TESS_OBJ_BYTES_V3 || (len) == TESS_OBJ_BYTES_V2_CRD || (len) == TESS_OBJ_BYTES_V2 || (len) == TESS_OBJ_BYTES_V1)   /* (older ones: converted) */
+#define ED_BK_TESS_OK(len) ((len) == TESS_OBJ_BYTES_CRD || (len) == TESS_OBJ_BYTES || (len) == TESS_OBJ_BYTES_V4_CRD || \
+    (len) == TESS_OBJ_BYTES_V4 || (len) == TESS_OBJ_BYTES_V3_CRD || (len) == TESS_OBJ_BYTES_V3 || \
+    (len) == TESS_OBJ_BYTES_V2_CRD || (len) == TESS_OBJ_BYTES_V2 || (len) == TESS_OBJ_BYTES_V1)   /* (older ones: converted) */
 #else
 #define ED_BK_TESS_OBJ 0u                         /* (no flash: no stored blocks) */
 #define ED_BK_TESS_OK(len) 0
@@ -24,7 +25,7 @@ static uint8_t ed_bk_tess_live[TESSERA_PK_BYTES]; /* id 29, as LIST found it */
 static uint32_t ed_bk_tess_ver(uint32_t len)      /* id 29: the block's version by its length (older: converted), 0 none */
 {
     uint32_t v;
-    for (v = 4u; v && tessera_pk_bytes(v) != len; v--) ;
+    for (v = 5u; v && tessera_pk_bytes(v) != len; v--) ;
     return v;
 }
 static uint32_t ed_bk_tess_len;                   /* id 28: TESS_OBJ_BYTES_CRD, 0 none stored */
@@ -220,7 +221,7 @@ static uint32_t ed_bk_commit_inner(void)
 #endif
     } else if (ed_bk_id == 29u) {                  /* the live generators (stopped: ed_flash_stop) */
         if (!ed_bk_len) tessera_reset();
-        else if (tessera_unpack_ver(ed_bk_tess_ver(ed_bk_len), raw) != 1) return 2;   /* (v1..v3: an older backup) */
+        else if (tessera_unpack_ver(ed_bk_tess_ver(ed_bk_len), raw) != 1) return 2;   /* (v1..v4: an older backup) */
         sync_reload = 1; ui.force = 1;
         return 0;
     } else if(ed_bk_id>=23u && ed_bk_id<=27u){

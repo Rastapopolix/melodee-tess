@@ -90,6 +90,9 @@ typedef struct {
     uint32_t         rnd[TESSERA_TRACKS];     /* each track's random stream, from its seed (gen.c gen_stream) */
     uint16_t         roll[TESSERA_TRACKS];    /* ROLL turned while playing: the seed for the next bar line, 0 none
                                                * (tessera.c tessera_seed_turn; not saved) */
+    uint8_t          nl_mode[TESSERA_TRACKS]; /* NOTE LENGTH (note_len.c): 0 STEP (the GATE), 1 FIXED, 2 HIT */
+    uint8_t          nl_len[TESSERA_TRACKS];  /* FIXED's length: 0..5 = 1/32 1/16 1/8 1/4 1/2 1 bar */
+    uint8_t          nl_keys[TESSERA_TRACKS]; /* FIXED: 1..4 notes held at once */
 } tessera_state_t;
 
 extern tessera_state_t tessera;
@@ -112,17 +115,21 @@ void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash); /* of
 void tessera_stop_all(void);
 void tessera_tweak_knob(uint32_t k, int32_t s);
 void tessera_form_knob(uint32_t k, int32_t s);
+void tessera_len_knob(uint32_t k, int32_t s);       /* LENGTH page: MODE LEN KEYS, and the STEP GATE */
+void tessera_len_tick(track_t *t, uint32_t n);     /* seq.c, each block: FIXED's held notes end on time */
+void tessera_len_stop(track_t *t);                 /* the held notes end now (panic, a pattern change) */
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 320u                       /* the saved state, version 4 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
-#define TESSERA_PK_BYTES_V3 204u                    /* version 3 (before BOUNCE, AWAKE, POLY): older projects and backups */
+#define TESSERA_PK_BYTES 332u                       /* the saved state, version 5 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V4 320u                    /* version 4 (before NOTE LENGTH): older projects and backups */
+#define TESSERA_PK_BYTES_V3 204u                    /* version 3 (before BOUNCE, AWAKE, POLY) */
 #define TESSERA_PK_BYTES_V2 188u                    /* version 2 (before GRIDS) */
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..4) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..5) */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
-void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 4 */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 5 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
@@ -139,6 +146,7 @@ enum {
     TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_BALLS,
     TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB,
     TX_POL_DIV1, TX_POL_DIV2, TX_POL_DIV3, TX_POL_DIV4, TX_POL_SPAN,
+    TX_NL_MODE, TX_NL_LEN, TX_NL_KEYS,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */

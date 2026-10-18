@@ -21,6 +21,8 @@ tessera_state_t tessera;
 #define TESS_ENTROPY() (fm1_ticks() ^ fm1_ms * 2654435761u)
 #endif
 
+#include "note_len.c"                                /* NOTE LENGTH: the LENGTH page's held notes */
+
 /* SEED (EVOLVE page, ROLL): 1..TESS_SEED_MAX per track, 0 = not picked yet (the defaults). A seed decides the track's
  * random stream and its generators' starting material: Turing's register, Euclid's pitch pattern, Markov's first state.
  * A knob's range, a quick turn across it (ui_input.c accel). Builds 1.1.3 to 1.1.5 picked up to TESS_SEED_LOAD_MAX: a
@@ -133,6 +135,10 @@ void tessera_init(void)
         tessera.evolve[i].amount = 30;
         tessera.evolve[i].rec = 2;
         tessera.evolve[i].contrast = 60;
+
+        /* 7. NOTE LENGTH: STEP (the GATE); FIXED's 1/8, four keys */
+        tessera.nl_len[i] = 2;
+        tessera.nl_keys[i] = NL_KEYS;
     }
 }
 
@@ -140,6 +146,7 @@ void tessera_kill(track_t *t)
 {
     uint32_t tr = trk_index(t);
     if (tr >= TESSERA_TRACKS) return;
+    nl_stop(t);
     if (tessera.active_gate[tr]) {
         trk_note_off(t, tessera.last_note[tr]);
         tessera.active_gate[tr] = 0;
@@ -617,6 +624,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
             trk_note_off(t, tessera.last_note[tr]);
             tessera.active_gate[tr] = 0;
         }
+        nl_stop(t);
         seq_release(t);
         return;
     }
@@ -701,6 +709,11 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         if (final_note < 0) final_note = 0;
         if (final_note > 127) final_note = 127;
 
+        if (tessera.nl_mode[tr] != NL_STEP) {             /* NOTE LENGTH: held by note_len.c, not the step's GATE */
+            nl_on(t, tr, (uint32_t)final_note, vel);
+            tessera.last_note[tr] = (uint8_t)final_note;
+            return;
+        }
         trk_note_on(t, (uint32_t)final_note, vel);
         tessera.last_note[tr] = (uint8_t)final_note;
         tessera.active_gate[tr] = 1;
@@ -743,6 +756,7 @@ static void tess_knob_body(uint32_t k, int32_t s)
         if (m < 0) m = 0;
         if (m >= TESS_ENG_COUNT) m = TESS_ENG_COUNT - 1;
         if ((uint8_t)m != tessera.mode[tr]) {
+            nl_stop(&trk[tr]);
             seq_release(&trk[tr]);
             tessera.active_gate[tr] = 0;
         }
@@ -993,11 +1007,13 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
  * EVOLVE / FORM / TWEAK settings and the settings of the remembered sections (A, B, C). Not stored: the recorded
  * Markov / Morph phrases (a loaded project records them again on its first pass: RAM is the limit, see
  * project.c), the playheads and the counters. A block that fails any range check is refused whole. */
-#define TESS_PK_TRACK 80u                            /* version 4: version 3's 51 bytes, then Bounce (3), Awake (19), Poly (7) */
+#define TESS_PK_TRACK 83u                            /* version 5: version 4's 80 bytes, then NOTE LENGTH (3) */
+#define TESS_PK_TRACK_V4 80u                         /* version 4: version 3's 51 bytes, then Bounce (3), Awake (19), Poly (7) */
 #define TESS_PK_TRACK_V3 51u                         /* version 3: version 2's 47 bytes, then Grids (4) */
 #define TESS_PK_TRACK_V2 47u                         /* version 2: version 1's 45 bytes, then SEED (2) */
 #define TESS_PK_TRACK_V1 45u
 _Static_assert(TESSERA_PK_BYTES == TESSERA_TRACKS * TESS_PK_TRACK, "TESSERA_PK_BYTES (tessera.h)");
+_Static_assert(TESSERA_PK_BYTES_V4 == TESSERA_TRACKS * TESS_PK_TRACK_V4, "TESSERA_PK_BYTES_V4 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V3 == TESSERA_TRACKS * TESS_PK_TRACK_V3, "TESSERA_PK_BYTES_V3 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V2 == TESSERA_TRACKS * TESS_PK_TRACK_V2, "TESSERA_PK_BYTES_V2 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V1 == TESSERA_TRACKS * TESS_PK_TRACK_V1, "TESSERA_PK_BYTES_V1 (tessera.h)");
@@ -1047,6 +1063,7 @@ uint32_t tessera_pack(uint8_t *o)
         *o++ = tessera.grids[tr].x; *o++ = tessera.grids[tr].y; *o++ = tessera.grids[tr].dens;
         *o++ = tessera.grids[tr].chaos;
         o = tess_put_v4(o, &tessera.bounce[tr], &tessera.awake[tr], &tessera.poly[tr]);
+        *o++ = tessera.nl_mode[tr]; *o++ = tessera.nl_len[tr]; *o++ = tessera.nl_keys[tr];
     }
     return TESSERA_PK_BYTES;
 }
@@ -1079,6 +1096,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     uint32_t v_visited = *in++;
     uint32_t v_seed = tess_get16(rec + TESS_PK_TRACK_V1);
     const uint8_t *grd = rec + TESS_PK_TRACK_V2, *bnc = rec + TESS_PK_TRACK_V3, *awk = bnc + 3, *pol = awk + 19;
+    const uint8_t *nl = rec + TESS_PK_TRACK_V4;
     uint32_t i;
 
     if (mode >= TESS_ENG_COUNT || v_seed > TESS_SEED_LOAD_MAX) return 0;
@@ -1099,6 +1117,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     for (i = 0; i < 4u; i++)                         /* (a pitch: its nibble and its fifth bit in SPAN's byte) */
         if ((((pol[4 + i / 2u] >> ((i & 1u) * 4u)) & 0xFu) | ((pol[6] >> (4u + i)) & 1u) << 4) > 20u) return 0;
     if ((pol[6] & 15u) < 1u || (pol[6] & 15u) > 3u) return 0;
+    if (nl[0] >= NL_COUNT || nl[1] > 5u || nl[2] < 1u || nl[2] > NL_KEYS) return 0;
     if (!apply) return 1;
 
     tessera.mode[tr] = (uint8_t)mode;
@@ -1135,9 +1154,17 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     for (i = 0; i < 4u; i++)
         tessera.poly[tr].pitch[i] = (uint8_t)(((pol[4 + i / 2u] >> ((i & 1u) * 4u)) & 0xFu) | ((pol[6] >> (4u + i)) & 1u) << 4);
     tessera.poly[tr].span = pol[6] & 15u;
+    tessera.nl_mode[tr] = nl[0]; tessera.nl_len[tr] = nl[1]; tessera.nl_keys[tr] = nl[2];
     return 1;
 }
 
+/* A version 4 track record (80 bytes, before NOTE LENGTH) -> version 5 (83): NOTE LENGTH as a fresh track's (STEP,
+ * FIXED's 1/8, four keys), so it plays as it did. out may not overlap in */
+static void tess_v4_track(const uint8_t *in, uint8_t *out)
+{
+    memcpy(out, in, TESS_PK_TRACK_V4);
+    out[TESS_PK_TRACK_V4] = NL_STEP; out[TESS_PK_TRACK_V4 + 1u] = 2; out[TESS_PK_TRACK_V4 + 2u] = NL_KEYS;
+}
 /* A version 3 track record (51 bytes, before BOUNCE, AWAKE, POLY) -> version 4 (80): their settings a fresh track's,
  * Awake's values and Poly's pitches from the track's seed (as ROLL would give them). out may not overlap in */
 static void tess_v3_track(const uint8_t *in, uint8_t *out)
@@ -1174,20 +1201,21 @@ static void tess_v1_track(const uint8_t *in, uint8_t *out)
 }
 uint32_t tessera_pk_bytes(uint32_t ver)
 {
-    return ver == 4u ? TESSERA_PK_BYTES : ver == 3u ? TESSERA_PK_BYTES_V3 : ver == 2u ? TESSERA_PK_BYTES_V2 :
-           ver == 1u ? TESSERA_PK_BYTES_V1 : 0u;
+    return ver == 5u ? TESSERA_PK_BYTES : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
+           ver == 2u ? TESSERA_PK_BYTES_V2 : ver == 1u ? TESSERA_PK_BYTES_V1 : 0u;
 }
-/* A track record of version ver (1..4) -> version 4, a version at a time. out may not overlap in */
+/* A track record of version ver (1..5) -> version 5, a version at a time. out may not overlap in */
 void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
 {
-    uint8_t v2[TESS_PK_TRACK_V2], v3[TESS_PK_TRACK_V3];
-    if (ver >= 4u) {
+    uint8_t v2[TESS_PK_TRACK_V2], v3[TESS_PK_TRACK_V3], v4[TESS_PK_TRACK_V4];
+    if (ver >= 5u) {
         memcpy(out, in, TESS_PK_TRACK);
         return;
     }
     if (ver <= 1u) { tess_v1_track(in, v2); in = v2; }
     if (ver <= 2u) { tess_v2_track(in, v3); in = v3; }
-    tess_v3_track(in, out);
+    if (ver <= 3u) { tess_v3_track(in, v4); in = v4; }
+    tess_v4_track(in, out);
 }
 
 /* 1 = loaded; 0 = refused, `tessera` untouched */
@@ -1208,7 +1236,7 @@ int tessera_unpack_ver(uint32_t ver, const uint8_t *in)
     uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
     uint32_t n = tessera_pk_bytes(ver) / TESSERA_TRACKS;
     if (!n) return 0;
-    if (ver == 4u) return tessera_unpack(in);
+    if (ver == 5u) return tessera_unpack(in);
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
     return tessera_unpack(b);
@@ -1270,6 +1298,9 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_AWK_PROB: return tessera.awake[tr].prob;
     case TX_POL_DIV1: case TX_POL_DIV2: case TX_POL_DIV3: case TX_POL_DIV4: return tessera.poly[tr].div[x - TX_POL_DIV1];
     case TX_POL_SPAN: return tessera.poly[tr].span;
+    case TX_NL_MODE: return tessera.nl_mode[tr];
+    case TX_NL_LEN: return tessera.nl_len[tr];
+    case TX_NL_KEYS: return tessera.nl_keys[tr];
     }
     return 0;
 }
@@ -1286,6 +1317,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_MODE:
         v = tess_clampi(v, 0, TESS_ENG_COUNT - 1);
         if ((uint8_t)v == tessera.mode[tr]) return;
+        nl_stop(&trk[tr]);
         seq_release(&trk[tr]);
         tessera.active_gate[tr] = 0;
         tessera.mode[tr] = (uint8_t)v;
@@ -1374,6 +1406,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
             gen_poly_fill(&tessera.poly[tr], tessera.seed[tr]);
         }
         eng = TESS_ENG_POLY; break;
+    case TX_NL_MODE: case TX_NL_LEN: case TX_NL_KEYS: nl_set_body(tr, x, v); return;
     default:
         return;
     }
