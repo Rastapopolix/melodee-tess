@@ -4,6 +4,8 @@ This covers what Tess adds to Melodee, as in **v1.3.1**: the generators, the SEQ
 cords (MODS), the mod shortcut and the help card. Everything else (the step sequencer, the effects, saving) works as
 in upstream [Melodee](https://github.com/keremimo/melodee).
 
+Melodee (Tess) is the testbed for **Tessera**, a standalone FM-1 firmware in progress with its own generative character. Expect features to change between releases.
+
 **Sound engines.** v1.3.1 offers SID, TRIO, PHYS and DRUM. FM6, CZ-1 and Prophet are not in the build: a track
 saved with one of them loads SID INIT. [v1.2.7](https://github.com/Rastapopolix/melodee-tess/releases/tag/v1.2.7)
 still has them.
