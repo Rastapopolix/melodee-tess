@@ -203,9 +203,13 @@ class Voice {
   }
 
   VirtualAnalogEngine virtual_analog_engine_;
+#ifndef PLAITS_LEAN
   WaveshapingEngine waveshaping_engine_;
+#endif
   FMEngine fm_engine_;
+#ifndef PLAITS_LEAN
   GrainEngine grain_engine_;
+#endif
   AdditiveEngine additive_engine_;
 #ifndef PLAITS_LEAN  // melodee-tess: the lean set (README.md) leaves these out
   WavetableEngine wavetable_engine_;
@@ -213,23 +217,27 @@ class Voice {
   SpeechEngine speech_engine_;
 #endif
 
+#ifndef PLAITS_LEAN
   SwarmEngine swarm_engine_;
   NoiseEngine noise_engine_;
   ParticleEngine particle_engine_;
+#endif
   StringEngine string_engine_;
   ModalEngine modal_engine_;
+#ifndef PLAITS_LEAN
   BassDrumEngine bass_drum_engine_;
   SnareDrumEngine snare_drum_engine_;
   HiHatEngine hi_hat_engine_;
+#endif
   
   VirtualAnalogVCFEngine virtual_analog_vcf_engine_;
   PhaseDistortionEngine phase_distortion_engine_;
 #ifndef PLAITS_LEAN
   SixOpEngine six_op_engine_;
   WaveTerrainEngine wave_terrain_engine_;
-#endif
   StringMachineEngine string_machine_engine_;
   ChiptuneEngine chiptune_engine_;
+#endif
 
   stmlib::HysteresisQuantizer2 engine_quantizer_;
   

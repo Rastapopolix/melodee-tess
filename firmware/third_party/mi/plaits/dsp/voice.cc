@@ -50,13 +50,26 @@ void Voice::Init(BufferAllocator* allocator) {
   engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
   engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
 #endif
+#ifndef PLAITS_LEAN
   engines_.RegisterInstance(&string_machine_engine_, false, 0.8f, 0.8f);
   engines_.RegisterInstance(&chiptune_engine_, false, 0.5f, 0.5f);
+#else  // melodee-tess (2026-10-17): STRING MACHINE and CHIPTUNE out (their chords)
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+#endif
   
   engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+#ifndef PLAITS_LEAN
   engines_.RegisterInstance(&waveshaping_engine_, false, 0.7f, 0.6f);
+#else
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+#endif
   engines_.RegisterInstance(&fm_engine_, false, 0.6f, 0.6f);
+#ifndef PLAITS_LEAN
   engines_.RegisterInstance(&grain_engine_, false, 0.7f, 0.6f);
+#else
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+#endif
   engines_.RegisterInstance(&additive_engine_, false, 0.8f, 0.8f);
 #ifndef PLAITS_LEAN
   engines_.RegisterInstance(&wavetable_engine_, false, 0.6f, 0.6f);
@@ -68,14 +81,26 @@ void Voice::Init(BufferAllocator* allocator) {
   engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
 #endif
 
+#ifndef PLAITS_LEAN
   engines_.RegisterInstance(&swarm_engine_, false, -3.0f, 1.0f);
   engines_.RegisterInstance(&noise_engine_, false, -1.0f, -1.0f);
   engines_.RegisterInstance(&particle_engine_, false, -2.0f, 1.0f);
+#else
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+#endif
   engines_.RegisterInstance(&string_engine_, true, -1.0f, 0.8f);
   engines_.RegisterInstance(&modal_engine_, true, -1.0f, 0.8f);
+#ifndef PLAITS_LEAN
   engines_.RegisterInstance(&bass_drum_engine_, true, 0.8f, 0.8f);
   engines_.RegisterInstance(&snare_drum_engine_, true, 0.8f, 0.8f);
   engines_.RegisterInstance(&hi_hat_engine_, true, 0.8f, 0.8f);
+#else  // (the DRUM engine has its own)
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+  engines_.RegisterInstance(&virtual_analog_engine_, false, 0.8f, 0.8f);
+#endif
   
   for (int i = 0; i < engines_.size(); ++i) {
     // All engines will share the same RAM space.
@@ -196,10 +221,6 @@ void Voice::Render(
         !modulations.trigger_patched || modulations.morph_patched ?
             0.0f : patch.morph_modulation_amount);
   } else
-#else
-  if (0) {
-  } else
-#endif
   if (engine_index == 7) {
     if (modulations.trigger_patched && !modulations.timbre_patched) {
       // Disable internal envelope on TIMBRE, and enable the envelope generator
@@ -210,6 +231,7 @@ void Voice::Render(
       chiptune_engine_.set_envelope_shape(ChiptuneEngine::NO_ENVELOPE);
     }
   }
+#endif
   
   p.note = ApplyModulations(
       patch.note + note,

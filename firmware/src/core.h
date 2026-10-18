@@ -54,11 +54,19 @@
 #ifndef MELODEE_CZ
 #define MELODEE_CZ 1
 #endif
+#ifndef MELODEE_TRIO
+#define MELODEE_TRIO 1           /* TRIO (eng_trio.c), back 2026-10-17 beside SID and DRUM (MACRO out: too costly) */
+#endif
+#ifndef MELODEE_PHYS
+#define MELODEE_PHYS 1           /* PHYS (eng_phys.c), back 2026-10-18 after TRIO */
+#endif
 #ifndef MELODEE_PLAITS
 #define MELODEE_PLAITS 0         /* MACRO (eng_macro.c): Plaits' synthesis, C++ (build.py); the prototype: off by default */
 #endif
 #define ENG_BUILT(e) ((e) == 12u ? MELODEE_FM6 : (e) == 15u ? MELODEE_CZ : (e) == 19u ? MELODEE_PROPHET : \
                       (e) == 21u ? MELODEE_PLAITS : 1)   /* FM6 CZ-1 PROPHET MACRO */
+#define TRIO_ON (MELODEE_TRIO || MELODEE_LEGACY_EXTRAS)
+#define PHYS_ON (MELODEE_PHYS || MELODEE_LEGACY_EXTRAS)
 #define ENGI_SID 3u
 #define ENGI_FALLBACK (MELODEE_FM6 ? 12u : ENGI_SID)   /* a retired engine's place (eng_rank, the designer) */
 #define ENGI_PROPHET 19u /* 16..18 reserved: historical preset namespaces */
@@ -71,7 +79,7 @@
 #define USER_NONE 256u
 #define ENGI_ANALOG 0u           /* retired in 1.2: never selectable (eng_ok), its stored sounds play silent */
 #define ENGI_DIGITAL 1u          /* retired: never selectable (eng_ok), its stored sounds play silent */
-#define NENG_SHOWN (NENGINES - 9u - !MELODEE_SLICE - 6u * !MELODEE_LEGACY_EXTRAS - !MELODEE_FM6 - !MELODEE_CZ - !MELODEE_PROPHET - \
+#define NENG_SHOWN (NENGINES - 9u - !MELODEE_SLICE - (MELODEE_LEGACY_EXTRAS ? 0u : 6u - MELODEE_TRIO - MELODEE_PHYS) - !MELODEE_FM6 - !MELODEE_CZ - !MELODEE_PROPHET - \
                     !MELODEE_PLAITS)   /* the engines one can pick: PRESETS, the EDIT
                                                 * layer, the editor, in the display order of engines.c ENGINE_ORDER */
 #define ENGI_SLICE 13u           /* reserved without MELODEE_SLICE: never selectable (eng_ok) */

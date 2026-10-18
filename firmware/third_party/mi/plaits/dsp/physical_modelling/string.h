@@ -83,6 +83,7 @@ class String {
   float delay_;
   float dispersion_noise_;
   float curved_bridge_;
+  float anti_denormal_;  // melodee-tess (string.cc)
   
   // Very crappy linear interpolation upsampler used for low pitches that
   // do not fit the delay line. Rarely used.

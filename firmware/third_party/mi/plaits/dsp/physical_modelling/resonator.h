@@ -93,8 +93,9 @@ class ResonatorSvf {
       }
     }
     for (int i = 0; i < batch_size; ++i) {
-      state_1_[i] = state_1[i];
-      state_2_[i] = state_2[i];
+      // melodee-tess: a dying mode's states flushed before they turn denormal (the AC79's FPU is slow on them)
+      state_1_[i] = fabsf(state_1[i]) < 1e-15f ? 0.0f : state_1[i];
+      state_2_[i] = fabsf(state_2[i]) < 1e-15f ? 0.0f : state_2[i];
     }
   }
   

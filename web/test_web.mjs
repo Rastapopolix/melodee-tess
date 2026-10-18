@@ -190,7 +190,7 @@ async function editorMock() {
   const rq = async (r, o) => link.request(r, o);
   const info = E.parse[E.CMD.INFO](await rq(E.req.info()));
   ok(info.nengines === 20 && info.engines[14] === "-" && info.engines[1] === "-" && info.engines[12] === "FM6" && info.engines[13] === "-"
- && info.engines[2] === "-" && info.engines[5] === "-" && info.engines[6] === "-" && info.engines[7] === "-" && info.engines[8] === "-" && info.engines[9] === "-" && info.engines[10] === "DRUM" && info.engines[11] === "-" && info.pcount === 119 && info.pe0 === 111 && info.engines[4] === "-",
+ && info.engines[2] === "-" && info.engines[5] === "-" && info.engines[6] === "TRIO" && info.engines[7] === "-" && info.engines[8] === "-" && info.engines[9] === "PHYS" && info.engines[10] === "DRUM" && info.engines[11] === "-" && info.pcount === 119 && info.pe0 === 111 && info.engines[4] === "-",
     "editor: INFO");
   let descs = 0;
   for (let i = 0; i < info.pcount; i++) if (E.parse[E.CMD.DESC](await rq(E.req.desc(0, i))).label) descs++;
@@ -283,7 +283,7 @@ async function editorMock() {
   ok(!prefs.favorites[info.namespace.general][31] && !E.devicePresetRows(info, names, prefs).some((r) => r.user), "editor: erased slot disappears and loses star");
   {   /* the lists in the device's order (engines.c ENGINE_ORDER): FM6 second, DRUM last, "-" never; the numbers stay */
     const shown = E.engineOrder(info.engines).map((i) => info.engines[i]);
-    ok(shown.join() === "PROPHET,FM6,CZ-1,SID,DRUM" &&
+    ok(shown.join() === "PROPHET,FM6,CZ-1,SID,TRIO,PHYS,DRUM" &&
        E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines).at(-1) === 10,
        "editor: engines listed FM6 second, DRUM last (indices kept)");
     ok(E.engineOrder(["ANALOG", "X", "-", "DRUM", "FM6"]).join() === "0,4,3,1", "editor: an unknown engine follows the known ones");
@@ -368,7 +368,7 @@ async function editorMock() {
 
 async function editorSamplePresets() {
  const {rq,done}=attachMock();const info=E.parse[E.CMD.INFO](await rq(E.req.info()));
- ok([4,6,7,8,9,13,14].every(i=>info.engines[i]==="-" && !E.engineOrder(info.engines).includes(i)),"editor: SAMPLE, GRAIN and SLICE removed; other engine IDs kept");done();
+ ok([4,7,8,13,14].every(i=>info.engines[i]==="-" && !E.engineOrder(info.engines).includes(i)),"editor: SAMPLE, GRAIN and SLICE removed; other engine IDs kept");done();
 }
 
 /* the mock's tables == the firmware's (build/host/desc.json from tests/descdump.c, written by run_tests.sh):
@@ -377,8 +377,8 @@ function mockTables() {
   {
     const m0 = E.makeMockDevice({ auto: false }), ph = m0.tables.ENG[9], dr = m0.tables.ENG[10];
     m0.stop();
-    ok([2,5,6,7,9,11].every((i) => m0.tables.ENG[i].name === "-" && !m0.tables.ENG[i].presets.length),
-       "editor: PHASE, VOICE, TRIO, WHEEL, PHYS and NOISE retired with their original IDs reserved");
+    ok([2,5,7,11].every((i) => m0.tables.ENG[i].name === "-" && !m0.tables.ENG[i].presets.length),
+       "editor: PHASE, VOICE, WHEEL and NOISE retired with their original IDs reserved");
     ok(dr.name === "DRUM" && dr.edit.map((d) => d.label).join() === "KIT,TUNE,TONE,DECY,SNAP,ACC,KICK,DRV" &&
        dr.edit[0].names.join() === "808,909,SID" && dr.edit[0].min === 4 && dr.edit[0].max === 6 && dr.presets.length === 4 && dr.presets[0].name === "808 KIT" && dr.presets[2].name === "SID KIT" && dr.presets[3].name === "SID DIGI",
        "editor: DRUM engine 10 (KIT TUNE TONE DECY SNAP ACC KICK DRV, KIT 808), 808, 909 and SID kits");
@@ -1572,6 +1572,53 @@ async function installerBuilds() {
   await element("go").listeners.click();
   ok(installed.at(-1)[1] === "FM-1_91002" && fetched.length === 6, "installer: returning from synth only restores the release without refetching");
 }
+async function localBuild() {
+  const script = readFileSync(join(HERE, "index_pkg.html"), "utf8").match(/<script type="module">([\s\S]*?)<\/script>/)[1]
+    .replace("/*META*/", JSON.stringify({version:"1.0.2",product:"FM-1_91002",pkg:{dual:"dual",single:"single"}}));
+  const mark = [...Buffer.from("FELUCCA-LOADER-1")];
+  const file = (name, product, {loader = true, crc = true} = {}) => ({name,
+    arrayBuffer:async () => new Uint8Array([crc ? 1 : 0, ...Buffer.from(product), 0, ...(loader ? mark : [])]).buffer});
+  async function run(pick, {answer = true} = {}) {
+    const installed = [], asked = [], elements = new Map();
+    const element = (id) => {
+      if (!elements.has(id)) elements.set(id, {checked:id === "build-dual", disabled:false, textContent:"", value:0, files:[], listeners:{},
+        addEventListener(k, fn) { this.listeners[k] = fn; }});
+      return elements.get(id);
+    };
+    const context = vm.createContext({
+      navigator:{language:"en", requestMIDIAccess:async () => ({})},
+      document:{documentElement:{}, querySelectorAll:() => [], getElementById:element},
+      window:{addEventListener() {}},
+      fetch:async () => ({ok:true, arrayBuffer:async () => new Uint8Array([1, ...Buffer.from("FM-1_91002"), 0]).buffer}),
+      Package:class { constructor(raw) { if (!raw[0]) throw new Error("not an FM-1 .fwsc (UFW header CRC mismatch)"); } },
+      productOf:(raw) => Buffer.from(raw.subarray(1, raw.indexOf(0, 1))).toString(), logicalImage:(raw) => "image:" + raw.length,
+      confirm:(message) => { asked.push(message); return answer; },
+      Updater:class { async find() { return null; } async install(image, product) { installed.push([image, product]); } },
+    });
+    vm.runInContext(script, context);
+    await new Promise(resolve => setImmediate(resolve));
+    const before = element("local-go").disabled;
+    element("local-file").files = [pick];
+    await element("local-file").listeners.change();
+    const status = element("status").textContent, enabled = !element("local-go").disabled;
+    await element("local-go").listeners.click();
+    return {before, status, enabled, installed, asked, unlocked:!element("local-file").disabled && !element("go").disabled};
+  }
+  let r = await run(file("melodee-tess-1.2.9-test.fwsc", "FM-1_91029"));
+  ok(r.before && r.enabled && r.status === "Test build checked: melodee-tess-1.2.9-test.fwsc (FM-1_91029)",
+    "local: Install test build stays off until a picked file checks out");
+  ok(r.asked.length === 1 && r.asked[0].includes("melodee-tess-1.2.9-test.fwsc (FM-1_91029)") && r.installed.length === 1
+    && r.installed[0][1] === "FM-1_91029" && r.installed[0][0].startsWith("image:") && r.unlocked,
+    "local: confirmed test build installs with the identity read from the file");
+  r = await run(file("t.fwsc", "FM-1_91029"), {answer:false});
+  ok(r.enabled && r.installed.length === 0 && r.unlocked, "local: cancelling the confirmation never flashes");
+  r = await run(file("FM-1.fwsc", "FM-1_015"));
+  ok(!r.enabled && r.status.startsWith("Cannot use this file: identity") && r.installed.length === 0, "local: official firmware is refused");
+  r = await run(file("patched.fwsc", "FM-1_91029", {loader:false}));
+  ok(!r.enabled && r.status.includes("no Melodee loader") && r.installed.length === 0, "local: a package without Melodee's loader is refused");
+  r = await run(file("broken.fwsc", "FM-1_91029", {crc:false}));
+  ok(!r.enabled && r.status.includes("CRC mismatch") && r.installed.length === 0, "local: a damaged package is refused");
+}
 async function installerBuildRaces() {
   const script = readFileSync(join(HERE, "index_pkg.html"), "utf8").match(/<script type="module">([\s\S]*?)<\/script>/)[1]
     .replace("/*META*/", JSON.stringify({version:"1.0.2",product:"FM-1_91002",pkg:{dual:"dual",single:"single"}}));
@@ -1605,6 +1652,7 @@ async function installerBuildRaces() {
 }
 await stockRestore();
 await installerBuilds();
+await localBuild();
 await installerBuildRaces();
 await patternProtocol();
 await editorMock();
