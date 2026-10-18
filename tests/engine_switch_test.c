@@ -53,8 +53,8 @@ int main(void)
     static const uint32_t GONE[3] = {12u, 15u, 19u};
     uint32_t k, shown = 0, ok = 1;
     for (k = 0; k < NENGINES; k++) shown += eng_ok(k);
-    check("FM6, CZ-1 and Prophet never offered; SID, TRIO and DRUM are", !eng_ok(12) && !eng_ok(15) && !eng_ok(19) &&
-          eng_ok(ENGI_SID) && eng_ok(6) && eng_ok(ENGI_DRUM) && shown == NENG_SHOWN && NENG_SHOWN == 3u);
+    check("FM6, CZ-1 and Prophet never offered; SID, TRIO, PHYS and DRUM are", !eng_ok(12) && !eng_ok(15) && !eng_ok(19) &&
+          eng_ok(ENGI_SID) && eng_ok(6) && eng_ok(ENGI_PHYS) && eng_ok(ENGI_DRUM) && shown == NENG_SHOWN && NENG_SHOWN == 4u);
     for (k = 0; k < NENG_SHOWN; k++) ok &= ENG_BUILT(eng_vis(k));
     for (k = 0; k < NPART; k++) ok &= ENG_BUILT(TRK_DEF[k][0]) && eng_ok(TRK_DEF[k][0]);
     check("the engine list and the power-on sounds: built engines only", ok);
