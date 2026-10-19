@@ -21,6 +21,8 @@ enum {
     TESS_ENG_POLY,        /* four rhythms advance four steps (EuroPi's Polyrhythmic Sequencer) */
     TESS_ENG_QUAD,        /* a row each of a 4 x 4 grid the tracks share (norns' initenere) */
     TESS_ENG_CONSTEL,     /* a ship catches the stars of a scrolling sky into a loop (norns' Constellation) */
+    TESS_ENG_SERIES,      /* Nørgård's infinity series (norns' nørgård) */
+    TESS_ENG_CELLS,       /* eight cells of an elementary automaton (norns' less concepts) */
     TESS_ENG_COUNT
 };
 
@@ -35,6 +37,8 @@ typedef gen_awake_t  tessera_awake_t;
 typedef gen_poly_t   tessera_poly_t;
 typedef gen_quad_t   tessera_quad_t;
 typedef gen_constel_t tessera_constel_t;
+typedef gen_series_t tessera_series_t;
+typedef gen_cells_t  tessera_cells_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
@@ -99,6 +103,8 @@ typedef struct {
     tessera_poly_t   poly[TESSERA_TRACKS];
     tessera_quad_t   quad[TESSERA_TRACKS];    /* a row each of QUAD's grid (whatever the track's MODE) */
     tessera_constel_t constel[TESSERA_TRACKS];
+    tessera_series_t series[TESSERA_TRACKS];
+    tessera_cells_t  cells[TESSERA_TRACKS];
     tessera_evolve_t evolve[TESSERA_TRACKS];
     tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
@@ -147,7 +153,8 @@ void organic_play(void);                            /* seq.c, PLAY: SLOTH and OC
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 480u                       /* the saved state, version 8 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES 508u                       /* the saved state, version 9 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V8 480u                    /* version 8 (before SERIES and CELLS) */
 #define TESSERA_PK_BYTES_V7 392u                    /* version 7 (before CONSTELLATION) */
 #define TESSERA_PK_BYTES_V6 380u                    /* version 6 (before NOTE LENGTH) */
 #define TESSERA_PK_BYTES_V5 352u                    /* version 5 (before QUAD) */
@@ -157,9 +164,9 @@ const char *tessera_form_name(uint32_t form);
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..8) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..9) */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
-void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 8 */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 9 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
@@ -181,6 +188,8 @@ enum {
     TX_QD_DIR, TX_QD_PROB, TX_QD_LINK,
     TX_NL_MODE, TX_NL_LEN, TX_NL_KEYS,
     TX_CS_Y, TX_CS_DENS, TX_CS_SIZE, TX_CS_AUTO,
+    TX_SR_START, TX_SR_INTV, TX_SR_LOOP,
+    TX_CL_RULE, TX_CL_TAP, TX_CL_SPAN,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -200,5 +209,7 @@ void tessera_awake_select(uint32_t tr, uint32_t step);   /* the step KNOB 1 (A) 
 const gen_poly_t *tessera_poly(uint32_t tr);
 const gen_quad_t *tessera_quad(uint32_t tr);
 const gen_constel_t *tessera_constel(uint32_t tr);
+const gen_series_t *tessera_series(uint32_t tr);
+const gen_cells_t *tessera_cells(uint32_t tr);
 
 #endif

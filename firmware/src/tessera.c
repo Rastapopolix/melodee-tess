@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* Tessera: the note generators of tracks 1-4 (Turing, Euclid, Markov, Morph, Grids, Bounce, Awake,
- * Poly, Quad, Constellation), EVOLVE, FORM and TWEAK, clocked by the
+ * Poly, Quad, Constellation, Series, Cells), EVOLVE, FORM and TWEAK, clocked by the
  * sequencer (seq.c) in place of a track's steps; their state is saved with the project (project.c, OBJ_TESSERA). */
 #include "tessera.h"
 
@@ -42,6 +42,8 @@ static void tess_seed_apply(uint32_t tr)
     gen_poly_fill(&tessera.poly[tr], sd);
     gen_quad_fill(&tessera.quad[tr], sd);
     gen_constel_fill(&tessera.constel[tr], sd);
+    gen_series_fill(&tessera.series[tr], sd);
+    gen_cells_fill(&tessera.cells[tr], sd);
     gen_bounce_serve(&tessera.bounce[tr], sd);
 }
 /* A track still without a seed (never played, nor loaded from a project) gets a random one now. Saved projects
@@ -139,6 +141,12 @@ void tessera_init(void)
         tessera.constel[i].dens = 50;                   /* columns caught within 2 rows, the ship steered by hand */
         tessera.constel[i].size = 2;
         gen_constel_start(&tessera.constel[i]);
+        tessera.series[i].intv = 1;                     /* 11. Series: from its start, a degree a unit, on and on */
+        tessera.cells[i].rule = 30;                     /* 12. Cells: rule 30, the first cell gating, a two octave */
+        tessera.cells[i].tap = 1;                       /* spread */
+        tessera.cells[i].span = 14;
+        gen_cells_fill(&tessera.cells[i], 0u);
+        gen_cells_start(&tessera.cells[i]);
         gen_bounce_serve(&tessera.bounce[i], 0u);
 
         /* 9. Evolve */
@@ -239,6 +247,8 @@ static void tess_realign(uint32_t tr)
     tessera.quad[tr].pos = 4;
     tessera.quad[tr].back = 0;
     gen_constel_start(&tessera.constel[tr]);
+    gen_series_start(&tessera.series[tr]);
+    gen_cells_start(&tessera.cells[tr]);
     tessera.morph[tr].step_idx = (uint8_t)((tessera.morph[tr].step_idx & 0xF0u) | 0x0Fu);  /* engine pre-increments */
 }
 
@@ -280,6 +290,8 @@ void tessera_mutate(uint32_t tr)
     case TESS_ENG_POLY:   gen_poly_mutate(&tessera.poly[tr], amt, &tessera.rnd[tr]); break;
     case TESS_ENG_QUAD:   tess_quad_mutate(tr, amt); break;
     case TESS_ENG_CONSTEL: gen_constel_mutate(&tessera.constel[tr], amt, &tessera.rnd[tr]); break;
+    case TESS_ENG_SERIES: gen_series_mutate(&tessera.series[tr], amt, &tessera.rnd[tr]); break;
+    case TESS_ENG_CELLS:  gen_cells_mutate(&tessera.cells[tr], amt, &tessera.rnd[tr]); break;
     }
     tessera.evolve[tr].flash = 4;
     tess_realign(tr);
@@ -333,6 +345,8 @@ static void tess_save_sec(uint32_t tr)
     case TESS_ENG_POLY:   gen_poly_save(&tessera.poly[tr], &g); break;
     case TESS_ENG_QUAD:   gen_quad_save(&tessera.quad[tr], &g); break;
     case TESS_ENG_CONSTEL: gen_constel_save(&tessera.constel[tr], &g); break;
+    case TESS_ENG_SERIES: gen_series_save(&tessera.series[tr], &g); break;
+    case TESS_ENG_CELLS:  gen_cells_save(&tessera.cells[tr], &g); break;
     }
     s->reg = g.reg;
     s->p0 = g.p0;
@@ -366,6 +380,8 @@ static void tess_load_sec(uint32_t tr)
     case TESS_ENG_POLY:   gen_poly_load(&tessera.poly[tr], &g); break;
     case TESS_ENG_QUAD:   gen_quad_load(&tessera.quad[tr], &g); break;
     case TESS_ENG_CONSTEL: gen_constel_load(&tessera.constel[tr], &g); break;
+    case TESS_ENG_SERIES: gen_series_load(&tessera.series[tr], &g); break;
+    case TESS_ENG_CELLS:  gen_cells_load(&tessera.cells[tr], &g); break;
     }
     tess_realign(tr);
     ev->valid = v;
@@ -871,6 +887,12 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         tessera.constel[tr].keep = tessera.evolve[tr].lock;
         gen_constel_tick(&tessera.constel[tr], &clk, &tessera.rnd[tr], &out);
         break;
+    case TESS_ENG_SERIES:
+        gen_series_tick(&tessera.series[tr], &out);
+        break;
+    case TESS_ENG_CELLS:
+        gen_cells_tick(&tessera.cells[tr], &out);
+        break;
     }
     uint8_t note = out.note, vel = out.vel;
     int should_trigger = out.gate;
@@ -1126,6 +1148,32 @@ static void tess_knob_body(uint32_t k, int32_t s)
             v = v < 0 ? 0 : v > (int32_t)TESSERA_TRACKS - 1 ? (int32_t)TESSERA_TRACKS - 1 : v;
             q->link = (uint8_t)(v ? tess_other(tr, (uint32_t)v - 1u) : 0u);
         }
+    } else if (mode == TESS_ENG_SERIES) {
+        tessera_series_t *g = &tessera.series[tr];
+        int32_t d = s > 0 ? 1 : -1, v;
+        if (k == 1u) {
+            v = (int32_t)g->start + s;
+            g->start = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
+        } else if (k == 2u) {
+            v = (int32_t)g->intv + d;
+            g->intv = (uint8_t)(v < 1 ? 1 : v > 7 ? 7 : v);
+        } else if (k == 3u) {
+            v = (int32_t)g->loop + d;
+            g->loop = (uint8_t)(v < 0 ? 0 : v > (int32_t)GEN_SR_LOOP ? (int32_t)GEN_SR_LOOP : v);
+        }
+    } else if (mode == TESS_ENG_CELLS) {
+        tessera_cells_t *g = &tessera.cells[tr];
+        int32_t d = s > 0 ? 1 : -1, v;
+        if (k == 1u) {                                      /* RULE: 0..255, a rule a click */
+            v = (int32_t)g->rule + s;
+            g->rule = (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v);
+        } else if (k == 2u) {
+            v = (int32_t)g->tap + d;
+            g->tap = (uint8_t)(v < 1 ? 1 : v > 8 ? 8 : v);
+        } else if (k == 3u) {
+            v = (int32_t)g->span + d;
+            g->span = (uint8_t)(v < 1 ? 1 : v > 15 ? 15 : v);
+        }
     } else if (mode == TESS_ENG_CONSTEL) {
         tessera_constel_t *c = &tessera.constel[tr];
         if (k == 1u) {                                      /* Y: a row a click */
@@ -1207,6 +1255,13 @@ uint32_t tessera_sig(uint32_t tr)
         h = (h ^ a->col ^ (uint32_t)a->ship << 16) * 16777619u;
         for (uint32_t i = 0; i < 16u; i++) h = (h ^ a->loop[i]) * 16777619u;
         break; }
+    case TESS_ENG_SERIES: { const tessera_series_t *a = &tessera.series[tr];
+        h = (h ^ (a->start | a->intv << 8 | a->loop << 16) ^ (uint32_t)a->n << 7) * 16777619u;
+        break; }
+    case TESS_ENG_CELLS: { const tessera_cells_t *a = &tessera.cells[tr];
+        h = (h ^ (a->rule | a->tap << 8 | a->span << 12 | (uint32_t)a->row0 << 16 | (uint32_t)a->cells << 24)) * 16777619u;
+        h = (h ^ a->n) * 16777619u;
+        break; }
     }
     return h;
 }
@@ -1272,7 +1327,8 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
  * EVOLVE / FORM / TWEAK settings and the settings of the remembered sections (A, B, C). Not stored: the recorded
  * Markov / Morph phrases (a loaded project records them again on its first pass: RAM is the limit, see
  * project.c), the playheads and the counters. A block that fails any range check is refused whole. */
-#define TESS_PK_TRACK 120u                           /* version 8: version 7's 98 bytes, then Constellation (22) */
+#define TESS_PK_TRACK 127u                           /* version 9: version 8's 120 bytes, then Series (3), Cells (4) */
+#define TESS_PK_TRACK_V8 120u                        /* version 8: version 7's 98 bytes, then Constellation (22) */
 #define TESS_PK_TRACK_V7 98u                         /* version 7: version 6's 95 bytes, then NOTE LENGTH (3) */
 #define TESS_PK_TRACK_V6 95u                         /* version 6: version 5's 88 bytes, then Quad (7) */
 #define TESS_PK_TRACK_V5 88u                         /* version 5: version 4's 80 bytes, then TWEAK 2 (6), SLOTH OCHD (2) */
@@ -1281,6 +1337,7 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
 #define TESS_PK_TRACK_V2 47u                         /* version 2: version 1's 45 bytes, then SEED (2) */
 #define TESS_PK_TRACK_V1 45u
 _Static_assert(TESSERA_PK_BYTES == TESSERA_TRACKS * TESS_PK_TRACK, "TESSERA_PK_BYTES (tessera.h)");
+_Static_assert(TESSERA_PK_BYTES_V8 == TESSERA_TRACKS * TESS_PK_TRACK_V8, "TESSERA_PK_BYTES_V8 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V7 == TESSERA_TRACKS * TESS_PK_TRACK_V7, "TESSERA_PK_BYTES_V7 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V6 == TESSERA_TRACKS * TESS_PK_TRACK_V6, "TESSERA_PK_BYTES_V6 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V5 == TESSERA_TRACKS * TESS_PK_TRACK_V5, "TESSERA_PK_BYTES_V5 (tessera.h)");
@@ -1323,6 +1380,13 @@ static uint8_t *tess_put_v8(uint8_t *o, const tessera_constel_t *c)
     memcpy(o, c->loop, 16);
     return o + 16;
 }
+/* version 9's part (after version 8's 120 bytes): Series' START, INTV, LOOP; Cells' RULE, TAP, SPAN, first generation */
+static uint8_t *tess_put_v9(uint8_t *o, const tessera_series_t *s, const tessera_cells_t *c)
+{
+    *o++ = s->start; *o++ = s->intv; *o++ = s->loop;
+    *o++ = c->rule; *o++ = c->tap; *o++ = c->span; *o++ = c->row0;
+    return o;
+}
 uint32_t tessera_pack(uint8_t *o)
 {
     tessera_ensure_init();
@@ -1354,6 +1418,7 @@ uint32_t tessera_pack(uint8_t *o)
         o = tess_put_v6(o, &tessera.quad[tr]);
         *o++ = tessera.nl_mode[tr]; *o++ = tessera.nl_len[tr]; *o++ = tessera.nl_keys[tr];
         o = tess_put_v8(o, &tessera.constel[tr]);
+        o = tess_put_v9(o, &tessera.series[tr], &tessera.cells[tr]);
     }
     return TESSERA_PK_BYTES;
 }
@@ -1387,7 +1452,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     uint32_t v_seed = tess_get16(rec + TESS_PK_TRACK_V1);
     const uint8_t *grd = rec + TESS_PK_TRACK_V2, *bnc = rec + TESS_PK_TRACK_V3, *awk = bnc + 3, *pol = awk + 19;
     const uint8_t *tw2 = rec + TESS_PK_TRACK_V4, *qd = rec + TESS_PK_TRACK_V5, *nl = rec + TESS_PK_TRACK_V6;
-    const uint8_t *cs = rec + TESS_PK_TRACK_V7;
+    const uint8_t *cs = rec + TESS_PK_TRACK_V7, *sc = rec + TESS_PK_TRACK_V8;
     uint32_t i;
 
     if (mode >= TESS_ENG_COUNT || v_seed > TESS_SEED_LOAD_MAX) return 0;
@@ -1417,6 +1482,8 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     if (cs[0] >= GEN_CS_ROWS || cs[1] > 100u || cs[2] > 7u || cs[3] > GEN_CS_SEEK) return 0;
     for (i = 0; i < 16u; i++)
         if (cs[6 + i] && !(cs[6 + i] & 15u)) return 0;      /* (a star has a height) */
+    if (sc[0] > 127u || sc[1] < 1u || sc[1] > 7u || sc[2] > GEN_SR_LOOP) return 0;
+    if (sc[4] < 1u || sc[4] > 8u || sc[5] < 1u || sc[5] > 15u || !sc[6]) return 0;
     if (!apply) return 1;
 
     tessera.mode[tr] = (uint8_t)mode;
@@ -1464,7 +1531,28 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     tessera.constel[tr].autop = cs[3]; tessera.constel[tr].sky = (uint16_t)tess_get16(cs + 4);
     memcpy(tessera.constel[tr].loop, cs + 6, 16);
     gen_constel_start(&tessera.constel[tr]);
+    tessera.series[tr].start = sc[0]; tessera.series[tr].intv = sc[1]; tessera.series[tr].loop = sc[2];
+    tessera.cells[tr].rule = sc[3]; tessera.cells[tr].tap = sc[4]; tessera.cells[tr].span = sc[5];
+    tessera.cells[tr].row0 = sc[6];
+    gen_series_start(&tessera.series[tr]);
+    gen_cells_start(&tessera.cells[tr]);
     return 1;
+}
+
+/* A version 8 track record (120 bytes, before SERIES and CELLS) -> version 9 (127): their defaults, START and the
+ * first generation from the track's seed (as ROLL would give them). out may not overlap in */
+static void tess_v8_track(const uint8_t *in, uint8_t *out)
+{
+    tessera_series_t s;
+    tessera_cells_t c;
+    memset(&s, 0, sizeof s);
+    memset(&c, 0, sizeof c);
+    s.intv = 1;
+    c.rule = 30; c.tap = 1; c.span = 14;
+    gen_series_fill(&s, tess_get16(in + TESS_PK_TRACK_V1));
+    gen_cells_fill(&c, tess_get16(in + TESS_PK_TRACK_V1));
+    memcpy(out, in, TESS_PK_TRACK_V8);
+    tess_put_v9(out + TESS_PK_TRACK_V8, &s, &c);
 }
 
 /* A version 7 track record (98 bytes, before CONSTELLATION) -> version 8 (120): Constellation's defaults, its sky from
@@ -1542,15 +1630,15 @@ static void tess_v1_track(const uint8_t *in, uint8_t *out)
 }
 uint32_t tessera_pk_bytes(uint32_t ver)
 {
-    return ver == 8u ? TESSERA_PK_BYTES : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
+    return ver == 9u ? TESSERA_PK_BYTES : ver == 8u ? TESSERA_PK_BYTES_V8 : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
            ver == 2u ? TESSERA_PK_BYTES_V2 : ver == 1u ? TESSERA_PK_BYTES_V1 : 0u;
 }
-/* A track record of version ver (1..8) -> version 8, a version at a time. out may not overlap in */
+/* A track record of version ver (1..9) -> version 9, a version at a time. out may not overlap in */
 void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
 {
     uint8_t v2[TESS_PK_TRACK_V2], v3[TESS_PK_TRACK_V3], v4[TESS_PK_TRACK_V4], v5[TESS_PK_TRACK_V5], v6[TESS_PK_TRACK_V6];
-    uint8_t v7[TESS_PK_TRACK_V7];
-    if (ver >= 8u) {
+    uint8_t v7[TESS_PK_TRACK_V7], v8[TESS_PK_TRACK_V8];
+    if (ver >= 9u) {
         memcpy(out, in, TESS_PK_TRACK);
         return;
     }
@@ -1560,7 +1648,8 @@ void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
     if (ver <= 4u) { tess_v4_track(in, v5); in = v5; }
     if (ver <= 5u) { tess_v5_track(in, v6); in = v6; }
     if (ver <= 6u) { tess_v6_track(in, v7); in = v7; }
-    tess_v7_track(in, out);
+    if (ver <= 7u) { tess_v7_track(in, v8); in = v8; }
+    tess_v8_track(in, out);
 }
 
 /* 1 = loaded; 0 = refused, `tessera` untouched */
@@ -1581,7 +1670,7 @@ int tessera_unpack_ver(uint32_t ver, const uint8_t *in)
     uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
     uint32_t n = tessera_pk_bytes(ver) / TESSERA_TRACKS;
     if (!n) return 0;
-    if (ver == 8u) return tessera_unpack(in);
+    if (ver == 9u) return tessera_unpack(in);
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
     return tessera_unpack(b);
@@ -1661,6 +1750,12 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_CS_DENS: return tessera.constel[tr].dens;
     case TX_CS_SIZE: return tessera.constel[tr].size;
     case TX_CS_AUTO: return tessera.constel[tr].autop;
+    case TX_SR_START: return tessera.series[tr].start;
+    case TX_SR_INTV: return tessera.series[tr].intv;
+    case TX_SR_LOOP: return tessera.series[tr].loop;
+    case TX_CL_RULE: return tessera.cells[tr].rule;
+    case TX_CL_TAP: return tessera.cells[tr].tap;
+    case TX_CL_SPAN: return tessera.cells[tr].span;
     }
     return 0;
 }
@@ -1792,6 +1887,12 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_CS_DENS: tessera.constel[tr].dens = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_CS_SIZE: tessera.constel[tr].size = (uint8_t)tess_clampi(v, 0, 7); return;
     case TX_CS_AUTO: tessera.constel[tr].autop = (uint8_t)tess_clampi(v, 0, GEN_CS_SEEK); return;
+    case TX_SR_START: tessera.series[tr].start = (uint8_t)tess_clampi(v, 0, 127); return;
+    case TX_SR_INTV: tessera.series[tr].intv = (uint8_t)tess_clampi(v, 1, 7); return;
+    case TX_SR_LOOP: tessera.series[tr].loop = (uint8_t)tess_clampi(v, 0, GEN_SR_LOOP); return;
+    case TX_CL_RULE: tessera.cells[tr].rule = (uint8_t)tess_clampi(v, 0, 255); return;
+    case TX_CL_TAP: tessera.cells[tr].tap = (uint8_t)tess_clampi(v, 1, 8); return;
+    case TX_CL_SPAN: tessera.cells[tr].span = (uint8_t)tess_clampi(v, 1, 15); return;
     default:
         return;
     }
@@ -1832,6 +1933,8 @@ void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v)
     case TX_CS_Y: tessera.constel[tr].y = (uint8_t)tess_clampi(v, 0, GEN_CS_ROWS - 1); break;
     case TX_CS_DENS: tessera.constel[tr].dens = (uint8_t)tess_clampi(v, 0, 100); break;
     case TX_CS_SIZE: tessera.constel[tr].size = (uint8_t)tess_clampi(v, 0, 7); break;
+    case TX_SR_START: tessera.series[tr].start = (uint8_t)tess_clampi(v, 0, 127); break;
+    case TX_CL_RULE: tessera.cells[tr].rule = (uint8_t)tess_clampi(v, 0, 255); break;
     default: break;                                 /* (the others are no cord's: cord.c's destinations) */
     }
 }
@@ -1855,6 +1958,8 @@ const gen_awake_t *tessera_awake(uint32_t tr) { return &tessera.awake[tr % TESSE
 const gen_poly_t *tessera_poly(uint32_t tr) { return &tessera.poly[tr % TESSERA_TRACKS]; }
 const gen_quad_t *tessera_quad(uint32_t tr) { return &tessera.quad[tr % TESSERA_TRACKS]; }
 const gen_constel_t *tessera_constel(uint32_t tr) { return &tessera.constel[tr % TESSERA_TRACKS]; }
+const gen_series_t *tessera_series(uint32_t tr) { return &tessera.series[tr % TESSERA_TRACKS]; }
+const gen_cells_t *tessera_cells(uint32_t tr) { return &tessera.cells[tr % TESSERA_TRACKS]; }
 void tessera_awake_select(uint32_t tr, uint32_t step)
 {
     uint8_t e;
