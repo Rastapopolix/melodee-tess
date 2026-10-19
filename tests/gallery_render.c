@@ -17,6 +17,8 @@ static const gshot_t SHOTS[] = {
     {"gen_grids", G_SCENE, S_GEN_GRIDS}, {"gen_bounce", G_SCENE, S_GEN_BOUNCE},
     {"gen_awake", G_SCENE, S_GEN_AWAKE}, {"gen_poly", G_SCENE, S_GEN_POLY},
     {"gen_evolve", G_SCENE, S_GEN_EVOLVE}, {"gen_tweak", G_SCENE, S_GEN_TWEAK},
+    {"gen_tweak2", G_SCENE, S_GEN_TWEAK2}, {"organic", G_SCENE, S_ORGANIC},
+    {"mods_live", G_SCENE, S_MODS_LIVE_GEN}, {"matrix", G_SCENE, S_MATRIX},   /* (1.3.3: TWEAK 2, ORGANIC, live mods) */
     {"mod_shortcut", G_SCENE, S_MOD_SHORTCUT}, {"cords", G_SCENE, S_CORDS},
     {"help", G_SCENE, S_HELP},
     {"edit_sid", G_SCENE, S_EDIT_SID}, {"edit_trio", G_TRIO, 0}, {"edit_phys", G_PHYS, 0},
