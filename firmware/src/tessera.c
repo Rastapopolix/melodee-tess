@@ -7,6 +7,8 @@
 
 tessera_state_t tessera;
 
+#include "organic.c"                                 /* SLOTH and OCHD: each track's drifting sources (cords) */
+
 /* The knob handlers (main loop) change several fields the sequencer reads in the audio interrupt (an engine change
  * releases the old note then clears the gate; SEED rewrites a register, pitches, a state): each runs whole, with the interrupt
  * held off, like project.c's loads. The sequencer runs in CPU0's audio interrupt, so this is enough. The host
@@ -134,6 +136,8 @@ void tessera_init(void)
         tessera.evolve[i].rec = 2;
         tessera.evolve[i].contrast = 60;
         tessera.evolve[i].cond_first = 1;
+        tessera.org_speed[i] = 50;                       /* SLOTH and OCHD at their own speeds */
+        tessera.org_rate[i] = 50;
     }
 }
 
@@ -1139,7 +1143,7 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
  * EVOLVE / FORM / TWEAK settings and the settings of the remembered sections (A, B, C). Not stored: the recorded
  * Markov / Morph phrases (a loaded project records them again on its first pass: RAM is the limit, see
  * project.c), the playheads and the counters. A block that fails any range check is refused whole. */
-#define TESS_PK_TRACK 86u                            /* version 5: version 4's 80 bytes, then TWEAK 2 (6) */
+#define TESS_PK_TRACK 88u                            /* version 5: version 4's 80 bytes, then TWEAK 2 (6), SLOTH OCHD (2) */
 #define TESS_PK_TRACK_V4 80u                         /* version 4: version 3's 51 bytes, then Bounce (3), Awake (19), Poly (7) */
 #define TESS_PK_TRACK_V3 51u                         /* version 3: version 2's 47 bytes, then Grids (4) */
 #define TESS_PK_TRACK_V2 47u                         /* version 2: version 1's 45 bytes, then SEED (2) */
@@ -1196,6 +1200,7 @@ uint32_t tessera_pack(uint8_t *o)
         *o++ = tessera.grids[tr].chaos;
         o = tess_put_v4(o, &tessera.bounce[tr], &tessera.awake[tr], &tessera.poly[tr]);
         *o++ = ev->branch; *o++ = ev->br_to; *o++ = ev->br_mode; *o++ = ev->logic; *o++ = ev->lg_with; *o++ = ev->cond;
+        *o++ = tessera.org_speed[tr]; *o++ = tessera.org_rate[tr];
     }
     return TESSERA_PK_BYTES;
 }
@@ -1250,7 +1255,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
         if ((((pol[4 + i / 2u] >> ((i & 1u) * 4u)) & 0xFu) | ((pol[6] >> (4u + i)) & 1u) << 4) > 20u) return 0;
     if ((pol[6] & 15u) < 1u || (pol[6] & 15u) > 3u) return 0;
     if (tw2[0] > 100u || tw2[1] > TESSERA_TRACKS || tw2[2] >= TESS_BR_COUNT || tw2[3] >= TESS_LG_COUNT ||
-        tw2[4] > TESSERA_TRACKS || tw2[5] >= TESS_COND_COUNT) return 0;
+        tw2[4] > TESSERA_TRACKS || tw2[5] >= TESS_COND_COUNT || tw2[6] > 100u || tw2[7] > 100u) return 0;
     if (!apply) return 1;
 
     tessera.mode[tr] = (uint8_t)mode;
@@ -1289,15 +1294,17 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     for (i = 0; i < 4u; i++)
         tessera.poly[tr].pitch[i] = (uint8_t)(((pol[4 + i / 2u] >> ((i & 1u) * 4u)) & 0xFu) | ((pol[6] >> (4u + i)) & 1u) << 4);
     tessera.poly[tr].span = pol[6] & 15u;
+    tessera.org_speed[tr] = tw2[6]; tessera.org_rate[tr] = tw2[7];
     return 1;
 }
 
-/* A version 4 track record (80 bytes, before BRANCH, LOGIC, COND) -> version 5 (86): all six off, so it plays as it
- * did. out may not overlap in */
+/* A version 4 track record (80 bytes, before BRANCH, LOGIC, COND, SLOTH, OCHD) -> version 5 (88): TWEAK 2 off, so it
+ * plays as it did, SLOTH and OCHD at their own speeds. out may not overlap in */
 static void tess_v4_track(const uint8_t *in, uint8_t *out)
 {
     memcpy(out, in, TESS_PK_TRACK_V4);
     memset(out + TESS_PK_TRACK_V4, 0, TESS_PK_TRACK - TESS_PK_TRACK_V4);
+    out[TESS_PK_TRACK_V4 + 6u] = 50; out[TESS_PK_TRACK_V4 + 7u] = 50;
 }
 /* A version 3 track record (51 bytes, before BOUNCE, AWAKE, POLY) -> version 4 (80): their settings a fresh track's,
  * Awake's values and Poly's pitches from the track's seed (as ROLL would give them). out may not overlap in */
@@ -1438,6 +1445,8 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_TW_LOGIC: return ev->logic;
     case TX_TW_LG_WITH: return ev->lg_with;
     case TX_TW_COND: return ev->cond;
+    case TX_ORG_SPEED: return tessera.org_speed[tr];
+    case TX_ORG_RATE: return tessera.org_rate[tr];
     }
     return 0;
 }
@@ -1555,6 +1564,8 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
         ev->lg_with = (uint8_t)(v == (int32_t)tr + 1 ? 0 : v);   /* (not itself) */
         return;
     case TX_TW_COND: ev->cond = (uint8_t)tess_clampi(v, 0, TESS_COND_COUNT - 1); return;
+    case TX_ORG_SPEED: tessera.org_speed[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_ORG_RATE: tessera.org_rate[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     default:
         return;
     }

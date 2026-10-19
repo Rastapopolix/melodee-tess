@@ -760,6 +760,17 @@ static void draw_columns(void)
         draw_column(3, "FOLLOW", w3, "", VAL(3u), (int32_t)ev->follow * 1000 / 4, ICON_AUTO);
         return;
     }
+    if (cur_page()->graph == GR_ORGANIC) {
+        uint32_t tr = song.sel < TESSERA_TRACKS ? song.sel : 0u;
+        char w0[8], w1[8];
+        fmt_int(w0, tessera.org_speed[tr]);
+        fmt_int(w1, tessera.org_rate[tr]);
+        draw_column(0, "SPEED", w0, "", VAL(0u), (int32_t)tessera.org_speed[tr] * 10, ICON_AUTO);   /* SLOTH's */
+        draw_column(1, "RATE", w1, "", VAL(1u), (int32_t)tessera.org_rate[tr] * 10, ICON_AUTO);    /* OCHD's */
+        draw_column(2, "", "", "", T_DIM, -1, ICON_NONE);
+        draw_column(3, "", "", "", T_DIM, -1, ICON_NONE);
+        return;
+    }
     if (cur_page()->graph == GR_TWEAK2) {
         static const char *const BRM[TESS_BR_COUNT] = {"COIN", "TGL", "LTCH"};
         static const char *const LGN[TESS_LG_COUNT] = {"OFF", "AND", "OR", "XOR", "NOT"};

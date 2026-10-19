@@ -658,6 +658,32 @@ static int test_tweak2(void)
     return bad;
 }
 
+/* ORGANIC (LFO family, any track): KNOB 1 SLOTH SPEED, KNOB 2 OCHD RATE, their help; a cord from T2 TORPOR */
+static int test_organic(void)
+{
+    int bad = 0;
+    ui_power_on();
+    song.sel = 1;
+    go_title("ORGANIC");
+    bad += check("ORGANIC shown on a STEP track, SPEED and RATE 50", str_eq(cur_page()->title, "ORGANIC") &&
+                 tessera.org_speed[1] == 50u && tessera.org_rate[1] == 50u);
+    turn(EN_K1, 10);
+    turn(EN_K1 + 1u, -20);
+    bad += check("KNOB 1: SLOTH SPEED up, KNOB 2: OCHD RATE down (track 2's only)", tessera.org_speed[1] > 50u &&
+                 tessera.org_rate[1] < 50u && tessera.org_speed[0] == 50u && tessera.org_rate[0] == 50u);
+    help_find(0);
+    bad += check("ORGANIC's help: SLOTH SPEED, OCHD RATE", help.pid == PID_TESS(TX_ORG_SPEED) &&
+                 (help_find(1), help.pid == PID_TESS(TX_ORG_RATE)));
+    {
+        cord_t c = {CS_TORPOR, 1, CD_CUTOFF, 0, 50, 0};
+        bad += check("a mod from T2 TORPOR: taken, named TORPOR", cord_set(0, &c) && str_eq(cord_src_name(CS_TORPOR), "TORPOR") &&
+                     str_eq(cord_src_name(CS_OCHD8), "OCHD 8"));
+        cord_clear();
+    }
+    song.sel = 0;
+    return bad;
+}
+
 /* Mod shortcut (ui_modsc.c): FX held + a knob sets its parameter's cord amount on this track, the value left; SELECT
  * the source; back at 0 the slot is free; a parameter no cord reaches: nothing; FX let go opens no page */
 static int test_mod_shortcut(void)
@@ -4941,6 +4967,7 @@ int main(void)
     bad += test_cords_page();
     bad += test_mod_shortcut();
     bad += test_tweak2();
+    bad += test_organic();
     bad += test_help_gesture();
     bad += test_mods_page();
     bad += test_midi();

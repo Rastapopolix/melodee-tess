@@ -183,6 +183,8 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x229 | TWEAK LOGIC | OFF, AND, OR, XOR, NOT | OFF | Combines the hits with track WITH's: AND plays only when both hit, OR when either does, XOR when one does, NOT only when the other rests; OFF is its own. |
 | 0x22A | TWEAK LOGIC WITH | OFF, T1, T2, T3, T4 | OFF | The track LOGIC reads: a lower track's hit on this step, a higher one's on the step before. |
 | 0x22B | TWEAK COND | OFF, 1:2, 2:2, 1:4, 2:4, 3:4, 4:4, 1:8, 8:8, FIRST, !FIRST | OFF | The bars a hit may play in, counted from PLAY (with FORM on, from the section's start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest. |
+| 0x22C | SLOTH SPEED | 0 to 100 | 50 | How fast the track's SLOTH drifts (mods: TORPOR, APATHY, INERTIA): 50 is about 17, 1 and 3 minutes a turn; each 12.5 more twice as fast. |
+| 0x22D | OCHD RATE | 0 to 100 | 50 | How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for OCHD 8; each 12.5 more twice as fast. |
 
 ## Mods
 
@@ -204,6 +206,17 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | NOTE | the generator's last note (C4 = 0) |
 | CV | the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the degree it moved to |
 | DRIFT | a slow wander of the track's own, a new point every 12 s or so, eased between (a new project's default mods: each track's CUTOFF and FX SEND) |
+| TORPOR | (null) |
+| APATHY | (null) |
+| INERTIA | (null) |
+| OCHD 1 | (null) |
+| OCHD 2 | (null) |
+| OCHD 3 | (null) |
+| OCHD 4 | (null) |
+| OCHD 5 | (null) |
+| OCHD 6 | (null) |
+| OCHD 7 | (null) |
+| OCHD 8 | (null) |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |

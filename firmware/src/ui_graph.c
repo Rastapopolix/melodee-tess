@@ -485,6 +485,28 @@ static void graph_tweak2(const track_t *t, uint16_t c)
     }
 }
 
+/* ORGANIC page (LFO family): the track's SLOTH, its three circuits as dots on their lines (TORPOR, APATHY, INERTIA from
+ * the top, -1 left, +1 right), and its OCHD, eight bars up or down from the middle, slowest left. Live: graph_sig
+ * redraws it as they move */
+static void graph_organic(const track_t *t, uint16_t c)
+{
+    static const char *const NAME[3] = {"TOR", "APA", "INE"};
+    uint32_t tr = trk_index(t) % TESSERA_TRACKS, i;
+    for (i = 0; i < 3u; i++) {
+        int32_t y = 22 + (int32_t)i * 28, v = organic_out(tr, i);
+        cv_text(PANEL_X0, y - 5, &AF_X, NAME[i], T_MID);
+        cv_rect(PANEL_X0 + 26, y, 84, 1, T_RAISE);
+        cv_rect(PANEL_X0 + 67, y - 4, 1, 9, T_RAISE);
+        cv_rrect(PANEL_X0 + 64 + v * 38 / 32767, y - 3, 7, 7, 3, c, T_SURF);
+    }
+    cv_rect(PANEL_X0 + 120, 50, 100, 1, T_RAISE);
+    for (i = 0; i < 8u; i++) {
+        int32_t x = PANEL_X0 + 122 + (int32_t)i * 12, h = organic_out(tr, 3u + i) * 38 / 32767;
+        if (h > 0) cv_rect(x, 50 - h, 9, h, c);
+        else if (h < 0) cv_rect(x, 51, 9, -h, c);
+    }
+}
+
 static void graph_steps(const track_t *t, uint16_t c)
 {
     uint32_t tr = trk_index(t);
@@ -1170,6 +1192,8 @@ static uint32_t graph_sig(int play)
         const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
         h ^= ((uint32_t)(uint8_t)ev->shift | (uint32_t)ev->drop << 8 | (uint32_t)ev->human << 16 | (uint32_t)ev->follow << 24) * 2246822519u;
     }
+    if (pg->graph == GR_ORGANIC)                     /* (it moves: a step a few pixels apart) */
+        for (uint32_t i = 0; i < 11u; i++) h = h * 31u + (uint32_t)(organic_out(trk_index(t), i) >> 11);
     if (pg->graph == GR_TWEAK2 && trk_index(t) < TESSERA_TRACKS) {
         const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
         h ^= ((uint32_t)ev->branch | (uint32_t)ev->br_to << 8 | (uint32_t)ev->br_mode << 12 | (uint32_t)ev->logic << 16 |
@@ -1464,6 +1488,9 @@ static void draw_graph(void)
         case GR_TWEAK2:
             cv_oy = 0;
             graph_tweak2(t, c);
+            break;
+        case GR_ORGANIC:
+            graph_organic(t, c);
             break;
         case GR_STEPS:
             graph_steps(t, c);

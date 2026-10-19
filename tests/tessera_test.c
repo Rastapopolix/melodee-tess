@@ -905,6 +905,75 @@ static void tw2_run(char *res, size_t cap)
     snprintf(res, cap, "%u", fail);
 }
 
+/* ------------------------------------------------------------ SLOTH, OCHD --- */
+static const char *const ORG_CHECK[] = {
+    "SLOTH: 6 hours at SPEED 100 (4 days at 50): every circuit in its range, swinging over most of it",
+    "SLOTH: APATHY turns about once a minute at SPEED 50, twice as often at 62.5",
+    "OCHD: 8 rates, slowest first, 64 s a turn for OCHD 1 at RATE 50; bent triangles within -1..1",
+    "PLAY: each track's from its SEED (the same again after PLAY), another SEED elsewhere",
+};
+#define ORG_N (sizeof ORG_CHECK / sizeof ORG_CHECK[0])
+static uint32_t org_turns(uint32_t tr, uint32_t k, uint32_t blocks)   /* upward zero crossings of output k */
+{
+    uint32_t n = 0;
+    int32_t was = organic_out(tr, k);
+    for (uint32_t i = 0; i < blocks; i++) {
+        int32_t v;
+        organic_tick();
+        v = organic_out(tr, k);
+        n += was < 0 && v >= 0;
+        was = v;
+    }
+    return n;
+}
+static void org_run(char *res, size_t cap)
+{
+    uint32_t fail = 0, tr, k, i, n1, n2;
+    const uint32_t BPS = 1378u;
+    int32_t lo[3] = {32767, 32767, 32767}, hi[3] = {-32767, -32767, -32767}, a[11];
+    host_tracks_init();
+    tessera_reset();
+    for (tr = 0; tr < TESSERA_TRACKS; tr++) { tessera.seed[tr] = (uint16_t)(1u + tr * 37u); tessera.org_speed[tr] = 100; }
+    organic_play();
+    organic_tick();
+    for (i = 0; i < 6u * 3600u * BPS; i++) {
+        organic_tick();
+        for (k = 0; k < 3u; k++) {
+            float x = organic[1].x[k];
+            int32_t v = organic_out(1, k);
+            if (!(x > -2.6f && x < 1.4f)) fail |= 1u << 0;
+            lo[k] = v < lo[k] ? v : lo[k], hi[k] = v > hi[k] ? v : hi[k];
+        }
+    }
+    for (k = 0; k < 3u; k++) if (lo[k] > -25000 || hi[k] < 15000) fail |= 1u << 0;
+    tessera.org_speed[0] = 50;
+    n1 = org_turns(0, 1, 30u * 60u * BPS);           /* 30 minutes of APATHY */
+    tessera.org_speed[0] = 62;                       /* (62.5: 62 is 2^0.96) */
+    n2 = org_turns(0, 1, 30u * 60u * BPS);
+    if (n1 < 20u || n1 > 45u || n2 * 10u < n1 * 17u || n2 * 10u > n1 * 23u) fail |= 1u << 1;
+    tessera.org_rate[0] = 50;
+    n1 = org_turns(0, 3, 640u * BPS);                /* OCHD 1: 10 turns in 640 s */
+    if (n1 < 9u || n1 > 11u) fail |= 1u << 2;
+    for (k = 4; k < 11u; k++) {
+        uint32_t m = org_turns(0, k, 64u * BPS);
+        if (m <= n1 / 10u) fail |= 1u << 2;
+        n1 = m * 10u;
+    }
+    for (i = 0; i < 100000u; i++) {
+        organic_tick();
+        for (k = 3; k < 11u; k++) if (organic_out(0, k) < -32767 || organic_out(0, k) > 32767) fail |= 1u << 2;
+    }
+    organic_play();
+    for (i = 0; i < 5000u; i++) organic_tick();
+    for (k = 0; k < 11u; k++) a[k] = organic_out(2, k);
+    organic_play();
+    for (i = 0; i < 5000u; i++) organic_tick();
+    for (k = 0; k < 11u; k++) if (organic_out(2, k) != a[k]) fail |= 1u << 3;
+    for (k = 0, n1 = 0; k < 11u; k++) n1 += organic_out(3, k) != a[k];
+    if (n1 < 9u) fail |= 1u << 3;
+    snprintf(res, cap, "%u", fail);
+}
+
 /* --------------------------------------------------------- saved block --- */
 static uint32_t pack_hash(const uint8_t *p)
 {
@@ -1039,10 +1108,18 @@ static void pack_run(char *res, size_t cap)
         }
         tessera_unpack(a);
     }
-    {   /* a version 4 block (before BRANCH, LOGIC, COND: each track 6 bytes shorter) loads every setting, theirs off;
+    {   /* SLOTH SPEED and OCHD RATE: their round trip */
+        tessera_param_set(3, TX_ORG_SPEED, 80);
+        tessera_param_set(3, TX_ORG_RATE, 7);
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.org_speed[3] == 80u && tessera.org_rate[3] == 7u;
+        tessera_unpack(a);
+    }
+    {   /* a version 4 block (before BRANCH, LOGIC, COND, SLOTH, OCHD: each track 8 bytes shorter) loads every setting, theirs off;
          * each new setting out of range is refused */
         static uint8_t v4[TESSERA_PK_BYTES_V4], v4b[TESSERA_PK_BYTES_V4];
-        static const uint8_t BAD[][2] = {{0, 101}, {1, 5}, {2, 3}, {3, 5}, {4, 5}, {5, 11}};
+        static const uint8_t BAD[][2] = {{0, 101}, {1, 5}, {2, 3}, {3, 5}, {4, 5}, {5, 11}, {6, 101}, {7, 101}};
         const uint32_t n5 = TESSERA_PK_BYTES / TESSERA_TRACKS, n4 = TESSERA_PK_BYTES_V4 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v4 + tr * n4, a + tr * n5, n4);
         ok &= tessera.evolve[2].branch == 40u && tessera.evolve[2].br_to == 4u && tessera.evolve[2].br_mode == TESS_BR_LATCH &&
@@ -1054,6 +1131,7 @@ static void pack_run(char *res, size_t cap)
             const tessera_evolve_t *ev = &tessera.evolve[tr];
             memcpy(v4b + tr * n4, b + tr * n5, n4);
             ok &= !ev->branch && !ev->br_to && !ev->br_mode && !ev->logic && !ev->lg_with && !ev->cond;
+            ok &= tessera.org_speed[tr] == 50u && tessera.org_rate[tr] == 50u;
         }
         ok &= !memcmp(v4, v4b, sizeof v4);            /* every version 4 setting as it was */
         for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
@@ -1209,6 +1287,24 @@ int main(int argc, char **argv)
             waitpid(pid, 0, 0);
         }
         for (i = 0; i < TW2_N; i++) bad += check(TW2_CHECK[i], !((fail >> i) & 1u));
+    }
+    {   /* SLOTH, OCHD */
+        unsigned fail = ~0u;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                org_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &fail);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        for (i = 0; i < ORG_N; i++) bad += check(ORG_CHECK[i], !((fail >> i) & 1u));
     }
     {   /* ROLL mid-bar: the line playing until the bar line */
         unsigned same = 0, n = 0;

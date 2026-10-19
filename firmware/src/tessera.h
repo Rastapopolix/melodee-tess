@@ -100,6 +100,8 @@ typedef struct {
     uint8_t          active_gate[TESSERA_TRACKS];
     uint8_t          hit[TESSERA_TRACKS];     /* its last step played on its own voice (LOGIC; seq.c sets a STEP track's) */
     uint8_t          br_in[TESSERA_TRACKS];   /* its seq_notes hold notes another track BRANCHed onto it */
+    uint8_t          org_speed[TESSERA_TRACKS];   /* SLOTH SPEED 0..100 (organic.c), 50: the module's speeds */
+    uint8_t          org_rate[TESSERA_TRACKS];    /* OCHD RATE 0..100, 50: 64 s .. 2.4 s a turn */
     int16_t          cv[TESSERA_TRACKS];      /* the generator's CV of its last step (gen.c; the cords' source CV) */
     uint16_t         seed[TESSERA_TRACKS];    /* SEED 1..128 (saved by 1.1.3-1.1.5: up to 9999), 0 = not picked yet
                                                * (tessera.c tess_seed_fresh) */
@@ -129,11 +131,12 @@ void tessera_stop_all(void);
 void tessera_tweak_knob(uint32_t k, int32_t s);
 void tessera_form_knob(uint32_t k, int32_t s);
 void tessera_tweak2_knob(uint32_t k, int32_t s);    /* TWEAK 2 page: BRANCH TO LOGIC COND */
+void organic_play(void);                            /* seq.c, PLAY: SLOTH and OCHD from each track's SEED */
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 344u                       /* the saved state, version 5 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
-#define TESSERA_PK_BYTES_V4 320u                    /* version 4 (before BRANCH, LOGIC, COND) */
+#define TESSERA_PK_BYTES 352u                       /* the saved state, version 5 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V4 320u                    /* version 4 (before BRANCH, LOGIC, COND, SLOTH, OCHD) */
 #define TESSERA_PK_BYTES_V3 204u                    /* version 3 (before BOUNCE, AWAKE, POLY): older projects and backups */
 #define TESSERA_PK_BYTES_V2 188u                    /* version 2 (before GRIDS) */
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
@@ -159,6 +162,7 @@ enum {
     TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB,
     TX_POL_DIV1, TX_POL_DIV2, TX_POL_DIV3, TX_POL_DIV4, TX_POL_SPAN,
     TX_TW_BRANCH, TX_TW_BR_TO, TX_TW_BR_MODE, TX_TW_LOGIC, TX_TW_LG_WITH, TX_TW_COND,
+    TX_ORG_SPEED, TX_ORG_RATE,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */

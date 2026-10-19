@@ -62,6 +62,8 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_TW_LOGIC] = PE("LOGIC", TX_N_LOGIC, 0),
     [TX_TW_LG_WITH] = PE("WITH", TX_N_FOLLOW, 0),
     [TX_TW_COND] = PE("COND", TX_N_COND, 0),
+    [TX_ORG_SPEED] = PD("SPEED", F_INT, 0, 100, 50),
+    [TX_ORG_RATE] = PD("RATE", F_INT, 0, 100, 50),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -290,6 +292,10 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                           "step before."),
     X_(TX_TW_COND, "TWEAK COND", "The bars a hit may play in, counted from PLAY (with FORM on, from the section's "
                                  "start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest."),
+    X_(TX_ORG_SPEED, "SLOTH SPEED", "How fast the track's SLOTH drifts (mods: TORPOR, APATHY, INERTIA): 50 is about 17, "
+                                    "1 and 3 minutes a turn; each 12.5 more twice as fast."),
+    X_(TX_ORG_RATE, "OCHD RATE", "How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for "
+                                 "OCHD 8; each 12.5 more twice as fast."),
 };
 #undef T_
 #undef G_

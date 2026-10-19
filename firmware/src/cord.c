@@ -75,13 +75,19 @@ const cord_dest_t *cord_dest(uint32_t code)
 /* ------------------------------------------------------------ sources --- */
 _Static_assert(CS_LFO == MS_LFO && CS_SLEW == MS_SLEW && CS_EXPR == MS_EXPR, "CS_LFO .. CS_SLEW == mod.c's MS_*");
 static const char *const CORD_SRC_NAME[CS_N] = {"--", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H",
-                                                "SLEW", "GATE", "NOTE", "CV", "DRIFT"};
+                                                "SLEW", "GATE", "NOTE", "CV", "DRIFT", "TORPOR", "APATHY",
+                                                "INERTIA", "OCHD 1", "OCHD 2", "OCHD 3", "OCHD 4", "OCHD 5", "OCHD 6",
+                                                "OCHD 7", "OCHD 8"};
 const char *cord_src_name(uint32_t code) { return code < CS_N ? CORD_SRC_NAME[code] : 0; }
 
 /* DRIFT: each track's slow wander, -1..1: a point every 2^14 audio blocks (11.9 s), the way between them eased
  * (smoothstep), the tracks apart in time and in their points. Its clock: the blocks since power-on (cord_tick) */
 static uint32_t cord_blocks;
-void cord_tick(void) { cord_blocks++; }
+void cord_tick(void)
+{
+    cord_blocks++;
+    organic_tick();                                     /* (tessera.c, organic.c) */
+}
 static int32_t cord_point(uint32_t k)
 {
     k = (k ^ (k >> 16)) * 0x7FEB352Du;
@@ -109,12 +115,14 @@ static int32_t cord_src(uint32_t s, uint32_t tr)
         return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF ? tessera.cv[tr] : 0;
     if (s == CS_DRIFT)
         return cord_drift(tr % NTRK);
+    if (s >= CS_TORPOR)
+        return organic_out(tr, s - CS_TORPOR);
     return mod_tsrc(t, s, mulq15(t->lfo_val, t->lfo_fade));
 }
 /* as mod.c's MS_BIPOLAR (a UNI LFO: 0..1, as ENV) */
 static int cord_bipolar(uint32_t s, uint32_t tr)
 {
-    return s == CS_NOTE || s == CS_DRIFT || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
+    return s == CS_NOTE || s == CS_DRIFT || s >= CS_TORPOR || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
 }
 
 /* ------------------------------------------------------------ the cords --- */

@@ -52,7 +52,7 @@ const cord_dest_t *cord_dest(uint32_t code);        /* 0: no such destination (a
 
 /* Source codes. FROZEN as the destinations. A source is a track's (its LFO, its latest note ..): one value per
  * track and block, so a cord crosses tracks (on its own track's voice destinations, ENV VEL KEY RAND: each voice its
- * own, as MOD's routes). Values Q15: bipolar -32768..32767 (LFO, KEY, RAND, S&H, SLEW, NOTE, DRIFT), else 0..32767
+ * own, as MOD's routes). Values Q15: bipolar -32768..32767 (LFO, KEY, RAND, S&H, SLEW, NOTE, DRIFT, SLOTH, OCHD), else 0..32767
  * (CV too) */
 enum {
     CS_OFF,
@@ -62,6 +62,8 @@ enum {
     CS_CV,                        /* the generator's CV (gen.c): Turing its register, Euclid and Morph a ramp, Markov the
                                    * degree, Grids the kick's chance, Bounce the ball's height, Awake A's value; 0..1 */
     CS_DRIFT,                     /* a slow wander of the track's own, a new point every 12 s or so (the default mods) */
+    CS_TORPOR, CS_APATHY, CS_INERTIA,   /* the track's SLOTH (organic.c): chaos, ~17 min, ~1 min, ~3 min a turn */
+    CS_OCHD1, CS_OCHD2, CS_OCHD3, CS_OCHD4, CS_OCHD5, CS_OCHD6, CS_OCHD7, CS_OCHD8,   /* its OCHD: 64 s .. 2.4 s */
     CS_N
 };
 
@@ -78,7 +80,7 @@ const cord_t *cord_get(uint32_t i);
 void cord_clear(void);                              /* every cord off */
 uint32_t cord_count(void);                          /* cords doing something (a destination and an amount or offset) */
 uint32_t cord_adopt(void);
-void cord_tick(void);                               /* an audio block (mix.c mix_block): DRIFT's clock */
+void cord_tick(void);                               /* an audio block (mix.c mix_block): DRIFT's clock, SLOTH, OCHD */
 void cord_defaults(void);                           /* a new project's mods (project.c): the default patch */
 void cord_sound_load(uint32_t tr);                  /* a sound loads on track tr (ui.c load_begin) */                          /* MOD's routes into cords (main loop): the routes left, no room */
 

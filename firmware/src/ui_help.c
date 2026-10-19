@@ -24,7 +24,8 @@ static void help_find(uint32_t k)
         {TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB}, {0xFF, TX_POL_DIV1, TX_POL_SPAN}};
     static const char *const CORD_TEXT[4] = {
         "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
-        "or CV, or DRIFT, a slow wander. -- leaves the mod a fixed move.",
+        "or CV, or DRIFT, a slow wander, or its SLOTH (TORPOR, APATHY, INERTIA) or OCHD 1-8 (LFO > ORGANIC). -- leaves "
+        "the mod a fixed move.",
         "Which of the 16 mods the other knobs edit.",
         "What it moves, on which track: the voices' pitch, cutoff, shape, gain, a sound setting, or a generator's.",
         "How far, and which way: at a full source, 100 % is the destination's whole range (pitch: an octave)."};
@@ -43,6 +44,7 @@ static void help_find(uint32_t k)
     if (pg->graph == GR_EVOLVE) x = EV[k];
     else if (pg->graph == GR_TWEAK) x = TW[k];
     else if (pg->graph == GR_TWEAK2) x = TW2[k];
+    else if (pg->graph == GR_ORGANIC && k < 2u) x = k ? TX_ORG_RATE : TX_ORG_SPEED;
     else if (pg->graph == GR_FORM) {
         x = FM[k];
         if (x == 0xFFu) {

@@ -165,3 +165,5 @@
 0x229 TWEAK LOGIC              track 0..4 def 0
 0x22a TWEAK LOGIC WITH         track 0..4 def 0
 0x22b TWEAK COND               track 0..10 def 0
+0x22c SLOTH SPEED              track 0..100 def 50
+0x22d OCHD RATE                track 0..100 def 50
