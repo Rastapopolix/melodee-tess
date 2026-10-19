@@ -109,8 +109,8 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x102 | CLOCK SOURCE | INT, USB, TRS | INT | Where the tempo comes from: the FM-1 itself, USB MIDI or the TRS MIDI input. |
 | 0x103 | TUNE | -50 to 50 | 0 | Fine tuning of every track, in cents. |
 | 0x10C | MIDI INPUT | USB, TRS | USB | Which MIDI input plays the tracks: USB or TRS. |
-| 0x10D | DRUM MIDI CHANNEL | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | 10 | The MIDI channel the first drum track listens to. (The device's, not the project's.) |
-| 0x10E | MIDI ROUTING | CH1-4, SEL, CH5-8, CH9-12, CH13-16 | CH1-4 | Which MIDI channels reach which tracks: four channels to the four tracks, or every channel to the selected track (SEL). |
+| 0x10D | DRUM MIDI CHANNEL | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | 10 | The MIDI channel the first drum track listens to and sends on (MIDI OUT). (The device's, not the project's.) |
+| 0x10E | MIDI ROUTING | CH1-4, SEL, CH5-8, CH9-12, CH13-16 | CH1-4 | Which MIDI channels reach which tracks: four channels to the four tracks, or every channel to the selected track (SEL). MIDI OUT sends each track on the same channels (SEL: 1 to 4). |
 | 0x110 | PROJECT SLOT | (a button) |  | The project slot LOAD and SAVE use. |
 | 0x111 | BOOT PROJECT | OFF, A, B, C, D | OFF | The project loaded when the FM-1 starts; OFF starts a new one. (The device's, not the project's.) |
 | 0x112 | PROJECT LOAD | (a button) |  | Loads the project in the slot. |
