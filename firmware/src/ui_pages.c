@@ -781,6 +781,8 @@ static void pv_picture(void)
                 for (uint32_t r = 0; r < TESSERA_TRACKS; r++) pp = pp * 5 + tessera_quad(r)->pos;
             }
             else if (m == TESS_ENG_CONSTEL) pp = tessera_constel(tr)->col ^ (int32_t)tessera_constel(tr)->ship << 16;
+            else if (m == TESS_ENG_SERIES) pp = tessera_series(tr)->n;
+            else if (m == TESS_ENG_CELLS) pp = tessera_cells(tr)->n ^ (int32_t)tessera_cells(tr)->cells << 16;
             else if (m == TESS_ENG_POLY) pp = tessera_poly(tr)->pos ^ (int32_t)(tessera_poly(tr)->tick % 720u) << 4;
             else if (m == TESS_ENG_AWAKE) pp = tessera_awake(tr)->pos_a ^ tessera_awake(tr)->pos_b << 8;
             else if (m == TESS_ENG_BOUNCE) pp = tessera_bounce(tr)->x[0] ^ tessera_bounce(tr)->y[0] << 8 ^ tessera_bounce(tr)->x[1] << 16;
