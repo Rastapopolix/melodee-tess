@@ -978,6 +978,19 @@ static void draw_columns(void)
                 if (q->link) v3[0] = 'T', fmt_int(v3 + 1, q->link);
                 else str_cpy(v3, "OFF", sizeof v3);
                 draw_column(3, "LINK", v3, "", VAL(3u), (int32_t)q->link * 1000 / TESSERA_TRACKS, ICON_AUTO);
+            } else if (m == TESS_ENG_CONSTEL) {
+                const gen_constel_t *c = tessera_constel(tr);
+                draw_column(0, "MODE", "CONSTL", "", VAL(0u), TESS_ENG_CONSTEL * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                fmt_int(v1, c->y);
+                col_mods(PID_TESS(TX_CS_Y));
+                draw_column(1, "Y", c->autop ? "AUTO" : v1, "", VAL(1u), (int32_t)c->y * 1000 / (GEN_CS_ROWS - 1u), ICON_AUTO);
+                fmt_int(v2, c->dens);
+                col_mods(PID_TESS(TX_CS_DENS));
+                draw_column(2, "DENS", v2, "%", VAL(2u), (int32_t)c->dens * 10, ICON_AUTO);
+                if (c->autop >= GEN_CS_SEEK) str_cpy(v3, "SEEK", sizeof v3);
+                else if (c->autop) fmt_int(v3, c->autop);
+                else str_cpy(v3, "OFF", sizeof v3);
+                draw_column(3, "AUTO", v3, "", VAL(3u), (int32_t)c->autop * 1000 / GEN_CS_SEEK, ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
                 draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
