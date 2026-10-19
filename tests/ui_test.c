@@ -591,6 +591,7 @@ static int test_awake_entry(void)
 static int test_cords_page(void)
 {
     int bad = 0;
+    uint32_t i;
     const cord_t *c;
     ui_power_on();
     cord_clear();
@@ -604,6 +605,19 @@ static int test_cords_page(void)
     turn(EN_K1, 1);
     bad += check("KNOB 1 from --: track 1's LFO, the fixed move become its amount", c->src == CS_LFO && c->src_trk == 0u &&
                  c->amount == 25 && !c->offset);
+    fm1_ms += 3000u; host_ticks += 3000000u; frame();   /* (KNOB 1's picker gone: OCT+ would close it) */
+    press(B_OCTUP);
+    bad += check("OCT+ tapped: the mod UNI (the LFO folded one way), no sheet opens", c->uni && pop.on != POP_SHEET &&
+                 !ui.home && cur_page()->graph == GR_CORDS);
+    press(B_OCTUP);
+    bad += check("..OCT+ again: BI", !c->uni && pop.on != POP_SHEET);
+    fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+    host_pressed |= 1u << panel.btn[B_OCTUP];
+    for (i = 0; i < 6u; i++) { frame(); fm1_ms += 200u; host_ticks += 200000u; }   /* (held 1.2 s) */
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
+    frame();
+    bad += check("..OCT+ held on MODS: no sound sheet (MODS is not a sound page), the mod UNI", pop.on != POP_SHEET && c->uni);
+    press(B_OCTUP);
     turn(EN_K1 + 3u, -3);
     bad += check("KNOB 4: the amount down by 3 (22 %)", c->amount == 22);
     turn(EN_K1, -1);

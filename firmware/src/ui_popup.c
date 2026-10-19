@@ -250,6 +250,8 @@ static uint32_t page_sheet(void)
         return 0;
     if (ui.home)
         return 1;
+    if (cur_page()->graph == GR_CORDS || cur_page()->graph == GR_MATRIX)
+        return 0;                                       /* (MODS, MATRIX: OCT+ is the mod's, tapped or held: Theo 2026-10-19) */
     if (cur_page()->graph == GR_SONG)
         return 2;
     if (cur_page()->graph == GR_PATGRID)
