@@ -2066,6 +2066,8 @@ static void ui_input(void)
         go_home();
     } else if (!ui.home && cur_page()->graph == GR_MATRIX && (oct & 2u)) {   /* MATRIX: OCT+ opens the mod in MODS */
         mx_open();
+    } else if (!ui.home && cur_page()->graph == GR_CORDS && (oct & 2u)) {    /* MODS: OCT+ the mod's BI / UNI */
+        cu_polarity();
     } else if (act_cols() && (oct & 2u)) {              /* action pages: OCT+ does the picked action, */
         act_do();
     } else if (act_cols() && (oct & 1u)) {              /* OCT- drops it, or (none picked) goes HOME */

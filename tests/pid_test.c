@@ -85,7 +85,9 @@ static int reference(FILE *f)
             "a free LFO, 2.4 s a turn"};
         fprintf(f, "\n## Mods\n\nA mod (the MODS page, under LFO) moves a destination on any track by a source on any "
                    "track: by its AMOUNT (-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) "
-                   "plus its OFFSET. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track "
+                   "plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, SLOTH, OCHD) swings both ways "
+                   "from the knob; OCT+ on MODS makes a mod UNI, the source folded to 0 to 1, so it moves one way only, as ENV "
+                   "does. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track "
                    "follow each note, as a chord's; elsewhere the latest note. Room for %u, %u in use. They are the project's, saved with it. Melodee's MOD page is "
                    "gone: the four routes a project or a sound was saved with become mods on their track, the same move "
                    "(a sound's go when another sound is loaded on the track, unless one was edited).\n\n"
