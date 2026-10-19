@@ -498,6 +498,8 @@ static void graph_tweak2(const track_t *t, uint16_t c)
 /* ORGANIC page (LFO family): the track's SLOTH, its three circuits as dots on their lines (TORPOR, APATHY, INERTIA from
  * the top, -1 left, +1 right), and its OCHD, eight bars up or down from the middle, slowest left. Live: graph_sig
  * redraws it as they move */
+static void mx_graph(uint16_t c);                       /* MATRIX (ui_matrix.c) */
+static uint32_t mx_sig(void);
 static void graph_organic(const track_t *t, uint16_t c)
 {
     static const char *const NAME[3] = {"TOR", "APA", "INE"};
@@ -1202,6 +1204,8 @@ static uint32_t graph_sig(int play)
         const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
         h ^= ((uint32_t)(uint8_t)ev->shift | (uint32_t)ev->drop << 8 | (uint32_t)ev->human << 16 | (uint32_t)ev->follow << 24) * 2246822519u;
     }
+    if (pg->graph == GR_MATRIX)                      /* (it moves with the mods: ui_matrix.c) */
+        h ^= mx_sig() * 2246822519u;
     if (pg->graph == GR_ORGANIC)                     /* (it moves: a step a few pixels apart) */
         for (uint32_t i = 0; i < 11u; i++) h = h * 31u + (uint32_t)(organic_out(trk_index(t), i) >> 11);
     if (pg->graph == GR_TWEAK2 && trk_index(t) < TESSERA_TRACKS) {
@@ -1501,6 +1505,9 @@ static void draw_graph(void)
             break;
         case GR_ORGANIC:
             graph_organic(t, c);
+            break;
+        case GR_MATRIX:
+            mx_graph(c);
             break;
         case GR_STEPS:
             graph_steps(t, c);

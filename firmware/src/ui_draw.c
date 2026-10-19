@@ -339,9 +339,15 @@ enum { CS_CARD, CS_STRIP, CS_RING, CS_FADER, CS_CHIP, CS_CAPTURE };   /* how dra
 static void list_capture(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc);
 static uint8_t col_style;                               /* (ui_pages.c pv_column) */
 static uint8_t col_quiet;                               /* the next card's value is an aside (ROLL's seed): 9 px, mid */
+static uint16_t col_pid = PID_NONE;                     /* the next card's parameter, for its live mark: col_mods */
+static int16_t pv_live = -1;                            /* (draw_column to the redesign's rings, ui_pages.c pv_ring) */
+/* the next card shows parameter pid of the selected track: with mods on it, draw_column marks on its gauge where they
+ * move it now (cord.c cord_moves), as it moves */
+static void col_mods(uint32_t pid) { col_pid = (uint16_t)pid; }
 static void pv_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc, int32_t ratio,
                       int hot);
 static void cu_columns(void);                           /* CORDS (ui_cords.c) */
+static void mx_columns(void);                           /* MATRIX (ui_matrix.c) */
 static void draw_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc,
                         int32_t ratio, uint32_t icon)
 {
@@ -352,9 +358,12 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
     int32_t x, lx = 6, uw, room = COL_W - 10;
     const aafont_t *vf = &AF_M;
     uint32_t n, kn;
-    int32_t kid = kc_tag(val, &kn);
+    int32_t kid = kc_tag(val, &kn), live = -1, sh;
     int quiet = col_quiet;
     col_quiet = 0;
+    if (col_pid != PID_NONE && ratio >= 0 && cord_moves(col_pid, song.sel, &sh))   /* the mods on it, now */
+        live = clamp(ratio + sh * 1000 / 32768, 0, 1000);
+    col_pid = PID_NONE;
     if (col_style == CS_CAPTURE) {                      /* a list's row (ui_list.c) */
         list_capture(c, label, val, unit, vc);
         fmt_named = 0;
@@ -381,7 +390,8 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
     key[n + 4] = (char)(' ' + (ratio < 0 ? 0 : 1 + ratio / 20));
     key[n + 5] = (char)(icon == ICON_NONE ? '~' : '!' + icon % 90u);
     key[n + 6] = (char)('0' + hot);
-    key[n + 7] = 0;
+    key[n + 7] = (char)(' ' + (live < 0 ? 0 : 1 + live * 44 / 1000));   /* (the live mark: to the pixel) */
+    key[n + 8] = 0;
     uw = unit[0] ? text_w(&AF_X, unit) + 2 : 0;
     if (text_w(vf, val) + uw > room)
         vf = &AF_S;
@@ -406,7 +416,9 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
                 ui.roll[c].from[0] = 0;
             str_cpy(ui.col[c], key, sizeof ui.col[c]);
         }
+        pv_live = (int16_t)live;
         pv_column(c, label, val, unit, vc, ratio, hot);
+        pv_live = -1;
         return;
     }
     roll_bg = cbg;
@@ -450,6 +462,12 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
             int32_t gw = COL_W - 12, fx = ratio * gw / 1000;
             cv_rrect(6, 36, gw, 3, 1, T_LINE, cbg);
             cv_rrect(6, 36, fx < 3 ? 3 : fx, 3, 1, vc == T_DIM ? T_DIM : T_THEME, T_LINE);
+            if (live >= 0) {                            /* the mods: from the set value to where they move it, a mark */
+                int32_t lx = live * gw / 1000;
+                if (lx != fx)
+                    cv_rect(6 + (lx < fx ? lx : fx), 36, lx < fx ? fx - lx : lx - fx, 3, ux_mix(T_LINE, T_TEXT, 60));
+                cv_rect(5 + (lx < 1 ? 1 : lx > gw - 1 ? gw - 1 : lx), 33, 2, 9, T_TEXT);
+            }
         }
     }
     cv_oy = 0;
@@ -689,8 +707,10 @@ static void draw_columns(void)
         const track_t *t = TSEL;
         uint32_t lvl = trk_level(song.sel);
         param_format(&TP[P_LEVEL], (int32_t)lvl, val, &unit);   /* (0: OFF) */
+        col_mods(PID_TRACK(P_LEVEL));
         draw_column(0, "LEVEL", val, unit, lvl && !t->p[P_MUTE] ? VAL(0u) : T_DIM, (int32_t)lvl * 1000 / 127, ICON_AUTO);
         param_format(&TP[P_PAN], t->p[P_PAN], val, &unit);
+        col_mods(PID_TRACK(P_PAN));
         draw_column(1, "PAN", val, unit, VAL(1u), RATIO(&TP[P_PAN], t->p[P_PAN]), param_icon(&TP[P_PAN], t->p[P_PAN]));
         draw_column(2, "", "", "", T_DIM, -1, ICON_NONE);
         draw_column(3, "MUTE", t->p[P_MUTE] ? "ON" : "OFF", "", t->p[P_MUTE] ? T_ACCENT : VAL(3u), -1, ICON_AUTO);
@@ -732,6 +752,7 @@ static void draw_columns(void)
         char f2[16];
         fmt_int(f2, ev->contrast);
         draw_column(0, "FORM", tessera_form_name(ev->form), "", VAL(0u), (int32_t)ev->form * 1000 / 6, ICON_AUTO);
+        col_mods(PID_TESS(TX_FM_CONTRAST));
         draw_column(1, "CONTR", f2, "%", VAL(1u), (int32_t)ev->contrast * 10, ICON_AUTO);
         draw_column(2, "CLEAR", "TURN", "", VAL(2u), -1, ICON_AUTO);
         {
@@ -754,8 +775,11 @@ static void draw_columns(void)
         fmt_int(w2, ev->human);
         if (ev->follow) { w3[0] = 'T'; w3[1] = (char)('0' + ev->follow); w3[2] = 0; }
         else str_cpy(w3, "OFF", sizeof w3);
+        col_mods(PID_TESS(TX_TW_SHIFT));
         draw_column(0, "SHIFT", w0, ev->follow ? "deg" : "st", VAL(0u), (sh + 24) * 1000 / 48, ICON_AUTO);   /* (following: scale degrees) */
+        col_mods(PID_TESS(TX_TW_DROP));
         draw_column(1, "DROP", w1, "%", VAL(1u), (int32_t)ev->drop * 10, ICON_AUTO);
+        col_mods(PID_TESS(TX_TW_HUMAN));
         draw_column(2, "HUMAN", w2, "%", VAL(2u), (int32_t)ev->human * 10, ICON_AUTO);
         draw_column(3, "FOLLOW", w3, "", VAL(3u), (int32_t)ev->follow * 1000 / 4, ICON_AUTO);
         return;
@@ -783,6 +807,7 @@ static void draw_columns(void)
         else str_cpy(w1, "OFF", sizeof w1);
         if (lg) { w3[0] = 'T'; w3[1] = (char)('0' + ev->lg_with); w3[2] = 0; }
         else w3[0] = 0;
+        col_mods(PID_TESS(TX_TW_BRANCH));
         draw_column(0, "BRANCH", w0, "%", on ? VAL(0u) : T_DIM, (int32_t)ev->branch * 10, ICON_AUTO);   /* (no TO: idle) */
         draw_column(1, "TO", w1, on ? BRM[ev->br_mode % TESS_BR_COUNT] : "", VAL(1u),
                     on ? (int32_t)(1u + (ev->br_to - 1u - (ev->br_to - 1u > tr)) * 3u + ev->br_mode) * 1000 / 9 : 0, ICON_AUTO);
@@ -804,6 +829,7 @@ static void draw_columns(void)
         fmt_int(e2, ev->amount);
         draw_column(0, "LOCK", e0, e0u, VAL(0u), lk < 0 ? -1 : lk * 10, ICON_AUTO);
         draw_column(1, "EVERY", e1, e1u, VAL(1u), (int32_t)ev->every * 1000 / 5, ICON_AUTO);
+        col_mods(PID_TESS(TX_EV_AMOUNT));
         draw_column(2, "AMOUNT", e2, e2u, VAL(2u), (int32_t)ev->amount * 10, ICON_AUTO);
         if (tr >= TESSERA_TRACKS || tessera.mode[tr] == TESS_ENG_OFF || !tessera.seed[tr]) str_cpy(e3, "--", sizeof e3);
         else if (tessera.roll[tr] && ((fm1_ms / 250u) & 1u)) e3[0] = 0;   /* a seed waiting for the bar line: blinking */
@@ -836,6 +862,7 @@ static void draw_columns(void)
                 uint8_t tlen = tur->len ? tur->len : 16;
                 draw_column(0, "MODE", "TURING", "", VAL(0u), 1 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, tlen);
+                col_mods(PID_TESS(TX_TUR_LEN));
                 draw_column(1, "LEN", v1, "/16", VAL(1u), (int32_t)(tlen - 1u) * 1000 / 15, ICON_AUTO);
                 if (tur->prob == 0) {
                     str_cpy(v2, "LOCK", sizeof v2);
@@ -843,6 +870,7 @@ static void draw_columns(void)
                     fmt_int(v2, tur->prob);
                     str_cpy(u2, "%", sizeof u2);
                 }
+                col_mods(PID_TESS(TX_TUR_PROB));
                 draw_column(2, "PROB", v2, u2, VAL(2u), (int32_t)tur->prob * 10, ICON_AUTO);
                 fmt_int(v3, tur->oct_span);
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(tur->oct_span > 1 ? tur->oct_span - 1 : 0) * 1000 / 2, ICON_AUTO);
@@ -853,8 +881,10 @@ static void draw_columns(void)
                 fmt_int(v1, esteps);
                 draw_column(1, "STEPS", v1, "", VAL(1u), (int32_t)(esteps - 1u) * 1000 / 31, ICON_AUTO);
                 fmt_int(v2, euc->pulses);
+                col_mods(PID_TESS(TX_EUC_PULSES));
                 draw_column(2, "PULSE", v2, "", VAL(2u), (int32_t)euc->pulses * 1000 / 32, ICON_AUTO);
                 fmt_int(v3, euc->rot);
+                col_mods(PID_TESS(TX_EUC_ROT));
                 draw_column(3, "ROT", v3, "", VAL(3u), (int32_t)euc->rot * 1000 / 31, ICON_AUTO);
             } else if (m == TESS_ENG_MARKOV) {
                 const gen_markov_t *mk = tessera_markov(tr);
@@ -862,8 +892,10 @@ static void draw_columns(void)
                 uint32_t dens = (mk->density >= 5 && mk->density <= 100) ? mk->density : 100;
                 draw_column(0, "MODE", "MARKOV", "", VAL(0u), 3 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, mk->tension);
+                col_mods(PID_TESS(TX_MKV_LEAP));
                 draw_column(1, "LEAP", v1, "%", VAL(1u), (int32_t)mk->tension * 10, ICON_AUTO);
                 fmt_int(v2, dens);
+                col_mods(PID_TESS(TX_MKV_DENS));
                 draw_column(2, "DENS", v2, "%", VAL(2u), (int32_t)dens * 10, ICON_AUTO);
                 fmt_int(v3, moct);
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(moct - 1u) * 1000 / 2, ICON_AUTO);
@@ -871,8 +903,10 @@ static void draw_columns(void)
                 const gen_bounce_t *b = tessera_bounce(tr);
                 draw_column(0, "MODE", "BOUNCE", "", VAL(0u), TESS_ENG_BOUNCE * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, b->speed);
+                col_mods(PID_TESS(TX_BNC_SPEED));
                 draw_column(1, "SPEED", v1, "", VAL(1u), (int32_t)(b->speed - 1u) * 1000 / 63, ICON_AUTO);
                 fmt_int(v2, b->angle);
+                col_mods(PID_TESS(TX_BNC_ANGLE));
                 draw_column(2, "ANGLE", v2, "DEG", VAL(2u), (int32_t)b->angle * 1000 / 90, ICON_AUTO);
                 fmt_int(v3, b->balls);
                 draw_column(3, "BALLS", v3, "", VAL(3u), (int32_t)(b->balls - 1u) * 1000 / (GEN_BOUNCE_MAX - 1u), ICON_AUTO);
@@ -897,6 +931,7 @@ static void draw_columns(void)
                 fmt_int(v2, a->len_b);
                 draw_column(2, "LEN B", v2, "", VAL(2u), (int32_t)(a->len_b - 1u) * 1000 / 15, ICON_AUTO);
                 fmt_int(v3, a->prob);
+                col_mods(PID_TESS(TX_AWK_PROB));
                 draw_column(3, "PROB", v3, "%", VAL(3u), (int32_t)a->prob * 10, ICON_AUTO);
             } else if (m == TESS_ENG_POLY) {
                 const gen_poly_t *p = tessera_poly(tr);
@@ -913,10 +948,13 @@ static void draw_columns(void)
                 const gen_grids_t *g = tessera_grids(tr);
                 draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, g->x);
+                col_mods(PID_TESS(TX_GRD_X));
                 draw_column(1, "X", v1, "", VAL(1u), (int32_t)g->x * 1000 / 255, ICON_AUTO);
                 fmt_int(v2, g->y);
+                col_mods(PID_TESS(TX_GRD_Y));
                 draw_column(2, "Y", v2, "", VAL(2u), (int32_t)g->y * 1000 / 255, ICON_AUTO);
                 fmt_int(v3, g->dens);
+                col_mods(PID_TESS(TX_GRD_DENS));
                 draw_column(3, "DENS", v3, "%", VAL(3u), (int32_t)g->dens * 10, ICON_AUTO);
             } else {
                 const gen_morph_t *mo = tessera_morph(tr);
@@ -924,6 +962,7 @@ static void draw_columns(void)
                 int32_t pb = (int32_t)mo->oct_span & 7;
                 draw_column(0, "MODE", "MORPH", "", VAL(0u), 4 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, mo->morph_pos);
+                col_mods(PID_TESS(TX_MRP_POS));
                 draw_column(1, "POS", v1, "/127", VAL(1u), (int32_t)mo->morph_pos * 1000 / 127, ICON_AUTO);
                 fmt_int(v2, pa + 1);
                 draw_column(2, "SNP A", v2, "/8", VAL(2u), pa * 1000 / 7, ICON_AUTO);
@@ -935,6 +974,10 @@ static void draw_columns(void)
     }
     if (cur_page()->graph == GR_CORDS) {                 /* (ui_cords.c) */
         cu_columns();
+        return;
+    }
+    if (cur_page()->graph == GR_MATRIX) {                /* (ui_matrix.c) */
+        mx_columns();
         return;
     }
     if (cur_page()->graph == GR_MOD) {                   /* the route's SRC, the route, its DST AMT */
@@ -1070,6 +1113,8 @@ static void draw_columns(void)
             param_format(d, *vp, val, &unit);
             if(d->names==N_FX && (*vp==FX_REVERB || *vp==FX_CHORUS))str_cpy(val,N_FX[*vp],sizeof val);
         }
+        if (vp >= TSEL->p && vp < TSEL->p + P_COUNT)     /* a track parameter: the mods on it, live */
+            col_mods(PID_TRACK(vp - TSEL->p));
         draw_column(c, d->label, val, unit, (cur_page()->scope == SC_CZ1 &&   /* CZ-1: no effect on the tone as it is */
                     !cz_ed_active(cz_patch[song.sel % NTRK].raw, cur_page()->id[c])) ||
                     (cur_page()->scope == SC_P5 && !p5_ed_active(TSEL, cur_page()->id[c])) ||

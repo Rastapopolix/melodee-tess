@@ -157,7 +157,7 @@ static struct {
     char msg2[24];               /* a second message, shown when the first is over */
     uint32_t enc_t[NE];
     /* drawn-state cache */
-    char col[4][32];
+    char col[4][40];
     uint32_t graph_sig, head_sig, foot_sig, frame;
     /* rolling digits (ui_draw.c roll_*): the four card values and the header BPM */
     struct {

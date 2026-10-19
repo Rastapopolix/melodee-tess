@@ -89,6 +89,7 @@ static void pv_mod_chips(void)
 static int32_t pick_bottom(void) { return pv_kind() == PV_CORDS || pv_kind() == PV_MOD ? 216 : 184; }
 
 #include "ui_cords.c"                                  /* CORDS (Tessera) */
+#include "ui_matrix.c"                                 /* MATRIX: the mods track by track (Tessera) */
 #include "ui_help.c"                                   /* ARP held + a knob: its help (Tessera) */
 #include "ui_modsc.c"                                  /* FX held + a knob: its mod amount (Tessera) */
 
@@ -223,6 +224,11 @@ static void pv_ring(uint32_t c, const char *label0, const char *val0, const char
             int32_t r = ratio > 1000 ? 1000 : ratio, a1 = -KA_END + r * 2 * KA_END / 1000, k = (r * 32 + 500) / 1000;
             knob_arc(29 - KNOB_RING_R, cy - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE,
                      lc, bg);
+            if (pv_live >= 0) {                         /* the mods (ui_draw.c col_mods): where they move it, a dot */
+                uint32_t q = (uint32_t)(pv_live * 32 + 500) / 1000u;
+                cv_disc(29 + PV_DOT[q][0], cy + PV_DOT[q][1], 6, bg, 0);
+                cv_disc(29 + PV_DOT[q][0], cy + PV_DOT[q][1], 4, ux_mix(bg, T_TEXT, 85), 0);
+            }
             cv_disc(29 + PV_DOT[k][0], cy + PV_DOT[k][1], 8, bg, 0);
             cv_disc(29 + PV_DOT[k][0], cy + PV_DOT[k][1], 6, T_TEXT, 0);
         } else {                                        /* (a list of names: the ring alone) */

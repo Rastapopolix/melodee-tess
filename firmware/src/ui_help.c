@@ -41,6 +41,18 @@ static void help_find(uint32_t k)
         help.text = CORD_TEXT[k];
         return;
     }
+    if (pg->graph == GR_MATRIX) {                       /* (ui_matrix.c) */
+        static const char *const MX_NAME[4] = {"MATRIX FROM", "MATRIX TO", "MATRIX MOD", "MATRIX OPEN"};
+        static const char *const MX_TEXT[4] = {
+            "The track the mods come from: a row of the grid. A lit cell: a mod goes from this track to that one, as "
+            "bright as it moves its destination now.",
+            "The track the mods go to: a column of the grid.",
+            "Which of the cell's mods, when it has more than one (its number in MODS).",
+            "OCT+ opens that mod in MODS, to change it."};
+        help.name = MX_NAME[k];
+        help.text = MX_TEXT[k];
+        return;
+    }
     if (pg->graph == GR_EVOLVE) x = EV[k];
     else if (pg->graph == GR_TWEAK) x = TW[k];
     else if (pg->graph == GR_TWEAK2) x = TW2[k];

@@ -659,6 +659,47 @@ static int test_tweak2(void)
 }
 
 /* ORGANIC (LFO family, any track): KNOB 1 SLOTH SPEED, KNOB 2 OCHD RATE, their help; a cord from T2 TORPOR */
+/* MATRIX (Tessera): the mods track by track; KNOB 1 and 2 pick a cell, 3 its mods one by one, OCT+ opens one in MODS;
+ * a card's live mark where a mod moves its knob */
+static int test_matrix(void)
+{
+    static const cord_t C3[3] = {{CS_OCHD1, 0, CD_PAN, 1, 50, 0}, {CS_LFO, 0, CD_LEVEL, 1, 40, 0},
+                                 {CS_DRIFT, 2, CD_FX_SEND, 3, 30, 0}};
+    int bad = 0;
+    uint32_t i, k, lit, dark;
+    ui_power_on();
+    cord_clear();
+    for (k = 0; k < 3u; k++) cord_set(k, &C3[k]);
+    go_title("MATRIX");
+    bad += check("MATRIX: the page, after MODS in LFO", !ui.home && cur_page()->graph == GR_MATRIX);
+    bad += check("...its cells: T1 to T2 two mods, T3 to T4 one, T2 to T1 none",
+                 mx_cell(0, 1, 0, &i) == 2u && mx_cell(2, 3, 0, &i) == 1u && mx_cell(1, 0, 0, &i) == 0u);
+    lit = mx_level(0, 1);
+    dark = mx_level(1, 0);
+    bad += check("...a linked cell lit, an empty one dark", lit >= 1u && dark == 0u);
+    mx_from = 0; mx_to = 0; mx_k = 0;
+    turn(EN_K2, 1);
+    bad += check("KNOB 2: the column (TO T2)", mx_to == 1u);
+    turn(EN_K3, 1);
+    bad += check("KNOB 3: the cell's second mod", mx_k == 1u && mx_cell(0, 1, 1, &i) == 2u && i == 1u);
+    turn(EN_K3, 1);
+    bad += check("...round to the first", mx_k == 0u);
+    turn(EN_K3, 1);
+    press(B_OCTUP);
+    bad += check("OCT+: that mod in MODS", !ui.home && cur_page()->graph == GR_CORDS && cord_ui_sel == 1u);
+    go_title("MATRIX");
+    turn(EN_K1, 1);
+    press(B_OCTUP);
+    bad += check("...an empty cell: OCT+ does nothing", cur_page()->graph == GR_MATRIX);
+    {                                             /* a knob card a mod moves: its live mark */
+        int32_t sh;
+        bad += check("cord_moves: T2's PAN moved by a mod, T1's not",
+                     cord_moves(PID_TRACK(P_PAN), 1, &sh) && !cord_moves(PID_TRACK(P_PAN), 0, &sh));
+    }
+    cord_clear();
+    return bad;
+}
+
 static int test_organic(void)
 {
     int bad = 0;
@@ -4968,6 +5009,7 @@ int main(void)
     bad += test_mod_shortcut();
     bad += test_tweak2();
     bad += test_organic();
+    bad += test_matrix();
     bad += test_help_gesture();
     bad += test_mods_page();
     bad += test_midi();

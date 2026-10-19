@@ -234,6 +234,21 @@ static int32_t cord_share(const cord_t *c)
     int32_t x = c->src ? cord_src(c->src, c->src_trk) : 0;
     return (x * c->amount) / 100 + (32768 * c->offset) / 100;
 }
+/* what the mods move parameter pid of track tr by now (Q15 of its range, as cord_share; the knob cards' live marks,
+ * ui_draw.c). 0: no mod reaches it (the voice destinations PITCH .. GAIN, LFO DEP have no knob: never) */
+static int cord_moves(uint32_t pid, uint32_t tr, int32_t *share)
+{
+    uint32_t i;
+    int n = 0;
+    *share = 0;
+    for (i = 0; i < CORD_LIVE; i++) {
+        const cord_t *c = &cords[i];
+        if (c->dst_trk != tr || !cord_live(c) || cord_dest(c->dst)->pid != pid) continue;
+        *share += cord_share(c);
+        n = 1;
+    }
+    return n;
+}
 /* that share of a range of span steps, to the nearest (25 % of 0..32: 8) */
 static int32_t cord_steps(int32_t share, int32_t span) { return (share * span + 16384) >> 15; }
 /* mod.c's AMT (-64..64 = the whole of it) of a percentage */
