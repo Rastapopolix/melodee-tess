@@ -67,7 +67,7 @@ static void draw_battery(int32_t bx)
 #define ROLL_BPM 4u                                     /* ui.roll[]: the four cards, then the header BPM */
 #define ROLL_Y 15                                       /* a card's value strip: rows 15..34 (M) */
 #define ROLL_H 19
-#define BPM_X 20
+#define BPM_X 208
 #define BPM_W 26                                        /* the header's BPM strip: 26 columns, every row (S) */
 static uint16_t roll_bg;                                /* what a card's value lies on (its fill: tinted while hot) */
 static const uint8_t ROLL_EASE[17] = {0, 45, 84, 118, 147, 172, 193, 210, 223, 234, 242, 247, 251, 253, 254, 255, 255};
@@ -146,10 +146,10 @@ static int32_t roll_text(uint32_t k, int32_t x, int32_t y, const char *s, uint16
     return x + text_w(f, s);
 }
 
-/* the header (docs/design, 18 px): the transport (a song playing: its disc) at x 8, the BPM at x 20, the REC mark
- * (filled: the selected track armed; a ring: another one), the octave shift ("+2") and the song's row, then the
- * page's dots; at the right a chip in the track's colour naming where you are (Stage: the engine; a page: its title),
- * or a message in its place (a layer: its name); a battery glyph only while it runs low. Which track: Stage's
+/* the header (docs/design, 18 px): at the left a chip in the track's colour naming where you are (Stage: the engine;
+ * a page: its title), then the page's dots, or a message in their place (a layer: its name); at the right the BPM
+ * (x 208..234), the transport left of it (a song playing: its disc), then leftward the REC mark (filled: the selected
+ * track armed; a ring: another one), the octave shift ("+2"), the song's row and a battery glyph only while it runs low. Which track: Stage's
  * columns, the pages' sound bar (pv_sound: its numeral) */
 static uint32_t page_sheet(void);                       /* ui_popup.c */
 static void list_words(char *d, const char *label, uint32_t n);   /* ui_list.c */
@@ -189,8 +189,8 @@ static void head_chip_text(char *b)
     }
 }
 /* the page's place in its family: a dot a page, the page's a pill in the track's colour (no room: "3/12") */
-static void head_pages(int32_t x, int32_t x1)          /* (x: after the transport's marks; x1: where the chip, or the
-                                                         * battery, starts) */
+static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1: where the transport's marks, or the
+                                                         * battery, start) */
 {
     const page_t *pg = cur_page();
     uint32_t i, n = 0, k = 0, sc = sec_on() ? sec_of(ui.page) + 1u : 0u;
@@ -246,56 +246,62 @@ static void draw_head(void)
     if (!ui.force && sig == ui.head_sig) {
         if (ui.roll[ROLL_BPM].from[0] || moved) {       /* rolling, or snapped to the new value: the BPM's strip only */
             cv_begin(BPM_W, H_HEAD, T_BG);
-            roll_text(ROLL_BPM, 0, 3, b, ui.bpm_t ? T_ACCENT : T_TEXT);
+            roll_text(ROLL_BPM, BPM_W - text_w(&AF_S, b), 3, b, ui.bpm_t ? T_ACCENT : T_TEXT);
             cv_blit(BPM_X, Y_HEAD);
         }
         return;
     }
     ui.head_sig = sig;
     cv_begin(240, H_HEAD, T_BG);
-    cv_icon_mid(8, H_HEAD / 2, 12, chain.running ? ICON_X_SONG : song.playing ? ICON_X_PLAY : ICON_X_STOP,
+    roll_text(ROLL_BPM, BPM_X + BPM_W - text_w(&AF_S, b), 3, b, ui.bpm_t ? T_ACCENT : T_TEXT);   /* (right-aligned) */
+    cv_icon_mid(BPM_X - 14, H_HEAD / 2, 12, chain.running ? ICON_X_SONG : song.playing ? ICON_X_PLAY : ICON_X_STOP,
                 song.playing ? T_TEXT : T_MID, T_BG);
-    roll_text(ROLL_BPM, BPM_X, 3, b, ui.bpm_t ? T_ACCENT : T_TEXT);
-    x = BPM_X + BPM_W + 2;                              /* (past the widest BPM) */
+    x = BPM_X - 14;                                     /* (the transport's left edge; the marks go leftward) */
     if (song.rec) {                                     /* (12 px, as the transport) */
-        cv_icon_mid(x, H_HEAD / 2, 12, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, T_BG);
-        x += 14;
+        cv_icon_mid(x - 14, H_HEAD / 2, 12, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, T_BG);
+        x -= 14;
     }
     if (seq_erase_active(TSEL)) {
-        cv_text_r(232, 3, &AF_S, "ERASING", T_REC, T_BG);
+        cv_text_on(8, 3, &AF_S, "ERASING", T_REC, T_BG);
     } else if (msg) {                                   /* a message, or the layer's name (may hold a keycap) */
-        cv_free_hint(x + 6, 3, ui.msg_t ? ui.msg : layer_head(), T_TEXT, T_BG, 236 - x - 6);
+        cv_free_hint(8, 3, ui.msg_t ? ui.msg : layer_head(), T_TEXT, T_BG, x - 6 - 8);
     } else {
-        int32_t cw = text_w(&AF_X, chip) + 16;
+        int32_t cw = text_w(&AF_X, chip) + 16, l;
         if (cw < (ui.home ? 82 : 46)) cw = ui.home ? 82 : 46;   /* (a page: its name's, the dots beside it) */
         if (song.octave) {                              /* the octave shift, signed, in an outlined pill ("+2") */
             int32_t w;
             b[0] = song.octave > 0 ? '+' : '-';
             fmt_int(b + 1, song.octave < 0 ? -song.octave : song.octave);
             w = text_w(&AF_X, b) + 10;
-            cv_rrect(x + 2, 3, w, 12, 4, T_MID, T_BG);
-            cv_rrect(x + 3, 4, w - 2, 10, 3, T_BG, T_MID);
-            cv_text_c(x + 2 + w / 2, 3, &AF_X, b, T_TEXT, T_BG);
-            x += w + 8;
+            x -= w + 4;
+            cv_rrect(x, 3, w, 12, 4, T_MID, T_BG);
+            cv_rrect(x + 1, 4, w - 2, 10, 3, T_BG, T_MID);
+            cv_text_c(x + w / 2, 3, &AF_X, b, T_TEXT, T_BG);
         }
         if (chain.running) {                            /* the song's row */
             str_cpy(b, "ROW ", 8);
             fmt_int(b + 4, (int32_t)chain.row + 1);
-            x = cv_text_on(x + 2, 4, &AF_X, b, T_MID, T_BG) + 6;
+            x -= text_w(&AF_X, b) + 6;
+            cv_text_on(x, 4, &AF_X, b, T_MID, T_BG);
         }
-        if (!ui.home)                                   /* a page: where it is in its family */
-            head_pages(x + 6, 232 - cw - (low ? 20 : 0) - (page_sheet() ? 16 : 0));
-        if (low)                                        /* the battery, only when it runs low */
-            cv_icon_mid(232 - cw - 18, H_HEAD / 2, 12, batt_level() ? ICON_X_BAT1 : ICON_X_BAT0, T_REC, T_BG);
-        if (page_sheet())                               /* the page has a sheet (OCT+ held) */
-            cv_text_r(232 - cw - 6 - (low ? 18 : 0), 2, &AF_S, "\x85", T_MID, T_BG);
+        if (low) {                                      /* the battery, only when it runs low */
+            cv_icon_mid(x - 16, H_HEAD / 2, 12, batt_level() ? ICON_X_BAT1 : ICON_X_BAT0, T_REC, T_BG);
+            x -= 18;
+        }
         if (!ui.home && cur_page()->graph == GR_PATGRID) {   /* PATTERNS: its name plain (the grid is in colour);
                                                               * Copy to: what goes where, in the theme's colour */
-            cv_text_r(232, 4, &AF_X, ptc_on() ? chip : "patterns", ptc_on() ? T_THEME : T_MID, T_BG);
+            l = cv_text_on(8, 4, &AF_X, ptc_on() ? chip : "patterns", ptc_on() ? T_THEME : T_MID, T_BG);
         } else {
-            cv_rrect(232 - cw, 2, cw, 14, 4, T_THEME, T_BG);
-            cv_text_c(232 - cw / 2, 3, &AF_X, chip, T_INK, T_THEME);
+            cv_rrect(8, 2, cw, 14, 4, T_THEME, T_BG);
+            cv_text_c(8 + cw / 2, 3, &AF_X, chip, T_INK, T_THEME);
+            l = 8 + cw;
         }
+        if (page_sheet()) {                             /* the page has a sheet (OCT+ held) */
+            cv_text_on(l + 4, 2, &AF_S, "\x85", T_MID, T_BG);
+            l += 14;
+        }
+        if (!ui.home)                                   /* a page: where it is in its family */
+            head_pages(l + 8, x);
     }
     cv_blit(0, Y_HEAD);
 }
