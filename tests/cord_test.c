@@ -106,6 +106,14 @@ static int behaviour(void)
         mod_begin(&trk[2]); top = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
         check("UNI: a bipolar source at its bottom moves nothing (BI: down), at its top up as BI",
               lo < 50u && uni == 50u && top > 50u);
+        trk[0].lfo_fade = 0;                       /* (FADE at its start: the LFO not in yet) */
+        mod_begin(&trk[2]); uni = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        trk[0].lfo_fade = 16384;
+        trk[0].lfo_val = -32767;
+        mod_begin(&trk[2]); lo = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        trk[0].lfo_fade = 32767;
+        check("...UNI with the LFO's FADE at 0: nothing moved; half faded in, at its bottom: nothing (folded before the "
+              "FADE, as POL UNI)", uni == 50u && lo == 50u);
         cord_pack(pk);
         cord_clear();
         check("...saved and loaded: UNI kept (src_trk's top bit), the track as it was",

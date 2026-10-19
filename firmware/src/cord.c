@@ -136,6 +136,19 @@ static int cord_bipolar(uint32_t s, uint32_t tr)
 static int cord_bip(const cord_t *c) { return !c->uni && cord_bipolar(c->src, c->src_trk); }
 static int cord_fold_on(const cord_t *c) { return c->uni && cord_bipolar(c->src, c->src_trk); }
 static int32_t cord_fold(const cord_t *c, int32_t x) { return cord_fold_on(c) ? (x + 32768) >> 1 : x; }
+/* a cord's source now, folded when UNI. A track's LFO is folded before its FADE and (own: the DEPTH gain of the track
+ * the cord is on, 32767 none) its DEPTH scale it, as the LFO's own POL UNI is (voice.c): faded in or turned down, a UNI
+ * mod goes to 0, not to half its amount */
+static int32_t cord_val(const cord_t *c, int32_t own)
+{
+    if (!c->src) return 0;
+    if (c->src == CS_LFO && cord_fold_on(c)) {
+        const track_t *s = &trk[c->src_trk % NTRK];
+        int32_t x = mulq15((s->lfo_val + 32768) >> 1, s->lfo_fade);
+        return own < 32767 ? mulq15(x, own) : x;
+    }
+    return cord_fold(c, cord_src(c->src, c->src_trk));
+}
 
 /* ------------------------------------------------------------ the cords --- */
 static cord_t cords[CORD_MAX];
@@ -244,7 +257,7 @@ uint32_t cord_count(void)
 /* a cord's move, as a share of the destination's range (Q15, 32768 = all of it): amount x source + offset */
 static int32_t cord_share(const cord_t *c)
 {
-    int32_t x = c->src ? cord_fold(c, cord_src(c->src, c->src_trk)) : 0;
+    int32_t x = cord_val(c, 32767);
     return (x * c->amount) / 100 + (32768 * c->offset) / 100;
 }
 /* what the mods move parameter pid of track tr by now (Q15 of its range, as cord_share; the knob cards' live marks,
@@ -275,7 +288,7 @@ static __attribute__((noinline)) int32_t cord_depth(const track_t *t, int32_t g)
         const cord_t *c = &cords[i];
         if (!(m & 1u) || c->dst != CD_LFO_DEPTH) continue;
         if (c->src && c->amount)
-            g = mulq15(g, mod_gain(cord_bip(c) ? MS_LFO : MS_ENV, cord_fold(c, cord_src(c->src, c->src_trk)),
+            g = mulq15(g, mod_gain(cord_bip(c) ? MS_LFO : MS_ENV, cord_val(c, 32767),
                                    cord_amt(c->amount)));
         if (c->offset)
             g = mulq15(g, mod_gain(MS_ENV, 32768, cord_amt(c->offset)));   /* (32768: the whole) */
@@ -295,7 +308,7 @@ static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32
         int32_t x;
         if (!(m & 1u)) continue;
         d = cord_dest(c->dst);
-        x = cord_fold(c, c->src == CS_LFO && c->src_trk == tr ? lfo : c->src ? cord_src(c->src, c->src_trk) : 0);
+        x = c->src == CS_LFO && c->src_trk == tr && !cord_fold_on(c) ? lfo : cord_val(c, c->src_trk == tr ? mod.ldep : 32767);
         if (d->kind == CK_VOICE) {
             mod.amp |= d->md == MD_AMP;
             if (c->src && c->amount && MS_VOICE(c->src) && c->src_trk == (uint8_t)(t - trk) && !cord_fold_on(c) &&
