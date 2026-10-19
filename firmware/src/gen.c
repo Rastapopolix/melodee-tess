@@ -840,7 +840,7 @@ static void gen_cells_start(gen_cells_t *g)
 static void gen_cells_tick(gen_cells_t *g, gen_out_t *out)
 {
     uint32_t c, ones = 0, t = g->tap >= 1u && g->tap <= 8u ? g->tap - 1u : 0u;
-    memmove(g->hist + 1, g->hist, GEN_CL_HIST - 1u);
+    for (uint32_t i = GEN_CL_HIST - 1u; i; i--) g->hist[i] = g->hist[i - 1u];   /* no memmove: this runs from RAM */
     g->hist[0] = g->cells;
     g->cells = (uint8_t)gen_cl_next(g->cells, g->rule);
     g->n++;
