@@ -827,6 +827,11 @@ static void edit_param(uint32_t slot, int32_t steps)
         ui.force = 1;
         return;
     }
+    if (pg->graph == GR_NOTELEN && slot < 3u) {         /* (KNOB 4, GATE: PATTERN's, as any parameter) */
+        tessera_len_knob(slot, steps);
+        ui.force = 1;
+        return;
+    }
     if (pg->graph == GR_ORGANIC) {                  /* SLOTH SPEED, OCHD RATE (the others: none) */
         if (slot < 2u && song.sel < TESSERA_TRACKS) {
             uint32_t x = slot ? TX_ORG_RATE : TX_ORG_SPEED;
@@ -1634,7 +1639,7 @@ static void page_knob(uint32_t k, int32_t s)
         edit_param(k, s);
         pg = cur_page();
         if (!(pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_TWEAK || pg->graph == GR_TWEAK2 ||
-              pg->graph == GR_ORGANIC || pg->graph == GR_MATRIX ||   /* Tessera's own pages: no picker */
+              pg->graph == GR_ORGANIC || pg->graph == GR_MATRIX || (pg->graph == GR_NOTELEN && k < 3u) ||   /* Tessera's own pages: no picker */
               (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && pg->fam == FAM_GEN && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF))))
             pick_touch(k);                              /* a name from a long list: its picker (ui_popup.c) */
     }

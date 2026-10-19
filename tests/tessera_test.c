@@ -647,14 +647,14 @@ static void scen_run(const scen_t *sc, const char *logdir, char *res, size_t cap
         mix_block(o, CTL);
         tt_blk++;
         for (tr = 0; tr < NTRK; tr++)
-            if (tt_open[tr] >= 0 && !trk[tr].seq_n) tt_close(tr);
+            if (tt_open[tr] >= 0 && !trk[tr].seq_n && !(nl_active & (1u << tr))) tt_close(tr);   /* (NOTE LENGTH's) */
     }
     transport_req = 2;
     for (f = 0; f < 4u * CTL; f += CTL) {
         mix_block(o, CTL);
         tt_blk++;
         for (tr = 0; tr < NTRK; tr++)
-            if (tt_open[tr] >= 0 && !trk[tr].seq_n) tt_close(tr);
+            if (tt_open[tr] >= 0 && !trk[tr].seq_n && !(nl_active & (1u << tr))) tt_close(tr);   /* (NOTE LENGTH's) */
     }
     for (tr = 0; tr < NTRK; tr++) {
         if (tessera.mode[tr] == TESS_ENG_OFF) continue;
@@ -780,6 +780,100 @@ static void roll_wait_check(char *res, size_t cap)
         }
     }
     snprintf(res, cap, "%u %u", same, n[0] + n[1]);
+}
+
+/* ------------------------------------------------------------ NOTE LENGTH --- */
+/* note_len.c on Euclid 4 of 16 at 1/16, 120 BPM: a hit every quarter (689 blocks). "ok": each note's length (the
+ * median of the second bar's) as its mode says: STEP the GATE (half a 16th, 86 blocks), FIXED 1/8 an eighth (345)
+ * whatever DIV, HIT up to the next hit (689), FIXED 1/1 with KEYS 1 the next hit ends it (689); FIXED 1/1 holds KEYS
+ * notes at once (4, 2); STOP, MUTE and STEP again leave no note held */
+static uint32_t nl_held(uint32_t tr)
+{
+    uint32_t n = 0;
+    if (nl_active & (1u << tr))
+        for (uint32_t k = 0; k < NL_KEYS; k++) n += nl_run[tr][k].on;
+    return n;
+}
+static uint32_t nl_gates(uint32_t tr)
+{
+    uint32_t n = 0;
+    for (uint32_t v = 0; v < NVOICE; v++) n += trk[tr].v[v].gate != 0;
+    return n;
+}
+/* track 0 Euclid in mode / len / keys for `bars` bars: the median length of the notes starting in the last bar (0
+ * none); *most: the most notes held at once */
+static uint32_t nl_play(uint32_t mode, uint32_t len, uint32_t keys, uint32_t bars, uint32_t *most)
+{
+    uint32_t f, total, bar_len, i, k = 0, l[64];
+    int32_t o[2 * CTL];
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (i = 0; i < NTRK; i++) tt_open[i] = -1;
+    tt_n = tt_blk = 0;
+    gen(0, TESS_ENG_EUCLID);
+    tessera_param_set(0, TX_NL_MODE, (int32_t)mode);
+    tessera_param_set(0, TX_NL_LEN, (int32_t)len);
+    tessera_param_set(0, TX_NL_KEYS, (int32_t)keys);
+    rng_state = 0x4E4Cu;
+    bar_len = 4u * seq_beat_samples();
+    total = bars * bar_len;
+    transport_req = 1;
+    *most = 0;
+    for (f = 0; f < total + 4u * CTL; f += CTL) {
+        if (f >= total) transport_req = 2;
+        mix_block(o, CTL);
+        tt_blk++;
+        if (tt_open[0] >= 0 && !trk[0].seq_n && !nl_held(0)) tt_close(0);
+        if (nl_held(0) > *most) *most = nl_held(0);
+    }
+    for (i = 0; i < tt_n; i++)                          /* (the last bar's, closed before the end) */
+        if (tt_ev[i].tr == 0 && tt_ev[i].blk >= (bars - 1u) * bar_len / CTL && tt_ev[i].len && k < 64u)
+            l[k++] = tt_ev[i].len;
+    for (i = 1; i < k; i++)
+        for (uint32_t j = i; j > 0 && l[j - 1] > l[j]; j--) { uint32_t x = l[j]; l[j] = l[j - 1]; l[j - 1] = x; }
+    return k ? l[k / 2u] : 0;
+}
+static int nl_near(uint32_t got, uint32_t want) { return got + 2u >= want && got <= want + 2u; }
+static void nl_check(char *res, size_t cap)
+{
+    uint32_t ok = 1, most, len;
+    int32_t o[2 * CTL];
+    len = nl_play(NL_STEP, 2, 4, 3, &most);
+    ok &= nl_near(len, 86) && !most;
+    printf("note length: STEP %u blocks, ", (unsigned)len);
+    len = nl_play(NL_FIXED, 2, 4, 3, &most);
+    ok &= nl_near(len, 345) && most == 1u;
+    printf("FIXED 1/8 %u, ", (unsigned)len);
+    len = nl_play(NL_HIT, 2, 4, 3, &most);
+    ok &= nl_near(len, 689) && most == 1u;
+    printf("HIT %u, ", (unsigned)len);
+    len = nl_play(NL_FIXED, 5, 1, 3, &most);
+    ok &= nl_near(len, 689) && most == 1u;
+    printf("FIXED 1/1 KEYS 1 %u, ", (unsigned)len);
+    nl_play(NL_FIXED, 5, 4, 3, &most);
+    ok &= most == 4u;
+    printf("KEYS 4 holds %u, ", (unsigned)most);
+    nl_play(NL_FIXED, 5, 2, 3, &most);
+    ok &= most == 2u;
+    printf("KEYS 2 holds %u\n", (unsigned)most);
+    printf("note length: after STOP %u held, %u gates\n", (unsigned)nl_held(0), (unsigned)nl_gates(0));
+    ok &= !nl_held(0) && !nl_gates(0);                 /* (nl_play ends with STOP) */
+    for (int how = 0; how < 2; how++) {                 /* MUTE, STEP again: nothing held from the next block */
+        nl_play(NL_HIT, 2, 4, 1, &most);
+        transport_req = 1;
+        for (uint32_t f = 0; f < 800u; f++) mix_block(o, CTL);   /* (over a quarter: a hit) */
+        printf("note length: %s: held %u (%u notes), ", how ? "STEP again" : "MUTE", (unsigned)nl_held(0), (unsigned)tt_n);
+        ok &= nl_held(0) == 1u;
+        if (how) tessera_param_set(0, TX_NL_MODE, NL_STEP);
+        else trk[0].p[P_MUTE] = 1;
+        mix_block(o, CTL);
+        mix_block(o, CTL);
+        printf("then %u, %u gates\n", (unsigned)nl_held(0), (unsigned)nl_gates(0));
+        ok &= !nl_held(0) && !nl_gates(0);
+        trk[0].p[P_MUTE] = 0;
+    }
+    snprintf(res, cap, "%u", ok);
 }
 
 /* ------------------------------------------------------------- TWEAK 2 --- */
@@ -1259,6 +1353,35 @@ static void pack_run(char *res, size_t cap)
         ok &= tessera_unpack(c) == 1 && !tessera.quad[1].link;
         tessera_unpack(a);
     }
+    {   /* a version 6 block (before NOTE LENGTH: each track 3 bytes shorter) loads every setting, NOTE LENGTH STEP;
+         * a NOTE LENGTH out of range is refused; FIXED 1/2 KEYS 3 round trips */
+        static uint8_t v6[TESSERA_PK_BYTES_V6], v6b[TESSERA_PK_BYTES_V6];
+        static const uint8_t BAD[3] = {NL_COUNT, 6, 0};
+        const uint32_t n7 = TESSERA_PK_BYTES / TESSERA_TRACKS, n6 = TESSERA_PK_BYTES_V6 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v6 + tr * n6, a + tr * n7, n6);
+        tessera_reset();
+        ok &= tessera_unpack_ver(6u, v6) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            memcpy(v6b + tr * n6, b + tr * n7, n6);
+            ok &= tessera.nl_mode[tr] == NL_STEP && tessera.nl_len[tr] == 2u && tessera.nl_keys[tr] == NL_KEYS;
+        }
+        ok &= !memcmp(v6, v6b, sizeof v6);            /* every version 6 setting as it was */
+        for (uint32_t k = 0; k < 3u; k++) {
+            memcpy(c, a, sizeof c);
+            c[3u * n7 + n6 + k] = BAD[k];             /* track 4's MODE, LEN, KEYS */
+            ok &= tessera_unpack(c) == 0;
+        }
+        tessera_unpack(a);
+        tessera_param_set(2, TX_NL_MODE, NL_FIXED);
+        tessera_param_set(2, TX_NL_LEN, 4);
+        tessera_param_set(2, TX_NL_KEYS, 3);
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.nl_mode[2] == NL_FIXED && tessera.nl_len[2] == 4u &&
+              tessera.nl_keys[2] == 3u;
+        tessera_unpack(a);
+    }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */
         static const uint8_t P[4] = {20, 16, 5, 15};
         tessera.poly[3].span = 3;
@@ -1405,6 +1528,27 @@ int main(int argc, char **argv)
             waitpid(pid, 0, 0);
         }
         for (i = 0; i < TW2_N; i++) bad += check(TW2_CHECK[i], !((fail >> i) & 1u));
+    }
+    {   /* NOTE LENGTH (note_len.c) */
+        unsigned ok = 0;
+        pid_t pid;
+        int fd[2];
+        fflush(stdout);
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                nl_check(res, sizeof res);
+                fflush(stdout);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &ok);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        bad += check("NOTE LENGTH: STEP the GATE, FIXED its LEN, HIT to the next hit, KEYS held at once; STOP, MUTE, "
+                     "STEP again release", ok);
     }
     {   /* SLOTH, OCHD */
         unsigned fail = ~0u;
