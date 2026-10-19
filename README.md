@@ -6,7 +6,7 @@ A fork of the M-Vave FM-1 alt-firmware [Melodee](https://github.com/keremimo/mel
 
 Melodee (Tess) is the testbed for **Tessera**, a standalone FM-1 firmware in progress with its own generative character. Expect features to change between releases.
 
-**Latest release: [v1.3.1](https://github.com/Rastapopolix/melodee-tess/releases/latest)**, based on Melodee 1.3.6 with picks from 1.4.1. Also listed on [altstrument.org](https://altstrument.org/firmware/m-vave-fm-1/melodee-tess).
+**Latest release: [v1.3.3](https://github.com/Rastapopolix/melodee-tess/releases/latest)**, based on Melodee 1.3.6 with picks from 1.4.1. Also listed on [altstrument.org](https://altstrument.org/firmware/m-vave-fm-1/melodee-tess).
 
 **[Try it in your browser](https://rastapopolix.github.io/melodee-tess/webapp/sim/)**: the firmware running on an on-screen FM-1, with the same engines, sequencer and Tessera generators. No FM-1 or install needed; press *Play the demo* to hear the generators.
 
@@ -50,7 +50,8 @@ The short version:
   * **Poly**: four notes stepped on by four rhythms (`RHY`, `DIV`, `SPAN`).
 * **EVOLVE** mutates the phrase every few bars (`LOCK`, `EVERY`, `AMOUNT`); **ROLL** picks the track's seed, a line you can always come back to.
 * **FORM** builds sections A, B and C into forms such as `AABA`; **TWEAK** transposes, thins, humanises or follows another track.
-* **Tap LFO to MODS** for 16 modulation cords between any source and destination on any track, generators included.
+* **TWEAK 2** branches hits to another track's sound (BRANCH), combines them with another track's (LOGIC), and plays them only on certain bars (COND).
+* **Tap LFO to MODS** for 16 modulation cords between any source and destination on any track, generators included. Each track has slow organic sources, SLOTH and OCHD (LFO > ORGANIC); knobs show live marks where the cords move them, and **MATRIX** shows which tracks modulate which.
 * **Hold FX and turn a knob** to set how far a cord modulates that knob's parameter.
 * **Hold ARP and turn a knob** to see what that knob does.
 
@@ -58,7 +59,7 @@ The short version:
 
 ## Saving & Storage
 
-Generator settings, seeds, FORM sections and the cords are saved with the project, in their own flash object (`OBJ_TESSERA` at `0x9D000`) because the main project record is near capacity. The current block format is version 4 ("TSR4", with Bounce, Awake and Poly); projects and backups saved by earlier Tess versions still load and convert.
+Generator settings, seeds, FORM sections and the cords are saved with the project, in their own flash object (`OBJ_TESSERA` at `0x9D000`) because the main project record is near capacity. The current block format is version 5 ("TSR5", with BRANCH, LOGIC, COND, SLOTH and OCHD); projects and backups saved by earlier Tess versions still load and convert.
 
 * **Tagging & Validation**: Each slot's block carries a hash of its parent project record. If hashes mismatch, the project loads with Tessera `OFF` to prevent stale data. Every field is range-checked.
 * **Compatibility**: Projects saved by stock Melodee load normally with Tessera `OFF`, and projects saved by this fork remain readable.
@@ -69,18 +70,15 @@ Generator settings, seeds, FORM sections and the cords are saved with the projec
 
 Planned for later Tess builds. Plans can change, and nothing here has a date yet.
 
-* **LOGIC and BRANCH**: new options on TWEAK. LOGIC combines the gates of two tracks, and BRANCH sends each note one of two ways by chance, like Mutable Instruments' Branches.
-* **Organic modulation**: SLOTH and OCHD, slowly drifting LFOs in the style of Nonlinearcircuits' Sloth and Instruō's ochd, as new sources for the cords.
-* **Live modulation feedback**: knob arcs and cord lights that move with what the cords are doing.
 * **More sounds**: a pad voice, a chord pad/drone mode that holds one chord a bar and changes it with the FORM sections, and our own pad, pluck and lead voices.
-* **More generators**: MATRIX, a 4x4 grid that links all four tracks, and a few smaller modes after it.
+* **More generators**: a few smaller modes.
 * **A new UI**: an optional Monomachine-style look (black and white, shapes instead of colours) as a separate firmware build.
 
 ---
 
 ## Visual Reference Gallery
 
-*The pages as v1.3.1 draws them, rendered on the host from the firmware's own drawing code (`tests/gallery_render.c` in the firmware sources) and shown at 2x.*
+*The pages as v1.3.3 draws them, rendered on the host from the firmware's own drawing code (`tests/gallery_render.c` in the firmware sources) and shown at 2x.*
 
 ### Sequencing
 
@@ -104,11 +102,11 @@ Planned for later Tess builds. Plans can change, and nothing here has a date yet
 </tr>
 <tr>
 <td align="center" valign="top" width="50%"><img src="assets/gallery/gen_grids.png" alt="Grids" width="240"><br><b>Grids</b><br><sub>Grids' drum map, kick, snare and hat: X, Y, DENS.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_bounce.png" alt="Bounce (new)" width="240"><br><b>Bounce (new)</b><br><sub>Balls bouncing in a box, a note at each wall hit: SPEED, ANGLE, BALLS.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_bounce.png" alt="Bounce" width="240"><br><b>Bounce</b><br><sub>Balls bouncing in a box, a note at each wall hit: SPEED, ANGLE, BALLS.</sub></td>
 </tr>
 <tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_awake.png" alt="Awake (new)" width="240"><br><b>Awake (new)</b><br><sub>Two loops in the style of norns' Awake, steps settable from the keys: LEN A, LEN B, PROB.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_poly.png" alt="Poly (new)" width="240"><br><b>Poly (new)</b><br><sub>Four notes stepped on by four rhythms over up to 3 octaves: RHY, DIVISION, SPAN.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_awake.png" alt="Awake" width="240"><br><b>Awake</b><br><sub>Two loops in the style of norns' Awake, steps settable from the keys: LEN A, LEN B, PROB.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_poly.png" alt="Poly" width="240"><br><b>Poly</b><br><sub>Four notes stepped on by four rhythms over up to 3 octaves: RHY, DIVISION, SPAN.</sub></td>
 </tr>
 </table>
 
@@ -120,11 +118,19 @@ Planned for later Tess builds. Plans can change, and nothing here has a date yet
 <td align="center" valign="top" width="50%"><img src="assets/gallery/gen_tweak.png" alt="TWEAK" width="240"><br><b>TWEAK</b><br><sub>SHIFT, DROP, HUMAN and FOLLOW, each drawn on the page.</sub></td>
 </tr>
 <tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_tweak2.png" alt="TWEAK 2 (new)" width="240"><br><b>TWEAK 2 (new)</b><br><sub>BRANCH hits to another track's sound, LOGIC with another track's hits, COND for certain bars.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/organic.png" alt="ORGANIC (new)" width="240"><br><b>ORGANIC (new)</b><br><sub>Each track's SLOTH (TORPOR, APATHY, INERTIA) and eight OCHD LFOs, slow sources for the cords.</sub></td>
+</tr>
+<tr>
 <td align="center" valign="top" width="50%"><img src="assets/gallery/help.png" alt="Help card" width="240"><br><b>Help card</b><br><sub>Hold ARP and turn a knob to see what it does.</sub></td>
 <td align="center" valign="top" width="50%"><img src="assets/gallery/cords.png" alt="MODS" width="240"><br><b>MODS</b><br><sub>Tap LFO for 16 modulation cords between any source and destination, generators included.</sub></td>
 </tr>
 <tr>
 <td align="center" valign="top" width="50%"><img src="assets/gallery/mod_shortcut.png" alt="Mod shortcut" width="240"><br><b>Mod shortcut</b><br><sub>Hold FX and turn a knob to set how far a cord moves that parameter.</sub></td>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/mods_live.png" alt="Live mod mark (new)" width="240"><br><b>Live mod mark (new)</b><br><sub>A knob a cord reaches shows where the cords move it now: here an OCHD sweeping BRANCH.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top" width="50%"><img src="assets/gallery/matrix.png" alt="MATRIX (new)" width="240"><br><b>MATRIX (new)</b><br><sub>The cords track by track, lit as they move. OCT+ opens one in MODS.</sub></td>
 </tr>
 </table>
 

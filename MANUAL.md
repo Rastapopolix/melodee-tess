@@ -1,14 +1,14 @@
 # Melodee (Tess) manual
 
-This covers what Tess adds to Melodee, as in **v1.3.1**: the generators, the SEQ MODE pages, seeds, the modulation
-cords (MODS), the mod shortcut and the help card. Everything else (the step sequencer, the effects, saving) works as
+This covers what Tess adds to Melodee, as in **v1.3.3**: the generators, the SEQ MODE pages, seeds, TWEAK 2, the
+modulation cords (MODS) with their organic sources and MATRIX, the mod shortcut and the help card. Everything else (the step sequencer, the effects, saving) works as
 in upstream [Melodee](https://github.com/keremimo/melodee).
 
 Melodee (Tess) is the testbed for **Tessera**, a standalone FM-1 firmware in progress with its own generative character. Expect features to change between releases.
 
-**Sound engines.** v1.3.1 offers SID, TRIO, PHYS and DRUM. FM6, CZ-1 and Prophet are not in the build: a track
+**Sound engines.** v1.3.3 offers SID, TRIO, PHYS and DRUM. FM6, CZ-1 and Prophet are not in the build: a track
 saved with one of them loads SID INIT. [v1.2.7](https://github.com/Rastapopolix/melodee-tess/releases/tag/v1.2.7)
-still has them.
+still has them. At power-on and on a new project, track 1 starts on PHYS DRONE STRING.
 
 Page and knob names are the ones on the screen. KNOB 1 to KNOB 4 are the four knobs left to right, and each
 page's four settings sit along the top of the screen in the same order.
@@ -19,7 +19,10 @@ page's four settings sit along the top of the screen in the same order.
 - [EVOLVE: mutation, LOCK and ROLL](#evolve-mutation-lock-and-roll)
 - [FORM: sections](#form-sections)
 - [TWEAK: shift, drop, human, follow](#tweak-shift-drop-human-follow)
+- [TWEAK 2: branch, logic, cond](#tweak-2-branch-logic-cond)
 - [MODS: the modulation cords](#mods-the-modulation-cords)
+- [ORGANIC: SLOTH and OCHD](#organic-sloth-and-ochd)
+- [MATRIX: the mods at a glance](#matrix-the-mods-at-a-glance)
 - [Mod shortcut](#mod-shortcut)
 - [Saving](#saving)
 - [Recipe: Grids variations that repeat](#recipe-grids-variations-that-repeat)
@@ -36,7 +39,8 @@ page's four settings sit along the top of the screen in the same order.
 | Hold **ARP** and turn any knob | **Help**: a card with that knob's parameter, its value and what it does. The value is not changed. Let go of ARP to close it (no page opens). Works on every page. |
 | Hold **FX** and turn any knob | **Mod shortcut**: sets how far a cord moves that knob's parameter (see [Mod shortcut](#mod-shortcut)). |
 | **GEN** on an AWAKE track, a white key | Picks that step: KNOB 1 sets its A, KNOB 2 its B. The same key lets it go. |
-| Tap **LFO** until **MODS** | The cords page, after LFO, LFO 2 and LFO DEST. MODS replaces upstream's MOD page. |
+| Tap **LFO** until **MODS** | The cords page, after LFO, LFO 2, LFO DEST and ORGANIC. MODS replaces upstream's MOD page. MATRIX follows it. |
+| **MATRIX**, OCT+ | Opens the picked mod in MODS. |
 | **EVOLVE**, KNOB 4 (**ROLL**) | Each click is a new seed (1 to 128), so a new line. Turn back to hear the previous one again, note for note. A quick turn jumps further. While playing, the new line starts on the track's next bar line and the number blinks until then. |
 | **FORM**, KNOB 1 with EVERY OFF | Turning FORM on sets EVERY to 4 bars, so the sections have a length. |
 | **FORM**, KNOB 3 (**CLEAR**) | Turn it either way: B and C are forgotten and the section playing becomes A. |
@@ -55,7 +59,7 @@ picks what the selected track plays. SEQ then shows only that mode's pages:
 |---|---|
 | **STEP** | GEN, NOTES, PATTERN, TEMPO, PATTERNS, SONG |
 | **ARP** | ARP, ARP 2, NOTES, PATTERN, TEMPO, PATTERNS, SONG, GEN |
-| a generator | GEN, EVOLVE, FORM, TWEAK, PATTERN, TEMPO, PATTERNS, SONG |
+| a generator | GEN, EVOLVE, FORM, TWEAK, TWEAK 2, PATTERN, TEMPO, PATTERNS, SONG |
 
 MOTION and DRUM HIT appear as in upstream. The **ARP** button switches the track to ARP and opens its page.
 Choosing STEP or a generator turns the arpeggiator off; choosing ARP again brings back its last setting.
@@ -140,6 +144,24 @@ On a GRIDS track only DROP and HUMAN apply: SHIFT, FOLLOW and FLOURISH would cha
 
 ---
 
+## TWEAK 2: branch, logic, cond
+
+TWEAK 2 comes after TWEAK on a generator track. It decides which hits play, and where. Everything starts OFF, so
+a track plays as before until you turn it on. The picture shows BRANCH as a fork (in COIN mode each arm shaded by
+its share of the hits), the four tracks with the one it branches to lit, the hits, and the bars COND lets
+through.
+
+| Knob | Setting | What it does |
+|---|---|---|
+| 1 | **BRANCH** (0–100 %) | The chance a hit plays on track TO's sound instead of this one's, so two tracks answer each other. 0 is off. The tosses replay with the seed. |
+| 2 | **TO** | OFF, or another track and a mode: **COIN** tosses each hit, **TOGGLE** (TGL) switches side on a toss won (100 % alternates), **LATCH** tosses once a bar and keeps the bar's hits on one side. |
+| 3 | **LOGIC** | OFF, or AND, OR, XOR or NOT with another track's hits: AND plays only when both hit, OR when either does, XOR when one does, NOT only when the other rests. A lower track's hit is read on this step, a higher one's on the step before. |
+| 4 | **COND** | The bars a hit may play in, counted from PLAY (with FORM on, from the section's start): OFF, 1:2, 2:2, 1:4 to 4:4, 1:8, 8:8, FIRST (only the first bar) or !FIRST (the rest). 1:4 is the first bar of every four. |
+
+BRANCH is also a MODS destination, so an LFO or OCHD can sweep how often hits branch.
+
+---
+
 ## MODS: the modulation cords
 
 MODS is a modulation bus: 16 cords, each from a source on any track to a destination on any track. Tap
@@ -147,18 +169,51 @@ MODS is a modulation bus: 16 cords, each from a source on any track to a destina
 
 | Knob | What it sets |
 |---|---|
-| 1 | **Source**: `--`, then per track (T1 to T4) LFO, ENV, VEL, KEY, RAND, MODW, AT, EXPR, S&H, SLEW, the generator's GATE, NOTE and CV, and DRIFT. |
+| 1 | **Source**: `--`, then per track (T1 to T4) LFO, ENV, VEL, KEY, RAND, MODW, AT, EXPR, S&H, SLEW, the generator's GATE, NOTE and CV, DRIFT, SLOTH's TORPOR, APATHY and INERTIA, and OCHD 1 to 8. |
 | 2 | **Cord**: which of the 16 the other knobs edit. |
-| 3 | **Destination**, on a track: the voice (PITCH, CUTOFF, SHAPE, GAIN), the mix (LEVEL, PAN, SPREAD, FX SEND), the envelope and LFO settings, the engine's E1 to E8, and the generators' settings (T PROB, T LEN, E PULSE, E ROT, M LEAP, M DENS, MP POS, SHIFT, DROP, HUMAN, EV AMT, CONTR, G X, G Y, G DENS). |
+| 3 | **Destination**, on a track: the voice (PITCH, CUTOFF, SHAPE, GAIN), the mix (LEVEL, PAN, SPREAD, FX SEND), the envelope and LFO settings, the engine's E1 to E8, and the generators' settings (T PROB, T LEN, E PULSE, E ROT, M LEAP, M DENS, MP POS, SHIFT, DROP, HUMAN, BRANCH, EV AMT, CONTR, G X, G Y, G DENS). |
 | 4 | **Amount**, −100 to +100 %. With no source (`--`) the cord is a fixed move and KNOB 4 sets its offset. |
 
 - **DRIFT** is each track's slow wander: a new point about every 12 seconds, eased between, not in time with the bars.
-- A new project starts with a default patch: each track's DRIFT moves its own CUTOFF a little, and another
-  track's DRIFT its FX SEND. Edit or clear these like any other cord.
+- **SLOTH** and **OCHD** are slow organic sources, set on the ORGANIC page (below).
+- A new project starts with all 16 cords empty: nothing moves until you patch it. (Before v1.3.3 a new project
+  came with DRIFT on each track's CUTOFF and FX SEND.)
+- **Live marks**: when a cord reaches a knob, that knob's card shows a mark where the cords are moving it now, and
+  each MODS row has a mark that moves with its cord.
 - Routes saved by upstream's MOD page (in a project or a sound) become cords when they load. A sound's cords
   go with it when another sound is loaded on the track, unless you edited them. If all 16 are in use, the
   screen says **MODS FULL**.
 - The cords are saved with the project.
+
+---
+
+## ORGANIC: SLOTH and OCHD
+
+Each track has its own SLOTH and OCHD, slowly moving sources for the cords in the style of Nonlinearcircuits'
+Sloth and Instruō's ochd. Tap **LFO** until **ORGANIC** to set their speed and watch them move.
+
+| Knob | Setting | What it does |
+|---|---|---|
+| 1 | **SPEED** (0–100) | How fast the track's SLOTH drifts. At 50, its three chaotic circuits take about 17 minutes (**TORPOR**), 1 minute (**APATHY**) and 3 minutes (**INERTIA**) a turn; each 12.5 more is twice as fast. |
+| 2 | **RATE** (0–100) | How fast the track's eight OCHD LFOs run. At 50, **OCHD 1** takes 64 s a turn and **OCHD 8** 2.4 s; each 12.5 more is twice as fast. |
+
+The picture shows SLOTH's three circuits as dots on their lines and the eight OCHD LFOs as bars. **PLAY** restarts
+them from the track's seed, so a piece replays the same way. Pick them as sources on MODS.
+
+---
+
+## MATRIX: the mods at a glance
+
+MATRIX comes after MODS. It shows the cords as a 4 x 4 grid, source track down the left (FROM) and destination
+track along the top (TO). A cell is lit when a cord goes from its row's track to its column's, as bright as the
+cords move it now. A cell holding more than one cord shows how many.
+
+| Knob | What it does |
+|---|---|
+| 1 | **FROM**: the row. |
+| 2 | **TO**: the column. |
+| 3 | **MOD**: which of the cell's cords, when it holds more than one (its number in MODS). |
+| 4 | **OPEN**: press **OCT+** to open that cord in MODS and change it. |
 
 ---
 
@@ -178,8 +233,9 @@ amount, −100 to +100 %, like the attenuverter beside a knob on a Mutable modul
 ## Saving
 
 Generator settings, seeds, sections and cords are saved with the project, in their own block next to it.
-Projects saved by earlier Tess versions load and convert (the format is TSR4 since v1.3.1; BOUNCE, AWAKE and POLY
-start from their defaults on older projects). Stock Melodee projects load with every track on STEP.
+Projects saved by earlier Tess versions load and convert (the format is TSR5 since v1.3.3; BOUNCE, AWAKE and POLY
+start from their defaults on projects older than v1.3.1, and TWEAK 2, SLOTH and OCHD on projects older than
+v1.3.3, so old projects play as before). Stock Melodee projects load with every track on STEP.
 
 ---
 
