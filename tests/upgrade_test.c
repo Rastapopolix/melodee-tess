@@ -122,7 +122,7 @@ static int tess_side_read(const char *path)
     fclose(f);
     if (n == TESSERA_PK_BYTES) { memcpy(want, b, n); return 0; }
 #ifdef TESSERA_PK_BYTES_V3                              /* (a build with tessera_track_up: every older version) */
-    for (uint32_t v = 1; v < 6u; v++)
+    for (uint32_t v = 1; v < 8u; v++)
         if (n == tessera_pk_bytes(v)) {
             for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
                 tessera_track_up(v, b + tr * (n / TESSERA_TRACKS), want + tr * (TESSERA_PK_BYTES / TESSERA_TRACKS));

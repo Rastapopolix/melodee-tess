@@ -452,6 +452,23 @@ static void s_fall_var(void)
     turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
     knob(tessera_evolve_knob, 2, 15);                 /* AMOUNT 60 */
 }
+static void s_constel(void) { gen(0, TESS_ENG_CONSTEL); }
+static void s_constel_var(void)
+{
+    gen(0, TESS_ENG_CONSTEL);
+    turns(tessera_knob, 1, 3);                        /* Y 10 */
+    knob(tessera_knob, 2, 15);                        /* DENS 80 */
+    turns(tessera_knob, 3, 5);                        /* AUTO 5: a wander */
+    knob(tessera_evolve_knob, 0, 25);                 /* LOCK 50 */
+}
+static void s_constel_seek(void)
+{
+    gen(0, TESS_ENG_CONSTEL);
+    tessera_param_set(0, TX_CS_SIZE, 0);              /* (a mod's: no knob) */
+    turns(tessera_knob, 3, 10);                       /* SEEK */
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 20);                 /* AMOUNT 70 */
+}
 static void s_evolve_bounce(void)
 {
     gen(0, TESS_ENG_BOUNCE);
@@ -635,6 +652,9 @@ static const scen_t SCEN[] = {
     {"evolve_quad_every1_amount70", 16, 0x1035u, s_evolve_quad, 0},
     {"fall", 8, 0x1036u, s_fall, 0},
     {"fall_speed40_wind-38_evolve60", 16, 0x1037u, s_fall_var, 0},
+    {"constel", 8, 0x1038u, s_constel, 0},
+    {"constel_y10_dens80_auto5_lock50", 8, 0x1039u, s_constel_var, 0},
+    {"constel_size0_seek_evolve70", 16, 0x103Au, s_constel_seek, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -1403,6 +1423,42 @@ static void pack_run(char *res, size_t cap)
         tessera_reset();
         ok &= tessera_unpack(b) == 1 && tessera.nl_mode[2] == NL_FIXED && tessera.nl_len[2] == 4u &&
               tessera.nl_keys[2] == 3u;
+        tessera_unpack(a);
+    }
+    {   /* a version 7 block (before CONSTELLATION: each track 22 bytes shorter) loads every setting, Constellation's
+         * defaults with its sky from the seed and an empty loop; each Constellation setting out of range is refused;
+         * one in use round trips */
+        static uint8_t v7[TESSERA_PK_BYTES_V7], v7b[TESSERA_PK_BYTES_V7];
+        static const uint8_t BAD[][2] = {{0, GEN_CS_ROWS}, {1, 101}, {2, 8}, {3, GEN_CS_SEEK + 1u}, {6, 0x30}, {21, 0x10}};
+        const uint32_t n8 = TESSERA_PK_BYTES / TESSERA_TRACKS, n7 = TESSERA_PK_BYTES_V7 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v7 + tr * n7, a + tr * n8, n7);
+        tessera_reset();
+        ok &= tessera_unpack_ver(7u, v7) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            const gen_constel_t *cs = &tessera.constel[tr];
+            gen_constel_t f;
+            memset(&f, 0, sizeof f);
+            gen_constel_fill(&f, tessera.seed[tr]);
+            memcpy(v7b + tr * n7, b + tr * n8, n7);
+            ok &= cs->y == 7u && cs->dens == 50u && cs->size == 2u && !cs->autop && cs->sky == f.sky;
+            for (uint32_t i = 0; i < 16u; i++) ok &= !cs->loop[i];
+        }
+        ok &= !memcmp(v7, v7b, sizeof v7);            /* every version 7 setting as it was */
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[2u * n8 + n7 + BAD[k][0]] = BAD[k][1];  /* (track 3's) */
+            ok &= tessera_unpack(c) == 0;
+        }
+        tessera_unpack(a);
+        tessera_param_set(1, TX_CS_Y, 12);
+        tessera_param_set(1, TX_CS_SIZE, 5);
+        tessera_param_set(1, TX_CS_AUTO, GEN_CS_SEEK);
+        tessera.constel[1].loop[3] = 0x9Bu;
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.constel[1].y == 12u && tessera.constel[1].size == 5u &&
+              tessera.constel[1].autop == GEN_CS_SEEK && tessera.constel[1].loop[3] == 0x9Bu;
         tessera_unpack(a);
     }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */
