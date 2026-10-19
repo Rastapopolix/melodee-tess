@@ -21,6 +21,11 @@ static const char *const TX_N_SRLOOP[] = {"OFF", "1", "2", "3", "4", "5", "6", "
                                            "14", "15", "16"};
 static const char *const TX_N_CSAUTO[] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "SEEK"};
 static const char *const TX_N_NLLEN[] = {"1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
+static const char *const TX_N_QLINK[] = {"OFF", "T1", "T2", "T12", "T3", "T13", "T23", "T123", "T4", "T14", "T24", "T124",
+                                         "T34", "T134", "T234", "T1234"};   /* (a mask of tracks; never the track's own) */
+static const char *const TX_N_QRANGE[] = {"3 OCT", "1 OCT", "2 OCT", "+-1"};
+static const char *const TX_N_QMOVE[] = {"STOP", "DOWN", "UP", "RAND"};
+static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
 static const param_desc_t TX_DESC[TX_COUNT] = {
@@ -72,7 +77,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_ORG_RATE] = PD("RATE", F_INT, 0, 100, 50),
     [TX_QD_DIR] = PE("DIR", TX_N_QDIR, 0),
     [TX_QD_PROB] = PD("PROB", F_PCT, 0, 100, 100),
-    [TX_QD_LINK] = PE("LINK", TX_N_FOLLOW, 0),
+    [TX_QD_LINK] = PE("LINK", TX_N_QLINK, 0),
     [TX_NL_MODE] = PE("LENGTH", TX_N_NLMODE, 0),
     [TX_NL_LEN] = PE("LEN", TX_N_NLLEN, 2),
     [TX_NL_KEYS] = PD("KEYS", F_INT, 1, 4, 4),
@@ -86,6 +91,15 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_CL_RULE] = PD("RULE", F_INT, 0, 255, 30),
     [TX_CL_TAP] = PD("TAP", F_INT, 1, 8, 1),
     [TX_CL_SPAN] = PD("SPAN", F_INT, 1, 15, 14),
+    [TX_QD_RANGE] = PE("RANGE", TX_N_QRANGE, 0),
+    [TX_QD_MOVE1] = PE("MOVE 1", TX_N_QMOVE, 0),
+    [TX_QD_MOVE2] = PE("MOVE 2", TX_N_QMOVE, 0),
+    [TX_QD_MOVE3] = PE("MOVE 3", TX_N_QMOVE, 0),
+    [TX_QD_MOVE4] = PE("MOVE 4", TX_N_QMOVE, 0),
+    [TX_QD_EVERY1] = PE("EVERY 1", TX_N_QEVERY, 3),
+    [TX_QD_EVERY2] = PE("EVERY 2", TX_N_QEVERY, 3),
+    [TX_QD_EVERY3] = PE("EVERY 3", TX_N_QEVERY, 3),
+    [TX_QD_EVERY4] = PE("EVERY 4", TX_N_QEVERY, 3),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -329,8 +343,9 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_QD_DIR, "QUAD DIRECTION", "How the track's playhead moves along its row of the grid: forward, back, back and "
                                     "forth, at random; HOLD rests on its own steps and moves only when a LINK moves it."),
     X_(TX_QD_PROB, "QUAD PROB", "The chance each of the row's notes plays: 100 every one, lower leaves gaps."),
-    X_(TX_QD_LINK, "QUAD LINK", "Another QUAD track this one's steps also move on, played for this step's gate: a "
-                                "slow track pulled along by a fast one, or a HOLD track played only by this one."),
+    X_(TX_QD_LINK, "QUAD LINK", "Other QUAD tracks this one's steps also move on, one, two or all three, each played "
+                                "for this step's gate: slow tracks pulled along by a fast one, or HOLD tracks played "
+                                "only by this one."),
     X_(TX_NL_MODE, "NOTE LENGTH", "How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever "
                                   "DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP."),
     X_(TX_NL_LEN, "NOTE LENGTH LEN", "FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts."),
@@ -355,6 +370,23 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_CL_TAP, "CELLS TAP", "The cell whose state gates the notes: lit, a note plays."),
     X_(TX_CL_SPAN, "CELLS SPAN", "How many degrees of the scale the notes spread over, the eight cells read as a "
                                  "number from low to high."),
+    X_(TX_QD_RANGE, "QUAD RANGE", "The octaves the row's notes fold into: 3 OCT as they are, 1 OCT or 2 OCT from the "
+                                  "root up, +-1 an octave either side of it. OCT+ held on GEN, KNOB 4."),
+#define QD_MOVE_TEXT "How a column of QUAD's grid moves its cells between the four rows: STOP, DOWN (each note a track " \
+                     "down, track 4's to track 1), UP, or RAND (a jump of 1 to 3 rows). Rows not in QUAD turn too, " \
+                     "keeping the notes. OCT+ held on GEN: KNOB 1 the column, KNOB 2 its MOVE."
+#define QD_EVERY_TEXT "How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 " \
+                      "the column, KNOB 3 its EVERY."
+    X_(TX_QD_MOVE1, "QUAD MOVE 1", QD_MOVE_TEXT),
+    X_(TX_QD_MOVE2, "QUAD MOVE 2", QD_MOVE_TEXT),
+    X_(TX_QD_MOVE3, "QUAD MOVE 3", QD_MOVE_TEXT),
+    X_(TX_QD_MOVE4, "QUAD MOVE 4", QD_MOVE_TEXT),
+    X_(TX_QD_EVERY1, "QUAD EVERY 1", QD_EVERY_TEXT),
+    X_(TX_QD_EVERY2, "QUAD EVERY 2", QD_EVERY_TEXT),
+    X_(TX_QD_EVERY3, "QUAD EVERY 3", QD_EVERY_TEXT),
+    X_(TX_QD_EVERY4, "QUAD EVERY 4", QD_EVERY_TEXT),
+#undef QD_MOVE_TEXT
+#undef QD_EVERY_TEXT
 };
 #undef T_
 #undef G_

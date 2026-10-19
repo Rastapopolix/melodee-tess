@@ -46,6 +46,25 @@ static void graph_adsr_v(int32_t va, int32_t vd, int32_t vs, int32_t vr, int32_t
 #undef EGY
 }
 
+/* QUAD on GEN with OCT+ held: the knobs are the grid's columns' (COL, MOVE, EVERY) and the row's RANGE
+ * (tessera.c tessera_quad_cols_knob); ui_input.c routes the knobs, ui_draw.c the cards, the picture marks the column */
+static int quad_cols_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && song.sel < TESSERA_TRACKS && cur_page()->fam == FAM_GEN &&
+           cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_QUAD &&
+           ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
+}
+/* QUAD's LINK as its card shows it: OFF, or "T" and the linked tracks ("T24") */
+static void quad_link_text(uint32_t m, char *b)
+{
+    uint32_t n = 0;
+    if (!(m & 15u)) { str_cpy(b, "OFF", 4); return; }
+    b[n++] = 'T';
+    for (uint32_t i = 0; i < TESSERA_TRACKS; i++)
+        if ((m >> i) & 1u) b[n++] = (char)('1' + i);
+    b[n] = 0;
+}
+
 /* FM6: a DX7 envelope, four rates (a segment's width: slower is wider) and four levels, held at L3 while the key is
  * down, then R4 to L4; it starts at L4 (as the DX7's). r, l: 0..99 each. pitch: a pitch envelope (50 = the note's
  * own pitch, a line there). The column just turned in ACCENT */
@@ -441,19 +460,52 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         }
     } else if (mode == TESS_ENG_QUAD) {
         /* the whole grid whatever track is selected: a row a track, a cell a bar at its pitch (a rest a dash), the cell
-         * each QUAD row plays lit; a row not in QUAD dim. Panel: each row's label, "1>3" when its steps also move track 3 */
-        int32_t top = is_panel ? 8 : y_base, lane = is_panel ? 24 : 6, x0 = is_panel ? 42 : 13, cw = is_panel ? 42 : 50;
+         * each QUAD row plays lit; a row not in QUAD dim. Panel, on all four sides: above each column its MOVE (an arrow
+         * down or up, RAND a dice's two dots, STOP a dash), below it its EVERY; left each row's track and DIR; right
+         * its RANGE and its LINKs (a dot a track, lit when linked). OCT+ held: the column KNOB 2 and 3 set lit */
+        int32_t top = is_panel ? 13 : y_base, lane = is_panel ? 21 : 6, x0 = is_panel ? 50 : 13, cw = is_panel ? 30 : 50;
+        int32_t gap = is_panel ? 4 : 6;
+        int layer = quad_cols_on();
+        static const char *const QD[GEN_QD_COUNT] = {">", "<", "<>", "?", "="};
+        static const char *const QR[GEN_QR_COUNT] = {"3", "1", "2", "+-1"};
+        if (is_panel) {
+            for (uint32_t i = 0; i < 4u; i++) {
+                int32_t cx = x0 + (int32_t)i * (cw + gap) + cw / 2, y = 3;
+                uint32_t mv = tessera.qcol[i] & 3u;
+                int sel = layer && i == (tessera.qcol_sel & 3u);
+                uint16_t mc = sel ? T_TEXT : mv ? c : dim;
+                char e[4] = {'/', 0, 0, 0};
+                if (mv == GEN_QC_DOWN || mv == GEN_QC_UP)
+                    for (int32_t k = 0; k < 4; k++)      /* (a triangle, 7 wide, its point the way the cells go) */
+                        cv_rect(cx - 3 + k, mv == GEN_QC_DOWN ? y + k : y + 3 - k, 7 - 2 * k, 1, mc);
+                else if (mv == GEN_QC_RAND) {
+                    cv_rect(cx - 3, y, 2, 2, mc);
+                    cv_rect(cx + 1, y + 2, 2, 2, mc);
+                } else
+                    cv_rect(cx - 3, y + 2, 7, 1, mc);
+                fmt_int(e + 1, tessera_quad_every(i));
+                cv_text_c(cx, top + 4 * lane, &AF_X, e, sel ? T_TEXT : mv ? c : dim, bg);
+                if (sel) cv_rect(cx - cw / 2, top - 3, cw, 1, T_TEXT);
+            }
+        }
         for (uint32_t r = 0; r < TESSERA_TRACKS; r++) {
             const gen_quad_t *q = tessera_quad(r);
             int on = tessera.mode[r] == TESS_ENG_QUAD;
             int32_t ly = top + (int32_t)r * lane;
             if (is_panel) {
-                char lb[5] = {'T', (char)('1' + r), 0, 0, 0};
-                if (on && q->link) lb[0] = (char)('1' + r), lb[1] = '>', lb[2] = (char)('0' + q->link);
-                cv_text(12, ly + (lane - 12) / 2, &AF_X, lb, r == tr ? T_TEXT : on ? c : dim);
+                char lb[3] = {'T', (char)('1' + r), 0};
+                uint16_t tc = r == tr ? T_TEXT : on ? c : dim;
+                cv_text(12, ly + (lane - 12) / 2, &AF_X, lb, tc);
+                cv_text(30, ly + (lane - 12) / 2, &AF_X, QD[q->dir % GEN_QD_COUNT], on ? tc : dim);
+                cv_text(x0 + 4 * (cw + gap) + 2, ly + (lane - 12) / 2, &AF_X, QR[q->range % GEN_QR_COUNT], on ? tc : dim);
+                for (uint32_t k = 0; k < TESSERA_TRACKS; k++) {   /* (its LINKs: a dot a track, none for its own) */
+                    int32_t dx = 208 + (int32_t)k * 5, dy = ly + lane / 2 - 1;
+                    if (k == r) continue;
+                    cv_rect(dx, dy, 3, 3, on && ((q->link >> k) & 1u) ? T_ACCENT : dim);
+                }
             }
             for (uint32_t i = 0; i < 4u; i++) {
-                int32_t sx = x0 + (int32_t)i * (cw + 6), v = q->cell[i] > 21u ? 21 : q->cell[i];
+                int32_t sx = x0 + (int32_t)i * (cw + gap), v = q->cell[i] > 21u ? 21 : q->cell[i];
                 int cur = on && i == q->pos;
                 uint16_t col = !on ? dim : cur ? T_TEXT : c;
                 if (!is_panel) {

@@ -187,7 +187,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x22D | OCHD RATE | 0 to 100 | 50 | How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for OCHD 8; each 12.5 more twice as fast. |
 | 0x22E | QUAD DIRECTION | FWD, BACK, PEND, RAND, HOLD | FWD | How the track's playhead moves along its row of the grid: forward, back, back and forth, at random; HOLD rests on its own steps and moves only when a LINK moves it. |
 | 0x22F | QUAD PROB | 0 to 100 % | 100 | The chance each of the row's notes plays: 100 every one, lower leaves gaps. |
-| 0x230 | QUAD LINK | OFF, T1, T2, T3, T4 | OFF | Another QUAD track this one's steps also move on, played for this step's gate: a slow track pulled along by a fast one, or a HOLD track played only by this one. |
+| 0x230 | QUAD LINK | OFF, T1, T2, T12, T3, T13, T23, T123, T4, T14, T24, T124, T34, T134, T234, T1234 | OFF | Other QUAD tracks this one's steps also move on, one, two or all three, each played for this step's gate: slow tracks pulled along by a fast one, or HOLD tracks played only by this one. |
 | 0x231 | NOTE LENGTH | STEP, FIXED, HIT | STEP | How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP. |
 | 0x232 | NOTE LENGTH LEN | 1/32, 1/16, 1/8, 1/4, 1/2, 1/1 | 1/8 | FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts. |
 | 0x233 | NOTE LENGTH KEYS | 1 to 4 | 4 | FIXED: how many notes may hold at once. One more ends the note nearest its end; the same pitch again ends the one before. |
@@ -201,6 +201,15 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x23B | CELLS RULE | 0 to 255 | 30 | How each generation follows from the last, 0 to 255 (an elementary automaton's rule): 30 and 90 stay restless, many others settle into a loop or die out. EVOLVE turns cells over to set a still ring going again. |
 | 0x23C | CELLS TAP | 1 to 8 | 1 | The cell whose state gates the notes: lit, a note plays. |
 | 0x23D | CELLS SPAN | 1 to 15 | 14 | How many degrees of the scale the notes spread over, the eight cells read as a number from low to high. |
+| 0x23E | QUAD RANGE | 3 OCT, 1 OCT, 2 OCT, +-1 | 3 OCT | The octaves the row's notes fold into: 3 OCT as they are, 1 OCT or 2 OCT from the root up, +-1 an octave either side of it. OCT+ held on GEN, KNOB 4. |
+| 0x23F | QUAD MOVE 1 | STOP, DOWN, UP, RAND | STOP | How a column of QUAD's grid moves its cells between the four rows: STOP, DOWN (each note a track down, track 4's to track 1), UP, or RAND (a jump of 1 to 3 rows). Rows not in QUAD turn too, keeping the notes. OCT+ held on GEN: KNOB 1 the column, KNOB 2 its MOVE. |
+| 0x240 | QUAD MOVE 2 | STOP, DOWN, UP, RAND | STOP | How a column of QUAD's grid moves its cells between the four rows: STOP, DOWN (each note a track down, track 4's to track 1), UP, or RAND (a jump of 1 to 3 rows). Rows not in QUAD turn too, keeping the notes. OCT+ held on GEN: KNOB 1 the column, KNOB 2 its MOVE. |
+| 0x241 | QUAD MOVE 3 | STOP, DOWN, UP, RAND | STOP | How a column of QUAD's grid moves its cells between the four rows: STOP, DOWN (each note a track down, track 4's to track 1), UP, or RAND (a jump of 1 to 3 rows). Rows not in QUAD turn too, keeping the notes. OCT+ held on GEN: KNOB 1 the column, KNOB 2 its MOVE. |
+| 0x242 | QUAD MOVE 4 | STOP, DOWN, UP, RAND | STOP | How a column of QUAD's grid moves its cells between the four rows: STOP, DOWN (each note a track down, track 4's to track 1), UP, or RAND (a jump of 1 to 3 rows). Rows not in QUAD turn too, keeping the notes. OCT+ held on GEN: KNOB 1 the column, KNOB 2 its MOVE. |
+| 0x243 | QUAD EVERY 1 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
+| 0x244 | QUAD EVERY 2 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
+| 0x245 | QUAD EVERY 3 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
+| 0x246 | QUAD EVERY 4 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
 
 ## Mods
 

@@ -104,16 +104,22 @@ typedef struct {
 
 /* 9. Quad (initenere, a norns script): a 4 x 4 grid of notes the four tracks share, a row each.
  * A track in QUAD plays its own row on its own clock (its division), so the polyrhythm comes from the tracks' speeds;
- * LINK: its steps also move another QUAD track on (tessera.c tess_quad_link). The cells come from the seed (ROLL); EVOLVE
- * turns the grid's columns between the QUAD rows (tessera.c tess_quad_mutate) */
+ * LINK: its steps also move other QUAD tracks on (tessera.c tess_quad_link). RANGE folds the row's notes into fewer
+ * octaves. The columns can move too, each on its own: its cells turn down or up the four rows, or jump, every so many
+ * steps (tessera.c tess_quad_cols; OCT+ held on GEN). The cells come from the seed (ROLL); EVOLVE turns the grid's
+ * columns between the QUAD rows while no column moves, else changes notes (tessera.c tess_quad_mutate) */
 enum { GEN_QD_FWD, GEN_QD_BACK, GEN_QD_PEND, GEN_QD_RAND, GEN_QD_HOLD, GEN_QD_COUNT };
+enum { GEN_QR_FULL, GEN_QR_ONE, GEN_QR_TWO, GEN_QR_LOW, GEN_QR_COUNT };   /* RANGE: 3 octaves, 1, 2, 1 either side */
+enum { GEN_QC_STOP, GEN_QC_DOWN, GEN_QC_UP, GEN_QC_RAND, GEN_QC_COUNT };  /* a column's MOVE */
+#define GEN_QC_EVERY_N 7u     /* a column's EVERY: 1, 2, 3, 4, 6, 8, 16 steps (gen.c GEN_QC_EVERY) */
 typedef struct {
     uint8_t  cell[4];     /* this track's row: 0 a rest, 1..21 a scale degree + 1 (three octaves) */
     uint8_t  dir;         /* GEN_QD_*: forward, back, back and forth, random, held (only a LINK moves it) */
     uint8_t  prob;        /* 0..100: the chance a cell plays */
-    uint8_t  link;        /* 0 = off, 1..4: the track this one's steps also move on (never this one) */
+    uint8_t  link;        /* the tracks this one's steps also move on, a bit each (bit 0 track 1; its own: none) */
     uint8_t  pos;         /* the cell playing, 0..3; 4: none yet (the first step plays cell 1, or 4 going back) */
     uint8_t  back;        /* back and forth: 1 going back (not saved) */
+    uint8_t  range;       /* GEN_QR_*: the octaves the row's notes fold into */
 } gen_quad_t;
 
 /* 10. Constellation (after norns' Constellation, timothy-taylor: the idea only, no code): stars scroll across a sky, a

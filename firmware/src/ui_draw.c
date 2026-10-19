@@ -969,15 +969,27 @@ static void draw_columns(void)
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(p->span - 1u) * 500, ICON_AUTO);
             } else if (m == TESS_ENG_QUAD) {
                 static const char *const QDIR[GEN_QD_COUNT] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
+                static const char *const QMOVE[GEN_QC_COUNT] = {"STOP", "DOWN", "UP", "RAND"};
+                static const char *const QRANGE[GEN_QR_COUNT] = {"3 OCT", "1 OCT", "2 OCT", "+-1"};
                 const gen_quad_t *q = tessera_quad(tr);
+                if (quad_cols_on()) {                           /* OCT+ held: the columns' and RANGE */
+                    uint32_t c = tessera.qcol_sel & 3u, mv = tessera.qcol[c] & 3u, ev = tessera.qcol[c] >> 2;
+                    fmt_int(v1, c + 1u);
+                    draw_column(0, "COL", v1, "", VAL(0u), (int32_t)c * 1000 / 3, ICON_AUTO);
+                    draw_column(1, "MOVE", QMOVE[mv], "", VAL(1u), (int32_t)mv * 1000 / (GEN_QC_COUNT - 1), ICON_AUTO);
+                    v2[0] = '/', fmt_int(v2 + 1, tessera_quad_every(c));
+                    draw_column(2, "EVERY", v2, "", VAL(2u), (int32_t)ev * 1000 / (GEN_QC_EVERY_N - 1), ICON_AUTO);
+                    draw_column(3, "RANGE", QRANGE[q->range % GEN_QR_COUNT], "", VAL(3u),
+                                (int32_t)(q->range % GEN_QR_COUNT) * 1000 / (GEN_QR_COUNT - 1), ICON_AUTO);
+                    return;
+                }
                 draw_column(0, "MODE", "QUAD", "", VAL(0u), TESS_ENG_QUAD * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 draw_column(1, "DIR", QDIR[q->dir % GEN_QD_COUNT], "", VAL(1u), (int32_t)(q->dir % GEN_QD_COUNT) * 1000 / (GEN_QD_COUNT - 1), ICON_AUTO);
                 fmt_int(v2, q->prob);
                 col_mods(PID_TESS(TX_QD_PROB));
                 draw_column(2, "PROB", v2, "%", VAL(2u), (int32_t)q->prob * 10, ICON_AUTO);
-                if (q->link) v3[0] = 'T', fmt_int(v3 + 1, q->link);
-                else str_cpy(v3, "OFF", sizeof v3);
-                draw_column(3, "LINK", v3, "", VAL(3u), (int32_t)q->link * 1000 / TESSERA_TRACKS, ICON_AUTO);
+                quad_link_text(q->link, v3);
+                draw_column(3, "LINK", v3, "", VAL(3u), (int32_t)(q->link & 15u) * 1000 / 15, ICON_AUTO);
             } else if (m == TESS_ENG_SERIES) {
                 const gen_series_t *g = tessera_series(tr);
                 draw_column(0, "MODE", "SERIES", "", VAL(0u), TESS_ENG_SERIES * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);

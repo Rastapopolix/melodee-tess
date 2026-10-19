@@ -509,13 +509,21 @@ static void gen_quad_move(gen_quad_t *g, uint32_t *rnd)
     }
     g->pos = (uint8_t)p;
 }
+static const uint8_t GEN_QC_EVERY[GEN_QC_EVERY_N] = {1, 2, 3, 4, 6, 8, 16};
+/* a cell's note: its degree over three octaves from 48, or RANGE's fold (one octave, two, or one either side of 48) */
+static uint32_t gen_quad_note(uint32_t v, uint32_t range)
+{
+    uint32_t deg = v - 1u, base = range == GEN_QR_LOW ? 36u : 48u;
+    if (range == GEN_QR_ONE) deg %= 7u;
+    else if (range == GEN_QR_TWO || range == GEN_QR_LOW) deg %= 14u;
+    return base + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u];
+}
 static void gen_quad_play(const gen_quad_t *g, uint32_t *rnd, gen_out_t *out)
 {
     uint32_t v = g->pos > 3u ? 0u : g->cell[g->pos] > 21u ? 21u : g->cell[g->pos];
     out->cv = (int16_t)(v * 32767u / 21u);
     if (v && (g->prob >= 100u || gen_rnd(rnd, 100u) < g->prob)) {
-        uint32_t deg = v - 1u;
-        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->note = (uint8_t)gen_quad_note(v, g->range);
         out->vel = g->pos ? 96u : 112u;
         out->gate = 1;
     }
