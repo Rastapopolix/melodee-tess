@@ -200,10 +200,10 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     G_(G_CLOCK, 0, "CLOCK SOURCE", "Where the tempo comes from: the FM-1 itself, USB MIDI or the TRS MIDI input."),
     G_(G_TUNE, 0, "TUNE", "Fine tuning of every track, in cents."),
     G_(G_MIDI, 0, "MIDI INPUT", "Which MIDI input plays the tracks: USB or TRS."),
-    G_(G_DRUMCH, PID_F_DEVICE, "DRUM MIDI CHANNEL", "The MIDI channel the first drum track listens to."),
+    G_(G_DRUMCH, PID_F_DEVICE, "DRUM MIDI CHANNEL", "The MIDI channel the first drum track listens to and sends on (MIDI OUT)."),
     G_(G_ROUTE, 0, "MIDI ROUTING",
         "Which MIDI channels reach which tracks: four channels to the four tracks, or every channel to the "
-        "selected track (SEL)."),
+        "selected track (SEL). MIDI OUT sends each track on the same channels (SEL: 1 to 4)."),
     G_(G_SLOT, PID_F_ACTION, "PROJECT SLOT", "The project slot LOAD and SAVE use."),
     G_(G_BOOT, PID_F_DEVICE, "BOOT PROJECT", "The project loaded when the FM-1 starts; OFF starts a new one."),
     G_(G_LOAD, PID_F_ACTION, "PROJECT LOAD", "Loads the project in the slot."),

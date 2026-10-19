@@ -26,6 +26,8 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
 #include "../firmware/src/panel.c"
 static void settings_save(void) {}
 static uint8_t settings_boot, settings_drumch = 10;  /* (params.c) */
+enum { MIDI_OUT_KEYS, MIDI_OUT_ALL, MIDI_OUT_OFF, MIDI_OUT_N };
+static uint8_t settings_midi_out, settings_clock_out;     /* (midi_out.c) */
 #define VOICE_BUDGET_DEFAULT 16u
 static int16_t settings_budget=VOICE_BUDGET_DEFAULT;
 static int native_used(uint32_t e, uint32_t k) { (void)e; (void)k; return 0; }
