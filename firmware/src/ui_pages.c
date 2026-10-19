@@ -694,7 +694,8 @@ static void pv_steps(void)
 {
     const track_t *t = TSEL;
     uint32_t tr = trk_index(t);
-    if (tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF) {
+    if (tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF && cur_page()->fam == FAM_GEN) {   /* (PATTERN: the
+                                                                                                    * steps, as ui_graph.c) */
         extern void graph_tessera_viz(uint32_t tr, int is_panel);
         graph_tessera_viz(tr, 1);
         return;
@@ -770,7 +771,7 @@ static void pv_picture(void)
     int32_t pp = -1;
     if (pic == 6u && song.playing) {
         uint32_t tr = trk_index(TSEL);
-        if (tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF) {
+        if (tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF && cur_page()->fam == FAM_GEN) {   /* (GEN's picture) */
             uint32_t m = tessera.mode[tr];
             if (m == TESS_ENG_TURING) pp = tessera_turing(tr)->step_idx;
             else if (m == TESS_ENG_EUCLID) pp = tessera_euclid(tr)->step_idx;

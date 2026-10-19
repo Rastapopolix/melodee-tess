@@ -656,6 +656,62 @@ static void graph_organic(const track_t *t, uint16_t c)
     }
 }
 
+/* LENGTH page (NOTE LENGTH, note_len.c): a bar of the track's steps at its DIV (the grid along the bottom), an example
+ * rhythm's hits on it (ticks), and above them the notes those hits play, as long as the mode makes them: STEP the
+ * step's GATE, FIXED LEN (at most KEYS at once, one row each: a hit past KEYS cuts the one nearest its end, the same as
+ * note_len.c), HIT up to the next hit. A note running past the bar is cut at its edge, open there. Grids: STEP */
+static void graph_notelen(const track_t *t, uint16_t c)
+{
+    static const uint8_t HITS[6] = {0, 3, 6, 8, 11, 14};   /* an example rhythm, in 16ths of the bar */
+    static const uint8_t LEN32[6] = {1, 2, 4, 8, 16, 32};  /* 1/32 .. 1/1 in 32nds of the bar */
+    uint32_t tr = trk_index(t) % TESSERA_TRACKS, m = tessera.nl_mode[tr], keys = tessera.nl_keys[tr], i, k;
+    int32_t x0 = PANEL_X0 + 6, w = PANEL_W - 12, bar = w, steps, sw, gate, start[6], end[6], row[6];
+    int32_t on_end[NL_KEYS];
+    uint32_t div = seq_div_samples((uint32_t)t->p[P_SDIV]), barlen = 4u * seq_beat_samples();
+    if (tessera.mode[tr] == TESS_ENG_GRIDS || m >= NL_COUNT) m = NL_STEP;
+    if (m != NL_FIXED) keys = 1u;
+    if (keys < 1u || keys > NL_KEYS) keys = NL_KEYS;
+    steps = div ? (int32_t)((barlen + div / 2u) / div) : 16;
+    steps = steps < 1 ? 1 : steps > 32 ? 32 : steps;
+    sw = bar / steps;
+    gate = sw * (t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128;
+    /* the grid: a tick a step, every 4th taller */
+    cv_rect(x0, 92, bar, 1, T_RAISE);
+    for (i = 0; i < (uint32_t)steps; i++)
+        cv_rect(x0 + (int32_t)i * sw, i % 4u ? 89 : 86, 1, i % 4u ? 3 : 6, T_RAISE);
+    /* the hits on the step they fall on, and their notes */
+    for (k = 0; k < NL_KEYS; k++) on_end[k] = -1;
+    for (i = 0; i < 6u; i++) {
+        int32_t s = (int32_t)HITS[i] * steps / 16;
+        start[i] = x0 + s * sw;
+        if (m == NL_FIXED) end[i] = start[i] + bar * LEN32[tessera.nl_len[tr] % 6u] / 32;
+        else if (m == NL_HIT) end[i] = i + 1u < 6u ? x0 + (int32_t)HITS[i + 1u] * steps / 16 * sw : x0 + bar;
+        else end[i] = start[i] + (gate > 2 ? gate : 2);
+        row[i] = 0;
+    }
+    for (i = 0; i < 6u; i++) {                          /* (rows: KEYS at most; full: the one ending first is cut) */
+        int32_t r = -1, first = -1;
+        for (k = 0; k < keys; k++) {
+            if (on_end[k] >= 0 && end[on_end[k]] > start[i] && start[on_end[k]] < start[i]) {
+                if (first < 0 || end[on_end[k]] < end[on_end[first]]) first = (int32_t)k;
+            } else if (r < 0) r = (int32_t)k;
+        }
+        if (r < 0) {                                    /* all held: the one nearest its end stops here */
+            end[on_end[first]] = start[i];
+            r = first;
+        }
+        row[i] = r;
+        on_end[r] = (int32_t)i;
+    }
+    for (i = 0; i < 6u; i++) {
+        int32_t y = 22 + row[i] * 15, e = end[i] > x0 + bar ? x0 + bar : end[i], ww = e - start[i] - 1;
+        cv_rect(start[i], 80, 2, 6, T_TEXT);            /* the hit */
+        if (ww < 2) ww = 2;
+        cv_rrect(start[i], y, ww, 11, 2, c, T_SURF);
+        if (end[i] > x0 + bar) cv_rect(x0 + bar - 1, y, 1, 11, T_SURF);   /* (it rings on past the bar) */
+    }
+}
+
 static void graph_steps(const track_t *t, uint16_t c)
 {
     uint32_t tr = trk_index(t);
@@ -1341,6 +1397,10 @@ static uint32_t graph_sig(int play)
         const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
         h ^= ((uint32_t)(uint8_t)ev->shift | (uint32_t)ev->drop << 8 | (uint32_t)ev->human << 16 | (uint32_t)ev->follow << 24) * 2246822519u;
     }
+    if (pg->graph == GR_NOTELEN && trk_index(t) < TESSERA_TRACKS)   /* (NOTE LENGTH lives in tessera, DIV in the song) */
+        h ^= ((uint32_t)tessera.nl_mode[trk_index(t)] | (uint32_t)tessera.nl_len[trk_index(t)] << 8 |
+              (uint32_t)tessera.nl_keys[trk_index(t)] << 16 | (uint32_t)tessera.mode[trk_index(t)] << 24 ^
+              (uint32_t)song.g[G_BPM]) * 2246822519u;
     if (pg->graph == GR_MATRIX)                      /* (it moves with the mods: ui_matrix.c) */
         h ^= mx_sig() * 2246822519u;
     if (pg->graph == GR_ORGANIC)                     /* (it moves: a step a few pixels apart) */
@@ -1642,6 +1702,9 @@ static void draw_graph(void)
             break;
         case GR_ORGANIC:
             graph_organic(t, c);
+            break;
+        case GR_NOTELEN:
+            graph_notelen(t, c);
             break;
         case GR_MATRIX:
             mx_graph(c);
