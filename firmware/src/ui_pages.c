@@ -89,6 +89,7 @@ static void pv_mod_chips(void)
 static int32_t pick_bottom(void) { return pv_kind() == PV_CORDS || pv_kind() == PV_MOD ? 216 : 184; }
 
 #include "ui_cords.c"                                  /* CORDS (Tessera) */
+#include "ui_matrix.c"                                 /* MATRIX: the mods track by track (Tessera) */
 #include "ui_help.c"                                   /* ARP held + a knob: its help (Tessera) */
 #include "ui_modsc.c"                                  /* FX held + a knob: its mod amount (Tessera) */
 

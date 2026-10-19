@@ -347,6 +347,7 @@ static void col_mods(uint32_t pid) { col_pid = (uint16_t)pid; }
 static void pv_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc, int32_t ratio,
                       int hot);
 static void cu_columns(void);                           /* CORDS (ui_cords.c) */
+static void mx_columns(void);                           /* MATRIX (ui_matrix.c) */
 static void draw_column(uint32_t c, const char *label, const char *val, const char *unit, uint16_t vc,
                         int32_t ratio, uint32_t icon)
 {
@@ -973,6 +974,10 @@ static void draw_columns(void)
     }
     if (cur_page()->graph == GR_CORDS) {                 /* (ui_cords.c) */
         cu_columns();
+        return;
+    }
+    if (cur_page()->graph == GR_MATRIX) {                /* (ui_matrix.c) */
+        mx_columns();
         return;
     }
     if (cur_page()->graph == GR_MOD) {                   /* the route's SRC, the route, its DST AMT */

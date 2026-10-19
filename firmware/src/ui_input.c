@@ -762,6 +762,10 @@ static void edit_param(uint32_t slot, int32_t steps)
         cu_knob(slot, steps);
         return;
     }
+    if (pg->graph == GR_MATRIX) {                       /* MATRIX (ui_matrix.c) */
+        mx_knob(slot, steps);
+        return;
+    }
     if (pg->graph == GR_SONG) {                       /* KNOB 1 the section, 2 the track, 3 its pattern there, 4 the
                                                        * section's repeats (TAKE JAM: REC held) */
         if (slot == 0u) {
@@ -1604,7 +1608,7 @@ static void page_knob(uint32_t k, int32_t s)
         edit_param(k, s);
         pg = cur_page();
         if (!(pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_TWEAK || pg->graph == GR_TWEAK2 ||
-              pg->graph == GR_ORGANIC ||   /* Tessera's own pages: no picker */
+              pg->graph == GR_ORGANIC || pg->graph == GR_MATRIX ||   /* Tessera's own pages: no picker */
               (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && pg->fam == FAM_GEN && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF))))
             pick_touch(k);                              /* a name from a long list: its picker (ui_popup.c) */
     }
@@ -2034,6 +2038,8 @@ static void ui_input(void)
         list_enter();
     } else if (list_on() && (oct & 1u)) {
         go_home();
+    } else if (!ui.home && cur_page()->graph == GR_MATRIX && (oct & 2u)) {   /* MATRIX: OCT+ opens the mod in MODS */
+        mx_open();
     } else if (act_cols() && (oct & 2u)) {              /* action pages: OCT+ does the picked action, */
         act_do();
     } else if (act_cols() && (oct & 1u)) {              /* OCT- drops it, or (none picked) goes HOME */
