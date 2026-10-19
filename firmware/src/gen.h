@@ -136,14 +136,41 @@ typedef struct {
     uint8_t  loop[16];    /* 0 empty, else bits 0..3 the height + 1, 4..5 the brightness, 6..7 the size */
 } gen_constel_t;
 
+/* 11. Series (after norns' nørgård and Per Nørgård's infinity series: the idea only, no code): the melody that is the
+ * same at every scale, worked out from the bits of the step's number. START picks where in the series it begins, INTV
+ * how many degrees of the scale its unit is, LOOP how many steps it plays before it begins again (0: on and on) */
+#define GEN_SR_LOOP 16u
+typedef struct {
+    uint8_t  start;       /* 0..127: the series' first number */
+    uint8_t  intv;        /* 1..7: degrees of the scale a step of the series */
+    uint8_t  loop;        /* 0 on and on, 1..16 steps */
+    uint8_t  pad;
+    uint16_t n;           /* the steps played since PLAY */
+} gen_series_t;
+
+/* 12. Cells (after norns' less concepts, dan_derks: the idea only, no code): eight cells in a ring, each step the next
+ * generation by RULE (an elementary automaton's 0..255); cell TAP's state is the gate, the eight cells as a number the
+ * note, spread over SPAN degrees of the scale */
+#define GEN_CL_HIST 10u       /* the generations the picture shows */
+typedef struct {
+    uint8_t  rule;        /* 0..255 */
+    uint8_t  tap;         /* 1..8: the cell that gates */
+    uint8_t  span;        /* 1..15: the degrees of the scale the notes spread over */
+    uint8_t  row0;        /* the first generation (ROLL) */
+    uint8_t  cells;       /* this generation */
+    uint8_t  hist[GEN_CL_HIST];   /* the generations before it, newest first (the picture's; not saved) */
+    uint16_t n;           /* the steps played since PLAY (the picture's) */
+} gen_cells_t;
+
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
     uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8; Bounce:
-                           * balls; Poly: the pitches' low 4 bits each; Quad: cells 1..3, 5 bits each; Constellation: the sky */
+                           * balls; Poly: the pitches' low 4 bits each; Quad: cells 1..3, 5 bits each; Constellation: the sky;
+                           * Series: START; Cells: RULE | the first generation << 8 */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos; Bounce: angle, speed; Awake: the
                            * lengths; Poly: span, the pitches' fifth bits from bit 4; Quad: cell 4; Constellation: Y | SIZE << 4,
-                           * DENS */
+                           * DENS; Series: INTV | LOOP << 3; Cells: TAP | SPAN << 4 */
 } gen_sec_t;
 
 /* One step of an input phrase (phase 6: STEP as seed) */

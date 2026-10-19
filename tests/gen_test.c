@@ -559,6 +559,127 @@ static void fall_tests(void)
     check("fall: the balls stay as they were", balls);
 }
 
+/* ---------------------------------------------------------- Series --- */
+static void series_tests(void)
+{
+    static const int8_t SER[16] = {0, 1, -1, 2, 1, 0, -2, 3, -1, 2, 0, 1, 2, -1, -3, 4};
+    int val = 1, range = 1, loop = 1, intv = 1, mut = 1, sec = 1;
+    for (uint32_t i = 0; i < 16u; i++) val &= gen_sr_value(i) == SER[i];
+    for (uint32_t i = 0; i < 4096u; i++) val &= gen_sr_value(2u * i) == -gen_sr_value(i) && gen_sr_value(2u * i + 1u) == gen_sr_value(i) + 1;
+    for (uint32_t st = 0; st < 128u; st += 9)
+        for (uint32_t iv = 1; iv <= 7u; iv++)
+            for (uint32_t lp = 0; lp <= GEN_SR_LOOP; lp += 5) {
+                gen_series_t g = {(uint8_t)st, (uint8_t)iv, (uint8_t)lp, 0, 0};
+                uint8_t first[16];
+                for (uint32_t i = 0; i < 64u; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t d = gen_sr_degree(&g, 0);
+                    gen_series_tick(&g, &o);
+                    range &= o.gate && o.note >= 48u && o.note <= 72u && o.vel >= 70u && o.vel <= 126u && d <= 14u;
+                    if (lp && i < lp && i < 16u) first[i] = o.note;
+                    if (lp && i >= lp && i % lp < 16u) loop &= o.note == first[i % lp];
+                }
+            }
+    {                                                  /* INTV 1: the series round the middle, a degree a unit */
+        gen_series_t g = {0, 1, 0, 0, 0};
+        for (uint32_t i = 0; i < 16u; i++) {
+            int32_t d = 7 + SER[i];
+            intv &= gen_sr_degree(&g, 0) == (uint32_t)d;
+            g.n++;
+        }
+    }
+    {
+        gen_series_t g = {40, 3, 8, 0, 0}, f = g, h = {0, 1, 0, 0, 0};
+        gen_sec_t s = {0, 0, 0};
+        gen_series_mutate(&g, 0, &rng_state);
+        mut &= g.start == f.start;
+        for (uint32_t i = 0; i < 20u && g.start == f.start; i++) gen_series_mutate(&g, 100, &rng_state);
+        mut &= g.start != f.start && g.start < 128u;
+        gen_series_save(&f, &s);
+        gen_series_load(&h, &s);
+        sec &= h.start == 40u && h.intv == 3u && h.loop == 8u;
+        f.loop = GEN_SR_LOOP, f.intv = 7;
+        gen_series_save(&f, &s);
+        gen_series_load(&h, &s);
+        sec &= h.loop == GEN_SR_LOOP && h.intv == 7u;
+    }
+    check("series: Norgard's infinity series (0 1 -1 2 1 0 -2 3 ...; s(2n) = -s(n), s(2n+1) = s(n) + 1)", val);
+    check("series: a note every step, 48..72 at 70..126, folded into two octaves", range);
+    check("series: INTV 1 plays the series a degree a unit round the middle; LOOP repeats its steps", intv && loop);
+    check("series: EVOLVE picks a new START (AMOUNT 0: none); a section keeps START, INTV and LOOP", mut && sec);
+}
+
+/* ---------------------------------------------------------- Cells --- */
+static void cells_tests(void)
+{
+    int rule = 1, gate = 1, range = 1, hist = 1, start = 1, mut = 1, sec = 1, r30 = 1;
+    for (uint32_t r = 0; r < 256u; r++)
+        for (uint32_t c = 0; c < 256u; c += 17) {
+            uint32_t n = gen_cl_next(c, r), want = 0;
+            for (uint32_t i = 0; i < 8u; i++) {
+                uint32_t l = (c >> ((i + 1u) % 8u)) & 1u, m = (c >> i) & 1u, rr = (c >> ((i + 7u) % 8u)) & 1u;
+                want |= ((r >> (l * 4u + m * 2u + rr)) & 1u) << i;
+            }
+            rule &= n == want;
+        }
+    rule &= gen_cl_next(0x10u, 204u) == 0x10u && gen_cl_next(0x10u, 0u) == 0u && gen_cl_next(0x10u, 255u) == 0xFFu;
+    for (uint32_t sd = 1; sd < 40u; sd += 7)
+        for (uint32_t r = 0; r < 256u; r += 15)
+            for (uint32_t t = 1; t <= 8u; t += 3)
+                for (uint32_t sp = 1; sp <= 15u; sp += 7) {
+                    gen_cells_t g;
+                    memset(&g, 0, sizeof g);
+                    g.rule = (uint8_t)r, g.tap = (uint8_t)t, g.span = (uint8_t)sp;
+                    gen_cells_fill(&g, sd);
+                    gen_cells_start(&g);
+                    start &= g.cells == g.row0 && g.row0 && !g.n;
+                    for (uint32_t i = 0; i < 40u; i++) {
+                        gen_out_t o = step_out();
+                        uint32_t prev = g.cells;
+                        gen_cells_tick(&g, &o);
+                        hist &= g.hist[0] == prev && g.cells == gen_cl_next(prev, r);
+                        gate &= o.gate == ((g.cells >> (t - 1u)) & 1u);
+                        if (o.gate) range &= o.note >= 48u && o.note <= 48u + 12u * ((sp - 1u) / 7u) + 12u && o.vel >= 71u &&
+                                             o.vel <= 120u;
+                    }
+                }
+    {                                                  /* rule 30 keeps changing */
+        gen_cells_t g;
+        uint32_t seen = 0, gates = 0;
+        memset(&g, 0, sizeof g);
+        g.rule = 30, g.tap = 1, g.span = 14, g.row0 = 0x10;
+        gen_cells_start(&g);
+        for (uint32_t i = 0; i < 64u; i++) {
+            gen_out_t o = step_out();
+            uint32_t prev = g.cells;
+            gen_cells_tick(&g, &o);
+            seen += g.cells != prev;
+            gates += o.gate;
+        }
+        r30 = seen > 48u && gates > 8u && gates < 56u;
+    }
+    {
+        gen_cells_t g, f, h;
+        gen_sec_t s = {0, 0, 0};
+        memset(&g, 0, sizeof g);
+        g.rule = 110, g.tap = 5, g.span = 9, g.row0 = 0x81, g.cells = 0;
+        f = g;
+        gen_cells_mutate(&g, 0, &rng_state);
+        mut &= !g.cells;
+        gen_cells_mutate(&g, 100, &rng_state);
+        mut &= g.cells == 0xFFu;
+        memset(&h, 0, sizeof h);
+        gen_cells_save(&f, &s);
+        gen_cells_load(&h, &s);
+        sec &= h.rule == 110u && h.tap == 5u && h.span == 9u && h.row0 == 0x81u;
+    }
+    check("cells: the next generation is RULE's bit for each cell and its neighbours, in a ring", rule);
+    check("cells: a generation a step; PLAY starts from the first (ROLL's, never empty)", hist && start);
+    check("cells: cell TAP lit plays a note within SPAN degrees, else a rest; rule 30 stays restless", gate && range && r30);
+    check("cells: EVOLVE turns cells over (AMOUNT 0: none); a section keeps RULE, TAP, SPAN and the first generation",
+          mut && sec);
+}
+
 /* ---------------------------------------------------------- Constellation --- */
 static gen_constel_t constel_at(uint32_t y, uint32_t dens, uint32_t size, uint32_t autop, uint32_t seed)
 {
@@ -1036,6 +1157,8 @@ int main(void)
     bounce_tests();
     fall_tests();
     constel_tests();
+    series_tests();
+    cells_tests();
     awake_tests();
     poly_tests();
     quad_tests();
