@@ -120,6 +120,19 @@ static int behaviour(void)
               cord_unpack(pk) && cord_get(0)->uni == 1u && cord_get(0)->src_trk == 0u);
         pk[1] &= 0x7Fu;
         check("...a mod saved before UNI (the bit 0): BI", cord_unpack(pk) && cord_get(0)->uni == 0u);
+        trk[0].p[P_LPOL] = 1;                         /* the LFO's own POL UNI: the mod's BI/UNI still decides */
+        trk[0].lfo_val = 0;                           /* (POL UNI's bottom) */
+        c.uni = 0;
+        cord_set(0, &c);
+        mod_begin(&trk[2]); lo = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        c.uni = 1;
+        cord_set(0, &c);
+        mod_begin(&trk[2]); uni = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        trk[0].lfo_val = 32767;
+        mod_begin(&trk[2]); top = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        check("...the LFO's POL UNI: BI still pulls down at its bottom, UNI leaves it, its top up",
+              lo < 50u && uni == 50u && top > 50u);
+        trk[0].p[P_LPOL] = 0;
         c.uni = 2;
         check("...a polarity past UNI: refused", !cord_set(1, &c));
         cord_clear();

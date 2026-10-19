@@ -106,6 +106,13 @@ static int32_t cord_drift(uint32_t tr)
     return a + (int32_t)(((int64_t)(c - a) * w) >> 14);
 }
 
+/* t's LFO -1..1 before its FADE, whatever its POL (voice.c folds POL UNI's to 0..1: unfolded back) */
+static int32_t cord_lfo_raw(const track_t *t)
+{
+    int32_t v = t->lfo_val;
+    if (t->p[P_LPOL]) v = v * 2 - 32768;
+    return v > 32767 ? 32767 : v;
+}
 /* track tr's source s now (Q15): mod.c's (ENV: the latest note's envelope, one block late; the LFO with its FADE),
  * the generator's */
 static int32_t cord_src(uint32_t s, uint32_t tr)
@@ -121,15 +128,19 @@ static int32_t cord_src(uint32_t s, uint32_t tr)
         return cord_drift(tr % NTRK);
     if (s >= CS_TORPOR)
         return organic_out(tr, s - CS_TORPOR);
+    if (s == CS_LFO)
+        return mulq15(cord_lfo_raw(t), t->lfo_fade);
     return mod_tsrc(t, s, mulq15(t->lfo_val, t->lfo_fade));
 }
-/* as mod.c's MS_BIPOLAR (a UNI LFO: 0..1, as ENV) */
+/* as mod.c's MS_BIPOLAR (the LFO bipolar whatever its POL: cord_lfo_raw) */
 static int cord_bipolar(uint32_t s, uint32_t tr)
 {
-    return s == CS_NOTE || s == CS_DRIFT || s >= CS_TORPOR || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
+    (void)tr;
+    return s == CS_NOTE || s == CS_DRIFT || s >= CS_TORPOR || s == CS_LFO || (s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
 }
 
-/* a cord's polarity: its source bipolar, unless UNI folds it to 0..1 (as an LFO's POL UNI) */
+/* a cord's polarity: its source bipolar, unless UNI folds it to 0..1. For the LFO the mod's BI/UNI alone decides: the
+ * LFO page's POL shapes its own DEPTH routes, not the mods */
 static int cord_bip(const cord_t *c) { return !c->uni && cord_bipolar(c->src, c->src_trk); }
 static int cord_fold_on(const cord_t *c) { return c->uni && cord_bipolar(c->src, c->src_trk); }
 static int32_t cord_fold(const cord_t *c, int32_t x) { return cord_fold_on(c) ? (x + 32768) >> 1 : x; }
@@ -141,7 +152,7 @@ static int32_t cord_val(const cord_t *c, int32_t own)
     if (!c->src) return 0;
     if (c->src == CS_LFO && cord_fold_on(c)) {
         const track_t *s = &trk[c->src_trk % NTRK];
-        int32_t x = mulq15((s->lfo_val + 32768) >> 1, s->lfo_fade);
+        int32_t x = mulq15((cord_lfo_raw(s) + 32768) >> 1, s->lfo_fade);
         return own < 32767 ? mulq15(x, own) : x;
     }
     return cord_fold(c, cord_src(c->src, c->src_trk));
@@ -305,7 +316,11 @@ static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32
         int32_t x;
         if (!(m & 1u)) continue;
         d = cord_dest(c->dst);
-        x = c->src == CS_LFO && c->src_trk == tr && !cord_fold_on(c) ? lfo : cord_val(c, c->src_trk == tr ? mod.ldep : 32767);
+        if (c->src == CS_LFO && c->src_trk == tr && !cord_fold_on(c)) {   /* its own LFO, BI: as mod_begin has it */
+            int32_t g = mod.ldep < 32767 ? mulq15(t->lfo_fade, mod.ldep) : t->lfo_fade;
+            x = t->p[P_LPOL] ? lfo * 2 - g : lfo;      /* (POL UNI's 0..g back to -g..g: cord_lfo_raw) */
+        } else
+            x = cord_val(c, c->src_trk == tr ? mod.ldep : 32767);
         if (d->kind == CK_VOICE) {
             mod.amp |= d->md == MD_AMP;
             if (c->src && c->amount && MS_VOICE(c->src) && c->src_trk == (uint8_t)(t - trk) && !cord_fold_on(c) &&
