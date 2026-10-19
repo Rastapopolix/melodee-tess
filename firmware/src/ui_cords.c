@@ -4,7 +4,8 @@
  * four to a screen, as MOD's rows:
  * "2  [2] ENV -> [4] DECAY  -25 %" over the amount's bar from the middle; the cord KNOB 2 is on: a card. The knobs as
  * MOD's: KNOB 1 the source (--, then T1 LFO .. T4 NOTE), 2 the cord, 3 the destination (--, then T1 PITCH ..), 4 the
- * amount. A cord without a source is a fixed move: KNOB 4 its OFFSET. Included by ui_pages.c. */
+ * amount. A cord without a source is a fixed move: KNOB 4 its OFFSET. OCT+: a bipolar source's polarity, BI (both
+ * ways from the knob) or UNI (folded to 0..1: one way, "+" after its name). Included by ui_pages.c. */
 
 static int32_t accel(uint32_t role, int32_t s, int32_t range);                       /* ui_input.c */
 static int32_t list_accel(uint32_t role, int32_t s, uint32_t total, uint32_t *fast);
@@ -25,6 +26,16 @@ static void cu_adopt(void)
 #define CU_NDST (1u + NTRK * (CD_N - 1u))
 static uint32_t cu_src_of(const cord_t *c) { return c->src ? 1u + c->src_trk * (CS_N - 1u) + c->src - 1u : 0u; }
 static uint32_t cu_dst_of(const cord_t *c) { return c->dst ? 1u + c->dst_trk * (CD_N - 1u) + c->dst - 1u : 0u; }
+
+/* the source's name, "+" after it when UNI folds it (cord.c cord_fold_on) */
+static const char *cu_src_name(const cord_t *c)
+{
+    static char b[12];
+    if (!c->src) return "--";
+    str_cpy(b, cord_src_name(c->src), sizeof b - 1u);
+    if (cord_fold_on(c)) str_cpy(b + str_len(b), "+", 2);
+    return b;
+}
 
 /* a destination's name: E1..E8 by the destination track's engine (as MOD names them) */
 static const char *cu_dst_name(const cord_t *c)
@@ -95,7 +106,7 @@ static void cu_rows(void)
         }
         fmt_int(b, (int32_t)(top + k + 1u));
         cv_text_on(top + k + 1u >= 10u ? 8 : 12, 7, &AF_S, b, sel ? T_THEME : T_MID, bg);
-        cu_chip(26, 6, 74, c->src_trk, c->src ? cord_src_name(c->src) : "--", c->src != CS_OFF, c->src != CS_OFF, bg);
+        cu_chip(26, 6, 74, c->src_trk, cu_src_name(c), c->src != CS_OFF, c->src != CS_OFF, bg);
         cv_rect(104, 14, 10, 2, on ? T_MID : T_DIM);    /* an arrow */
         cv_line(110, 11, 113, 14, on ? T_MID : T_DIM);
         cv_line(110, 17, 113, 14, on ? T_MID : T_DIM);
@@ -163,7 +174,8 @@ static void cu_columns(void)
         str_cpy(src + 3, cord_src_name(c->src), sizeof src - 3);
     } else
         str_cpy(src, "--", sizeof src);
-    draw_column(0, "", src, "", c->src ? VAL(0u) : T_DIM, -1, ICON_NONE);
+    draw_column(0, "", src, c->src && cord_bipolar(c->src, c->src_trk) ? (c->uni ? "UNI" : "BI") : "",
+                c->src ? VAL(0u) : T_DIM, -1, ICON_NONE);
     fmt_int(val, (int32_t)cord_ui_sel + 1);
     draw_column(1, "MOD", val, "/16", VAL(1u), (int32_t)cord_ui_sel * 1000 / (CORD_LIVE - 1u), ICON_NONE);
     if (c->dst) {
@@ -201,6 +213,20 @@ static const char *cu_pick_name(uint32_t col, int32_t i, int32_t *tr)
     c.dst = (uint8_t)((i - 1) % (int32_t)(CD_N - 1u) + 1);
     c.dst_trk = (uint8_t)*tr;
     return cu_dst_name(&c);
+}
+
+/* OCT+ on MODS: the cord's polarity, BI <-> UNI (a source that is 0..1 already: nothing to fold) */
+static void cu_polarity(void)
+{
+    cord_t c = *cord_get(cord_ui_sel);
+    if (!c.src || !cord_bipolar(c.src, c.src_trk)) {
+        ui_message(c.src ? "UNI ALREADY" : "NO SOURCE");
+        return;
+    }
+    c.uni = (uint8_t)!c.uni;
+    (void)cord_set(cord_ui_sel, &c);
+    ui_message(c.uni ? "UNI: ONE WAY" : "BI: BOTH WAYS");
+    ui.force = 1;
 }
 
 /* a knob on CORDS (ui_input.c edit_param) */

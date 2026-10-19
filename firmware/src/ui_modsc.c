@@ -80,6 +80,7 @@ static int msc_knob(uint32_t k, int32_t s)
         c.dst = (uint8_t)dst;
         c.dst_trk = (uint8_t)tr;
         c.amount = c.offset = 0;
+        c.uni = 0;
     } else {
         ui_message("MODS FULL");
         return 1;

@@ -88,6 +88,36 @@ static int behaviour(void)
           i == 0u && trk[2].p[P_LEVEL] == 100);
     check("...and only track 3: track 1 and 2 untouched", !mod_begin(&trk[0]) && !mod_begin(&trk[1]));
 
+    /* polarity: track 1's LFO (POL BI) at its bottom, +50 % on track 3's LEVEL; BI pulls it down, UNI (0) leaves it */
+    {
+        uint32_t lo, uni, top;
+        uint8_t pk[CORD_PK_BYTES];
+        cord_clear();
+        trk[0].p[P_LPOL] = 0;
+        trk[0].lfo_val = -32767;
+        trk[2].p[P_LEVEL] = 50;
+        c = C(CS_LFO, 0, CD_LEVEL, 2, 50, 0);
+        cord_set(0, &c);
+        mod_begin(&trk[2]); lo = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        c.uni = 1;
+        cord_set(0, &c);
+        mod_begin(&trk[2]); uni = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        trk[0].lfo_val = 32767;
+        mod_begin(&trk[2]); top = (uint32_t)trk[2].p[P_LEVEL]; mod_end(&trk[2]);
+        check("UNI: a bipolar source at its bottom moves nothing (BI: down), at its top up as BI",
+              lo < 50u && uni == 50u && top > 50u);
+        cord_pack(pk);
+        cord_clear();
+        check("...saved and loaded: UNI kept (src_trk's top bit), the track as it was",
+              cord_unpack(pk) && cord_get(0)->uni == 1u && cord_get(0)->src_trk == 0u);
+        pk[1] &= 0x7Fu;
+        check("...a mod saved before UNI (the bit 0): BI", cord_unpack(pk) && cord_get(0)->uni == 0u);
+        c.uni = 2;
+        check("...a polarity past UNI: refused", !cord_set(1, &c));
+        cord_clear();
+        trk[2].p[P_LEVEL] = 100;
+    }
+
     /* per voice: the pitch term, as a MOD slot's */
     cord_clear();
     c = C(CS_OFF, 0, CD_PITCH, 0, 0, 100);

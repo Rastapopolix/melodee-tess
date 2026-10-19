@@ -125,6 +125,11 @@ static int cord_bipolar(uint32_t s, uint32_t tr)
     return s == CS_NOTE || s == CS_DRIFT || s >= CS_TORPOR || (s == CS_LFO ? !trk[tr % NTRK].p[P_LPOL] : s < CS_GATE && MS_BIPOLAR(s));   /* (CV: 0..1) */
 }
 
+/* a cord's polarity: its source bipolar, unless UNI folds it to 0..1 (as an LFO's POL UNI) */
+static int cord_bip(const cord_t *c) { return !c->uni && cord_bipolar(c->src, c->src_trk); }
+static int cord_fold_on(const cord_t *c) { return c->uni && cord_bipolar(c->src, c->src_trk); }
+static int32_t cord_fold(const cord_t *c, int32_t x) { return cord_fold_on(c) ? (x + 32768) >> 1 : x; }
+
 /* ------------------------------------------------------------ the cords --- */
 static cord_t cords[CORD_MAX];
 /* per destination track, the cords that reach it (bit i: cords[i]): mask in the audio block, smask at the step.
@@ -159,7 +164,7 @@ int cord_set(uint32_t i, const cord_t *c)
 {
     uint32_t t;
     if (i >= CORD_LIVE || c->src >= CS_N || c->src_trk >= NTRK || !cord_dest(c->dst) || c->dst_trk >= NTRK ||
-        c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100)
+        c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100 || c->uni > 1u)
         return 0;
     TESS_IRQ_OFF();
     cords[i] = *c;
@@ -188,14 +193,15 @@ void cord_clear(void)
 }
 
 /* ------------------------------------------------------------ saved (project.c, the Tessera object) --- */
-/* the cords as saved: CORD_MAX x 6 bytes, src src_trk dst dst_trk amount offset (CORD_LIVE in use, the rest kept 0) */
+/* the cords as saved: CORD_MAX x 6 bytes, src src_trk dst dst_trk amount offset (CORD_LIVE in use, the rest kept 0);
+ * UNI is src_trk's top bit (saved before it: 0, BI as they played) */
 #define CORD_PK_BYTES (CORD_MAX * 6u)
 static void cord_pack(uint8_t *out)
 {
     uint32_t i;
     for (i = 0; i < CORD_MAX; i++, out += 6) {
         const cord_t *c = &cords[i];
-        out[0] = c->src; out[1] = c->src_trk; out[2] = c->dst; out[3] = c->dst_trk;
+        out[0] = c->src; out[1] = (uint8_t)(c->src_trk | c->uni << 7); out[2] = c->dst; out[3] = c->dst_trk;
         out[4] = (uint8_t)c->amount; out[5] = (uint8_t)c->offset;
     }
 }
@@ -207,7 +213,7 @@ static int cord_unpack(const uint8_t *in)
     uint32_t i;
     for (i = 0; i < CORD_MAX; i++, in += 6) {
         cord_t *c = &got[i];
-        c->src = in[0]; c->src_trk = in[1]; c->dst = in[2]; c->dst_trk = in[3];
+        c->src = in[0]; c->src_trk = in[1] & 0x7Fu; c->uni = in[1] >> 7; c->dst = in[2]; c->dst_trk = in[3];
         c->amount = (int8_t)in[4]; c->offset = (int8_t)in[5];
         if (c->src >= CS_N || c->src_trk >= NTRK || c->dst >= CD_N || !cord_dest(c->dst) || c->dst_trk >= NTRK ||
             c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100)
@@ -231,7 +237,7 @@ uint32_t cord_count(void)
 /* a cord's move, as a share of the destination's range (Q15, 32768 = all of it): amount x source + offset */
 static int32_t cord_share(const cord_t *c)
 {
-    int32_t x = c->src ? cord_src(c->src, c->src_trk) : 0;
+    int32_t x = c->src ? cord_fold(c, cord_src(c->src, c->src_trk)) : 0;
     return (x * c->amount) / 100 + (32768 * c->offset) / 100;
 }
 /* what the mods move parameter pid of track tr by now (Q15 of its range, as cord_share; the knob cards' live marks,
@@ -262,7 +268,7 @@ static __attribute__((noinline)) int32_t cord_depth(const track_t *t, int32_t g)
         const cord_t *c = &cords[i];
         if (!(m & 1u) || c->dst != CD_LFO_DEPTH) continue;
         if (c->src && c->amount)
-            g = mulq15(g, mod_gain(cord_bipolar(c->src, c->src_trk) ? MS_LFO : MS_ENV, cord_src(c->src, c->src_trk),
+            g = mulq15(g, mod_gain(cord_bip(c) ? MS_LFO : MS_ENV, cord_fold(c, cord_src(c->src, c->src_trk)),
                                    cord_amt(c->amount)));
         if (c->offset)
             g = mulq15(g, mod_gain(MS_ENV, 32768, cord_amt(c->offset)));   /* (32768: the whole) */
@@ -282,16 +288,16 @@ static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32
         int32_t x;
         if (!(m & 1u)) continue;
         d = cord_dest(c->dst);
-        x = c->src == CS_LFO && c->src_trk == tr ? lfo : c->src ? cord_src(c->src, c->src_trk) : 0;
+        x = cord_fold(c, c->src == CS_LFO && c->src_trk == tr ? lfo : c->src ? cord_src(c->src, c->src_trk) : 0);
         if (d->kind == CK_VOICE) {
             mod.amp |= d->md == MD_AMP;
-            if (c->src && c->amount && MS_VOICE(c->src) && c->src_trk == (uint8_t)(t - trk) &&
+            if (c->src && c->amount && MS_VOICE(c->src) && c->src_trk == (uint8_t)(t - trk) && !cord_fold_on(c) &&
                 mod.nv < NMSLOT + CORD_LIVE) {          /* its own voices' ENV VEL KEY RAND: each voice its own, as */
                 mod.vsrc[mod.nv] = c->src;              /* MOD's routes (mod_voice) */
                 mod.vdst[mod.nv] = (uint8_t)d->md;
                 mod.vamt[mod.nv++] = (int8_t)cord_amt(c->amount);
             } else if (c->src && c->amount)
-                mod_voice_add(cord_bipolar(c->src, c->src_trk) ? MS_LFO : MS_ENV, d->md, x, cord_amt(c->amount), &mod.pit,
+                mod_voice_add(cord_bip(c) ? MS_LFO : MS_ENV, d->md, x, cord_amt(c->amount), &mod.pit,
                               &mod.cut, &mod.shp, &mod.gain);
             if (c->offset)
                 mod_voice_add(MS_ENV, d->md, 32768, cord_amt(c->offset), &mod.pit, &mod.cut, &mod.shp, &mod.gain);
