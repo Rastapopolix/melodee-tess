@@ -93,13 +93,27 @@ typedef struct {
     uint32_t tick;        /* steps since PLAY, modulo 720720 (every divider's multiple) */
 } gen_poly_t;
 
+/* 9. Quad (initenere, a norns script): a 4 x 4 grid of notes the four tracks share, a row each.
+ * A track in QUAD plays its own row on its own clock (its division), so the polyrhythm comes from the tracks' speeds;
+ * LINK: its steps also move another QUAD track on (tessera.c tess_quad_link). The cells come from the seed (ROLL); EVOLVE
+ * turns the grid's columns between the QUAD rows (tessera.c tess_quad_mutate) */
+enum { GEN_QD_FWD, GEN_QD_BACK, GEN_QD_PEND, GEN_QD_RAND, GEN_QD_HOLD, GEN_QD_COUNT };
+typedef struct {
+    uint8_t  cell[4];     /* this track's row: 0 a rest, 1..21 a scale degree + 1 (three octaves) */
+    uint8_t  dir;         /* GEN_QD_*: forward, back, back and forth, random, held (only a LINK moves it) */
+    uint8_t  prob;        /* 0..100: the chance a cell plays */
+    uint8_t  link;        /* 0 = off, 1..4: the track this one's steps also move on (never this one) */
+    uint8_t  pos;         /* the cell playing, 0..3; 4: none yet (the first step plays cell 1, or 4 going back) */
+    uint8_t  back;        /* back and forth: 1 going back (not saved) */
+} gen_quad_t;
+
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
     uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8; Bounce:
-                           * balls; Poly: the pitches' low 4 bits each */
+                           * balls; Poly: the pitches' low 4 bits each; Quad: cells 1..3, 5 bits each */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos; Bounce: angle, speed; Awake: the
-                           * lengths; Poly: span, the pitches' fifth bits from bit 4 */
+                           * lengths; Poly: span, the pitches' fifth bits from bit 4; Quad: cell 4 */
 } gen_sec_t;
 
 /* One step of an input phrase (phase 6: STEP as seed) */

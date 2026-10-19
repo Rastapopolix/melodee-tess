@@ -9,7 +9,7 @@
  *   OCHD:  eight free-running LFOs, the slowest a turn in 64 s, each 1.6 times faster than the one before (no two in
  *          step), a triangle bent towards a sine and leaning forward (RATE 50; each 12.5 more twice as fast).
  * They run every audio block (cord_tick), stopped or playing; PLAY starts every track's from the place its SEED gives,
- * so a piece replays. Settings: tessera.org_speed / org_rate (the Tessera block, TSR5). Included by tessera.c. */
+ * so a piece replays. Settings: tessera.org_speed / org_rate (the Tessera block, since TSR5). Included by tessera.c. */
 
 #define ORG_BPS (44100.0f / 32.0f)                    /* audio blocks a second (32 samples each: CTL) */
 #define ORG_LOOP 6.45f                                /* the jerk system's time units for one turn, about */

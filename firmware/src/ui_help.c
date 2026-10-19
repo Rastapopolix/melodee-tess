@@ -21,7 +21,8 @@ static void help_find(uint32_t k)
     static const uint8_t ENG[TESS_ENG_COUNT][3] = {{0xFF, 0xFF, 0xFF}, {TX_TUR_LEN, TX_TUR_PROB, TX_TUR_SPAN},
         {TX_EUC_STEPS, TX_EUC_PULSES, TX_EUC_ROT}, {TX_MKV_LEAP, TX_MKV_DENS, TX_MKV_SPAN}, {TX_MRP_POS, TX_MRP_SNPA, TX_MRP_SNPB},
         {TX_GRD_X, TX_GRD_Y, TX_GRD_DENS}, {TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_BALLS},
-        {TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB}, {0xFF, TX_POL_DIV1, TX_POL_SPAN}};
+        {TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB}, {0xFF, TX_POL_DIV1, TX_POL_SPAN},
+        {TX_QD_DIR, TX_QD_PROB, TX_QD_LINK}};
     static const char *const CORD_TEXT[4] = {
         "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
         "or CV, or DRIFT, a slow wander, or its SLOTH (TORPOR, APATHY, INERTIA) or OCHD 1-8 (LFO > ORGANIC). -- leaves "
