@@ -944,6 +944,17 @@ static void draw_columns(void)
                 draw_column(2, "DIV", v2, u2, VAL(2u), (int32_t)d * 1000 / 16, ICON_AUTO);
                 fmt_int(v3, p->span);
                 draw_column(3, "SPAN", v3, "OCT", VAL(3u), (int32_t)(p->span - 1u) * 500, ICON_AUTO);
+            } else if (m == TESS_ENG_QUAD) {
+                static const char *const QDIR[GEN_QD_COUNT] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
+                const gen_quad_t *q = tessera_quad(tr);
+                draw_column(0, "MODE", "QUAD", "", VAL(0u), TESS_ENG_QUAD * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                draw_column(1, "DIR", QDIR[q->dir % GEN_QD_COUNT], "", VAL(1u), (int32_t)(q->dir % GEN_QD_COUNT) * 1000 / (GEN_QD_COUNT - 1), ICON_AUTO);
+                fmt_int(v2, q->prob);
+                col_mods(PID_TESS(TX_QD_PROB));
+                draw_column(2, "PROB", v2, "%", VAL(2u), (int32_t)q->prob * 10, ICON_AUTO);
+                if (q->link) v3[0] = 'T', fmt_int(v3 + 1, q->link);
+                else str_cpy(v3, "OFF", sizeof v3);
+                draw_column(3, "LINK", v3, "", VAL(3u), (int32_t)q->link * 1000 / TESSERA_TRACKS, ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
                 draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);

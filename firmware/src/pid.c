@@ -6,7 +6,8 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY"};
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD"};
+static const char *const TX_N_QDIR[] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
 static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10", "/11", "/12",
                                          "/13", "/14", "/15", "/16"};   /* (every n steps: no unit, "st" read as semitones) */
 static const char *const TX_N_EVERY[] = {"OFF", "1", "2", "4", "8", "16"};
@@ -64,6 +65,9 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_TW_COND] = PE("COND", TX_N_COND, 0),
     [TX_ORG_SPEED] = PD("SPEED", F_INT, 0, 100, 50),
     [TX_ORG_RATE] = PD("RATE", F_INT, 0, 100, 50),
+    [TX_QD_DIR] = PE("DIR", TX_N_QDIR, 0),
+    [TX_QD_PROB] = PD("PROB", F_PCT, 0, 100, 100),
+    [TX_QD_LINK] = PE("LINK", TX_N_FOLLOW, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -232,7 +236,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_MODE, "GENERATOR MODE", "SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the "
                                   "keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; "
                                   "GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball "
-                                  "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms."),
+                                  "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
+                                  "QUAD plays the track's row of a four by four grid the tracks share."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
@@ -296,6 +301,11 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                     "1 and 3 minutes a turn; each 12.5 more twice as fast."),
     X_(TX_ORG_RATE, "OCHD RATE", "How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for "
                                  "OCHD 8; each 12.5 more twice as fast."),
+    X_(TX_QD_DIR, "QUAD DIRECTION", "How the track's playhead moves along its row of the grid: forward, back, back and "
+                                    "forth, at random; HOLD rests on its own steps and moves only when a LINK moves it."),
+    X_(TX_QD_PROB, "QUAD PROB", "The chance each of the row's notes plays: 100 every one, lower leaves gaps."),
+    X_(TX_QD_LINK, "QUAD LINK", "Another QUAD track this one's steps also move on, played for this step's gate: a "
+                                "slow track pulled along by a fast one, or a HOLD track played only by this one."),
 };
 #undef T_
 #undef G_

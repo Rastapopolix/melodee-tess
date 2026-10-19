@@ -19,6 +19,7 @@ enum {
     TESS_ENG_BOUNCE,      /* a ball in a box: a wall hit plays */
     TESS_ENG_AWAKE,       /* two loops added (norns' Awake) */
     TESS_ENG_POLY,        /* four rhythms advance four steps (EuroPi's Polyrhythmic Sequencer) */
+    TESS_ENG_QUAD,        /* a row each of a 4 x 4 grid the tracks share (norns' initenere) */
     TESS_ENG_COUNT
 };
 
@@ -31,6 +32,7 @@ typedef gen_grids_t  tessera_grids_t;
 typedef gen_bounce_t tessera_bounce_t;
 typedef gen_awake_t  tessera_awake_t;
 typedef gen_poly_t   tessera_poly_t;
+typedef gen_quad_t   tessera_quad_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
@@ -93,6 +95,7 @@ typedef struct {
     tessera_bounce_t bounce[TESSERA_TRACKS];
     tessera_awake_t  awake[TESSERA_TRACKS];
     tessera_poly_t   poly[TESSERA_TRACKS];
+    tessera_quad_t   quad[TESSERA_TRACKS];    /* a row each of QUAD's grid (whatever the track's MODE) */
     tessera_evolve_t evolve[TESSERA_TRACKS];
     tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
@@ -135,16 +138,17 @@ void organic_play(void);                            /* seq.c, PLAY: SLOTH and OC
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 352u                       /* the saved state, version 5 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES 380u                       /* the saved state, version 6 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V5 352u                    /* version 5 (before QUAD) */
 #define TESSERA_PK_BYTES_V4 320u                    /* version 4 (before BRANCH, LOGIC, COND, SLOTH, OCHD) */
 #define TESSERA_PK_BYTES_V3 204u                    /* version 3 (before BOUNCE, AWAKE, POLY): older projects and backups */
 #define TESSERA_PK_BYTES_V2 188u                    /* version 2 (before GRIDS) */
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..5) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..6) */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
-void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 5 */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 6 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
@@ -163,6 +167,7 @@ enum {
     TX_POL_DIV1, TX_POL_DIV2, TX_POL_DIV3, TX_POL_DIV4, TX_POL_SPAN,
     TX_TW_BRANCH, TX_TW_BR_TO, TX_TW_BR_MODE, TX_TW_LOGIC, TX_TW_LG_WITH, TX_TW_COND,
     TX_ORG_SPEED, TX_ORG_RATE,
+    TX_QD_DIR, TX_QD_PROB, TX_QD_LINK,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -180,5 +185,6 @@ const gen_awake_t *tessera_awake(uint32_t tr);
 void tessera_awake_select(uint32_t tr, uint32_t step);   /* the step KNOB 1 (A) and KNOB 2 (B) set (the same again, or
                                                         * step 16: none) */
 const gen_poly_t *tessera_poly(uint32_t tr);
+const gen_quad_t *tessera_quad(uint32_t tr);
 
 #endif

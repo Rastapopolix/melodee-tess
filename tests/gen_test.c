@@ -627,6 +627,99 @@ static void poly_tests(void)
     check("poly: the seed's pitches and mutation's stay inside SPAN (1..3); a section keeps them; the rhythms stay", fill && mut);
 }
 
+/* ------------------------------------------------------------------ Quad --- */
+static gen_quad_t quad_at(uint32_t dir, uint32_t prob, uint32_t seed)
+{
+    gen_quad_t g;
+    memset(&g, 0, sizeof g);
+    g.dir = (uint8_t)dir, g.prob = (uint8_t)prob, g.pos = 4;
+    gen_quad_fill(&g, seed);
+    return g;
+}
+static void quad_tests(void)
+{
+    int range = 1, draws = 1, fill = 1, mut = 1, order = 1, hold = 1, sec = 1, same = 1;
+    for (uint32_t dir = 0; dir < GEN_QD_COUNT; dir++)
+        for (uint32_t prob = 0; prob <= 100; prob += 25) {
+            gen_quad_t g = quad_at(dir, prob, dir * 31u + prob + 1u);
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_out_t o = step_out();
+                uint32_t c = rng_state, v, want;
+                gen_quad_tick(&g, &CLK0, &rng_state, &o);
+                v = g.pos < 4u ? g.cell[g.pos] : 0u;
+                want = dir == GEN_QD_HOLD ? 0u : (dir == GEN_QD_RAND) + (v && prob < 100u);
+                draws &= draws_since(c) == want;
+                range &= o.gate ? o.note >= 48 && o.note <= 84 && (o.vel == 112 || o.vel == 96) && v : o.note == 60 && o.vel == 100;
+                range &= (dir == GEN_QD_HOLD ? g.pos == 4u : g.pos < 4u) && o.cv >= 0;
+                if (prob == 0u) range &= !o.gate;
+                if (prob == 100u && dir != GEN_QD_HOLD) range &= o.gate == (v != 0u);
+            }
+        }
+    {   /* the order of the cells: forward, back, back and forth; a LINK's step moves a held row forward */
+        static const uint8_t WANT[3][8] = {{0, 1, 2, 3, 0, 1, 2, 3}, {3, 2, 1, 0, 3, 2, 1, 0}, {0, 1, 2, 3, 2, 1, 0, 1}};
+        for (uint32_t dir = 0; dir < 3u; dir++) {
+            gen_quad_t g = quad_at(dir, 100, 5);
+            for (uint32_t i = 0; i < 8u; i++) {
+                gen_out_t o = step_out();
+                gen_quad_tick(&g, &CLK0, &rng_state, &o);
+                order &= g.pos == WANT[dir][i];
+            }
+        }
+        {
+            gen_quad_t g = quad_at(GEN_QD_HOLD, 100, 5);
+            for (uint32_t i = 0; i < 8u; i++) {
+                gen_out_t o = step_out();
+                gen_quad_tick(&g, &CLK0, &rng_state, &o);
+                hold &= !o.gate && g.pos == 4u;
+            }
+            for (uint32_t i = 0; i < 8u; i++) {
+                gen_out_t o = step_out();
+                gen_quad_step(&g, &rng_state, &o);
+                hold &= g.pos == i % 4u && o.gate == (g.cell[g.pos] != 0u);
+            }
+        }
+    }
+    {   /* the same seed and stream, the same steps (RANDOM, PROB 60) */
+        gen_quad_t a = quad_at(GEN_QD_RAND, 60, 77), b = a;
+        uint32_t ra = 12345u, rb = 12345u;
+        for (uint32_t i = 0; i < 100; i++) {
+            gen_out_t oa = step_out(), ob = step_out();
+            gen_quad_tick(&a, &CLK0, &ra, &oa);
+            gen_quad_tick(&b, &CLK0, &rb, &ob);
+            same &= oa.gate == ob.gate && oa.note == ob.note && a.pos == b.pos;
+        }
+    }
+    for (uint32_t sd = 0; sd < 300; sd++) {
+        gen_quad_t g = quad_at(0, 100, sd);
+        for (uint32_t i = 0; i < 4; i++) fill &= g.cell[i] <= 14u;
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_quad_t g = quad_at(1, 80, 4), g0 = g;
+        for (uint32_t n = 0; n < 300; n++) {
+            gen_quad_mutate(&g, amt, &rng_state);
+            for (uint32_t i = 0; i < 4; i++) mut &= g.cell[i] <= 21u;
+            mut &= g.dir == g0.dir && g.prob == g0.prob && g.link == g0.link;
+        }
+        if (!amt) mut &= !memcmp(g.cell, g0.cell, 4);
+    }
+    {   /* a FORM section keeps the row (cells up to 21) */
+        static const uint8_t ROW[4] = {21, 0, 17, 9};
+        gen_quad_t g = quad_at(0, 100, 1), h;
+        gen_sec_t s;
+        memcpy(g.cell, ROW, 4);
+        gen_quad_save(&g, &s);
+        memset(&h, 0, sizeof h);
+        gen_quad_load(&h, &s);
+        sec &= !memcmp(h.cell, ROW, 4);
+    }
+    check("quad: notes 48..84 (a degree of three octaves), 112 on the first cell, 96 the others; a rest as ever", range);
+    check("quad: draws a step: RANDOM's cell, PROB's below 100 on a note; HOLD none, and silent", draws);
+    check("quad: FWD, BACK, PEND in their order; HOLD stays, a LINK's step moves it forward and plays", order && hold);
+    check("quad: the same seed and stream, the same steps", same);
+    check("quad: the seed's cells in two octaves; mutation's in three, the settings kept (AMOUNT 0: none); a section keeps the row",
+          fill && mut && sec);
+}
+
 /* ------------------------------------------------------------------ sections --- */
 static void section_tests(void)
 {
@@ -684,6 +777,7 @@ static double ns_per_step(int kind)
     gen_bounce_t bo = bounce_at(37, 61, 3, 4);
     gen_awake_t aw = awake_at(9, 5, 70, 3);
     gen_poly_t po = poly_at(4, 3, 5, 0, 2, 3);
+    gen_quad_t qu = quad_at(GEN_QD_PEND, 70, 3);
     const uint32_t N = 2000000u;
     volatile uint32_t sink = 0;
     struct timespec a, b;
@@ -697,7 +791,8 @@ static double ns_per_step(int kind)
         else if (kind == 4) gen_grids_tick(&gr, &CLK0, &rng_state, &o);
         else if (kind == 5) gen_bounce_tick(&bo, &CLK0, &rng_state, &o);
         else if (kind == 6) gen_awake_tick(&aw, &CLK0, &rng_state, &o);
-        else gen_poly_tick(&po, &CLK0, &rng_state, &o);
+        else if (kind == 7) gen_poly_tick(&po, &CLK0, &rng_state, &o);
+        else gen_quad_tick(&qu, &CLK0, &rng_state, &o);
         sink += o.note + o.gate;
     }
     clock_gettime(CLOCK_MONOTONIC, &b);
@@ -735,10 +830,11 @@ int main(void)
     bounce_tests();
     awake_tests();
     poly_tests();
+    quad_tests();
     section_tests();
     printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns, "
-           "Bounce %.1f ns, Awake %.1f ns, Poly %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2), ns_per_step(3),
-           ns_per_step(4), ns_per_step(5), ns_per_step(6), ns_per_step(7));
+           "Bounce %.1f ns, Awake %.1f ns, Poly %.1f ns, Quad %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2),
+           ns_per_step(3), ns_per_step(4), ns_per_step(5), ns_per_step(6), ns_per_step(7), ns_per_step(8));
     printf(bad ? "gen: %d FAILED\n" : "gen: all passed\n", bad);
     return bad != 0;
 }

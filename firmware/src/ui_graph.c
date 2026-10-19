@@ -334,6 +334,38 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rect(bx, ny + nh - 1, bw, 1, dim);
             cv_rrect(bx, ny + nh - bh, bw, bh, 2, i == p->pos ? T_TEXT : c, bg);
         }
+    } else if (mode == TESS_ENG_QUAD) {
+        /* the whole grid whatever track is selected: a row a track, a cell a bar at its pitch (a rest a dash), the cell
+         * each QUAD row plays lit; a row not in QUAD dim. Panel: each row's label, "1>3" when its steps also move track 3 */
+        int32_t top = is_panel ? 8 : y_base, lane = is_panel ? 24 : 6, x0 = is_panel ? 42 : 13, cw = is_panel ? 42 : 50;
+        for (uint32_t r = 0; r < TESSERA_TRACKS; r++) {
+            const gen_quad_t *q = tessera_quad(r);
+            int on = tessera.mode[r] == TESS_ENG_QUAD;
+            int32_t ly = top + (int32_t)r * lane;
+            if (is_panel) {
+                char lb[5] = {'T', (char)('1' + r), 0, 0, 0};
+                if (on && q->link) lb[0] = (char)('1' + r), lb[1] = '>', lb[2] = (char)('0' + q->link);
+                cv_text(12, ly + (lane - 12) / 2, &AF_X, lb, r == tr ? T_TEXT : on ? c : dim);
+            }
+            for (uint32_t i = 0; i < 4u; i++) {
+                int32_t sx = x0 + (int32_t)i * (cw + 6), v = q->cell[i] > 21u ? 21 : q->cell[i];
+                int cur = on && i == q->pos;
+                uint16_t col = !on ? dim : cur ? T_TEXT : c;
+                if (!is_panel) {
+                    if (v) cv_rect(sx, ly, cw, lane - 2, col);
+                    else cv_rect(sx, ly + lane - 3, cw, 1, col);
+                    continue;
+                }
+                cv_rect(sx, ly + lane - 3, cw, 1, dim);
+                if (v) {
+                    int32_t bh = 3 + (v - 1) * (lane - 7) / 20;
+                    cv_rrect(sx, ly + lane - 4 - bh, cw, bh, 2, col, bg);
+                } else {
+                    cv_rect(sx + cw / 2 - 4, ly + lane - 7, 8, 2, col);
+                }
+                if (cur) cv_rect(sx, ly + lane - 2, cw, 2, T_TEXT);   /* (the cell playing, underlined) */
+            }
+        }
     }
 }
 

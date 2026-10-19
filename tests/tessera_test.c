@@ -534,6 +534,32 @@ static void s_cond_form(void)
     turns(tessera_tweak2_knob, 3, 10);                /* COND !FIRST */
     turns(tessera_tweak2_knob, 2, 10);                /* NOT T1 */
 }
+static void s_quad(void) { gen(0, TESS_ENG_QUAD); }
+static void s_quad_var(void)
+{
+    gen(0, TESS_ENG_QUAD);
+    turns(tessera_knob, 1, GEN_QD_PEND);              /* DIR PEND */
+    knob(tessera_knob, 2, -15);                       /* PROB 70 */
+}
+static void s_quad_four(void)                         /* four rows at four speeds, track 1 pulling a HOLD track 4 */
+{
+    gen(3, TESS_ENG_QUAD);
+    turns(tessera_knob, 1, GEN_QD_HOLD);
+    gen(2, TESS_ENG_QUAD);
+    turns(tessera_knob, 1, GEN_QD_RAND);
+    trk[2].p[P_SDIV] = (int16_t)(trk[2].p[P_SDIV] - 1);
+    gen(1, TESS_ENG_QUAD);
+    turns(tessera_knob, 1, GEN_QD_BACK);
+    trk[1].p[P_SDIV] = (int16_t)(trk[1].p[P_SDIV] - 2);
+    gen(0, TESS_ENG_QUAD);
+    turns(tessera_knob, 3, 3);                        /* LINK T4 */
+}
+static void s_evolve_quad(void)
+{
+    s_quad_four();
+    turns(tessera_evolve_knob, 1, 1);                 /* track 1: EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 20);                 /* AMOUNT 70 */
+}
 
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
@@ -589,6 +615,10 @@ static const scen_t SCEN[] = {
     {"logic_markov_not_euclid", 4, 0x102Fu, s_logic_not, 0},
     {"logic_turing_and_higher_track", 4, 0x1030u, s_logic_higher, 0},
     {"cond_2of4_form_ab_grids_notfirst_not", 16, 0x1031u, s_cond_form, 0},
+    {"quad", 4, 0x1032u, s_quad, 0},
+    {"quad_pend_prob70", 8, 0x1033u, s_quad_var, 0},
+    {"quad_four_rows_link_hold", 8, 0x1034u, s_quad_four, 0},
+    {"evolve_quad_every1_amount70", 16, 0x1035u, s_evolve_quad, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -765,6 +795,11 @@ static const char *const TW2_CHECK[] = {
     "BRANCH to a muted track: its share not played, the rest here",
     "BRANCH: no note left sounding on the track TO after the stop",
     "BRANCH 0, LOGIC and COND OFF: the same notes as without TWEAK 2",
+    "QUAD FWD: the row in order, a cell a step, its first cell louder",
+    "QUAD BACK and PEND: the same cells, backwards and back and forth; HOLD alone: silent",
+    "QUAD LINK to a HOLD track: it plays on the linking track's steps only, its row in order",
+    "QUAD LINK: no note left sounding on the linked track after the stop",
+    "QUAD EVOLVE with two QUAD rows at AMOUNT 100: their cells change places, the other rows kept",
 };
 #define TW2_N (sizeof TW2_CHECK / sizeof TW2_CHECK[0])
 static uint32_t tw2_mode, tw2_a, tw2_b, tw2_c;          /* (tw2_setup's: which set-up, its values) */
@@ -788,6 +823,20 @@ static void tw2_setup(void)
         knob(tessera_knob, 2, 3);
         knob(tessera_knob, 3, 3);
         if (tw2_a) turns(tessera_tweak2_knob, 2, (int32_t)(1u + (tw2_a - 1u) * 3u));
+    } else if (tw2_mode == 4u) {                        /* QUAD row 1 5 3 10 on track 1, DIR tw2_a */
+        static const uint8_t ROW[4] = {1, 5, 3, 10};
+        gen(0, TESS_ENG_QUAD);
+        memcpy(tessera.quad[0].cell, ROW, 4);
+        turns(tessera_knob, 1, (int32_t)tw2_a);
+    } else if (tw2_mode == 5u) {                        /* QUAD FWD on track 1 at 1/8 LINK T2, track 2 QUAD HOLD */
+        static const uint8_t ROW[4] = {1, 5, 3, 10}, ROW2[4] = {8, 12, 2, 6};
+        gen(1, TESS_ENG_QUAD);
+        memcpy(tessera.quad[1].cell, ROW2, 4);
+        turns(tessera_knob, 1, GEN_QD_HOLD);
+        gen(0, TESS_ENG_QUAD);
+        memcpy(tessera.quad[0].cell, ROW, 4);
+        turns(tessera_knob, 3, 1);
+        trk[0].p[P_SDIV] = (int16_t)(trk[1].p[P_SDIV] - 1);   /* (a division slower than track 2's own) */
     } else {                                            /* BRANCH tw2_b % to T2 (STEP), mode tw2_a; tw2_c: T2 muted */
         gen(0, TESS_ENG_EUCLID);
         knob(tessera_knob, 2, 3);
@@ -902,6 +951,43 @@ static void tw2_run(char *res, size_t cap)
     if (tw2_n[1] || tw2_n[0] != nb) fail |= 1u << 7;
     tw2_go(3, TESS_BR_COIN, 0, 0);                      /* BRANCH 0 with TO set: as off */
     if (tw2_n[0] != na || tw2_n[1] || memcmp(a, tw2_ev[0], na * sizeof a[0])) fail |= 1u << 9;
+    tw2_go(4, GEN_QD_FWD, 0, 0);                        /* QUAD */
+    na = tw2_n[0];
+    memcpy(a, tw2_ev[0], na * sizeof a[0]);
+    if (na < 128u || (a[0] & 0xFFu) <= (a[1] & 0xFFu)) fail |= 1u << 10;   /* (8 bars, and the step on the last line) */
+    for (i = 0; i + 4u < na; i++) if (((a[i] ^ a[i + 4u]) & 0xFFFFu) || (i % 4u && (a[i] & 0xFFu) != (a[1] & 0xFFu))) fail |= 1u << 10;
+    if (((a[0] ^ a[1]) & 0xFF00u) == 0u && ((a[1] ^ a[2]) & 0xFF00u) == 0u) fail |= 1u << 10;
+    tw2_go(4, GEN_QD_BACK, 0, 0);
+    if (tw2_n[0] != na) fail |= 1u << 11;
+    for (i = 0; i < tw2_n[0]; i++) if (((tw2_ev[0][i] ^ a[3u - i % 4u]) & 0xFF00u)) fail |= 1u << 11;
+    tw2_go(4, GEN_QD_PEND, 0, 0);                       /* cells 1 2 3 4 3 2, 1 2 ..: 6 steps a turn */
+    if (tw2_n[0] != na) fail |= 1u << 11;
+    for (i = 0; i < tw2_n[0]; i++) {
+        static const uint8_t PEND[6] = {0, 1, 2, 3, 2, 1};
+        if ((tw2_ev[0][i] ^ a[PEND[i % 6u]]) & 0xFF00u) fail |= 1u << 11;
+    }
+    tw2_go(4, GEN_QD_HOLD, 0, 0);
+    if (tw2_n[0]) fail |= 1u << 11;
+    tw2_go(5, 0, 0, 0);                                 /* LINK */
+    if (!tw2_n[0] || tw2_n[1] != tw2_n[0]) fail |= 1u << 12;
+    for (i = 0; i < tw2_n[1]; i++) {
+        if (tw2_ev[1][i] >> 16 != tw2_ev[0][i] >> 16) fail |= 1u << 12;
+        if (i >= 4u && (tw2_ev[1][i] ^ tw2_ev[1][i - 4u]) & 0xFF00u) fail |= 1u << 12;
+    }
+    if (!((tw2_ev[1][0] ^ tw2_ev[1][1]) & 0xFF00u)) fail |= 1u << 12;
+    if (tw2_held) fail |= 1u << 13;
+    {   /* EVOLVE: tracks 1 and 3 in QUAD, AMOUNT 100: every column turns, so the two rows swap; rows 2 and 4 kept */
+        static const uint8_t R[4][4] = {{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 0}, {12, 13, 14, 15}};
+        host_tracks_init();
+        tessera_reset();
+        gen(0, TESS_ENG_QUAD);
+        gen(2, TESS_ENG_QUAD);
+        for (k = 0; k < 4u; k++) memcpy(tessera.quad[k].cell, R[k], 4);
+        tessera.evolve[0].amount = 100;
+        tessera_mutate(0);
+        if (memcmp(tessera.quad[0].cell, R[2], 4) || memcmp(tessera.quad[2].cell, R[0], 4) ||
+            memcmp(tessera.quad[1].cell, R[1], 4) || memcmp(tessera.quad[3].cell, R[3], 4)) fail |= 1u << 14;
+    }
     snprintf(res, cap, "%u", fail);
 }
 
@@ -1004,6 +1090,9 @@ static void pack_run(char *res, size_t cap)
     turns(tessera_tweak2_knob, 1, 9);
     turns(tessera_tweak2_knob, 2, 8);
     turns(tessera_tweak2_knob, 3, 5);
+    tessera_param_set(3, TX_QD_DIR, GEN_QD_PEND);     /* track 4: QUAD PEND, PROB 70, LINK T1 */
+    tessera_param_set(3, TX_QD_PROB, 70);
+    tessera_param_set(3, TX_QD_LINK, 1);
     tessera_pack(a);
     ha = pack_hash(a);
     tessera_reset();
@@ -1139,6 +1228,35 @@ static void pack_run(char *res, size_t cap)
             c[1u * n5 + n4 + BAD[k][0]] = BAD[k][1];  /* (track 2's) */
             ok &= tessera_unpack(c) == 0;
         }
+        tessera_unpack(a);
+    }
+    {   /* a version 5 block (before QUAD: each track 7 bytes shorter) loads every setting; QUAD's row the seed's, FWD,
+         * every cell, no LINK; each QUAD setting out of range is refused */
+        static uint8_t v5[TESSERA_PK_BYTES_V5], v5b[TESSERA_PK_BYTES_V5];
+        static const uint8_t BAD[][2] = {{0, 22}, {3, 22}, {4, GEN_QD_COUNT}, {5, 101}, {6, 5}};
+        const uint32_t n6 = TESSERA_PK_BYTES / TESSERA_TRACKS, n5 = TESSERA_PK_BYTES_V5 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v5 + tr * n5, a + tr * n6, n5);
+        ok &= tessera.quad[3].dir == GEN_QD_PEND && tessera.quad[3].prob == 70u && tessera.quad[3].link == 1u;
+        tessera_reset();
+        ok &= tessera_unpack_ver(5u, v5) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            tessera_quad_t q;
+            memset(&q, 0, sizeof q);
+            gen_quad_fill(&q, tessera.seed[tr]);
+            memcpy(v5b + tr * n5, b + tr * n6, n5);
+            ok &= !tessera.quad[tr].dir && tessera.quad[tr].prob == 100u && !tessera.quad[tr].link;
+            ok &= !memcmp(q.cell, tessera.quad[tr].cell, 4);
+        }
+        ok &= !memcmp(v5, v5b, sizeof v5);            /* every version 5 setting as it was */
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[1u * n6 + n5 + BAD[k][0]] = BAD[k][1];  /* (track 2's) */
+            ok &= tessera_unpack(c) == 0;
+        }
+        memcpy(c, a, sizeof c);
+        c[1u * n6 + n5 + 6u] = 2;                     /* track 2 LINKed to itself: loads as no LINK */
+        ok &= tessera_unpack(c) == 1 && !tessera.quad[1].link;
         tessera_unpack(a);
     }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */

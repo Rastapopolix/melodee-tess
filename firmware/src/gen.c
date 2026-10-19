@@ -109,6 +109,14 @@ static void gen_poly_fill(gen_poly_t *g, uint32_t seed)
         g->pitch[i] = (uint8_t)gen_rnd(&s, n);
 }
 
+/* Quad's row from a seed (ROLL; a track's first): a rest one cell in six, the others over two octaves */
+static void gen_quad_fill(gen_quad_t *g, uint32_t seed)
+{
+    uint32_t s = gen_stream(seed * 37u + 3u), i;
+    for (i = 0; i < 4u; i++)
+        g->cell[i] = (uint8_t)(gen_rnd(&s, 6u) ? 1u + gen_rnd(&s, 14u) : 0u);
+}
+
 /* ------------------------------------------------------------------ the generators, one step each --- */
 /* Each fills only what it plays: out arrives as {gate 0, note 60, vel 100, cv 0} (tessera.c), which a rest
  * keeps, so LOCK's recording sees exactly what it did before phase 1. The CV (the cords' source CV, Q15 0..32767)
@@ -379,6 +387,53 @@ static void gen_poly_tick(gen_poly_t *g, const gen_clock_t *clk, uint32_t *rnd, 
     out->cv = (int16_t)((g->pos & 3u) * 32767u / 3u);
 }
 
+/* Quad: the playhead moves a cell (DIR; held: forward, for a LINK's move), the cell plays at PROB (a draw only below
+ * 100 and on a note; RANDOM draws the cell first), its first cell louder. The CV: the cell's pitch, a rest 0 */
+static void gen_quad_move(gen_quad_t *g, uint32_t *rnd)
+{
+    uint32_t p = g->pos;
+    switch (g->dir) {
+    case GEN_QD_BACK: p = p > 3u ? 3u : (p + 3u) & 3u; break;
+    case GEN_QD_PEND:
+        if (p > 3u) p = 0, g->back = 0;
+        else if (g->back) { if (p) p--; else p = 1, g->back = 0; }
+        else if (p < 3u) p++;
+        else p = 2, g->back = 1;
+        break;
+    case GEN_QD_RAND: p = gen_rnd(rnd, 4u); break;
+    default: p = p > 3u ? 0u : (p + 1u) & 3u; break;
+    }
+    g->pos = (uint8_t)p;
+}
+static void gen_quad_play(const gen_quad_t *g, uint32_t *rnd, gen_out_t *out)
+{
+    uint32_t v = g->pos > 3u ? 0u : g->cell[g->pos] > 21u ? 21u : g->cell[g->pos];
+    out->cv = (int16_t)(v * 32767u / 21u);
+    if (v && (g->prob >= 100u || gen_rnd(rnd, 100u) < g->prob)) {
+        uint32_t deg = v - 1u;
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = g->pos ? 96u : 112u;
+        out->gate = 1;
+    }
+}
+/* a step of the track's own clock: held, it rests where it is */
+static void gen_quad_tick(gen_quad_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    (void)clk;
+    if (g->dir == GEN_QD_HOLD) {
+        out->cv = (int16_t)(g->pos > 3u ? 0u : (g->cell[g->pos] > 21u ? 21u : g->cell[g->pos]) * 32767u / 21u);
+        return;
+    }
+    gen_quad_move(g, rnd);
+    gen_quad_play(g, rnd, out);
+}
+/* a step another track's LINK gives it */
+static void gen_quad_step(gen_quad_t *g, uint32_t *rnd, gen_out_t *out)
+{
+    gen_quad_move(g, rnd);
+    gen_quad_play(g, rnd, out);
+}
+
 /* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
@@ -500,6 +555,22 @@ static void gen_poly_mutate(gen_poly_t *g, uint32_t amt, uint32_t *rnd)
     }
 }
 
+/* Quad alone (no other QUAD row to trade with): each cell at AMOUNT % moves a degree or two, turning back at the ends;
+ * one in eight a note becomes a rest or a rest a note */
+static void gen_quad_mutate(gen_quad_t *g, uint32_t amt, uint32_t *rnd)
+{
+    for (uint32_t i = 0; i < 4u; i++) {
+        int32_t v;
+        if (gen_rnd(rnd, 100u) >= amt) continue;
+        if (!gen_rnd(rnd, 8u)) { g->cell[i] = (uint8_t)(g->cell[i] ? 0u : 1u + gen_rnd(rnd, 14u)); continue; }
+        if (!g->cell[i]) continue;
+        v = (int32_t)g->cell[i] + (int32_t)(1u + gen_rnd(rnd, 2u)) * (gen_rnd(rnd, 2u) ? 1 : -1);
+        if (v < 1) v = 2 - v;
+        if (v > 21) v = 42 - v;
+        g->cell[i] = (uint8_t)(v < 1 ? 1 : v > 21 ? 21 : v);
+    }
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -543,4 +614,16 @@ static void gen_poly_load(gen_poly_t *g, const gen_sec_t *s)
         g->pitch[i] = (uint8_t)(v > 20u ? 20u : v);
     }
     g->span = (s->p0 & 15u) >= 1u && (s->p0 & 15u) <= 3u ? s->p0 & 15u : 1u;
+}
+static void gen_quad_save(const gen_quad_t *g, gen_sec_t *s)
+{
+    s->reg = (uint16_t)((g->cell[0] & 31u) | (g->cell[1] & 31u) << 5 | (g->cell[2] & 31u) << 10);
+    s->p0 = g->cell[3];
+}
+static void gen_quad_load(gen_quad_t *g, const gen_sec_t *s)
+{
+    for (uint32_t i = 0; i < 4u; i++) {
+        uint32_t v = i < 3u ? (s->reg >> (i * 5u)) & 31u : s->p0;
+        g->cell[i] = (uint8_t)(v > 21u ? 21u : v);
+    }
 }

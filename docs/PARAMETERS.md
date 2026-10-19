@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share. |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -185,6 +185,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x22B | TWEAK COND | OFF, 1:2, 2:2, 1:4, 2:4, 3:4, 4:4, 1:8, 8:8, FIRST, !FIRST | OFF | The bars a hit may play in, counted from PLAY (with FORM on, from the section's start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest. |
 | 0x22C | SLOTH SPEED | 0 to 100 | 50 | How fast the track's SLOTH drifts (mods: TORPOR, APATHY, INERTIA): 50 is about 17, 1 and 3 minutes a turn; each 12.5 more twice as fast. |
 | 0x22D | OCHD RATE | 0 to 100 | 50 | How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for OCHD 8; each 12.5 more twice as fast. |
+| 0x22E | QUAD DIRECTION | FWD, BACK, PEND, RAND, HOLD | FWD | How the track's playhead moves along its row of the grid: forward, back, back and forth, at random; HOLD rests on its own steps and moves only when a LINK moves it. |
+| 0x22F | QUAD PROB | 0 to 100 % | 100 | The chance each of the row's notes plays: 100 every one, lower leaves gaps. |
+| 0x230 | QUAD LINK | OFF, T1, T2, T3, T4 | OFF | Another QUAD track this one's steps also move on, played for this step's gate: a slow track pulled along by a fast one, or a HOLD track played only by this one. |
 
 ## Mods
 
@@ -268,3 +271,4 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | B ANGLE | the generator's step | Bounce's angle: the balls' paths |
 | A PROB | the generator's step | Awake's PROB: the chance a note plays |
 | BRANCH | the generator's step | TWEAK 2's BRANCH: the chance a hit plays on track TO |
+| Q PROB | the generator's step | Quad's PROB: the chance a cell plays |
