@@ -429,6 +429,62 @@ static void graph_tweak(const track_t *t, uint16_t c)
     }
 }
 
+/* TWEAK 2 page. BRANCH: a stem forking in two, the branch to TO as thick as its chance (none: the stem alone);
+ * TO: the four tracks as numbered cells (as FOLLOW), the one hits go to filled, this one dashed; LOGIC: 8 steps of
+ * this track (top), of WITH's (middle) and what plays (bottom); COND: 8 bars, those a hit may play in filled */
+static void graph_tweak2(const track_t *t, uint16_t c)
+{
+    static const uint8_t ME = 0xD6u, OTHER = 0x4Du;         /* 8 steps' hits, step 1 the low bit */
+    uint32_t tr = trk_index(t), i, res = ME;
+    const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
+    int on = ev->br_to && ev->br_to != tr + 1u, lg = ev->logic && ev->lg_with && ev->lg_with != tr + 1u;
+    int32_t x, w;
+    /* BRANCH: the stem from the bottom, this track's branch up left, TO's up right */
+    x = CARD_X(0u);
+    cv_rect(x + 24, 62, 3, 18, T_MID);
+    w = on ? 1 + (int32_t)ev->branch * 4 / 100 : 0;
+    cv_line_t(x + 25, 62, x + 8, 40, T_MID, 2);
+    if (on && w) cv_line_t(x + 25, 62, x + 42, 40, c, w);
+    else cv_line(x + 25, 62, x + 42, 40, T_LINE);
+    cv_rrect(x + 3, 34, 10, 10, 3, T_RAISE, T_SURF);
+    cv_rrect(x + 38, 34, 10, 10, 3, on && ev->branch ? c : T_RAISE, T_SURF);
+    /* TO: the tracks as numbered cells */
+    x = CARD_X(1u);
+    for (i = 0; i < TESSERA_TRACKS; i++) {
+        int32_t cx = x + 4 + (int32_t)(i % 2u) * 25, cy = 40 + (int32_t)(i / 2u) * 25;
+        char n[2] = {(char)('1' + i), 0};
+        if (on && ev->br_to == i + 1u) {
+            cv_rrect(cx, cy, 21, 21, 3, c, T_SURF);
+            cv_text_c(cx + 11, cy + 5, &AF_X, n, T_BG, c);
+        } else {
+            if (i == tr) cv_dashed(cx, cy, 21, 21, 3, on ? T_TEXT : T_MID);
+            else cv_rrect(cx, cy, 21, 21, 3, T_RAISE, T_SURF);
+            cv_text_c(cx + 11, cy + 5, &AF_X, n, i == tr ? T_TEXT : T_MID, i == tr ? T_SURF : T_RAISE);
+        }
+    }
+    /* LOGIC: three rows of 8 steps */
+    if (lg) res = ev->logic == TESS_LG_AND ? ME & OTHER : ev->logic == TESS_LG_OR ? ME | OTHER :
+                  ev->logic == TESS_LG_XOR ? ME ^ OTHER : ME & ~OTHER & 0xFFu;
+    x = CARD_X(2u);
+    for (i = 0; i < 8u; i++) {
+        int32_t hx = x + 3 + (int32_t)i * 6;
+        if ((ME >> i) & 1u) cv_rect(hx, 36, 5, 8, T_MID);
+        else cv_rect(hx, 42, 5, 2, T_RAISE);
+        if ((OTHER >> i) & 1u) cv_rect(hx, 50, 5, 8, lg ? T_MID : T_DIM);
+        else cv_rect(hx, 56, 5, 2, T_RAISE);
+        if ((res >> i) & 1u) cv_rrect(hx, 66, 5, 12, 1, lg ? c : T_DIM, T_SURF);
+        else cv_rect(hx, 76, 5, 2, T_RAISE);
+    }
+    /* COND: 8 bars in two rows of four */
+    x = CARD_X(3u);
+    for (i = 0; i < 8u; i++) {
+        static const uint8_t PLAYS[TESS_COND_COUNT] = {0xFF, 0x55, 0xAA, 0x11, 0x22, 0x44, 0x88, 0x01, 0x80, 0x01, 0xFE};
+        int32_t hx = x + 5 + (int32_t)(i % 4u) * 12, hy = 40 + (int32_t)(i / 4u) * 22;
+        if ((PLAYS[ev->cond % TESS_COND_COUNT] >> i) & 1u) cv_rrect(hx, hy, 9, 14, 2, ev->cond ? c : T_DIM, T_SURF);
+        else cv_frame(hx, hy, 9, 14, T_LINE);
+    }
+}
+
 static void graph_steps(const track_t *t, uint16_t c)
 {
     uint32_t tr = trk_index(t);
@@ -1114,6 +1170,11 @@ static uint32_t graph_sig(int play)
         const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
         h ^= ((uint32_t)(uint8_t)ev->shift | (uint32_t)ev->drop << 8 | (uint32_t)ev->human << 16 | (uint32_t)ev->follow << 24) * 2246822519u;
     }
+    if (pg->graph == GR_TWEAK2 && trk_index(t) < TESSERA_TRACKS) {
+        const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
+        h ^= ((uint32_t)ev->branch | (uint32_t)ev->br_to << 8 | (uint32_t)ev->br_mode << 12 | (uint32_t)ev->logic << 16 |
+              (uint32_t)ev->lg_with << 20 | (uint32_t)ev->cond << 24) * 2654435761u;
+    }
     return h;
 }
 static uint32_t graph_signature(void) { return graph_sig(1); }
@@ -1399,6 +1460,10 @@ static void draw_graph(void)
         case GR_TWEAK:
             cv_oy = 0;
             graph_tweak(t, c);
+            break;
+        case GR_TWEAK2:
+            cv_oy = 0;
+            graph_tweak2(t, c);
             break;
         case GR_STEPS:
             graph_steps(t, c);

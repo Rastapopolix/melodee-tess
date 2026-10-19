@@ -459,7 +459,7 @@ static const char *seq_taps(char *got, size_t cap, uint32_t n)   /* n SEQ taps f
 static int test_gen_family(void)
 {
     static const char STEP[] = "GEN NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
-                      GEN[] = "GEN EVOLVE FORM TWEAK PATTERN TEMPO PATTERNS SONG GEN";
+                      GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 PATTERN TEMPO PATTERNS SONG";
     char got[128];
     int bad = 0, in_seq = 0, pattern_seq = 0;
     uint32_t k, n = 0;
@@ -476,12 +476,13 @@ static int test_gen_family(void)
     bad += check("SEQ in ARP: back to ARP (its last page), ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN", str_eq(seq_taps(got, sizeof got, 9), ARP));
     if (!str_eq(got, ARP)) printf("    got: %s\n", got);
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);
-    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 9), GEN));
+    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 9), GEN));
     if (!str_eq(got, GEN)) printf("    got: %s\n", got);
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
     TSEL->p[P_AMODE] = 0;
     for (k = 0; k < NPAGES; k++)
-        if (PAGES[k].fam == FAM_SEQ && (PAGES[k].graph == GR_EVOLVE || PAGES[k].graph == GR_FORM || PAGES[k].graph == GR_TWEAK))
+        if (PAGES[k].fam == FAM_SEQ && (PAGES[k].graph == GR_EVOLVE || PAGES[k].graph == GR_FORM || PAGES[k].graph == GR_TWEAK ||
+                                        PAGES[k].graph == GR_TWEAK2))
             in_seq++;
         else if (PAGES[k].fam == FAM_SEQ && str_eq(PAGES[k].title, "PATTERN"))
             pattern_seq = 1;
@@ -584,6 +585,76 @@ static int test_cords_page(void)
     turn(EN_K1 + 1u, -5);
     bad += check("KNOB 2 stops at cord 1", cord_ui_sel == 0u);
     cord_clear();
+    return bad;
+}
+
+/* TWEAK 2 (Logic and Branches): KNOB 1 BRANCH, KNOB 2 TO (OFF, then each other track with COIN, TOGGLE, LATCH: never
+ * this one), KNOB 3 LOGIC (OFF, then AND, OR, XOR, NOT with each other track), KNOB 4 COND through each of its values,
+ * each with its help; FX + KNOB 1 a cord to BRANCH */
+static int test_tweak2(void)
+{
+    static const char *const COND[TESS_COND_COUNT] = {"OFF", "1:2", "2:2", "1:4", "2:4", "3:4", "4:4", "1:8", "8:8",
+                                                      "FIRST", "!FIRST"};
+    const tessera_evolve_t *ev;
+    int bad = 0, n = 1;
+    uint32_t i;
+    ui_power_on();
+    cord_clear();
+    song.sel = 1;
+    tessera_knob(0, TESS_ENG_EUCLID);
+    go_title("TWEAK 2");
+    ev = &tessera.evolve[1];
+    bad += check("TWEAK 2 shown for a generator track, all off", str_eq(cur_page()->title, "TWEAK 2") && !ev->branch &&
+                 !ev->br_to && !ev->logic && !ev->cond);
+    turn(EN_K1, 25);
+    bad += check("KNOB 1: BRANCH 50 %", ev->branch == 50u);
+    for (i = 0; i < 9u; i++) {                       /* T1 COIN TGL LATCH, T3 .., T4 .. (track 2 left out) */
+        turn(EN_K1 + 1u, 1);
+        n &= ev->br_to == (i < 3u ? 1u : i < 6u ? 3u : 4u) && ev->br_mode == i % 3u;
+    }
+    turn(EN_K1 + 1u, 1);
+    n &= ev->br_to == 4u && ev->br_mode == TESS_BR_LATCH;   /* (stops at the end) */
+    for (i = 0; i < 9u; i++) turn(EN_K1 + 1u, -1);
+    n &= !ev->br_to;
+    bad += check("KNOB 2: TO OFF, T1 COIN / TOGGLE / LATCH, T3 .., T4 ..: never this track, OFF again", n);
+    n = 1;
+    for (i = 0; i < 12u; i++) {                      /* AND T1 T3 T4, OR .., XOR .., NOT .. */
+        turn(EN_K1 + 2u, 1);
+        n &= ev->logic == 1u + i / 3u && ev->lg_with == (i % 3u == 0u ? 1u : i % 3u == 1u ? 3u : 4u);
+    }
+    for (i = 0; i < 12u; i++) turn(EN_K1 + 2u, -1);
+    n &= ev->logic == TESS_LG_OFF && !ev->lg_with;
+    bad += check("KNOB 3: LOGIC OFF, AND / OR / XOR / NOT with T1, T3, T4 (never this track), OFF again", n);
+    for (i = 0; i < TESS_COND_COUNT; i++) {
+        char what[96];
+        if (i) turn(EN_K1 + 3u, 1);
+        frame();
+        help_find(3);
+        snprintf(what, sizeof what, "KNOB 4: COND %s, its name and help", COND[i]);
+        bad += check(what, ev->cond == i && str_eq(tessera_cond_name(i), COND[i]) && help.pid == PID_TESS(TX_TW_COND) &&
+                     pid_find(help.pid));
+    }
+    turn(EN_K1 + 3u, 1);
+    bad += check("KNOB 4: COND stops at !FIRST", ev->cond == TESS_COND_NFIRST);
+    help_find(0);
+    n = help.pid == PID_TESS(TX_TW_BRANCH);
+    help_find(1);
+    n &= help.pid == PID_TESS(TX_TW_BR_TO);
+    help_find(2);
+    n &= help.pid == PID_TESS(TX_TW_LOGIC);
+    bad += check("TWEAK 2's help: BRANCH, BRANCH TO, LOGIC", n);
+    fm1_in.buttons |= 1u << panel.btn[B_FX];
+    frame();
+    turn(EN_K1, 5);
+    bad += check("FX + KNOB 1 on TWEAK 2: a cord to track 2's BRANCH, +10 %, BRANCH left", cord_count() == 1u &&
+                 cord_get(0)->dst == CD_TW_BRANCH && cord_get(0)->dst_trk == 1u && cord_get(0)->amount == 10 &&
+                 ev->branch == 50u);
+    fm1_in.buttons &= ~(1u << panel.btn[B_FX]);
+    frame();
+    frame();
+    cord_clear();
+    tessera_knob(0, -TESS_ENG_EUCLID);
+    song.sel = 0;
     return bad;
 }
 
@@ -4869,6 +4940,7 @@ int main(void)
     bad += test_gen_family();
     bad += test_cords_page();
     bad += test_mod_shortcut();
+    bad += test_tweak2();
     bad += test_help_gesture();
     bad += test_mods_page();
     bad += test_midi();

@@ -760,6 +760,27 @@ static void draw_columns(void)
         draw_column(3, "FOLLOW", w3, "", VAL(3u), (int32_t)ev->follow * 1000 / 4, ICON_AUTO);
         return;
     }
+    if (cur_page()->graph == GR_TWEAK2) {
+        static const char *const BRM[TESS_BR_COUNT] = {"COIN", "TGL", "LTCH"};
+        static const char *const LGN[TESS_LG_COUNT] = {"OFF", "AND", "OR", "XOR", "NOT"};
+        uint32_t tr = song.sel;
+        const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
+        char w0[16], w1[8], w3[8];
+        int on = ev->br_to && ev->br_to != tr + 1u, lg = ev->logic && ev->lg_with && ev->lg_with != tr + 1u;
+        fmt_int(w0, ev->branch);
+        if (on) { w1[0] = 'T'; w1[1] = (char)('0' + ev->br_to); w1[2] = 0; }
+        else str_cpy(w1, "OFF", sizeof w1);
+        if (lg) { w3[0] = 'T'; w3[1] = (char)('0' + ev->lg_with); w3[2] = 0; }
+        else w3[0] = 0;
+        draw_column(0, "BRANCH", w0, "%", on ? VAL(0u) : T_DIM, (int32_t)ev->branch * 10, ICON_AUTO);   /* (no TO: idle) */
+        draw_column(1, "TO", w1, on ? BRM[ev->br_mode % TESS_BR_COUNT] : "", VAL(1u),
+                    on ? (int32_t)(1u + (ev->br_to - 1u - (ev->br_to - 1u > tr)) * 3u + ev->br_mode) * 1000 / 9 : 0, ICON_AUTO);
+        draw_column(2, "LOGIC", LGN[lg ? ev->logic % TESS_LG_COUNT : 0u], w3, VAL(2u), lg ? (int32_t)ev->logic * 1000 / 4 : 0,
+                    ICON_AUTO);
+        draw_column(3, "COND", tessera_cond_name(ev->cond), "", VAL(3u), (int32_t)ev->cond * 1000 / (TESS_COND_COUNT - 1),
+                    ICON_AUTO);
+        return;
+    }
     if (cur_page()->graph == GR_EVOLVE) {
         uint32_t tr = song.sel;
         const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
