@@ -601,6 +601,34 @@ static int test_awake_entry(void)
     return bad;
 }
 
+/* CONSTELLATION on GEN: KNOB 4 is SPEED, the track's DIV from the slowest (4BAR) to the fastest (1/32), clockwise
+ * faster, stopping at both ends; its help its own; AUTO left to the mods */
+static int test_constel_speed(void)
+{
+    static const uint8_t ORDER[10] = {9, 8, 7, 6, 0, 4, 1, 5, 2, 3};   /* (4BAR 2BAR 1/1 1/2 1/4 8T 1/8 16T 1/16 1/32) */
+    int bad = 0, n = 1;
+    uint32_t i, au;
+    ui_power_on();
+    go_title("GEN");
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_CONSTEL);
+    frame();
+    au = tessera_constel(song.sel)->autop;
+    for (i = 0; i < 12u; i++) turn(EN_K1 + 3u, -1);
+    n &= TSEL->p[P_SDIV] == 9 && tessera_cs_speed(song.sel) == 0u;
+    for (i = 1; i < 10u; i++) {
+        turn(EN_K1 + 3u, 1);
+        n &= TSEL->p[P_SDIV] == ORDER[i] && tessera_cs_speed(song.sel) == i;
+    }
+    turn(EN_K1 + 3u, 1);
+    n &= TSEL->p[P_SDIV] == 3;
+    bad += check("CONSTELLATION KNOB 4: SPEED, DIV 4BAR .. 1/32 slow to fast, stopping at both ends; AUTO untouched",
+                 n && tessera_constel(song.sel)->autop == au);
+    help_find(3);
+    bad += check("..its help: CONSTELLATION SPEED", help.pid == PID_NONE && help.name && str_eq(help.name, "CONSTELLATION SPEED"));
+    TSEL->p[P_SDIV] = 2;
+    return bad;
+}
+
 /* CORDS (ui_cords.c): KNOB 2 the cord, 1 its source, 3 its destination, 4 the move (a fixed cord's: its OFFSET) */
 static int test_cords_page(void)
 {
@@ -5076,6 +5104,7 @@ int main(void)
     bad += test_tracks();
     bad += test_grid();
     bad += test_awake_entry();
+    bad += test_constel_speed();
     bad += test_screen();
     bad += test_favorites();
     bad += test_browser();

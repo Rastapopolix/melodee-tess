@@ -60,8 +60,9 @@ typedef struct {
 
 /* 6. Bounce (Theo's): balls crossing a 256 x 256 box a fixed distance a step, no gravity; a wall a ball hits plays a
  * note (which wall, and where along it). BALLS 1..4: each one more from a place and an angle of its own (the seed's).
- * BALLS past 4 is FALL (after norns' Fall, ambalek): eight leaves fall at speeds of their own, swaying in a WIND (ANGLE
- * turned round its middle); a leaf landing plays a note from where it lands, rests, fades and falls again from the top */
+ * BALLS past 4 is FALL (after norns' Fall, ambalek): eight leaves fall at speeds of their own, swaying; a leaf landing
+ * plays a note from where it lands, rests, fades and falls again from the top. The WIND (ANGLE turned round its middle)
+ * blows them towards one side, so the melody leans up or down, and in gusts that hurry them down together */
 #define GEN_BOUNCE_MAX 4u
 #define GEN_BOUNCE_FALL 5u    /* BALLS: FALL */
 #define GEN_FALL_LEAVES 8u
@@ -76,6 +77,7 @@ typedef struct {
     uint8_t  lx[GEN_FALL_LEAVES], ly[GEN_FALL_LEAVES];   /* FALL: the leaves, 0..255 (ly 0: landed) */
     uint8_t  lv[GEN_FALL_LEAVES];   /* FALL: a leaf's speed, 4..19; bit 7 a bass leaf (an octave down) */
     uint8_t  lt[GEN_FALL_LEAVES];   /* FALL: the steps a landed leaf still rests (0 falling) */
+    uint8_t  gust;        /* FALL: the steps a gust still blows (0 none) */
 } gen_bounce_t;
 
 /* 7. Awake (norns, tehn): two looping sequences of their own lengths: A (upper) plays, its value a scale degree (0 a
@@ -115,9 +117,10 @@ typedef struct {
 } gen_quad_t;
 
 /* 10. Constellation (after norns' Constellation, timothy-taylor: the idea only, no code): stars scroll across a sky, a
- * column a step, each column's star (or none) worked out from the sky's seed (ROLL): its height a scale degree, its
- * brightness a velocity, its size. A ship's crosshair at height Y catches the stars crossing it within SIZE rows into a
- * loop of 16 (the phrase loop's position), which plays; LOCK is the chance a caught star leaves the loop as it was.
+ * column a step (the track's DIV its speed), each column's star (or none) worked out from the sky's seed (ROLL): its
+ * height a scale degree, its brightness a velocity, its size the note's length. A star crossing the ship's crosshair at
+ * height Y, within SIZE rows of it, plays as it crosses; the loop of 16 (the phrase loop's position) keeps what each step
+ * caught. LOCK is the chance a step plays the loop it holds instead of the sky (100: the loop frozen).
  * AUTO steers the ship: a wander, faster further up; at the top SEEK (towards the next star) */
 #define GEN_CS_ROWS 15u       /* heights 0..14: two octaves of the scale and one more degree */
 #define GEN_CS_SEEK 10u       /* AUTO: SEEK */
@@ -129,6 +132,8 @@ typedef struct {
     uint8_t  autop;       /* 0 OFF, 1..9 a wander (faster up), 10 SEEK */
     uint8_t  keep;        /* LOCK as the adapter hands it in, 0..100 (not saved here: EVOLVE's) */
     uint8_t  caught;      /* the last step's catch: 0 none, else its loop slot + 1 (the picture's blink) */
+    uint8_t  held;        /* the last step played the loop (LOCK), not the sky: its slot + 1, else 0 */
+    uint8_t  trail;       /* the stars that sounded crossing, a bit a column: bit 0 the last step's (the picture's lines) */
     int8_t   drift;       /* AUTO's wander: 1/16 rows a step */
     uint16_t sky;         /* the sky's seed */
     uint16_t col;         /* the sky's column at the crosshair */
@@ -193,6 +198,7 @@ typedef struct {
     uint8_t accent;         /* Grids: the parts among them accented */
     uint8_t more[2];        /* Bounce: notes after `note` on the same step (raw, as note), more_n of them */
     uint8_t more_n;
+    uint8_t len;            /* the note's length, quarters of the step's GATE (Constellation: a star's size); 0 = GATE */
 } gen_out_t;
 
 #endif

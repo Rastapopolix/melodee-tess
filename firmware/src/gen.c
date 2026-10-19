@@ -140,6 +140,8 @@ static void gen_constel_start(gen_constel_t *g)
     g->ship = (uint16_t)(g->y * 256u + 128u);
     g->drift = 0;
     g->caught = 0;
+    g->held = 0;
+    g->trail = 0;
 }
 
 /* ------------------------------------------------------------------ the generators, one step each --- */
@@ -324,6 +326,7 @@ static void gen_bounce_serve(gen_bounce_t *g, uint32_t seed)
         g->lv[k] = (uint8_t)((4u + gen_rnd(&s, 16u)) | (gen_rnd(&s, 7u) ? 0u : 0x80u));
         g->lt[k] = 0;
     }
+    g->gust = 0;
 }
 /* FALL: a leaf from the top again, at a place, a speed and (one in seven) a bass of the track's stream's */
 static void gen_fall_spawn(gen_bounce_t *g, uint32_t k, uint32_t *rnd)
@@ -332,34 +335,41 @@ static void gen_fall_spawn(gen_bounce_t *g, uint32_t k, uint32_t *rnd)
     g->ly[k] = 255;
     g->lv[k] = (uint8_t)((4u + gen_rnd(rnd, 16u)) | (gen_rnd(rnd, 7u) ? 0u : 0x80u));
 }
-/* FALL: each falling leaf drops its speed x SPEED / 16 (one at least) and drifts with the WIND (ANGLE - 45, its share of
- * the drop) and a sway of its own, round the box's sides. A leaf reaching the floor plays: where it lands two octaves of
- * the scale left to right, a bass leaf an octave down, faster ones louder; it rests 2..8 steps (the picture fades it),
- * then falls again from the top. Leaves landing on the same step play together, three notes at most, the lowest first */
+/* FALL: each falling leaf drops its speed x SPEED / 16 (one at least) and sways. The WIND (ANGLE - 45) blows it
+ * towards the box's side it blows to, its share of the drop: |WIND| / 45 of the way there on a whole fall at most
+ * three quarters, so the landings crowd that side and the melody leans up (right) or down. A wind blows in gusts too:
+ * one starts on |WIND| / 3 % of the steps (a draw only in a wind) and blows 2..4 steps, the leaves dropping twice as far.
+ * A leaf reaching the floor plays: where it lands two octaves of the scale left to right, a bass leaf an octave down,
+ * faster ones louder; it rests 2..8 steps (the picture fades it), then falls again from the top. Leaves landing on the
+ * same step play together, three notes at most, the lowest first */
 static void gen_fall_tick(gen_bounce_t *g, uint32_t *rnd, gen_out_t *out)
 {
-    int32_t wind = (int32_t)(g->angle > 90u ? 90u : g->angle) - 45, sp = g->speed ? g->speed : 1;
+    int32_t wind = (int32_t)(g->angle > 90u ? 90u : g->angle) - 45, sp = g->speed ? g->speed : 1, aw = wind < 0 ? -wind : wind;
     uint32_t k, got = 0, w;
     uint8_t note[GEN_FALL_LEAVES], vel[GEN_FALL_LEAVES];
     g->hit = 0;
+    if (g->gust) g->gust--;
+    else if (aw && gen_rnd(rnd, 300u) < (uint32_t)aw) g->gust = (uint8_t)(2u + gen_rnd(rnd, 3u));
     for (k = 0; k < GEN_FALL_LEAVES; k++) {
-        int32_t v = g->lv[k] & 31u, dy, ph, sw, x, y;
+        int32_t v = g->lv[k] & 31u, dy, ph, sw, x, y, room;
         if (g->lt[k]) {
             if (!--g->lt[k]) gen_fall_spawn(g, k, rnd);
             continue;
         }
         if (v < 4) v = 4;
-        dy = (v * sp + 15) / 16;
+        dy = (v * sp + 15) / 16 * (g->gust ? 2 : 1);
         ph = ((int32_t)g->ly[k] + (int32_t)k * 40) & 63;
         sw = ph < 32 ? ph - 16 : 48 - ph;               /* (-16..16: the sway, a triangle down the box) */
-        x = ((int32_t)g->lx[k] + wind * dy / 30 + sw / 4) & 255;
+        room = wind > 0 ? 255 - (int32_t)g->lx[k] : (int32_t)g->lx[k];   /* (to the side the wind blows to) */
+        x = (int32_t)g->lx[k] + (wind < 0 ? -1 : 1) * ((room * aw * dy + 4140) / 8280) + sw / 4;
+        x = x < 0 ? 0 : x > 255 ? 255 : x;
         y = (int32_t)g->ly[k] - dy;
         g->lx[k] = (uint8_t)x;
         if (y > 0) {
             g->ly[k] = (uint8_t)y;
             continue;
         }
-        {
+    {
             uint32_t deg = (uint32_t)x * 14u / 256u, n = 48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u], i;
             if (g->lv[k] & 0x80u) n -= 12u;
             for (i = got; i > 0 && note[i - 1u] > n; i--)
@@ -555,32 +565,40 @@ static void gen_cs_steer(gen_constel_t *g, uint32_t *rnd)
     }
     g->ship = (uint16_t)(s < 128 ? 128 : s > top ? top : s);
 }
-/* Constellation: the sky moves a column, the ship steers, and the star crossing the crosshair within SIZE rows of it is
- * caught into the loop's slot for this step (LOCK: the chance it leaves the slot as it was; a draw only between 0 and
- * 100); then the slot plays: its height two octaves and a degree of the scale, its brightness the velocity. The CV:
- * the ship's height */
+/* Constellation: the sky moves a column and the ship steers. The star crossing the crosshair within SIZE rows of it
+ * plays now, and goes into the loop's slot for this step (a step with none empties it), so the loop holds the last 16
+ * steps. LOCK: the chance the step plays its slot as it is instead, the sky passing unheard (a draw only between 0 and
+ * 100). A star plays its height two octaves and a degree of the scale, its brightness the velocity, its size the length
+ * (half the GATE to twice it). The CV: the ship's height */
 static void gen_constel_tick(gen_constel_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
-    uint32_t slot = clk->pos & 15u, st, v;
+    uint32_t slot = clk->pos & 15u, st, v, hit = 0;
     int32_t row;
     g->col++;
     gen_cs_steer(g, rnd);
     row = g->ship >> 8;
     g->caught = 0;
+    g->held = 0;
     st = gen_cs_star(g->sky, g->col, 0, g->dens);
     if (st) {
         int32_t d = (int32_t)(st & 15u) - 1 - row, w = g->size > 7u ? 7 : (int32_t)g->size;
-        if (d >= -w && d <= w && g->keep < 100u && (!g->keep || gen_rnd(rnd, 100u) >= g->keep)) {
-            g->loop[slot] = (uint8_t)st;
-            g->caught = (uint8_t)(slot + 1u);
-        }
+        hit = d >= -w && d <= w;
     }
+    if (g->keep >= 100u || (g->keep && gen_rnd(rnd, 100u) < g->keep)) {
+        g->held = (uint8_t)(slot + 1u);
+        hit = 0;
+    } else {
+        g->loop[slot] = (uint8_t)(hit ? st : 0u);
+        if (hit) g->caught = (uint8_t)(slot + 1u);
+    }
+    g->trail = (uint8_t)(g->trail << 1 | hit);
     out->cv = (int16_t)(row * 32767 / (int32_t)(GEN_CS_ROWS - 1u));
     v = g->loop[slot];
     if (v & 15u) {
         uint32_t deg = (v & 15u) - 1u;
         out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
         out->vel = (uint8_t)(70u + ((v >> 4) & 3u) * 19u);
+        out->len = (uint8_t)(2u + ((v >> 6) & 3u) * 2u);
         out->gate = 1;
     }
 }

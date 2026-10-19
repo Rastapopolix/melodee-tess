@@ -256,7 +256,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                   "GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball "
                                   "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
                                   "QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) "
-                                  "catches the stars of a passing sky into a loop; SERIES plays Per Norgard's infinity "
+                                  "plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity "
                                   "series; CELLS eight cells of an automaton, a generation a step."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
@@ -273,7 +273,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_MRP_SNPA, "MORPH RHYTHM A", "Rhythm A: one of eight preset patterns."),
     X_(TX_MRP_SNPB, "MORPH RHYTHM B", "Rhythm B: one of eight preset patterns."),
     X_(TX_EV_LOCK, "EVOLVE LOCK", "How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every "
-                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a star caught leaves the loop as it was; Euclid, Bounce, Awake, Poly and Quad have none."),
+                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a step plays its loop instead of the sky; Euclid, Bounce, Awake, Poly and Quad have none."),
     X_(TX_EV_EVERY, "EVOLVE EVERY", "Bars between mutations; OFF keeps the phrase as it is."),
     X_(TX_EV_AMOUNT, "EVOLVE AMOUNT", "How much changes at each mutation."),
     X_(TX_EV_SEED, "EVOLVE ROLL", "The track's seed, 1 to 128: each one a line of its own, the same every time. "
@@ -293,7 +293,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                      "leaves fall."),
     X_(TX_BNC_ANGLE, "BOUNCE ANGLE", "The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle "
                                      "between draws a longer loop. EVOLVE nudges it. In FALL it is the WIND: the middle is calm, "
-                                     "lower blows the leaves left, higher right."),
+                                     "lower blows the leaves left (the melody leans low), higher right (high); further out, gusts "
+                                     "hurry them down together."),
     X_(TX_BNC_BALLS, "BOUNCE BALLS", "How many balls: each one more starts from a place and an angle of its own, so they "
                                      "cross; balls hitting on the same step play together, three notes at most. Past 4, FALL: eight "
                                      "leaves fall at speeds of their own and play where they land (left low, right high; "
@@ -335,13 +336,13 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_NL_LEN, "NOTE LENGTH LEN", "FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts."),
     X_(TX_NL_KEYS, "NOTE LENGTH KEYS", "FIXED: how many notes may hold at once. One more ends the note nearest its end; "
                                        "the same pitch again ends the one before."),
-    X_(TX_CS_Y, "CONSTELLATION Y", "The height of the ship's crosshair in the sky: the stars crossing it are caught into "
-                                   "the loop, so it sets where the melody sits. AUTO steers it instead."),
-    X_(TX_CS_DENS, "CONSTELLATION DENS", "How many stars the sky holds: more stars, more catches, a fuller loop."),
-    X_(TX_CS_SIZE, "CONSTELLATION SIZE", "How many rows either side of the crosshair a star is still caught in: 0 only its "
+    X_(TX_CS_Y, "CONSTELLATION Y", "The height of the ship's crosshair in the sky: the stars crossing it play as they "
+                                   "cross, so it sets where the melody sits. AUTO steers it instead."),
+    X_(TX_CS_DENS, "CONSTELLATION DENS", "How many stars the sky holds: more stars, more notes."),
+    X_(TX_CS_SIZE, "CONSTELLATION SIZE", "How many rows either side of the crosshair a star still plays in: 0 only its "
                                          "own row, higher a wider melody. Set by a mod (no knob of its own)."),
     X_(TX_CS_AUTO, "CONSTELLATION AUTO", "Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; "
-                                         "SEEK flies towards the next star."),
+                                         "SEEK flies towards the next star. Set by a mod (no knob of its own)."),
     X_(TX_SR_START, "SERIES START", "Where in the infinity series the melody begins: each START a different line, "
                                     "all of them alike at every scale. EVOLVE picks new ones."),
     X_(TX_SR_INTV, "SERIES INTV", "How many degrees of the scale a step of the series is: 1 close and stepwise, "

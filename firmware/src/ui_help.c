@@ -84,6 +84,12 @@ static void help_find(uint32_t k)
             help.text = "Which of the four rhythms DIV sets.";
             return;
         }
+        if (tessera.mode[tr] == TESS_ENG_CONSTEL && k == 3u) {   /* (SPEED: the track's DIV, in another order) */
+            help.name = "CONSTELLATION SPEED";
+            help.text = "How fast the sky flies by: a column a step, so this is the track's DIV (PATTERN's too), from 4 "
+                        "bars a step to 1/32. AUTO, the ship's steering, is a mod's to set.";
+            return;
+        }
         if (tessera.mode[tr] == TESS_ENG_POLY && k == 2u) x += tessera_poly(tr)->sel & 3u;
     }
     if (x != 0xFFu) {

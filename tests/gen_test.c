@@ -486,7 +486,7 @@ static void bounce_tests(void)
 /* ------------------------------------------------------------------- FALL --- */
 static void fall_tests(void)
 {
-    int range = 1, same = 1, rest = 1, calm = 1, windy = 1, balls = 1;
+    int range = 1, same = 1, rest = 1, calm = 1, windy = 1, balls = 1, lean = 1, gust = 1;
     uint32_t notes = 0, bass = 0, chords = 0;
     for (uint32_t sp = 4; sp <= 64; sp += 12)
         for (uint32_t sd = 1; sd < 40u; sd += 13) {
@@ -544,6 +544,32 @@ static void fall_tests(void)
         }
         windy = moved > 0;
     }
+    {                                                  /* WIND: the landings lean to the side it blows to; gusts only
+                                                        * in a wind, landing more leaves a step */
+        int32_t sum[3] = {0, 0, 0}, cnt[3] = {0, 0, 0};
+        uint32_t gusts[3] = {0, 0, 0}, in_gust = 0, gust_steps = 0, out_gust = 0, calm_steps = 0;
+        static const uint8_t ANG[3] = {0, 45, 90};
+        for (uint32_t a = 0; a < 3u; a++)
+            for (uint32_t sd = 1; sd < 30u; sd += 7) {
+                gen_bounce_t g = bounce_at(24, ANG[a], GEN_BOUNCE_FALL, sd);
+                for (uint32_t i = 0; i < 300; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t n;
+                    gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+                    n = o.gate ? 1u + o.more_n : 0u;
+                    gusts[a] += g.gust != 0u;
+                    for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++)
+                        if (g.lt[k] && !g.ly[k] && o.gate) { sum[a] += g.lx[k], cnt[a]++; }
+                    if (a != 1u) {
+                        if (g.gust) in_gust += n, gust_steps++;
+                        else out_gust += n, calm_steps++;
+                    }
+                }
+            }
+        lean = cnt[0] && cnt[1] && cnt[2] && sum[0] / cnt[0] + 40 < sum[1] / cnt[1] && sum[1] / cnt[1] + 40 < sum[2] / cnt[2];
+        gust = !gusts[1] && gusts[0] > 100u && gusts[2] > 100u && gust_steps && calm_steps &&
+               in_gust * calm_steps > out_gust * gust_steps * 3u / 2u;
+    }
     {                                                  /* FALL leaves the balls alone */
         gen_bounce_t g = bounce_at(30, 50, GEN_BOUNCE_FALL, 11), f = g;
         gen_out_t o = step_out();
@@ -556,6 +582,8 @@ static void fall_tests(void)
     check("fall: a landed leaf rests 2..8 steps, then falls from the top", rest);
     check("fall: the same seed and stream give the same steps", same);
     check("fall: calm, the leaves sway in place; the wind carries them", calm && windy);
+    check("fall: the landings lean to the side the wind blows to (low left, high right)", lean);
+    check("fall: a wind blows in gusts (none when calm), more leaves landing a step in one", gust);
     check("fall: the balls stay as they were", balls);
 }
 
@@ -694,7 +722,8 @@ static gen_clock_t cs_clk(uint32_t pos) { gen_clock_t c = {(uint8_t)pos, 16, 0};
 static void constel_tests(void)
 {
     int range = 1, window = 1, manual = 1, frozen = 1, loops = 1, same = 1, wander = 1, seek = 1, mut = 1, sec = 1, empty = 1;
-    uint32_t caught = 0, draws = 1;
+    int heard = 1, mixed = 1;
+    uint32_t caught = 0, draws = 1, held = 0, live = 0;
     for (uint32_t sd = 1; sd < 60u; sd += 11)
         for (uint32_t size = 0; size <= 7u; size += 3)
             for (uint32_t dens = 0; dens <= 100u; dens += 25) {
@@ -715,8 +744,9 @@ static void constel_tests(void)
                         int32_t d = (int32_t)(st & 15u) - 1 - (int32_t)g.y;
                         window &= d < -(int32_t)size || d > (int32_t)size;
                     }
+                    heard &= o.gate == (g.caught != 0u) && (g.trail & 1u) == o.gate && !g.held;   /* (LOCK 0: the sky) */
                     if (o.gate) range &= o.note >= 48u && o.note <= 72u && o.vel >= 70u && o.vel <= 127u &&
-                                         (g.loop[i & 15u] & 15u) != 0u;
+                                         (g.loop[i & 15u] & 15u) != 0u && o.len == 2u + ((st >> 6) & 3u) * 2u;
                     else range &= o.note == 60u && o.vel == 100u && !(g.loop[i & 15u] & 15u);
                     if (!dens) empty &= !o.gate && !g.caught;
                 }
@@ -737,6 +767,28 @@ static void constel_tests(void)
             else loops &= o.gate == a[i % 16u].gate && o.note == a[i % 16u].note;
         }
         frozen &= !memcmp(was, g.loop, 16);
+    }
+    {   /* LOCK 50: about half the steps play their slot as it was (the sky unheard), the others the sky */
+        gen_constel_t g = constel_at(7, 70, 4, 0, 8);
+        for (uint32_t i = 0; i < 400; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t o = step_out();
+            uint8_t was = g.loop[i & 15u];
+            uint32_t st;
+            g.keep = 50;
+            gen_constel_tick(&g, &c, &rng_state, &o);
+            st = gen_cs_star(g.sky, g.col, 0, g.dens);
+            if (g.held) {
+                held++;
+                mixed &= g.held == (i & 15u) + 1u && g.loop[i & 15u] == was && !g.caught && !(g.trail & 1u) &&
+                         o.gate == ((was & 15u) != 0u);
+            } else {
+                int32_t d = (int32_t)(st & 15u) - 1 - 7;
+                live++;
+                mixed &= g.loop[i & 15u] == (st && d >= -4 && d <= 4 ? st : 0u);
+            }
+        }
+        mixed &= held > 150u && live > 150u;
     }
     {   /* the same seed and stream: the same steps */
         gen_constel_t g1 = constel_at(3, 60, 2, 4, 9), g2 = constel_at(3, 60, 2, 4, 9);
@@ -802,9 +854,12 @@ static void constel_tests(void)
     }
     check("constellation: a star crossing the crosshair within SIZE rows is caught into the step's slot, others not",
           window && caught > 100u);
+    check("constellation: LOCK 0 plays a star as it crosses and only then (the picture's trail), its size the length",
+          heard);
+    check("constellation: LOCK 50 plays the loop's slot on about half the steps, the sky (into the slot) on the rest", mixed);
     check("constellation: the loop plays: 48..72 at 70..127 (brightness); an empty slot rests; DENS 0 an empty sky", range && empty);
     check("constellation: AUTO OFF keeps the ship at Y and draws nothing", manual && draws);
-    check("constellation: LOCK 100 catches nothing more, the loop plays round as it is", frozen && loops);
+    check("constellation: LOCK 100 lets the sky by, the loop plays round as it is", frozen && loops);
     check("constellation: the same seed and stream give the same steps", same);
     check("constellation: AUTO wanders inside the sky, faster further up; SEEK catches more, with no draw", wander && seek);
     check("constellation: EVOLVE lets go of the loop's stars (AMOUNT 0: none); a section keeps sky, Y, SIZE, DENS", mut && sec);
