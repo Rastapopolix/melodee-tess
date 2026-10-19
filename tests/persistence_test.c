@@ -283,6 +283,17 @@ int main(void)
                       !strcmp(ui.msg, "RENAMED") && (memset(proj_slot[0].raw, 0, 8), proj_fetch(0), project_name(0, n)) &&
                       !strcmp(n, "DUB") && proj_scratch.t[0].step[0].note[0] == st0.note[0]);
     }
+    {   /* CLK TUNE MIDI ROUT are the device's: a project saved with others loads without changing them; its BPM loads */
+        song.g[G_CLOCK] = 1; song.g[G_TUNE] = 9; song.g[G_MIDI] = (int16_t)GP[G_MIDI].max; song.g[G_ROUTE] = 2;
+        song.g[G_BPM] = 133;
+        project_save_as(3, "SYNC");
+        song.g[G_CLOCK] = 0; song.g[G_TUNE] = -4; song.g[G_MIDI] = (int16_t)GP[G_MIDI].min; song.g[G_ROUTE] = 0;
+        song.g[G_BPM] = 90;
+        project_load(3);
+        bad += check("project load keeps the device's CLK TUNE MIDI ROUT, takes the project's BPM",
+                     song.g[G_CLOCK] == 0 && song.g[G_TUNE] == -4 && song.g[G_MIDI] == GP[G_MIDI].min &&
+                     song.g[G_ROUTE] == 0 && song.g[G_BPM] == 133);
+    }
     {   /* All inactive banks are validated before replacing the runtime. */
         step_t keep = trk[0].step[0];
         project_capture(&proj_scratch); bank_pack(got, &proj_scratch, 1);
