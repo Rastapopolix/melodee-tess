@@ -458,6 +458,51 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 if (k == now) cv_ring(x, y, 9, T_TEXT);
             }
         }
+    } else if (mode == TESS_ENG_SERIES) {
+        /* the series as a contour: the next 16 steps' degrees as bars (the one playing lit, a line through their tops), the
+         * loop's length marked under them; LOOP OFF a dashed line, the series running on */
+        const gen_series_t *g = tessera_series(tr);
+        int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 10 : y_base - 2;
+        int32_t sh = is_panel ? 88 : 26, cw = sw / 16, px = -1, py = 0;
+        gen_series_t p = *g;                                 /* (from the step just played) */
+        if (p.n) p.n--;
+        for (uint32_t k = 0; k < 16u; k++) {
+            uint32_t d = gen_sr_degree(&p, k), cur = song.playing && g->n && k == 0u;
+            int32_t x = x0 + (int32_t)k * cw, h = 3 + (int32_t)d * (sh - 3) / 14, y = top + sh - h;
+            cv_rect(x + 1, y, cw - 3, h, cur ? T_TEXT : c);
+            if (px >= 0) cv_line(px, py, x + cw / 2 - 1, y, dim);
+            px = x + cw / 2 - 1, py = y;
+        }
+        if (is_panel) {
+            int32_t ly = top + sh + 8;
+            uint32_t l = g->loop;
+            if (l) {
+                cv_rect(x0 + 1, ly, (int32_t)l * cw - 3, 2, c);
+                cv_rect(x0 + 1, ly - 3, 1, 5, c);
+                cv_rect(x0 + (int32_t)l * cw - 3, ly - 3, 1, 5, c);
+            } else
+                for (int32_t x = x0 + 1; x < x0 + sw - 3; x += 6) cv_rect(x, ly, 3, 2, dim);
+        }
+    } else if (mode == TESS_ENG_CELLS) {
+        /* the generations scrolling down: the newest at the top, a row each, a lit cell a block; TAP's column marked */
+        const gen_cells_t *g = tessera_cells(tr);
+        int32_t rows = is_panel ? (int32_t)GEN_CL_HIST + 1 : 3, ch = is_panel ? 9 : 8, cw = is_panel ? 24 : 26;
+        int32_t x0 = is_panel ? 18 + (202 - 8 * cw) / 2 : 13 + (218 - 8 * cw) / 2, top = is_panel ? 6 : y_base - 2;
+        uint32_t t = g->tap >= 1u && g->tap <= 8u ? g->tap - 1u : 0u;
+        if (!is_panel) ch = 9, cw = 26;
+        for (int32_t r = 0; r < rows; r++) {
+            uint32_t v = r ? g->hist[r - 1] : g->cells;
+            for (uint32_t i = 0; i < 8u; i++) {
+                int32_t x = x0 + (int32_t)(7u - i) * cw, y = top + r * ch;
+                if ((v >> i) & 1u) cv_rect(x + 1, y + 1, cw - 2, ch - 2, !r ? (i == t ? T_TEXT : c) : dim);
+                else if (!r) cv_rect(x + 1, y + ch - 2, cw - 2, 1, dim);
+            }
+        }
+        if (is_panel) {
+            int32_t x = x0 + (int32_t)(7u - t) * cw, y = top + rows * ch + 2;
+            cv_rect(x + cw / 2 - 3, y, 7, 2, T_ACCENT);
+            cv_rect(x + cw / 2 - 1, y + 2, 3, 2, T_ACCENT);
+        }
     } else if (mode == TESS_ENG_QUAD) {
         /* the whole grid whatever track is selected: a row a track, a cell a bar at its pitch (a rest a dash), the cell
          * each QUAD row plays lit; a row not in QUAD dim. Panel, on all four sides: above each column its MOVE (an arrow
