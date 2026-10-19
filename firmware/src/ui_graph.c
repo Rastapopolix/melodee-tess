@@ -429,7 +429,8 @@ static void graph_tweak(const track_t *t, uint16_t c)
     }
 }
 
-/* TWEAK 2 page. BRANCH: a stem forking in two, the branch to TO as thick as its chance (none: the stem alone);
+/* TWEAK 2 page. BRANCH: a stem forking in two, the branch to TO as thick as its chance (COIN: both branches shaded by
+ * their share);
  * TO: the four tracks as numbered cells (as FOLLOW), the one hits go to filled, this one dashed; LOGIC: 8 steps of
  * this track (top), of WITH's (middle) and what plays (bottom); COND: 8 bars, those a hit may play in filled */
 static void graph_tweak2(const track_t *t, uint16_t c)
@@ -439,15 +440,24 @@ static void graph_tweak2(const track_t *t, uint16_t c)
     const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
     int on = ev->br_to && ev->br_to != tr + 1u, lg = ev->logic && ev->lg_with && ev->lg_with != tr + 1u;
     int32_t x, w;
-    /* BRANCH: the stem from the bottom, this track's branch up left, TO's up right */
+    /* BRANCH: the stem from the bottom, this track's branch up left, TO's up right. COIN: each branch as strong in
+     * colour and as thick as its share of the hits (BRANCH % to TO's, the rest to this one's) */
     x = CARD_X(0u);
     cv_rect(x + 24, 62, 3, 18, T_MID);
     w = on ? 1 + (int32_t)ev->branch * 4 / 100 : 0;
-    cv_line_t(x + 25, 62, x + 8, 40, T_MID, 2);
-    if (on && w) cv_line_t(x + 25, 62, x + 42, 40, c, w);
-    else cv_line(x + 25, 62, x + 42, 40, T_LINE);
-    cv_rrect(x + 3, 34, 10, 10, 3, T_RAISE, T_SURF);
-    cv_rrect(x + 38, 34, 10, 10, 3, on && ev->branch ? c : T_RAISE, T_SURF);
+    if (on && ev->br_mode == TESS_BR_COIN) {
+        int32_t p = ev->branch > 100u ? 100 : (int32_t)ev->branch;
+        cv_line_t(x + 25, 62, x + 8, 40, ux_mix(T_LINE, c, 100 - p), 1 + (100 - p) * 4 / 100);
+        cv_line_t(x + 25, 62, x + 42, 40, ux_mix(T_LINE, c, p), w);
+        cv_rrect(x + 3, 34, 10, 10, 3, ux_mix(T_RAISE, c, 100 - p), T_SURF);
+        cv_rrect(x + 38, 34, 10, 10, 3, ux_mix(T_RAISE, c, p), T_SURF);
+    } else {
+        cv_line_t(x + 25, 62, x + 8, 40, T_MID, 2);
+        if (on && w) cv_line_t(x + 25, 62, x + 42, 40, c, w);
+        else cv_line(x + 25, 62, x + 42, 40, T_LINE);
+        cv_rrect(x + 3, 34, 10, 10, 3, T_RAISE, T_SURF);
+        cv_rrect(x + 38, 34, 10, 10, 3, on && ev->branch ? c : T_RAISE, T_SURF);
+    }
     /* TO: the tracks as numbered cells */
     x = CARD_X(1u);
     for (i = 0; i < TESSERA_TRACKS; i++) {
