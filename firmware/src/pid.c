@@ -6,7 +6,7 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD"};
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL"};
 static const char *const TX_N_QDIR[] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
 static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10", "/11", "/12",
                                          "/13", "/14", "/15", "/16"};   /* (every n steps: no unit, "st" read as semitones) */
@@ -17,6 +17,7 @@ static const char *const TX_N_BRMODE[] = {"COIN", "TOGGLE", "LATCH"};
 static const char *const TX_N_LOGIC[] = {"OFF", "AND", "OR", "XOR", "NOT"};
 static const char *const TX_N_COND[] = {"OFF", "1:2", "2:2", "1:4", "2:4", "3:4", "4:4", "1:8", "8:8", "FIRST", "!FIRST"};
 static const char *const TX_N_NLMODE[] = {"STEP", "FIXED", "HIT"};
+static const char *const TX_N_CSAUTO[] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "SEEK"};
 static const char *const TX_N_NLLEN[] = {"1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
@@ -73,6 +74,10 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_NL_MODE] = PE("LENGTH", TX_N_NLMODE, 0),
     [TX_NL_LEN] = PE("LEN", TX_N_NLLEN, 2),
     [TX_NL_KEYS] = PD("KEYS", F_INT, 1, 4, 4),
+    [TX_CS_Y] = PD("Y", F_INT, 0, 14, 7),
+    [TX_CS_DENS] = PD("DENS", F_PCT, 0, 100, 50),
+    [TX_CS_SIZE] = PD("SIZE", F_INT, 0, 7, 2),
+    [TX_CS_AUTO] = PE("AUTO", TX_N_CSAUTO, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -242,7 +247,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                   "keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; "
                                   "GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball "
                                   "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
-                                  "QUAD plays the track's row of a four by four grid the tracks share."),
+                                  "QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) "
+                                  "catches the stars of a passing sky into a loop."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
@@ -258,7 +264,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_MRP_SNPA, "MORPH RHYTHM A", "Rhythm A: one of eight preset patterns."),
     X_(TX_MRP_SNPB, "MORPH RHYTHM B", "Rhythm B: one of eight preset patterns."),
     X_(TX_EV_LOCK, "EVOLVE LOCK", "How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every "
-                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Euclid, Bounce, Awake and Poly have none."),
+                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a star caught leaves the loop as it was; Euclid, Bounce, Awake, Poly and Quad have none."),
     X_(TX_EV_EVERY, "EVOLVE EVERY", "Bars between mutations; OFF keeps the phrase as it is."),
     X_(TX_EV_AMOUNT, "EVOLVE AMOUNT", "How much changes at each mutation."),
     X_(TX_EV_SEED, "EVOLVE ROLL", "The track's seed, 1 to 128: each one a line of its own, the same every time. "
@@ -320,6 +326,13 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_NL_LEN, "NOTE LENGTH LEN", "FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts."),
     X_(TX_NL_KEYS, "NOTE LENGTH KEYS", "FIXED: how many notes may hold at once. One more ends the note nearest its end; "
                                        "the same pitch again ends the one before."),
+    X_(TX_CS_Y, "CONSTELLATION Y", "The height of the ship's crosshair in the sky: the stars crossing it are caught into "
+                                   "the loop, so it sets where the melody sits. AUTO steers it instead."),
+    X_(TX_CS_DENS, "CONSTELLATION DENS", "How many stars the sky holds: more stars, more catches, a fuller loop."),
+    X_(TX_CS_SIZE, "CONSTELLATION SIZE", "How many rows either side of the crosshair a star is still caught in: 0 only its "
+                                         "own row, higher a wider melody. Set by a mod (no knob of its own)."),
+    X_(TX_CS_AUTO, "CONSTELLATION AUTO", "Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; "
+                                         "SEEK flies towards the next star."),
 };
 #undef T_
 #undef G_

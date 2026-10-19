@@ -63,6 +63,9 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_AWK_PROB] = S_(CD_AWK_PROB, TX_AWK_PROB, "A PROB", "Awake's PROB: the chance a note plays"),
     [CD_TW_BRANCH] = S_(CD_TW_BRANCH, TX_TW_BRANCH, "BRANCH", "TWEAK 2's BRANCH: the chance a hit plays on track TO"),
     [CD_QD_PROB] = S_(CD_QD_PROB, TX_QD_PROB, "Q PROB", "Quad's PROB: the chance a cell plays"),
+    [CD_CS_Y] = S_(CD_CS_Y, TX_CS_Y, "C Y", "Constellation's Y: the crosshair's height (AUTO OFF)"),
+    [CD_CS_SIZE] = S_(CD_CS_SIZE, TX_CS_SIZE, "C SIZE", "Constellation's SIZE: how far from the crosshair a star is caught"),
+    [CD_CS_DENS] = S_(CD_CS_DENS, TX_CS_DENS, "C DENS", "Constellation's DENS: how many stars the sky holds"),
 };
 #undef V_
 #undef B_
