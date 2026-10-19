@@ -117,6 +117,31 @@ static void gen_quad_fill(gen_quad_t *g, uint32_t seed)
         g->cell[i] = (uint8_t)(gen_rnd(&s, 6u) ? 1u + gen_rnd(&s, 14u) : 0u);
 }
 
+/* Constellation: column c's star in layer l (0 the front, the one that plays; 1 and 2 the far ones, the picture's,
+ * scrolling slower): 0 none, else bits 0..3 its height + 1, 4..5 its brightness, 6..7 its size. Worked out from the
+ * sky's seed, so the sky needs no memory */
+static uint32_t gen_cs_star(uint32_t sky, uint32_t c, uint32_t layer, uint32_t dens)
+{
+    uint32_t h = gen_stream(sky * 2654435761u ^ (c & 0xFFFFu) * 40503u ^ layer * 0x9E3779B9u);
+    if (h % 100u >= dens) return 0;
+    h >>= 8;
+    return (h % GEN_CS_ROWS + 1u) | ((h >> 4) & 3u) << 4 | ((h >> 6) & 3u) << 6;
+}
+/* Constellation from a seed (ROLL; a track's first): a new sky, the loop empty (the ship catches it again) */
+static void gen_constel_fill(gen_constel_t *g, uint32_t seed)
+{
+    g->sky = (uint16_t)(gen_stream(seed * 53u + 17u) >> 8);
+    for (uint32_t i = 0; i < 16u; i++) g->loop[i] = 0;
+}
+/* Constellation back to the sky's start (PLAY, a new section): the first column, the ship at Y, still */
+static void gen_constel_start(gen_constel_t *g)
+{
+    g->col = 0;
+    g->ship = (uint16_t)(g->y * 256u + 128u);
+    g->drift = 0;
+    g->caught = 0;
+}
+
 /* ------------------------------------------------------------------ the generators, one step each --- */
 /* Each fills only what it plays: out arrives as {gate 0, note 60, vel 100, cv 0} (tessera.c), which a rest
  * keeps, so LOCK's recording sees exactly what it did before phase 1. The CV (the cords' source CV, Q15 0..32767)
@@ -503,6 +528,63 @@ static void gen_quad_step(gen_quad_t *g, uint32_t *rnd, gen_out_t *out)
     gen_quad_play(g, rnd, out);
 }
 
+/* Constellation's ship: AUTO OFF at Y. A wander: its drift changes by -1..1 a step (a draw), kept within AUTO x 2,
+ * turning back at the sky's edges. SEEK: towards the next star in reach (GEN_CS_AHEAD columns), a row and a half a
+ * step at most, no draw */
+static void gen_cs_steer(gen_constel_t *g, uint32_t *rnd)
+{
+    int32_t s = g->ship, top = (int32_t)(GEN_CS_ROWS - 1u) * 256 + 128;
+    if (!g->autop) {
+        g->ship = (uint16_t)(g->y * 256u + 128u);
+        return;
+    }
+    if (g->autop >= GEN_CS_SEEK) {
+        uint32_t k, st = 0;
+        for (k = 0; k < GEN_CS_AHEAD && !st; k++) st = gen_cs_star(g->sky, g->col + k, 0, g->dens);
+        if (st) {
+            int32_t d = (int32_t)((st & 15u) - 1u) * 256 + 128 - s;
+            s += d > 384 ? 384 : d < -384 ? -384 : d;
+        }
+    } else {
+        int32_t d = (int32_t)g->drift + (int32_t)gen_rnd(rnd, 3u) - 1, m = (int32_t)g->autop * 2;
+        d = d > m ? m : d < -m ? -m : d;
+        s += d * 16;
+        if (s < 128) s = 256 - s, d = -d;
+        if (s > top) s = 2 * top - s, d = -d;
+        g->drift = (int8_t)d;
+    }
+    g->ship = (uint16_t)(s < 128 ? 128 : s > top ? top : s);
+}
+/* Constellation: the sky moves a column, the ship steers, and the star crossing the crosshair within SIZE rows of it is
+ * caught into the loop's slot for this step (LOCK: the chance it leaves the slot as it was; a draw only between 0 and
+ * 100); then the slot plays: its height two octaves and a degree of the scale, its brightness the velocity. The CV:
+ * the ship's height */
+static void gen_constel_tick(gen_constel_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
+{
+    uint32_t slot = clk->pos & 15u, st, v;
+    int32_t row;
+    g->col++;
+    gen_cs_steer(g, rnd);
+    row = g->ship >> 8;
+    g->caught = 0;
+    st = gen_cs_star(g->sky, g->col, 0, g->dens);
+    if (st) {
+        int32_t d = (int32_t)(st & 15u) - 1 - row, w = g->size > 7u ? 7 : (int32_t)g->size;
+        if (d >= -w && d <= w && g->keep < 100u && (!g->keep || gen_rnd(rnd, 100u) >= g->keep)) {
+            g->loop[slot] = (uint8_t)st;
+            g->caught = (uint8_t)(slot + 1u);
+        }
+    }
+    out->cv = (int16_t)(row * 32767 / (int32_t)(GEN_CS_ROWS - 1u));
+    v = g->loop[slot];
+    if (v & 15u) {
+        uint32_t deg = (v & 15u) - 1u;
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = (uint8_t)(70u + ((v >> 4) & 3u) * 19u);
+        out->gate = 1;
+    }
+}
+
 /* ------------------------------------------------------------------ mutation (EVOLVE, FORM) --- */
 /* amt 0..100: how much changes. The draws keep the order they had in tessera.c */
 
@@ -640,6 +722,13 @@ static void gen_quad_mutate(gen_quad_t *g, uint32_t amt, uint32_t *rnd)
     }
 }
 
+/* Constellation: each of the loop's stars let go at AMOUNT % (to be caught again) */
+static void gen_constel_mutate(gen_constel_t *g, uint32_t amt, uint32_t *rnd)
+{
+    for (uint32_t i = 0; i < 16u; i++)
+        if (g->loop[i] && gen_rnd(rnd, 100u) < amt) g->loop[i] = 0;
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -695,4 +784,18 @@ static void gen_quad_load(gen_quad_t *g, const gen_sec_t *s)
         uint32_t v = i < 3u ? (s->reg >> (i * 5u)) & 31u : s->p0;
         g->cell[i] = (uint8_t)(v > 21u ? 21u : v);
     }
+}
+/* Constellation: a section's sky, Y, SIZE and DENS (the loop carries on, caught over as it flies) */
+static void gen_constel_save(const gen_constel_t *g, gen_sec_t *s)
+{
+    s->reg = g->sky;
+    s->p0 = (uint8_t)((g->y & 15u) | (g->size & 7u) << 4);
+    s->p1 = g->dens;
+}
+static void gen_constel_load(gen_constel_t *g, const gen_sec_t *s)
+{
+    g->sky = s->reg;
+    g->y = (uint8_t)((s->p0 & 15u) < GEN_CS_ROWS ? s->p0 & 15u : GEN_CS_ROWS - 1u);
+    g->size = (uint8_t)((s->p0 >> 4) & 7u);
+    g->dens = s->p1 > 100u ? 100u : s->p1;
 }

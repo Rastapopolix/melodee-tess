@@ -559,6 +559,136 @@ static void fall_tests(void)
     check("fall: the balls stay as they were", balls);
 }
 
+/* ---------------------------------------------------------- Constellation --- */
+static gen_constel_t constel_at(uint32_t y, uint32_t dens, uint32_t size, uint32_t autop, uint32_t seed)
+{
+    gen_constel_t g;
+    memset(&g, 0, sizeof g);
+    g.y = (uint8_t)y, g.dens = (uint8_t)dens, g.size = (uint8_t)size, g.autop = (uint8_t)autop;
+    gen_constel_fill(&g, seed);
+    gen_constel_start(&g);
+    return g;
+}
+static gen_clock_t cs_clk(uint32_t pos) { gen_clock_t c = {(uint8_t)pos, 16, 0}; return c; }
+static void constel_tests(void)
+{
+    int range = 1, window = 1, manual = 1, frozen = 1, loops = 1, same = 1, wander = 1, seek = 1, mut = 1, sec = 1, empty = 1;
+    uint32_t caught = 0, draws = 1;
+    for (uint32_t sd = 1; sd < 60u; sd += 11)
+        for (uint32_t size = 0; size <= 7u; size += 3)
+            for (uint32_t dens = 0; dens <= 100u; dens += 25) {
+                gen_constel_t g = constel_at(sd % 15u, dens, size, 0, sd);
+                for (uint32_t i = 0; i < 200; i++) {
+                    gen_clock_t c = cs_clk(i);
+                    gen_out_t o = step_out();
+                    uint32_t r = rng_state, st;
+                    gen_constel_tick(&g, &c, &rng_state, &o);
+                    draws &= rng_state == r;                      /* (no draw: AUTO OFF, LOCK 0) */
+                    manual &= g.ship >> 8 == g.y;
+                    st = gen_cs_star(g.sky, g.col, 0, g.dens);
+                    if (g.caught) {
+                        int32_t d = (int32_t)(st & 15u) - 1 - (int32_t)g.y;
+                        caught++;
+                        window &= st && d >= -(int32_t)size && d <= (int32_t)size && g.loop[i & 15u] == st;
+                    } else if (st) {
+                        int32_t d = (int32_t)(st & 15u) - 1 - (int32_t)g.y;
+                        window &= d < -(int32_t)size || d > (int32_t)size;
+                    }
+                    if (o.gate) range &= o.note >= 48u && o.note <= 72u && o.vel >= 70u && o.vel <= 127u &&
+                                         (g.loop[i & 15u] & 15u) != 0u;
+                    else range &= o.note == 60u && o.vel == 100u && !(g.loop[i & 15u] & 15u);
+                    if (!dens) empty &= !o.gate && !g.caught;
+                }
+            }
+    {   /* LOCK 100: nothing more caught; the loop plays round as it is */
+        gen_constel_t g = constel_at(7, 80, 7, 0, 5);
+        uint8_t was[16];
+        gen_out_t a[16];
+        for (uint32_t i = 0; i < 64; i++) { gen_clock_t c = cs_clk(i); gen_out_t o = step_out(); gen_constel_tick(&g, &c, &rng_state, &o); }
+        memcpy(was, g.loop, 16);
+        g.keep = 100;
+        for (uint32_t i = 0; i < 48; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t o = step_out();
+            gen_constel_tick(&g, &c, &rng_state, &o);
+            frozen &= !g.caught;
+            if (i < 16u) a[i] = o;
+            else loops &= o.gate == a[i % 16u].gate && o.note == a[i % 16u].note;
+        }
+        frozen &= !memcmp(was, g.loop, 16);
+    }
+    {   /* the same seed and stream: the same steps */
+        gen_constel_t g1 = constel_at(3, 60, 2, 4, 9), g2 = constel_at(3, 60, 2, 4, 9);
+        uint32_t r1 = 77, r2 = 77;
+        for (uint32_t i = 0; i < 300; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t a = step_out(), b = step_out();
+            gen_constel_tick(&g1, &c, &r1, &a);
+            gen_constel_tick(&g2, &c, &r2, &b);
+            same &= !memcmp(&a, &b, sizeof a) && g1.ship == g2.ship;
+        }
+    }
+    {   /* AUTO 1..9: the ship wanders over the sky, faster further up; SEEK: on the star's row when it crosses */
+        uint32_t span[2] = {0, 0};
+        for (uint32_t k = 0; k < 2u; k++) {
+            gen_constel_t g = constel_at(7, 50, 2, k ? 9u : 1u, 3);
+            uint32_t lo = 255, hi = 0, moved = 0, last = g.ship;
+            for (uint32_t i = 0; i < 400; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out();
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                wander &= g.ship >= 128u && g.ship <= 14u * 256u + 128u;
+                lo = g.ship >> 8 < lo ? g.ship >> 8 : lo;
+                hi = g.ship >> 8 > hi ? g.ship >> 8 : hi;
+                moved += g.ship > last ? g.ship - last : last - g.ship;
+                last = g.ship;
+            }
+            span[k] = moved;
+            wander &= hi > lo;
+        }
+        wander &= span[1] > span[0];
+        {
+            gen_constel_t g = constel_at(0, 40, 0, GEN_CS_SEEK, 21), h = constel_at(0, 40, 0, 0, 21);
+            uint32_t ns = 0, nm = 0;
+            for (uint32_t i = 0; i < 400; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out(), p = step_out();
+                uint32_t r = rng_state;
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                seek &= rng_state == r;                           /* (SEEK draws nothing) */
+                gen_constel_tick(&h, &c, &rng_state, &p);
+                ns += g.caught != 0u;
+                nm += h.caught != 0u;
+            }
+            seek &= ns > nm * 2u;
+        }
+    }
+    {   /* EVOLVE lets go of the loop's stars at AMOUNT % (0: none); a section keeps the sky, Y, SIZE and DENS */
+        gen_constel_t g = constel_at(7, 90, 7, 0, 13), f;
+        for (uint32_t i = 0; i < 64; i++) { gen_clock_t c = cs_clk(i); gen_out_t o = step_out(); gen_constel_tick(&g, &c, &rng_state, &o); }
+        f = g;
+        gen_constel_mutate(&g, 0, &rng_state);
+        mut &= !memcmp(f.loop, g.loop, 16);
+        gen_constel_mutate(&g, 100, &rng_state);
+        for (uint32_t i = 0; i < 16u; i++) mut &= !g.loop[i];
+        {
+            gen_sec_t s;
+            gen_constel_t a = constel_at(11, 37, 5, 3, 2), b = constel_at(0, 0, 0, 0, 99);
+            gen_constel_save(&a, &s);
+            gen_constel_load(&b, &s);
+            sec = b.sky == a.sky && b.y == 11u && b.size == 5u && b.dens == 37u;
+        }
+    }
+    check("constellation: a star crossing the crosshair within SIZE rows is caught into the step's slot, others not",
+          window && caught > 100u);
+    check("constellation: the loop plays: 48..72 at 70..127 (brightness); an empty slot rests; DENS 0 an empty sky", range && empty);
+    check("constellation: AUTO OFF keeps the ship at Y and draws nothing", manual && draws);
+    check("constellation: LOCK 100 catches nothing more, the loop plays round as it is", frozen && loops);
+    check("constellation: the same seed and stream give the same steps", same);
+    check("constellation: AUTO wanders inside the sky, faster further up; SEEK catches more, with no draw", wander && seek);
+    check("constellation: EVOLVE lets go of the loop's stars (AMOUNT 0: none); a section keeps sky, Y, SIZE, DENS", mut && sec);
+}
+
 /* ------------------------------------------------------------------ Awake --- */
 static gen_awake_t awake_at(uint32_t la, uint32_t lb, uint32_t prob, uint32_t seed)
 {
@@ -905,6 +1035,7 @@ int main(void)
     grids_tests();
     bounce_tests();
     fall_tests();
+    constel_tests();
     awake_tests();
     poly_tests();
     quad_tests();

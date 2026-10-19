@@ -114,13 +114,36 @@ typedef struct {
     uint8_t  back;        /* back and forth: 1 going back (not saved) */
 } gen_quad_t;
 
+/* 10. Constellation (after norns' Constellation, timothy-taylor: the idea only, no code): stars scroll across a sky, a
+ * column a step, each column's star (or none) worked out from the sky's seed (ROLL): its height a scale degree, its
+ * brightness a velocity, its size. A ship's crosshair at height Y catches the stars crossing it within SIZE rows into a
+ * loop of 16 (the phrase loop's position), which plays; LOCK is the chance a caught star leaves the loop as it was.
+ * AUTO steers the ship: a wander, faster further up; at the top SEEK (towards the next star) */
+#define GEN_CS_ROWS 15u       /* heights 0..14: two octaves of the scale and one more degree */
+#define GEN_CS_SEEK 10u       /* AUTO: SEEK */
+#define GEN_CS_AHEAD 6u       /* SEEK looks this many columns ahead */
+typedef struct {
+    uint8_t  y;           /* 0..14: the crosshair's height (AUTO OFF) */
+    uint8_t  dens;        /* 0..100: the chance a column has a star */
+    uint8_t  size;        /* 0..7: the rows either side of the crosshair a star is caught in */
+    uint8_t  autop;       /* 0 OFF, 1..9 a wander (faster up), 10 SEEK */
+    uint8_t  keep;        /* LOCK as the adapter hands it in, 0..100 (not saved here: EVOLVE's) */
+    uint8_t  caught;      /* the last step's catch: 0 none, else its loop slot + 1 (the picture's blink) */
+    int8_t   drift;       /* AUTO's wander: 1/16 rows a step */
+    uint16_t sky;         /* the sky's seed */
+    uint16_t col;         /* the sky's column at the crosshair */
+    uint16_t ship;        /* the ship's height, rows x 256 */
+    uint8_t  loop[16];    /* 0 empty, else bits 0..3 the height + 1, 4..5 the brightness, 6..7 the size */
+} gen_constel_t;
+
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
     uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8; Bounce:
-                           * balls; Poly: the pitches' low 4 bits each; Quad: cells 1..3, 5 bits each */
+                           * balls; Poly: the pitches' low 4 bits each; Quad: cells 1..3, 5 bits each; Constellation: the sky */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos; Bounce: angle, speed; Awake: the
-                           * lengths; Poly: span, the pitches' fifth bits from bit 4; Quad: cell 4 */
+                           * lengths; Poly: span, the pitches' fifth bits from bit 4; Quad: cell 4; Constellation: Y | SIZE << 4,
+                           * DENS */
 } gen_sec_t;
 
 /* One step of an input phrase (phase 6: STEP as seed) */
