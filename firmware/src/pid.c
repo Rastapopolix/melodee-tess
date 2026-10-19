@@ -6,7 +6,7 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL"};
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL", "SERIES", "CELLS"};
 static const char *const TX_N_QDIR[] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
 static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10", "/11", "/12",
                                          "/13", "/14", "/15", "/16"};   /* (every n steps: no unit, "st" read as semitones) */
@@ -17,6 +17,8 @@ static const char *const TX_N_BRMODE[] = {"COIN", "TOGGLE", "LATCH"};
 static const char *const TX_N_LOGIC[] = {"OFF", "AND", "OR", "XOR", "NOT"};
 static const char *const TX_N_COND[] = {"OFF", "1:2", "2:2", "1:4", "2:4", "3:4", "4:4", "1:8", "8:8", "FIRST", "!FIRST"};
 static const char *const TX_N_NLMODE[] = {"STEP", "FIXED", "HIT"};
+static const char *const TX_N_SRLOOP[] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
+                                           "14", "15", "16"};
 static const char *const TX_N_CSAUTO[] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "SEEK"};
 static const char *const TX_N_NLLEN[] = {"1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
 
@@ -78,6 +80,12 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_CS_DENS] = PD("DENS", F_PCT, 0, 100, 50),
     [TX_CS_SIZE] = PD("SIZE", F_INT, 0, 7, 2),
     [TX_CS_AUTO] = PE("AUTO", TX_N_CSAUTO, 0),
+    [TX_SR_START] = PD("START", F_INT, 0, 127, 0),
+    [TX_SR_INTV] = PD("INTV", F_INT, 1, 7, 1),
+    [TX_SR_LOOP] = PE("LOOP", TX_N_SRLOOP, 0),
+    [TX_CL_RULE] = PD("RULE", F_INT, 0, 255, 30),
+    [TX_CL_TAP] = PD("TAP", F_INT, 1, 8, 1),
+    [TX_CL_SPAN] = PD("SPAN", F_INT, 1, 15, 14),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -248,7 +256,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                   "GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball "
                                   "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
                                   "QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) "
-                                  "catches the stars of a passing sky into a loop."),
+                                  "catches the stars of a passing sky into a loop; SERIES plays Per Norgard's infinity "
+                                  "series; CELLS eight cells of an automaton, a generation a step."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
@@ -333,6 +342,18 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                          "own row, higher a wider melody. Set by a mod (no knob of its own)."),
     X_(TX_CS_AUTO, "CONSTELLATION AUTO", "Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; "
                                          "SEEK flies towards the next star."),
+    X_(TX_SR_START, "SERIES START", "Where in the infinity series the melody begins: each START a different line, "
+                                    "all of them alike at every scale. EVOLVE picks new ones."),
+    X_(TX_SR_INTV, "SERIES INTV", "How many degrees of the scale a step of the series is: 1 close and stepwise, "
+                                  "higher wider leaps (folded back into two octaves)."),
+    X_(TX_SR_LOOP, "SERIES LOOP", "OFF lets the series run on, never repeating; 1 to 16 plays that many steps of it "
+                                  "round and round."),
+    X_(TX_CL_RULE, "CELLS RULE", "How each generation follows from the last, 0 to 255 (an elementary automaton's rule): "
+                                 "30 and 90 stay restless, many others settle into a loop or die out. EVOLVE turns "
+                                 "cells over to set a still ring going again."),
+    X_(TX_CL_TAP, "CELLS TAP", "The cell whose state gates the notes: lit, a note plays."),
+    X_(TX_CL_SPAN, "CELLS SPAN", "How many degrees of the scale the notes spread over, the eight cells read as a "
+                                 "number from low to high."),
 };
 #undef T_
 #undef G_

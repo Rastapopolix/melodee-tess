@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) catches the stars of a passing sky into a loop. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CELLS | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) catches the stars of a passing sky into a loop; SERIES plays Per Norgard's infinity series; CELLS eight cells of an automaton, a generation a step. |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -195,6 +195,12 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x235 | CONSTELLATION DENS | 0 to 100 % | 50 | How many stars the sky holds: more stars, more catches, a fuller loop. |
 | 0x236 | CONSTELLATION SIZE | 0 to 7 | 2 | How many rows either side of the crosshair a star is still caught in: 0 only its own row, higher a wider melody. Set by a mod (no knob of its own). |
 | 0x237 | CONSTELLATION AUTO | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, SEEK | OFF | Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; SEEK flies towards the next star. |
+| 0x238 | SERIES START | 0 to 127 | 0 | Where in the infinity series the melody begins: each START a different line, all of them alike at every scale. EVOLVE picks new ones. |
+| 0x239 | SERIES INTV | 1 to 7 | 1 | How many degrees of the scale a step of the series is: 1 close and stepwise, higher wider leaps (folded back into two octaves). |
+| 0x23A | SERIES LOOP | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | OFF | OFF lets the series run on, never repeating; 1 to 16 plays that many steps of it round and round. |
+| 0x23B | CELLS RULE | 0 to 255 | 30 | How each generation follows from the last, 0 to 255 (an elementary automaton's rule): 30 and 90 stay restless, many others settle into a loop or die out. EVOLVE turns cells over to set a still ring going again. |
+| 0x23C | CELLS TAP | 1 to 8 | 1 | The cell whose state gates the notes: lit, a note plays. |
+| 0x23D | CELLS SPAN | 1 to 15 | 14 | How many degrees of the scale the notes spread over, the eight cells read as a number from low to high. |
 
 ## Mods
 
@@ -282,3 +288,5 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | C Y | the generator's step | Constellation's Y: the crosshair's height (AUTO OFF) |
 | C SIZE | the generator's step | Constellation's SIZE: how far from the crosshair a star is caught |
 | C DENS | the generator's step | Constellation's DENS: how many stars the sky holds |
+| S START | the generator's step | Series' START: where in the infinity series it plays |
+| CL RULE | the generator's step | Cells' RULE: how each generation follows the last |

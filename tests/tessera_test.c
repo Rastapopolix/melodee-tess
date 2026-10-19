@@ -453,6 +453,24 @@ static void s_fall_var(void)
     knob(tessera_evolve_knob, 2, 15);                 /* AMOUNT 60 */
 }
 static void s_constel(void) { gen(0, TESS_ENG_CONSTEL); }
+static void s_series(void) { gen(0, TESS_ENG_SERIES); }
+static void s_series_var(void)
+{
+    gen(0, TESS_ENG_SERIES);
+    knob(tessera_knob, 1, 20);                        /* START +20 */
+    turns(tessera_knob, 2, 2);                        /* INTV 3 */
+    turns(tessera_knob, 3, 6);                        /* LOOP 6 */
+}
+static void s_cells(void) { gen(0, TESS_ENG_CELLS); }
+static void s_cells_var(void)
+{
+    gen(0, TESS_ENG_CELLS);
+    knob(tessera_knob, 1, 80);                        /* RULE 110 */
+    turns(tessera_knob, 2, 3);                        /* TAP 4 */
+    turns(tessera_knob, 3, -7);                       /* SPAN 7 */
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 10);                 /* AMOUNT */
+}
 static void s_constel_var(void)
 {
     gen(0, TESS_ENG_CONSTEL);
@@ -655,6 +673,10 @@ static const scen_t SCEN[] = {
     {"constel", 8, 0x1038u, s_constel, 0},
     {"constel_y10_dens80_auto5_lock50", 8, 0x1039u, s_constel_var, 0},
     {"constel_size0_seek_evolve70", 16, 0x103Au, s_constel_seek, 0},
+    {"series", 8, 0x103Bu, s_series, 0},
+    {"series_start20_intv3_loop6", 8, 0x103Cu, s_series_var, 0},
+    {"cells", 8, 0x103Du, s_cells, 0},
+    {"cells_rule110_tap4_span7_evolve", 16, 0x103Eu, s_cells_var, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -1459,6 +1481,50 @@ static void pack_run(char *res, size_t cap)
         tessera_reset();
         ok &= tessera_unpack(b) == 1 && tessera.constel[1].y == 12u && tessera.constel[1].size == 5u &&
               tessera.constel[1].autop == GEN_CS_SEEK && tessera.constel[1].loop[3] == 0x9Bu;
+        tessera_unpack(a);
+    }
+    {   /* a version 8 block (before SERIES and CELLS: each track 7 bytes shorter) loads every setting, their defaults
+         * with START and the first generation from the seed; each of their settings out of range is refused; settings in
+         * use round trip */
+        static uint8_t v8[TESSERA_PK_BYTES_V8], v8b[TESSERA_PK_BYTES_V8];
+        static const uint8_t BAD[][2] = {{0, 128}, {1, 0}, {1, 8}, {2, GEN_SR_LOOP + 1u}, {4, 0}, {4, 9}, {5, 0}, {5, 16}, {6, 0}};
+        const uint32_t n9 = TESSERA_PK_BYTES / TESSERA_TRACKS, n8 = TESSERA_PK_BYTES_V8 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v8 + tr * n8, a + tr * n9, n8);
+        tessera_reset();
+        ok &= tessera_unpack_ver(8u, v8) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            const gen_series_t *sr = &tessera.series[tr];
+            const gen_cells_t *cl = &tessera.cells[tr];
+            gen_series_t fs;
+            gen_cells_t fc;
+            memset(&fs, 0, sizeof fs);
+            memset(&fc, 0, sizeof fc);
+            gen_series_fill(&fs, tessera.seed[tr]);
+            gen_cells_fill(&fc, tessera.seed[tr]);
+            memcpy(v8b + tr * n8, b + tr * n9, n8);
+            ok &= sr->intv == 1u && !sr->loop && sr->start == fs.start;
+            ok &= cl->rule == 30u && cl->tap == 1u && cl->span == 14u && cl->row0 == fc.row0 && cl->cells == fc.row0;
+        }
+        ok &= !memcmp(v8, v8b, sizeof v8);            /* every version 8 setting as it was */
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[2u * n9 + n8 + BAD[k][0]] = BAD[k][1];  /* (track 3's) */
+            ok &= tessera_unpack(c) == 0;
+        }
+        tessera_unpack(a);
+        tessera_param_set(1, TX_SR_START, 99);
+        tessera_param_set(1, TX_SR_INTV, 5);
+        tessera_param_set(1, TX_SR_LOOP, 11);
+        tessera_param_set(2, TX_CL_RULE, 110);
+        tessera_param_set(2, TX_CL_TAP, 6);
+        tessera_param_set(2, TX_CL_SPAN, 3);
+        tessera.cells[2].row0 = 0xA5u;
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.series[1].start == 99u && tessera.series[1].intv == 5u &&
+              tessera.series[1].loop == 11u && tessera.cells[2].rule == 110u && tessera.cells[2].tap == 6u &&
+              tessera.cells[2].span == 3u && tessera.cells[2].row0 == 0xA5u && tessera.cells[2].cells == 0xA5u;
         tessera_unpack(a);
     }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */

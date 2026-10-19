@@ -729,6 +729,125 @@ static void gen_constel_mutate(gen_constel_t *g, uint32_t amt, uint32_t *rnd)
         if (g->loop[i] && gen_rnd(rnd, 100u) < amt) g->loop[i] = 0;
 }
 
+/* Series: the infinity series' number for i: from the top bit down, a 1 adds one, a 0 turns it over (0, 1, -1, 2, 1, 0,
+ * -2, 3, ...) */
+static int32_t gen_sr_value(uint32_t i)
+{
+    int32_t v = 0;
+    uint32_t b = 1u << 16;
+    while (b > i && b) b >>= 1;
+    for (; b; b >>= 1) v = (i & b) ? v + 1 : -v;
+    return v;
+}
+/* Series: the degree (0..14, two octaves of the scale and one more) step k from now plays: the series times INTV round
+ * the middle, folded back at the edges */
+static uint32_t gen_sr_degree(const gen_series_t *g, uint32_t k)
+{
+    uint32_t n = g->n + k, i = g->start + (g->loop ? n % g->loop : n);
+    int32_t d = 7 + gen_sr_value(i) * (int32_t)(g->intv ? g->intv : 1u);
+    d %= 28;
+    if (d < 0) d += 28;
+    return (uint32_t)(d > 14 ? 28 - d : d);
+}
+/* Series from a seed (ROLL): a new START */
+static void gen_series_fill(gen_series_t *g, uint32_t seed)
+{
+    g->start = (uint8_t)((gen_stream(seed * 61u + 5u) >> 8) & 127u);
+}
+static void gen_series_start(gen_series_t *g) { g->n = 0; }
+/* Series: a note every step, the degree the series gives; the velocity from the number's ones (an accent where the
+ * series is busy). The CV: the degree */
+static void gen_series_tick(gen_series_t *g, gen_out_t *out)
+{
+    uint32_t deg = gen_sr_degree(g, 0), i = g->start + (g->loop ? g->n % g->loop : g->n), ones = 0;
+    for (; i; i &= i - 1u) ones++;
+    g->n++;
+    out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+    out->vel = (uint8_t)(70u + (ones > 8u ? 8u : ones) * 7u);
+    out->gate = 1;
+    out->cv = (int16_t)(deg * 32767u / 14u);
+}
+/* Series: at AMOUNT %, a new START */
+static void gen_series_mutate(gen_series_t *g, uint32_t amt, uint32_t *rnd)
+{
+    if (gen_rnd(rnd, 100u) < amt) g->start = (uint8_t)gen_rnd(rnd, 128u);
+}
+static void gen_series_save(const gen_series_t *g, gen_sec_t *s)
+{
+    s->reg = g->start;
+    s->p0 = (uint8_t)((g->intv & 7u) | (g->loop & 31u) << 3);
+}
+static void gen_series_load(gen_series_t *g, const gen_sec_t *s)
+{
+    uint32_t l = (s->p0 >> 3) & 31u;
+    g->start = (uint8_t)(s->reg & 127u);
+    g->intv = (uint8_t)((s->p0 & 7u) ? s->p0 & 7u : 1u);
+    g->loop = (uint8_t)(l > GEN_SR_LOOP ? GEN_SR_LOOP : l);
+}
+
+/* Cells: the next generation of eight cells in a ring: each cell's next state RULE's bit for it and its two
+ * neighbours (left the high bit) */
+static uint32_t gen_cl_next(uint32_t c, uint32_t rule)
+{
+    uint32_t o = 0;
+    for (uint32_t i = 0; i < 8u; i++) {
+        uint32_t l = (c >> ((i + 1u) & 7u)) & 1u, m = (c >> i) & 1u, r = (c >> ((i + 7u) & 7u)) & 1u;
+        o |= ((rule >> (l << 2 | m << 1 | r)) & 1u) << i;
+    }
+    return o;
+}
+/* Cells from a seed (ROLL): a new first generation, never empty */
+static void gen_cells_fill(gen_cells_t *g, uint32_t seed)
+{
+    uint32_t v = (gen_stream(seed * 71u + 3u) >> 8) & 255u;
+    g->row0 = (uint8_t)(v ? v : 1u);
+}
+/* Cells back to the first generation (PLAY, a new section) */
+static void gen_cells_start(gen_cells_t *g)
+{
+    g->cells = g->row0;
+    memset(g->hist, 0, sizeof g->hist);
+    g->n = 0;
+}
+/* Cells: a generation a step; cell TAP lit plays the eight cells as a number over SPAN degrees, its velocity from how
+ * many are lit. The CV: that number */
+static void gen_cells_tick(gen_cells_t *g, gen_out_t *out)
+{
+    uint32_t c, ones = 0, t = g->tap >= 1u && g->tap <= 8u ? g->tap - 1u : 0u;
+    memmove(g->hist + 1, g->hist, GEN_CL_HIST - 1u);
+    g->hist[0] = g->cells;
+    g->cells = (uint8_t)gen_cl_next(g->cells, g->rule);
+    g->n++;
+    c = g->cells;
+    out->cv = (int16_t)(c * 32767u / 255u);
+    for (uint32_t v = c; v; v &= v - 1u) ones++;
+    if ((c >> t) & 1u) {
+        uint32_t sp = g->span < 1u ? 1u : g->span > 15u ? 15u : g->span, deg = c * sp / 256u;
+        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
+        out->vel = (uint8_t)(64u + ones * 7u);
+        out->gate = 1;
+    }
+}
+/* Cells: each cell turned over at AMOUNT % (a stuck ring set going again) */
+static void gen_cells_mutate(gen_cells_t *g, uint32_t amt, uint32_t *rnd)
+{
+    for (uint32_t i = 0; i < 8u; i++)
+        if (gen_rnd(rnd, 100u) < amt) g->cells ^= (uint8_t)(1u << i);
+}
+static void gen_cells_save(const gen_cells_t *g, gen_sec_t *s)
+{
+    s->reg = (uint16_t)(g->rule | g->row0 << 8);
+    s->p0 = (uint8_t)((g->tap & 15u) | (g->span & 15u) << 4);
+}
+static void gen_cells_load(gen_cells_t *g, const gen_sec_t *s)
+{
+    uint32_t t = s->p0 & 15u, sp = s->p0 >> 4;
+    g->rule = (uint8_t)s->reg;
+    g->row0 = (uint8_t)((s->reg >> 8) ? s->reg >> 8 : 1u);
+    g->tap = (uint8_t)(t >= 1u && t <= 8u ? t : 1u);
+    g->span = (uint8_t)(sp ? sp : 1u);
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
