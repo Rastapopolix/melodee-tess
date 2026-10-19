@@ -478,6 +478,10 @@ static int test_gen_family(void)
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);
     bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 9), GEN));
     if (!str_eq(got, GEN)) printf("    got: %s\n", got);
+    go_title("EVOLVE");
+    press(B_ARP);
+    bad += check("ARP on a generator's track: the MODE stays (the generator keeps playing), GEN opens",
+                 seqm_get(song.sel) == 1u + TESS_ENG_TURING && !ui.home && str_eq(cur_page()->title, "GEN"));
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
     TSEL->p[P_AMODE] = 0;
     for (k = 0; k < NPAGES; k++)
