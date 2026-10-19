@@ -42,7 +42,7 @@
 #include "phys_symp.c"
 
 enum { PM_MODAL, PM_STRING, PM_MEMB, PM_SYMP, PM_COUNT };
-#define PHYS_POLY 3
+#define PHYS_POLY (MELODEE_RAM_AUDIO ? 2 : 3)   /* (the resident audio arena: four parts of three SYMP voices, 50 KB, pass its 48) */
 /* output: model 1.0 -> this (VOICE_FS scale), then a soft knee; per model (a strike of all the modes in
  * phase peaks high but is short) */
 static const int32_t PHYS_GAIN[PM_COUNT] = {28000, 12000, 90000, 12000};

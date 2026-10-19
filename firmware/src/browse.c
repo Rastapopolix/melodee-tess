@@ -26,6 +26,12 @@ static const char *const PRESET_CAT[NENGINES] = {
     [11] = "FFFF",                                      /* NOISE */
 #endif
     [3] = "OLBBBBBBLLLLLLLLPSPPGGKKUUERFFFF",          /* SID */
+#if TRIO_ON
+    [6] = "BLLEP",                                      /* TRIO: FAT BASS, ARP LEAD, SYNC LEAD, RING BELL, CHIP CHOIR */
+#endif
+#if PHYS_ON
+    [9] = "EKUSKDDSU",                                  /* PHYS: BELL TREE, MARIMBA, PLUCK, BOWED METAL, KALIMBA, HAND DRUM, TOMS, DRONE STRING, HARP */
+#endif
     [10] = "DDDD",                                      /* DRUM: the kits (808, 909, SID, SID DIGI) */
     [12] = "KEBRPEGUKRBEEKGSPLUEWEBEO",                 /* FM6, INIT VOICE */
 #if MELODEE_PLAITS
