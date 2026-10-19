@@ -4,6 +4,7 @@
 /* Melodee UI input: LEDs, knobs and buttons, SEQ step entry, panel setup. */
 #include "ui_name.c"                                    /* NAME: naming user presets and projects */
 #include "ui_new.c"                                     /* NEW SONG: key, tempo, roles */
+static uint8_t oct_eat, oct_deferred;                   /* (below, with OCT's taps; QUAD's OCT+ layer uses them first) */
 /* ----------------------------------------------------------- LEDs --- */
 /* The LED picture is built off-line and copied one byte per column: clearing
  * and relighting would let the 10 kHz scan catch the dark gap and flicker. */
@@ -847,6 +848,14 @@ static void edit_param(uint32_t slot, int32_t steps)
     }
     if (pg->graph == GR_STEPS && pg->fam == FAM_GEN) {   /* GEN: the generator's knobs (PATTERN: upstream's) */
         uint32_t sel_tr = song.sel;
+        if (quad_cols_on()) {                           /* QUAD, OCT+ held: the columns and RANGE (no octave, no sheet) */
+            tessera_quad_cols_knob(slot, steps);
+            oct_eat |= 2u;
+            ui.oct_t0 |= 2u;
+            oct_deferred = 0;
+            ui.force = 1;
+            return;
+        }
         if (sel_tr < TESSERA_TRACKS) {
             if (slot == 0u && !(tessera.mode[sel_tr] == TESS_ENG_AWAKE && tessera_awake(sel_tr)->edit)) {
                 seqm_set(sel_tr, (int32_t)seqm_get(sel_tr) + steps);   /* MODE: STEP ARP and the generators (ui.c) */
@@ -1762,12 +1771,17 @@ static void ui_input(void)
     if (octup == BT_HOLD) {
         oct_eat |= 2u;                                  /* (its release is no OCT+) */
         oct_deferred = 0;
-        if(bulk_context())ui.bulk_hold=1;else page_sheet_open();
+        if(bulk_context())ui.bulk_hold=1;else if(!quad_cols_on())page_sheet_open();   /* (QUAD on GEN: its columns) */
     } else if (octup == BT_TAP && oct_deferred) {
         song.octave += song.octave < 3 ? 1 : 0;         /* (OCT+ pressed on a page with a sheet: on release) */
     }
     if (octup != BT_NONE || !((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u))
         oct_deferred = 0;
+    {
+        static uint8_t qc_was;                          /* QUAD's OCT+ layer shown or gone: the cards again */
+        uint8_t qc = (uint8_t)quad_cols_on();
+        if (qc != qc_was) qc_was = qc, ui.force = 1;
+    }
     if(ui.bulk_hold && !(fm1_in.buttons&(1u<<panel.btn[B_OCTUP]))){
         if(bulk_context()){if(bulk.on&&!slot_kind())notes_bulk_sheet_open();else if(!bulk.on)page_sheet_open();}ui.bulk_hold=0;
     }
@@ -2037,6 +2051,7 @@ static void ui_input(void)
                 oct_deferred = 0;
             } else if (b == B_OCTUP && page_sheet() == 1u) {
                 oct_deferred = 1;                       /* Stage: OCT+ on release, held: the sound's sheet */
+                ui.force = 1;
             } else {
                 song.octave += b == B_OCTDN ? (song.octave > -3 ? -1 : 0) : (song.octave < 3 ? 1 : 0);
             }

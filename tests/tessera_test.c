@@ -603,6 +603,30 @@ static void s_quad_four(void)                         /* four rows at four speed
     gen(0, TESS_ENG_QUAD);
     turns(tessera_knob, 3, 3);                        /* LINK T4 */
 }
+static void s_quad_cols(void)                         /* QUAD's columns moving: 1 DOWN every step, 2 UP every 2, 3 RAND
+                                                        * every 4 (4 still); track 1 LINKs tracks 3 and 4 (HOLD), track 3
+                                                        * folded into one octave, track 4 into one either side */
+{
+    gen(3, TESS_ENG_QUAD);
+    turns(tessera_knob, 1, GEN_QD_HOLD);
+    tessera_param_set(3, TX_QD_RANGE, GEN_QR_LOW);
+    gen(2, TESS_ENG_QUAD);
+    turns(tessera_knob, 1, GEN_QD_HOLD);
+    tessera_param_set(2, TX_QD_RANGE, GEN_QR_ONE);
+    gen(0, TESS_ENG_QUAD);
+    turns(tessera_knob, 3, 6);                        /* LINK T34 (OFF T2 T3 T4 T23 T24 T34) */
+    tessera_param_set(0, TX_QD_MOVE1, GEN_QC_DOWN);
+    tessera_param_set(0, TX_QD_EVERY1, 0);
+    tessera_param_set(0, TX_QD_MOVE2, GEN_QC_UP);
+    tessera_param_set(0, TX_QD_EVERY2, 1);
+    tessera_param_set(0, TX_QD_MOVE3, GEN_QC_RAND);
+}
+static void s_evolve_quad_cols(void)                  /* EVOLVE with the columns moving: notes change, no column turn */
+{
+    s_quad_cols();
+    turns(tessera_evolve_knob, 1, 1);
+    knob(tessera_evolve_knob, 2, 20);
+}
 static void s_evolve_quad(void)
 {
     s_quad_four();
@@ -677,6 +701,8 @@ static const scen_t SCEN[] = {
     {"series_start20_intv3_loop6", 8, 0x103Cu, s_series_var, 0},
     {"cells", 8, 0x103Du, s_cells, 0},
     {"cells_rule110_tap4_span7_evolve", 16, 0x103Eu, s_cells_var, 0},
+    {"quad_cols_link2_range", 8, 0x103Fu, s_quad_cols, 0},
+    {"evolve_quad_cols", 8, 0x1040u, s_evolve_quad_cols, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -1392,7 +1418,7 @@ static void pack_run(char *res, size_t cap)
     {   /* a version 5 block (before QUAD: each track 7 bytes shorter) loads every setting; QUAD's row the seed's, FWD,
          * every cell, no LINK; each QUAD setting out of range is refused */
         static uint8_t v5[TESSERA_PK_BYTES_V5], v5b[TESSERA_PK_BYTES_V5];
-        static const uint8_t BAD[][2] = {{0, 22}, {3, 22}, {4, GEN_QD_COUNT}, {5, 101}, {6, 5}};
+        static const uint8_t BAD[][2] = {{0, 22}, {3, 22}, {4, GEN_QD_COUNT}, {5, 101}, {6, 16}};   /* (LINK: a mask) */
         const uint32_t n6 = TESSERA_PK_BYTES / TESSERA_TRACKS, n5 = TESSERA_PK_BYTES_V5 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v5 + tr * n5, a + tr * n6, n5);
         ok &= tessera.quad[3].dir == GEN_QD_PEND && tessera.quad[3].prob == 70u && tessera.quad[3].link == 1u;
@@ -1414,7 +1440,7 @@ static void pack_run(char *res, size_t cap)
             ok &= tessera_unpack(c) == 0;
         }
         memcpy(c, a, sizeof c);
-        c[1u * n6 + n5 + 6u] = 2;                     /* track 2 LINKed to itself: loads as no LINK */
+        c[1u * n6 + n5 + 6u] = 2;                     /* track 2 LINKed to itself (its bit): loads as no LINK */
         ok &= tessera_unpack(c) == 1 && !tessera.quad[1].link;
         tessera_unpack(a);
     }
@@ -1527,6 +1553,40 @@ static void pack_run(char *res, size_t cap)
               tessera.cells[2].span == 3u && tessera.cells[2].row0 == 0xA5u && tessera.cells[2].cells == 0xA5u;
         tessera_unpack(a);
     }
+    {   /* a version 9 block (before QUAD's columns: each track 2 bytes shorter, LINK one track) loads every setting, LINK
+         * track 3 as its bit, RANGE 3 OCT, the columns still (each set to every 4 steps); RANGE and EVERY out of range are
+         * refused; columns, RANGE and a LINK to two tracks round trip */
+        static uint8_t v9[TESSERA_PK_BYTES_V9], v9b[TESSERA_PK_BYTES_V9];
+        static const uint8_t BAD[][2] = {{0, GEN_QR_COUNT}, {1, GEN_QC_EVERY_N << 2}};
+        const uint32_t n10 = TESSERA_PK_BYTES / TESSERA_TRACKS, n9 = TESSERA_PK_BYTES_V9 / TESSERA_TRACKS;
+        const uint32_t ql = TESSERA_PK_BYTES_V5 / TESSERA_TRACKS + 6u;   /* (LINK's byte in a record) */
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v9 + tr * n9, a + tr * n10, n9);
+        v9[0u * n9 + ql] = 3;                          /* (track 1 LINKs track 3, version 9's way) */
+        tessera_reset();
+        ok &= tessera_unpack_ver(9u, v9) == 1 && tessera.quad[0].link == 4u;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            memcpy(v9b + tr * n9, b + tr * n10, n9);
+            ok &= tessera.quad[tr].range == GEN_QR_FULL && tessera.qcol[tr] == 3u << 2;
+        }
+        v9b[0u * n9 + ql] = 3;
+        ok &= !memcmp(v9, v9b, sizeof v9);            /* every other version 9 setting as it was */
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[2u * n10 + n9 + BAD[k][0]] = BAD[k][1];  /* (track 3's) */
+            ok &= tessera_unpack(c) == 0;
+        }
+        tessera_unpack(a);
+        tessera_param_set(1, TX_QD_RANGE, GEN_QR_LOW);
+        tessera_param_set(1, TX_QD_LINK, 0x9);
+        tessera_param_set(0, TX_QD_MOVE3, GEN_QC_RAND);
+        tessera_param_set(0, TX_QD_EVERY3, 5);
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.quad[1].range == GEN_QR_LOW && tessera.quad[1].link == 0x9u &&
+              tessera.qcol[2] == (GEN_QC_RAND | 5u << 2) && tessera_quad_every(2) == 8u;
+        tessera_unpack(a);
+    }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */
         static const uint8_t P[4] = {20, 16, 5, 15};
         tessera.poly[3].span = 3;
@@ -1616,6 +1676,50 @@ int main(int argc, char **argv)
         bad += check("the same scenario twice: the same notes", !strcmp(res, again));
     else
         bad += check("the same scenario twice: the same notes", 0);
+    {   /* QUAD's columns, on the first QUAD track's steps: DOWN a row down (track 4's to 1), UP a row up, each every
+         * EVERY steps, every row turning (a track not in QUAD too); the other QUAD tracks' steps move none. EVOLVE with
+         * a column moving: only the track's own row changes */
+        int ok = 1;
+        uint8_t was[TESSERA_TRACKS][4];
+        tessera_reset();
+        tessera.mode[0] = tessera.mode[2] = TESS_ENG_QUAD;
+        for (uint32_t r = 0; r < TESSERA_TRACKS; r++)
+            for (uint32_t c = 0; c < 4u; c++) tessera.quad[r].cell[c] = (uint8_t)(r * 4u + c + 1u);
+        tessera.qcol[0] = GEN_QC_DOWN;                  /* (every step) */
+        tessera.qcol[1] = GEN_QC_UP | 1u << 2;          /* (every 2) */
+        tess_quad_cols(0);
+        ok &= tessera.quad[1].cell[0] == 1u && tessera.quad[0].cell[0] == 13u && tessera.quad[3].cell[0] == 9u;
+        ok &= tessera.quad[0].cell[1] == 2u && tessera.quad[2].cell[2] == 11u;
+        tess_quad_cols(2);                              /* (track 3: not the first QUAD track) */
+        ok &= tessera.quad[1].cell[0] == 1u && tessera.quad[0].cell[1] == 2u;
+        tess_quad_cols(0);
+        ok &= tessera.quad[2].cell[0] == 1u && tessera.quad[0].cell[1] == 6u && tessera.quad[3].cell[1] == 2u;
+        bad += check("QUAD columns: DOWN and UP turn all four rows, each on its EVERY, on the first QUAD track's steps", ok);
+        for (uint32_t r = 0; r < TESSERA_TRACKS; r++) memcpy(was[r], tessera.quad[r].cell, 4);
+        tess_quad_mutate(0, 100);
+        ok = 1;
+        for (uint32_t r = 1; r < TESSERA_TRACKS; r++) ok &= !memcmp(was[r], tessera.quad[r].cell, 4);
+        bad += check("QUAD columns moving: EVOLVE changes the track's own notes, no column turns", ok);
+        {
+            gen_quad_t q;
+            uint32_t lo[GEN_QR_COUNT] = {127, 127, 127, 127}, hi[GEN_QR_COUNT] = {0, 0, 0, 0};
+            memset(&q, 0, sizeof q);
+            q.prob = 100;
+            for (uint32_t rg = 0; rg < GEN_QR_COUNT; rg++)
+                for (uint32_t v = 1; v <= 21u; v++) {
+                    gen_out_t o = {0, 60, 100, 0, 0, 0};
+                    uint32_t rn = 1;
+                    q.range = (uint8_t)rg, q.cell[0] = (uint8_t)v, q.pos = 3, q.dir = GEN_QD_FWD;
+                    gen_quad_tick(&q, 0, &rn, &o);
+                    lo[rg] = o.note < lo[rg] ? o.note : lo[rg];
+                    hi[rg] = o.note > hi[rg] ? o.note : hi[rg];
+                }
+            bad += check("QUAD RANGE: 3 OCT 48..82, 1 OCT 48..58, 2 OCT 48..70, +-1 36..58 (A minor)",
+                         lo[0] == 48u && hi[0] == 82u && lo[1] == 48u && hi[1] == 58u && lo[2] == 48u && hi[2] == 70u &&
+                         lo[3] == 36u && hi[3] == 58u);
+        }
+        tessera_reset();
+    }
     {   /* FOLLOW of a STEP melody, note by note */
         unsigned n2 = 0, wrong = 1;
         pid_t pid;

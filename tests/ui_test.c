@@ -629,6 +629,48 @@ static int test_constel_speed(void)
     return bad;
 }
 
+/* QUAD on GEN, OCT+ held: KNOB 1 the column, 2 its MOVE, 3 its EVERY, 4 the row's RANGE; the octave stays, no sheet
+ * opens; let go, the generator's knobs again; a tap of OCT+ still raises the octave */
+static int test_quad_cols(void)
+{
+    int bad = 0;
+    uint32_t i;
+    int32_t oct;
+    ui_power_on();
+    go_title("GEN");
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_QUAD);
+    frame();
+    oct = song.octave;
+    fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+    host_pressed |= 1u << panel.btn[B_OCTUP];
+    frame();
+    turn(EN_K1, 1);
+    turn(EN_K1, 1);                                     /* COL 3 */
+    turn(EN_K1 + 1u, 1);                                /* its MOVE: DOWN */
+    turn(EN_K1 + 2u, 1);
+    turn(EN_K1 + 2u, 1);                                /* its EVERY: /4 -> /8 */
+    turn(EN_K1 + 3u, 1);                                /* RANGE 1 OCT */
+    for (i = 0; i < 6u; i++) { frame(); fm1_ms += 200u; host_ticks += 200000u; }   /* (held 1.2 s) */
+    help_find(1);
+    bad += check("QUAD, OCT+ held: KNOB 1 column 3, KNOB 2 its MOVE DOWN, KNOB 3 EVERY /8, KNOB 4 RANGE 1 OCT; its help",
+                 tessera.qcol_sel == 2u && (tessera.qcol[2] & 3u) == GEN_QC_DOWN && tessera_quad_every(2) == 8u &&
+                 tessera_quad(song.sel)->range == GEN_QR_ONE && help.pid == PID_TESS(TX_QD_MOVE3) && pid_find(help.pid));
+    bad += check("..the octave as it was, no sheet open", song.octave == oct && pop.on != POP_SHEET);
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
+    frame();
+    turn(EN_K1 + 2u, -1);
+    bad += check("OCT+ let go: KNOB 3 is PROB again, the octave still as it was",
+                 tessera_quad(song.sel)->prob == 98u && song.octave == oct && tessera_quad_every(2) == 8u);
+    turn(EN_K1 + 2u, 1);
+    press(B_OCTUP);
+    bad += check("OCT+ tapped on QUAD's GEN: its sheet, as on any GEN", pop.on == POP_SHEET && song.octave == oct);
+    pop_close();
+    frame();
+    tessera.qcol[2] = 3u << 2;
+    tessera_param_set(song.sel, TX_QD_RANGE, 0);
+    return bad;
+}
+
 /* CORDS (ui_cords.c): KNOB 2 the cord, 1 its source, 3 its destination, 4 the move (a fixed cord's: its OFFSET) */
 static int test_cords_page(void)
 {
@@ -5105,6 +5147,7 @@ int main(void)
     bad += test_grid();
     bad += test_awake_entry();
     bad += test_constel_speed();
+    bad += test_quad_cols();
     bad += test_screen();
     bad += test_favorites();
     bad += test_browser();

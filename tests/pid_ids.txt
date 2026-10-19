@@ -169,7 +169,7 @@
 0x22d OCHD RATE                track 0..100 def 50
 0x22e QUAD DIRECTION           track 0..4 def 0
 0x22f QUAD PROB                track 0..100 def 100
-0x230 QUAD LINK                track 0..4 def 0
+0x230 QUAD LINK                track 0..15 def 0
 0x231 NOTE LENGTH              track 0..2 def 0
 0x232 NOTE LENGTH LEN          track 0..5 def 2
 0x233 NOTE LENGTH KEYS         track 1..4 def 4
@@ -183,3 +183,12 @@
 0x23b CELLS RULE               track 0..255 def 30
 0x23c CELLS TAP                track 1..8 def 1
 0x23d CELLS SPAN               track 1..15 def 14
+0x23e QUAD RANGE               track 0..3 def 0
+0x23f QUAD MOVE 1              track 0..3 def 0
+0x240 QUAD MOVE 2              track 0..3 def 0
+0x241 QUAD MOVE 3              track 0..3 def 0
+0x242 QUAD MOVE 4              track 0..3 def 0
+0x243 QUAD EVERY 1             track 0..6 def 3
+0x244 QUAD EVERY 2             track 0..6 def 3
+0x245 QUAD EVERY 3             track 0..6 def 3
+0x246 QUAD EVERY 4             track 0..6 def 3

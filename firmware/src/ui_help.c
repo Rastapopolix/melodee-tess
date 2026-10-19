@@ -70,6 +70,11 @@ static void help_find(uint32_t k)
         }
     } else if (pg->graph == GR_STEPS && pg->fam == FAM_GEN && tr < TESSERA_TRACKS && (k == 0u || tessera.mode[tr] != TESS_ENG_OFF))
     {
+        if (!k && quad_cols_on()) {
+            help.name = "QUAD COL";
+            help.text = "Which of the grid's four columns KNOB 2 (MOVE) and KNOB 3 (EVERY) set. The picture marks it.";
+            return;
+        }
         x = k == 0u ? (uint32_t)TX_MODE : ENG[tessera.mode[tr] % TESS_ENG_COUNT][k - 1u];
         if (tessera.mode[tr] == TESS_ENG_AWAKE && k <= 1u && tessera_awake(tr)->edit) {   /* (a step picked) */
             help.name = k ? "AWAKE STEP B" : "AWAKE STEP A";
@@ -82,6 +87,11 @@ static void help_find(uint32_t k)
         if (tessera.mode[tr] == TESS_ENG_POLY && k == 1u) {   /* (RHY: the page's choice, no setting of its own) */
             help.name = "POLY RHY";
             help.text = "Which of the four rhythms DIV sets.";
+            return;
+        }
+        if (k && quad_cols_on()) {                      /* (QUAD, OCT+ held: the columns' and RANGE) */
+            uint32_t c = tessera.qcol_sel & 3u;
+            help.pid = (uint16_t)PID_TESS(k == 1u ? TX_QD_MOVE1 + c : k == 2u ? TX_QD_EVERY1 + c : TX_QD_RANGE);
             return;
         }
         if (tessera.mode[tr] == TESS_ENG_CONSTEL && k == 3u) {   /* (SPEED: the track's DIV, in another order) */
