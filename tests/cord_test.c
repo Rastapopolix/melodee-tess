@@ -357,17 +357,12 @@ static int drift_and_defaults(void)
     cord_blocks = saved;
 
     fresh_tracks();
-    cord_defaults();
-    for (tr = 0, b = 1; tr < NTRK; tr++) {
-        const cord_t *c = cord_get(2u * tr), *e = cord_get(2u * tr + 1u);
-        if (c->src != CS_DRIFT || c->src_trk != tr || c->dst != CD_CUTOFF || c->dst_trk != tr || c->amount != 12 ||
-            e->src != CS_DRIFT || e->src_trk != (tr + 2u) % NTRK || e->dst != CD_FX_SEND || e->dst_trk != tr ||
-            e->amount != 10) b = 0;
+    {
+        cord_t c = {CS_DRIFT, 0, CD_CUTOFF, 0, 12, 0};
+        cord_set(0, &c);
     }
-    check("the default patch: each track's CUTOFF (+12 %) and FX SEND (+10 %, another track's DRIFT): 8 mods, 8 free",
-          b && cord_count() == 8u);
-    d = render(4);
-    check("...four tracks for four seconds with it: plays, never past full scale", d > 0);
+    cord_defaults();
+    check("a new project's mods: none (automation is opt-in), all 16 free", cord_count() == 0u);
     cord_clear();
     return bad - fails;
 }

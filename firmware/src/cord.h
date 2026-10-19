@@ -61,7 +61,7 @@ enum {
     CS_NOTE,                      /* the generator's last note, as KEY (C4 = 0, an octave = 0.19) */
     CS_CV,                        /* the generator's CV (gen.c): Turing its register, Euclid and Morph a ramp, Markov the
                                    * degree, Grids the kick's chance, Bounce the ball's height, Awake A's value; 0..1 */
-    CS_DRIFT,                     /* a slow wander of the track's own, a new point every 12 s or so (the default mods) */
+    CS_DRIFT,                     /* a slow wander of the track's own, a new point every 12 s or so */
     CS_TORPOR, CS_APATHY, CS_INERTIA,   /* the track's SLOTH (organic.c): chaos, ~17 min, ~1 min, ~3 min a turn */
     CS_OCHD1, CS_OCHD2, CS_OCHD3, CS_OCHD4, CS_OCHD5, CS_OCHD6, CS_OCHD7, CS_OCHD8,   /* its OCHD: 64 s .. 2.4 s */
     CS_N

@@ -77,8 +77,7 @@ static int reference(FILE *f)
             "a random value held for each cycle of the track's LFO", "S&H, gliding from one value to the next",
             "1 while the track's generator plays a note", "the generator's last note (C4 = 0)",
             "the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the "
-            "degree it moved to", "a slow wander of the track's own, a new point every 12 s or so, eased between "
-            "(a new project's default mods: each track's CUTOFF and FX SEND)",
+            "degree it moved to", "a slow wander of the track's own, a new point every 12 s or so, eased between",
             "SLOTH's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50)",
             "SLOTH's fastest chaotic circuit, about 1 min a turn", "SLOTH's middle chaotic circuit, about 3 min a turn",
             "a free LFO, 64 s a turn (ORGANIC page, RATE 50)", "a free LFO, 40 s a turn", "a free LFO, 25 s a turn",
