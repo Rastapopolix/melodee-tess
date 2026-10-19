@@ -924,11 +924,15 @@ static void draw_columns(void)
                 fmt_int(v1, b->speed);
                 col_mods(PID_TESS(TX_BNC_SPEED));
                 draw_column(1, "SPEED", v1, "", VAL(1u), (int32_t)(b->speed - 1u) * 1000 / 63, ICON_AUTO);
-                fmt_int(v2, b->angle);
+                fmt_int(v2, b->balls == GEN_BOUNCE_FALL ? (int32_t)b->angle - 45 : (int32_t)b->angle);
                 col_mods(PID_TESS(TX_BNC_ANGLE));
-                draw_column(2, "ANGLE", v2, "DEG", VAL(2u), (int32_t)b->angle * 1000 / 90, ICON_AUTO);
+                if (b->balls == GEN_BOUNCE_FALL)                /* FALL: ANGLE is the WIND, calm in the middle */
+                    draw_column(2, "WIND", v2, "", VAL(2u), (int32_t)b->angle * 1000 / 90, ICON_AUTO);
+                else
+                    draw_column(2, "ANGLE", v2, "DEG", VAL(2u), (int32_t)b->angle * 1000 / 90, ICON_AUTO);
                 fmt_int(v3, b->balls);
-                draw_column(3, "BALLS", v3, "", VAL(3u), (int32_t)(b->balls - 1u) * 1000 / (GEN_BOUNCE_MAX - 1u), ICON_AUTO);
+                draw_column(3, "BALLS", b->balls == GEN_BOUNCE_FALL ? "FALL" : v3, "", VAL(3u),
+                            (int32_t)(b->balls - 1u) * 1000 / (GEN_BOUNCE_FALL - 1u), ICON_AUTO);
             } else if (m == TESS_ENG_AWAKE) {
                 const gen_awake_t *a = tessera_awake(tr);
                 if (a->edit) {                                  /* a step picked (ui_awake.c): KNOB 1 its A, KNOB 2 its B */

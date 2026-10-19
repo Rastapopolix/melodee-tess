@@ -1069,8 +1069,8 @@ static void tess_knob_body(uint32_t k, int32_t s)
             int32_t v = (int32_t)b->angle + s;
             b->angle = (uint8_t)(v < 0 ? 0 : v > 90 ? 90 : v);
         } else if (k == 3u) {
-            int32_t v = (int32_t)b->balls + (s > 0 ? 1 : -1);
-            b->balls = (uint8_t)(v < 1 ? 1 : v > (int32_t)GEN_BOUNCE_MAX ? (int32_t)GEN_BOUNCE_MAX : v);
+            int32_t v = (int32_t)b->balls + (s > 0 ? 1 : -1);   /* (past 4: FALL) */
+            b->balls = (uint8_t)(v < 1 ? 1 : v > (int32_t)GEN_BOUNCE_FALL ? (int32_t)GEN_BOUNCE_FALL : v);
         }
     } else if (mode == TESS_ENG_AWAKE) {
         tessera_awake_t *a = &tessera.awake[tr];
@@ -1157,6 +1157,9 @@ uint32_t tessera_sig(uint32_t tr)
     case TESS_ENG_BOUNCE: { const tessera_bounce_t *a = &tessera.bounce[tr];
         h ^= a->speed * 131u + a->angle * 977u + a->balls * 17u + a->dir * 3u + a->hit * 104729u;
         for (uint32_t i = 0; i < GEN_BOUNCE_MAX; i++) h = (h ^ a->x[i] ^ (uint32_t)a->y[i] << 8) * 16777619u;
+        if (a->balls == GEN_BOUNCE_FALL)                /* (FALL: the leaves) */
+            for (uint32_t i = 0; i < GEN_FALL_LEAVES; i++)
+                h = (h ^ a->lx[i] ^ (uint32_t)a->ly[i] << 8 ^ (uint32_t)a->lt[i] << 16) * 16777619u;
         break; }
     case TESS_ENG_AWAKE:  { const tessera_awake_t *a = &tessera.awake[tr];
         h ^= a->pos_a * 31u + a->pos_b * 7919u + a->len_a * 131u + a->len_b * 977u + a->prob * 17u;
@@ -1353,7 +1356,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     if (v_shift < -24 || v_shift > 24 || v_drop > 100u || v_human > 100u || v_follow > TESSERA_TRACKS) return 0;
     if (v_flour < -12 || v_flour > 12 || v_visited > 7u) return 0;
     if (grd[2] > 100u || grd[3] > 100u) return 0;
-    if (bnc[0] < 1u || bnc[0] > 64u || bnc[1] > 90u || bnc[2] < 1u || bnc[2] > GEN_BOUNCE_MAX) return 0;
+    if (bnc[0] < 1u || bnc[0] > 64u || bnc[1] > 90u || bnc[2] < 1u || bnc[2] > GEN_BOUNCE_FALL) return 0;
     if (awk[0] < 1u || awk[0] > 16u || awk[1] < 1u || awk[1] > 16u || awk[2] > 100u) return 0;
     for (i = 0; i < 8u; i++)
         if ((awk[3 + i] & 0xFu) > 8u || awk[3 + i] >> 4 > 8u || (awk[11 + i] & 0xFu) > 7u || awk[11 + i] >> 4 > 7u) return 0;
@@ -1682,7 +1685,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_GRD_DENS: tessera.grids[tr].dens = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_GRIDS; break;
     case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); eng = TESS_ENG_BOUNCE; break;
     case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); eng = TESS_ENG_BOUNCE; break;
-    case TX_BNC_BALLS: tessera.bounce[tr].balls = (uint8_t)tess_clampi(v, 1, GEN_BOUNCE_MAX); eng = TESS_ENG_BOUNCE; break;
+    case TX_BNC_BALLS: tessera.bounce[tr].balls = (uint8_t)tess_clampi(v, 1, GEN_BOUNCE_FALL); eng = TESS_ENG_BOUNCE; break;
     case TX_AWK_LENA: tessera.awake[tr].len_a = (uint8_t)tess_clampi(v, 1, 16); eng = TESS_ENG_AWAKE; break;
     case TX_AWK_LENB: tessera.awake[tr].len_b = (uint8_t)tess_clampi(v, 1, 16); eng = TESS_ENG_AWAKE; break;
     case TX_AWK_PROB: tessera.awake[tr].prob = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_AWAKE; break;

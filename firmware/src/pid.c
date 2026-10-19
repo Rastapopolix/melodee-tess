@@ -50,7 +50,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_DENS] = PD("DENS", F_PCT, 0, 100, 50),
     [TX_BNC_SPEED] = PD("SPEED", F_INT, 1, 64, 24),
     [TX_BNC_ANGLE] = PD("ANGLE", F_INT, 0, 90, 37),
-    [TX_BNC_BALLS] = PD("BALLS", F_INT, 1, 4, 1),
+    [TX_BNC_BALLS] = PD("BALLS", F_INT, 1, 5, 1),     /* 5: FALL (gen.h GEN_BOUNCE_FALL) */
     [TX_AWK_LENA] = PD("LEN A", F_INT, 1, 16, 8),
     [TX_AWK_LENB] = PD("LEN B", F_INT, 1, 16, 7),
     [TX_AWK_PROB] = PD("PROB", F_PCT, 0, 100, 100),
@@ -274,11 +274,15 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_GRD_X, "GRIDS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
     X_(TX_GRD_Y, "GRIDS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
     X_(TX_GRD_DENS, "GRIDS DENSITY", "How full the kick, snare and hat are: 0 silent, 100 every hit the map offers."),
-    X_(TX_BNC_SPEED, "BOUNCE SPEED", "How far the ball travels each step: faster, more wall hits, more notes."),
+    X_(TX_BNC_SPEED, "BOUNCE SPEED", "How far the ball travels each step: faster, more wall hits, more notes. In FALL, how fast the "
+                                     "leaves fall."),
     X_(TX_BNC_ANGLE, "BOUNCE ANGLE", "The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle "
-                                     "between draws a longer loop. EVOLVE nudges it."),
+                                     "between draws a longer loop. EVOLVE nudges it. In FALL it is the WIND: the middle is calm, "
+                                     "lower blows the leaves left, higher right."),
     X_(TX_BNC_BALLS, "BOUNCE BALLS", "How many balls: each one more starts from a place and an angle of its own, so they "
-                                     "cross; balls hitting on the same step play together, three notes at most."),
+                                     "cross; balls hitting on the same step play together, three notes at most. Past 4, FALL: eight "
+                                     "leaves fall at speeds of their own and play where they land (left low, right high; "
+                                     "one in seven an octave down), rest, and fall again."),
     X_(TX_AWK_LENA, "AWAKE LENGTH A", "Steps in loop A, the melody: its values are degrees of the scale or rests. ROLL "
                                       "draws them, EVOLVE changes a few; a white key picks a step: KNOB 1 its A, KNOB 2 its B."),
     X_(TX_AWK_LENB, "AWAKE LENGTH B", "Steps in loop B, which lifts the melody up the scale; a length other than A's "

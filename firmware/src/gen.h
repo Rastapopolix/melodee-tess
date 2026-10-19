@@ -59,8 +59,12 @@ typedef struct {
 } gen_grids_t;
 
 /* 6. Bounce (Theo's): balls crossing a 256 x 256 box a fixed distance a step, no gravity; a wall a ball hits plays a
- * note (which wall, and where along it). BALLS 1..4: each one more from a place and an angle of its own (the seed's) */
+ * note (which wall, and where along it). BALLS 1..4: each one more from a place and an angle of its own (the seed's).
+ * BALLS past 4 is FALL (after norns' Fall, ambalek): eight leaves fall at speeds of their own, swaying in a WIND (ANGLE
+ * turned round its middle); a leaf landing plays a note from where it lands, rests, fades and falls again from the top */
 #define GEN_BOUNCE_MAX 4u
+#define GEN_BOUNCE_FALL 5u    /* BALLS: FALL */
+#define GEN_FALL_LEAVES 8u
 typedef struct {
     uint8_t  speed;       /* 1..64: how far a ball moves a step */
     uint8_t  angle;       /* 0..90: degrees from the floor (ball 1's; the others' offset from it) */
@@ -69,6 +73,9 @@ typedef struct {
     uint8_t  dir;         /* 2 bits a ball: bit 0 moving left, bit 1 moving down */
     uint8_t  hit;         /* the walls hit on the last step, a bit each: 0 floor, 1 left, 2 right, 3 top */
     int8_t   off[GEN_BOUNCE_MAX];   /* each ball's angle from ANGLE (ball 1: 0) */
+    uint8_t  lx[GEN_FALL_LEAVES], ly[GEN_FALL_LEAVES];   /* FALL: the leaves, 0..255 (ly 0: landed) */
+    uint8_t  lv[GEN_FALL_LEAVES];   /* FALL: a leaf's speed, 4..19; bit 7 a bass leaf (an octave down) */
+    uint8_t  lt[GEN_FALL_LEAVES];   /* FALL: the steps a landed leaf still rests (0 falling) */
 } gen_bounce_t;
 
 /* 7. Awake (norns, tehn): two looping sequences of their own lengths: A (upper) plays, its value a scale degree (0 a
