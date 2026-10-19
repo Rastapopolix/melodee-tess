@@ -456,6 +456,28 @@ static const char *seq_taps(char *got, size_t cap, uint32_t n)   /* n SEQ taps f
     }
     return got;
 }
+/* PHYS SYMP's CHRD (an F_INT shown as 8 names over 0..127): a click of KNOB 2 is the next name, both ways, to the ends */
+static int test_phys_chrd_click(void)
+{
+    int ok = 1;
+    uint32_t i;
+    ui_power_on();
+    set_engine_of(&trk[0], ENGI_PHYS);
+    trk[0].engine = trk[0].eng_req;
+    TSEL->p[P_E0] = PM_SYMP;
+    TSEL->p[P_E1] = 70;                           /* (MIN: 64..79, inside its range) */
+    go_title("EDIT 1");
+    turn(EN_K2, 1);
+    ok &= TSEL->p[P_E1] == 80;                    /* SUS: 80..95, from its start */
+    turn(EN_K2, -1);
+    turn(EN_K2, -1);
+    ok &= TSEL->p[P_E1] == 48;                    /* MAJ */
+    for (i = 0; i < 10u; i++) turn(EN_K2, 1);
+    ok &= TSEL->p[P_E1] == 112;                   /* ROOT, and no further */
+    for (i = 0; i < 10u; i++) turn(EN_K2, -1);
+    ok &= TSEL->p[P_E1] == 0;                     /* OCT */
+    return check("PHYS CHRD: one click of KNOB 2 a name (OCT 5TH 4TH MAJ MIN SUS 7TH ROOT), both ways", ok);
+}
 static int test_gen_family(void)
 {
     static const char STEP[] = "GEN NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
@@ -5012,6 +5034,7 @@ int main(void)
     bad += test_no_phrases();
     bad += test_rec();
     bad += test_gen_family();
+    bad += test_phys_chrd_click();
     bad += test_cords_page();
     bad += test_mod_shortcut();
     bad += test_tweak2();

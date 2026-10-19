@@ -278,6 +278,18 @@ static int32_t desc_range(const param_desc_t *d)     /* (a list of names: no acc
 {
     return d->fmt == F_ENUM ? 0 : d->max - d->min;
 }
+/* an F_INT shown as names (a range split evenly over them, params.c: PHYS CHRD, NOISE LEN): a click is the next name,
+ * landing on the first value it shows (Theo 2026-10-19: not several clicks a name). -> the new value */
+static int32_t zone_step(const param_desc_t *d, int32_t v, int32_t steps)
+{
+    int32_t k = 0, n = d->max - d->min + 1, z;
+    while (d->names[k])
+        k++;
+    if (k >= n)                                       /* (a name a value: FM6 ALG) */
+        return clamp(v + steps, d->min, d->max);
+    z = clamp((clamp(v, d->min, d->max) - d->min) * k / n + steps, 0, k - 1);
+    return d->min + (z * n + k - 1) / k;
+}
 /* a list of total entries (the sounds, the scales, the user slots): up to x16 over 256 entries */
 static int32_t list_accel(uint32_t role, int32_t s, uint32_t total, uint32_t *fast)
 {
@@ -905,7 +917,8 @@ static void edit_param(uint32_t slot, int32_t steps)
     d = page_desc(pg, slot, &vp);
     if (!d || !vp || d->max == d->min)
         return;
-    v = enum_step(d, *vp, clamp(*vp + accel(EN_K1 + slot, steps, desc_range(d)), d->min, d->max));
+    v = d->fmt == F_INT && d->names ? zone_step(d, *vp, steps)
+                                    : enum_step(d, *vp, clamp(*vp + accel(EN_K1 + slot, steps, desc_range(d)), d->min, d->max));
     *vp = (int16_t)v;
     if(pg->scope==SC_P5){
         uint8_t old[MO_NATIVE_N];uint32_t f=motion_guard();
