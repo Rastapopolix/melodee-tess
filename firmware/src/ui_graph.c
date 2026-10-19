@@ -262,6 +262,25 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         int h = is_panel ? 14 : 18;
         int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 8 : y_base - 2, bh = is_panel ? 96 : h + 8;
         uint32_t w = b->hit, n = b->balls >= 1u && b->balls <= GEN_BOUNCE_MAX ? b->balls : 1u;
+        if (b->balls == GEN_BOUNCE_FALL) {
+            /* FALL: the floor (lit on a landing), the leaves tilting with their sway; a landed leaf on the floor, fading
+             * as it rests, a bass leaf the track's colour */
+            int32_t fy = top + bh - (w ? 2 : 1);
+            cv_rect(x0, fy, sw, w ? 2 : 1, w ? T_TEXT : dim);
+            static const uint8_t LEAF[4][2] = {{2, 3}, {1, 5}, {0, 5}, {1, 3}};   /* (a row's first pixel and length) */
+            for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) {
+                int32_t lx = x0 + 2 + (int32_t)b->lx[k] * (sw - 10) / 255, ly = fy - 5 - (int32_t)b->ly[k] * (bh - 10) / 255;
+                int tilt = (((int32_t)b->ly[k] + (int32_t)k * 40) & 63) < 32;
+                uint16_t lc = b->lt[k] ? (b->lt[k] > 3u ? c : dim) : b->lv[k] & 0x80u ? c : T_TEXT;
+                if (b->lt[k]) {                              /* (landed: lying flat) */
+                    cv_rect(lx, fy - 2, 6, 2, lc);
+                    continue;
+                }
+                for (uint32_t r = 0; r < 4u; r++)            /* falling: tilted one way or the other as it sways */
+                    cv_rect(tilt ? lx + LEAF[r][0] : lx + 6 - LEAF[r][0] - LEAF[r][1], ly + (int32_t)r, LEAF[r][1], 1, lc);
+            }
+            return;
+        }
         cv_rect(x0, top, sw, w & 8u ? 2 : 1, w & 8u ? T_TEXT : dim);                     /* top */
         cv_rect(x0, top + bh - (w & 1u ? 2 : 1), sw, w & 1u ? 2 : 1, w & 1u ? T_TEXT : dim);   /* floor */
         cv_rect(x0, top, w & 2u ? 2 : 1, bh, w & 2u ? T_TEXT : dim);                     /* left */

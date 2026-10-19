@@ -293,6 +293,72 @@ static void gen_bounce_serve(gen_bounce_t *g, uint32_t seed)
         g->dir |= (uint8_t)(gen_rnd(&s, 4u) << (2u * k));
         g->off[k] = (int8_t)(gen_rnd(&s, 2u) ? o : -o);
     }
+    for (k = 0; k < GEN_FALL_LEAVES; k++) {         /* FALL's leaves: at heights of their own, so they land apart */
+        g->lx[k] = (uint8_t)gen_rnd(&s, 256u);
+        g->ly[k] = (uint8_t)(64u + gen_rnd(&s, 192u));
+        g->lv[k] = (uint8_t)((4u + gen_rnd(&s, 16u)) | (gen_rnd(&s, 7u) ? 0u : 0x80u));
+        g->lt[k] = 0;
+    }
+}
+/* FALL: a leaf from the top again, at a place, a speed and (one in seven) a bass of the track's stream's */
+static void gen_fall_spawn(gen_bounce_t *g, uint32_t k, uint32_t *rnd)
+{
+    g->lx[k] = (uint8_t)gen_rnd(rnd, 256u);
+    g->ly[k] = 255;
+    g->lv[k] = (uint8_t)((4u + gen_rnd(rnd, 16u)) | (gen_rnd(rnd, 7u) ? 0u : 0x80u));
+}
+/* FALL: each falling leaf drops its speed x SPEED / 16 (one at least) and drifts with the WIND (ANGLE - 45, its share of
+ * the drop) and a sway of its own, round the box's sides. A leaf reaching the floor plays: where it lands two octaves of
+ * the scale left to right, a bass leaf an octave down, faster ones louder; it rests 2..8 steps (the picture fades it),
+ * then falls again from the top. Leaves landing on the same step play together, three notes at most, the lowest first */
+static void gen_fall_tick(gen_bounce_t *g, uint32_t *rnd, gen_out_t *out)
+{
+    int32_t wind = (int32_t)(g->angle > 90u ? 90u : g->angle) - 45, sp = g->speed ? g->speed : 1;
+    uint32_t k, got = 0, w;
+    uint8_t note[GEN_FALL_LEAVES], vel[GEN_FALL_LEAVES];
+    g->hit = 0;
+    for (k = 0; k < GEN_FALL_LEAVES; k++) {
+        int32_t v = g->lv[k] & 31u, dy, ph, sw, x, y;
+        if (g->lt[k]) {
+            if (!--g->lt[k]) gen_fall_spawn(g, k, rnd);
+            continue;
+        }
+        if (v < 4) v = 4;
+        dy = (v * sp + 15) / 16;
+        ph = ((int32_t)g->ly[k] + (int32_t)k * 40) & 63;
+        sw = ph < 32 ? ph - 16 : 48 - ph;               /* (-16..16: the sway, a triangle down the box) */
+        x = ((int32_t)g->lx[k] + wind * dy / 30 + sw / 4) & 255;
+        y = (int32_t)g->ly[k] - dy;
+        g->lx[k] = (uint8_t)x;
+        if (y > 0) {
+            g->ly[k] = (uint8_t)y;
+            continue;
+        }
+        {
+            uint32_t deg = (uint32_t)x * 14u / 256u, n = 48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u], i;
+            if (g->lv[k] & 0x80u) n -= 12u;
+            for (i = got; i > 0 && note[i - 1u] > n; i--)
+                note[i] = note[i - 1u], vel[i] = vel[i - 1u];
+            note[i] = (uint8_t)n;
+            vel[i] = (uint8_t)(70 + v * 3);
+            got++;
+        }
+        g->ly[k] = 0;
+        g->lt[k] = (uint8_t)(2u + gen_rnd(rnd, 7u));
+        g->hit = 1;                                     /* (the floor) */
+    }
+    out->cv = (int16_t)(g->ly[0] * 32767 / 255);       /* leaf 1's height */
+    for (k = 0, w = 0; k < got && w < 3u; k++) {
+        if (k && note[k] == note[k - 1u]) continue;
+        if (!w) {
+            out->note = note[k];
+            out->vel = vel[k];
+            out->gate = 1;
+        } else {
+            out->more[out->more_n++] = note[k];
+        }
+        w++;
+    }
 }
 /* Bounce: each ball moves SPEED at its angle (ANGLE and its offset, folded into 0..90), off the walls as a mirror.
  * A wall hit plays its note: the wall (floor 0, left 1, right 2, top 3) two scale degrees apart, where along it eight
@@ -304,7 +370,10 @@ static void gen_bounce_tick(gen_bounce_t *g, const gen_clock_t *clk, uint32_t *r
     uint32_t n = g->balls >= 1u && g->balls <= GEN_BOUNCE_MAX ? g->balls : 1u, k, w, got = 0;
     uint8_t note[GEN_BOUNCE_MAX], wall[GEN_BOUNCE_MAX];
     (void)clk;
-    (void)rnd;
+    if (g->balls == GEN_BOUNCE_FALL) {
+        gen_fall_tick(g, rnd, out);
+        return;
+    }
     g->hit = 0;
     for (k = 0; k < n; k++) {
         int32_t a = (int32_t)g->angle + g->off[k], hw = -1, at = 0;
@@ -513,7 +582,7 @@ static void gen_grids_mutate(gen_grids_t *g, uint32_t amt, uint32_t *rnd)
     g->y = gen_grids_walk(g->y, amt, rnd);
 }
 
-/* Bounce: the angle nudged by up to +-AMOUNT/100 of 15 degrees (one at least), turning back at 0 and 90 */
+/* Bounce: the angle (FALL: the WIND) nudged by up to +-AMOUNT/100 of 15 degrees (one at least), turning back at 0 and 90 */
 static void gen_bounce_mutate(gen_bounce_t *g, uint32_t amt, uint32_t *rnd)
 {
     int32_t r = (int32_t)(amt * 15u / 100u) + 1, v = (int32_t)g->angle + (int32_t)gen_rnd(rnd, (uint32_t)(2 * r + 1)) - r;
@@ -592,7 +661,7 @@ static void gen_bounce_load(gen_bounce_t *g, const gen_sec_t *s)
 {
     g->angle = s->p0 > 90u ? 90u : s->p0;
     g->speed = s->p1 < 1u ? 1u : s->p1 > 64u ? 64u : s->p1;
-    g->balls = (uint8_t)(s->reg < 1u ? 1u : s->reg > GEN_BOUNCE_MAX ? GEN_BOUNCE_MAX : s->reg);
+    g->balls = (uint8_t)(s->reg < 1u ? 1u : s->reg > GEN_BOUNCE_FALL ? GEN_BOUNCE_FALL : s->reg);
 }
 /* Awake: its lengths here; its 32 values in the section's phrase buffer (tessera.c tess_save_sec) */
 static void gen_awake_save(const gen_awake_t *g, gen_sec_t *s) { s->p0 = g->len_a; s->p1 = g->len_b; }

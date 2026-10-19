@@ -438,6 +438,20 @@ static void s_bounce_var(void)
     turns(tessera_knob, 3, 2);                        /* BALLS 3 */
     knob(tessera_tweak_knob, 1, 10);                  /* DROP 20 */
 }
+static void s_fall(void)
+{
+    gen(0, TESS_ENG_BOUNCE);
+    turns(tessera_knob, 3, 4);                        /* BALLS: FALL */
+}
+static void s_fall_var(void)
+{
+    gen(0, TESS_ENG_BOUNCE);
+    turns(tessera_knob, 3, 4);                        /* FALL */
+    knob(tessera_knob, 1, 16);                        /* SPEED 40 */
+    knob(tessera_knob, 2, -30);                       /* WIND -38 */
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 15);                 /* AMOUNT 60 */
+}
 static void s_evolve_bounce(void)
 {
     gen(0, TESS_ENG_BOUNCE);
@@ -619,6 +633,8 @@ static const scen_t SCEN[] = {
     {"quad_pend_prob70", 8, 0x1033u, s_quad_var, 0},
     {"quad_four_rows_link_hold", 8, 0x1034u, s_quad_four, 0},
     {"evolve_quad_every1_amount70", 16, 0x1035u, s_evolve_quad, 0},
+    {"fall", 8, 0x1036u, s_fall, 0},
+    {"fall_speed40_wind-38_evolve60", 16, 0x1037u, s_fall_var, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -1260,9 +1276,9 @@ static void pack_run(char *res, size_t cap)
          * track's with Awake's values and Poly's pitches from the track's seed (as ROLL gives them); each new setting
          * out of range is refused */
         static uint8_t v3[TESSERA_PK_BYTES_V3], v3b[TESSERA_PK_BYTES_V3];
-        static const uint8_t BAD[][2] = {{0, 0}, {0, 65}, {1, 91}, {2, 0}, {2, 5}, {3, 0}, {4, 17}, {5, 101}, {6, 0x09},
+        static const uint8_t BAD[][2] = {{0, 0}, {0, 65}, {1, 91}, {2, 0}, {2, 6}, {3, 0}, {4, 17}, {5, 101}, {6, 0x09},
                                          {13, 0x90}, {14, 0x08}, {21, 0x80}, {22, 17},
-                                         {28, 0}, {28, 4}, {28, 0x10}};   /* (Bounce 0..2, Awake 3..21, Poly 22..28) */
+                                         {28, 0}, {28, 4}, {28, 0x10}};   /* (Bounce 0..2: BALLS 6 past FALL; Awake 3..21, Poly 22..28) */
         const uint32_t n4 = TESSERA_PK_BYTES / TESSERA_TRACKS, n3 = TESSERA_PK_BYTES_V3 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v3 + tr * n3, a + tr * n4, n3);
         tessera_reset();
@@ -1289,6 +1305,13 @@ static void pack_run(char *res, size_t cap)
             c[3u * n4 + n3 + BAD[k][0]] = BAD[k][1];  /* (track 4's) */
             ok &= tessera_unpack(c) == 0;
         }
+        tessera_unpack(a);
+    }
+    {   /* BOUNCE's FALL (BALLS 5): its round trip, no format step */
+        tessera_param_set(2, TX_BNC_BALLS, GEN_BOUNCE_FALL);
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.bounce[2].balls == GEN_BOUNCE_FALL;
         tessera_unpack(a);
     }
     {   /* SLOTH SPEED and OCHD RATE: their round trip */

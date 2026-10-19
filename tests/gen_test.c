@@ -483,6 +483,82 @@ static void bounce_tests(void)
     check("bounce: mutation moves only the angle, inside 0..90", mut);
 }
 
+/* ------------------------------------------------------------------- FALL --- */
+static void fall_tests(void)
+{
+    int range = 1, same = 1, rest = 1, calm = 1, windy = 1, balls = 1;
+    uint32_t notes = 0, bass = 0, chords = 0;
+    for (uint32_t sp = 4; sp <= 64; sp += 12)
+        for (uint32_t sd = 1; sd < 40u; sd += 13) {
+            gen_bounce_t g = bounce_at(sp, 45, GEN_BOUNCE_FALL, sd);
+            uint32_t landed[GEN_FALL_LEAVES] = {0};
+            for (uint32_t i = 0; i < 400; i++) {
+                gen_out_t o = step_out();
+                uint8_t before[GEN_FALL_LEAVES];
+                for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) before[k] = g.lt[k];
+                gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+                if (o.gate) {
+                    notes++;
+                    chords += o.more_n > 0u;
+                    range &= o.note >= 36u && o.note <= 71u && o.vel >= 82u && o.vel <= 127u && o.more_n <= 2u && g.hit == 1u;
+                    for (uint32_t m = 0; m < o.more_n; m++) range &= o.more[m] > o.note && o.more[m] <= 71u;
+                    bass += o.note < 48u;
+                } else
+                    range &= o.note == 60u && o.vel == 100u && !g.hit;
+                for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) {
+                    if (!before[k] && g.lt[k]) { landed[k]++; rest &= g.ly[k] == 0u && g.lt[k] >= 2u && g.lt[k] <= 8u; }
+                    if (before[k] == 1u) rest &= !g.lt[k] && g.ly[k] == 255u;   /* (rested: from the top again) */
+                }
+            }
+            for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) range &= landed[k] > 0u;   /* (every leaf lands) */
+        }
+    {                                                  /* the same seed and stream: the same steps */
+        gen_bounce_t g1 = bounce_at(24, 30, GEN_BOUNCE_FALL, 7), g2 = bounce_at(24, 30, GEN_BOUNCE_FALL, 7);
+        uint32_t r1 = 99, r2 = 99;
+        for (uint32_t i = 0; i < 200; i++) {
+            gen_out_t a = step_out(), b = step_out();
+            gen_bounce_tick(&g1, &CLK0, &r1, &a);
+            gen_bounce_tick(&g2, &CLK0, &r2, &b);
+            same &= !memcmp(&a, &b, sizeof a);
+        }
+    }
+    {                                                  /* WIND: calm leaves only sway (each stays near its column); a wind
+                                                        * from the left carries them right, round the box */
+        gen_bounce_t g = bounce_at(8, 45, GEN_BOUNCE_FALL, 3), w = bounce_at(8, 90, GEN_BOUNCE_FALL, 3);
+        uint32_t r1 = 5, r2 = 5;
+        int32_t moved = 0;
+        for (uint32_t i = 0; i < 6; i++) {
+            gen_out_t a = step_out(), b = step_out();
+            uint8_t x0[GEN_FALL_LEAVES];
+            for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) x0[k] = w.lx[k];
+            gen_bounce_tick(&g, &CLK0, &r1, &a);
+            gen_bounce_tick(&w, &CLK0, &r2, &b);
+            for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) if (!w.lt[k]) moved += (int32_t)(uint8_t)(w.lx[k] - x0[k]) < 128 ? 1 : -1;
+        }
+        for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) {
+            gen_bounce_t f = bounce_at(8, 45, GEN_BOUNCE_FALL, 3);
+            int32_t d = (int32_t)g.lx[k] - (int32_t)f.lx[k];
+            if (d > 128) d -= 256;
+            if (d < -128) d += 256;
+            calm &= g.lt[k] || (d >= -24 && d <= 24);
+        }
+        windy = moved > 0;
+    }
+    {                                                  /* FALL leaves the balls alone */
+        gen_bounce_t g = bounce_at(30, 50, GEN_BOUNCE_FALL, 11), f = g;
+        gen_out_t o = step_out();
+        gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+        balls = !memcmp(g.x, f.x, sizeof g.x) && !memcmp(g.y, f.y, sizeof g.y) && g.dir == f.dir;
+    }
+    check("fall: a landing plays 36..71, louder when faster, up to 3 notes, the lowest first; else a rest", range && notes > 100u);
+    check("fall: leaves land together now and then (chords); about one in seven an octave down", chords > 0u && bass > 0u &&
+          bass < notes / 3u);
+    check("fall: a landed leaf rests 2..8 steps, then falls from the top", rest);
+    check("fall: the same seed and stream give the same steps", same);
+    check("fall: calm, the leaves sway in place; the wind carries them", calm && windy);
+    check("fall: the balls stay as they were", balls);
+}
+
 /* ------------------------------------------------------------------ Awake --- */
 static gen_awake_t awake_at(uint32_t la, uint32_t lb, uint32_t prob, uint32_t seed)
 {
@@ -828,6 +904,7 @@ int main(void)
     morph_tests();
     grids_tests();
     bounce_tests();
+    fall_tests();
     awake_tests();
     poly_tests();
     quad_tests();
