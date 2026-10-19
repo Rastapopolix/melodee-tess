@@ -557,7 +557,7 @@ int tessera_lock_get(uint32_t tr)
     if (tessera.mode[tr] == TESS_ENG_TURING) return 100 - (int)tessera.turing[tr].prob;
     if (tessera.mode[tr] == TESS_ENG_GRIDS) return 100 - (int)tessera.grids[tr].chaos;
     if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH || tessera.mode[tr] == TESS_ENG_CONSTEL)
-        return tessera.evolve[tr].lock;                      /* (Constellation: the chance a catch leaves the loop) */
+        return tessera.evolve[tr].lock;                      /* (Constellation: the chance a step plays the loop) */
     return -1;                                               /* Euclid, Bounce, Awake, Poly: fixed loops, no LOCK */
 }
 
@@ -819,6 +819,15 @@ static void tess_grids_play(track_t *t, uint32_t tr, const gen_out_t *out)
     t->seq_off = seq_div_samples((uint32_t)t->p[P_SDIV]) * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
 }
 
+/* a note's length in samples: the step's GATE, or len quarters of it (gen_out_t len; Constellation's star sizes), never
+ * past the step */
+static uint32_t tess_gate_len(const track_t *t, uint32_t period, uint32_t len)
+{
+    uint32_t g = (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64);
+    if (len) g = g * len / 4u > 127u ? 127u : g * len / 4u;
+    return period * g / 128u;
+}
+
 static void tess_clock_step_body(track_t *t, uint32_t tr)
 {
     tess_seed_fresh(tr);                                    /* before EVOLVE captures the phrase's start */
@@ -939,7 +948,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         uint32_t to = tess_branch(tr);
         if (to != tr) {                                    /* BRANCH: the hit plays on track to's voice instead */
             track_t *v = &trk[to];
-            uint32_t off = seq_div_samples((uint32_t)t->p[P_SDIV]) * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
+            uint32_t off = tess_gate_len(t, seq_div_samples((uint32_t)t->p[P_SDIV]), out.len);
             tessera.last_note[tr] = (uint8_t)final_note;   /* (FOLLOW of this track: still its melody) */
             if (v->p[P_MUTE]) return;
             tess_branch_on(v, (uint32_t)final_note, vel, off);
@@ -975,10 +984,20 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         }
 
         uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]);
-        t->seq_off = period * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
+        t->seq_off = tess_gate_len(t, period, out.len);
         if (tw2->human)                                    /* shorten by up to HUMAN/2 percent */
             t->seq_off = t->seq_off * (100u - gen_rnd(&tessera.rnd[tr], tw2->human / 2u + 1u)) / 100u;
     }
+}
+
+/* Constellation's SPEED: the track's DIVs (params.c N_DIV) from the slowest to the fastest */
+static const uint8_t TESS_CS_DIV[10] = {9, 8, 7, 6, 0, 4, 1, 5, 2, 3};
+uint32_t tessera_cs_speed(uint32_t tr)
+{
+    uint32_t d = (uint32_t)trk[tr % TESSERA_TRACKS].p[P_SDIV], i;
+    for (i = 0; i < sizeof TESS_CS_DIV; i++)
+        if (TESS_CS_DIV[i] == d) return i;
+    return 4u;                                          /* (1/4) */
 }
 
 static void tess_knob_body(uint32_t k, int32_t s)
@@ -1182,9 +1201,10 @@ static void tess_knob_body(uint32_t k, int32_t s)
         } else if (k == 2u) {
             int32_t v = (int32_t)c->dens + s * 2;
             c->dens = (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
-        } else if (k == 3u) {                               /* AUTO: OFF, 1..9, SEEK */
-            int32_t v = (int32_t)c->autop + (s > 0 ? 1 : -1);
-            c->autop = (uint8_t)(v < 0 ? 0 : v > (int32_t)GEN_CS_SEEK ? (int32_t)GEN_CS_SEEK : v);
+        } else if (k == 3u) {                               /* SPEED: the track's DIV, slow to fast (a column a step) */
+            int32_t v = (int32_t)tessera_cs_speed(tr) + (s > 0 ? 1 : -1);
+            v = v < 0 ? 0 : v >= (int32_t)sizeof TESS_CS_DIV ? (int32_t)sizeof TESS_CS_DIV - 1 : v;
+            trk[tr].p[P_SDIV] = TESS_CS_DIV[v];
         }
     } else if (mode == TESS_ENG_GRIDS) {
         tessera_grids_t *g = &tessera.grids[tr];
@@ -1251,7 +1271,8 @@ uint32_t tessera_sig(uint32_t tr)
         }
         break; }
     case TESS_ENG_CONSTEL: { const tessera_constel_t *a = &tessera.constel[tr];
-        h ^= a->y * 31u + a->dens * 7919u + a->size * 131u + a->autop * 977u + a->caught * 17u + a->sky * 104729u;
+        h ^= a->y * 31u + a->dens * 7919u + a->size * 131u + a->autop * 977u + a->caught * 17u + a->sky * 104729u +
+             a->held * 61u + a->trail * 4093u + (uint32_t)trk[tr].p[P_SDIV] * 3u;
         h = (h ^ a->col ^ (uint32_t)a->ship << 16) * 16777619u;
         for (uint32_t i = 0; i < 16u; i++) h = (h ^ a->loop[i]) * 16777619u;
         break; }
@@ -1933,6 +1954,7 @@ void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v)
     case TX_CS_Y: tessera.constel[tr].y = (uint8_t)tess_clampi(v, 0, GEN_CS_ROWS - 1); break;
     case TX_CS_DENS: tessera.constel[tr].dens = (uint8_t)tess_clampi(v, 0, 100); break;
     case TX_CS_SIZE: tessera.constel[tr].size = (uint8_t)tess_clampi(v, 0, 7); break;
+    case TX_CS_AUTO: tessera.constel[tr].autop = (uint8_t)tess_clampi(v, 0, GEN_CS_SEEK); break;
     case TX_SR_START: tessera.series[tr].start = (uint8_t)tess_clampi(v, 0, 127); break;
     case TX_CL_RULE: tessera.cells[tr].rule = (uint8_t)tess_clampi(v, 0, 255); break;
     default: break;                                 /* (the others are no cord's: cord.c's destinations) */

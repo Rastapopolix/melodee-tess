@@ -1185,7 +1185,7 @@ static void setup(int s)
         }
         go_title("GEN");
         break;
-    case S_GEN_FALL:                                 /* FALL, a breeze from the right, some leaves landed and fading */
+    case S_GEN_FALL:                                 /* FALL, a wind from the right gusting, some leaves landed and fading */
         tessera_reset();
         song.sel = 0;
         tessera_knob(0, TESS_ENG_BOUNCE);
@@ -1193,7 +1193,11 @@ static void setup(int s)
         tessera_knob(2, -20);
         {
             uint32_t r = 1;
-            for (uint32_t i = 0; i < 12u; i++) { gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0}; gen_bounce_tick(&tessera.bounce[0], 0, &r, &o); }
+            for (uint32_t i = 0; i < 40u; i++) {    /* (on till a gust blows, with some leaves landed) */
+                gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0, 0};
+                gen_bounce_tick(&tessera.bounce[0], 0, &r, &o);
+                if (i >= 12u && tessera.bounce[0].gust) break;
+            }
         }
         go_title("GEN");
         break;

@@ -209,6 +209,7 @@ void tessera_awake_select(uint32_t tr, uint32_t step);   /* the step KNOB 1 (A) 
 const gen_poly_t *tessera_poly(uint32_t tr);
 const gen_quad_t *tessera_quad(uint32_t tr);
 const gen_constel_t *tessera_constel(uint32_t tr);
+uint32_t tessera_cs_speed(uint32_t tr);                 /* Constellation's SPEED: the track's DIV, 0 the slowest .. 9 */
 const gen_series_t *tessera_series(uint32_t tr);
 const gen_cells_t *tessera_cells(uint32_t tr);
 

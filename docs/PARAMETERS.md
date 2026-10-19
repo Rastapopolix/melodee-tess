@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CELLS | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) catches the stars of a passing sky into a loop; SERIES plays Per Norgard's infinity series; CELLS eight cells of an automaton, a generation a step. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CELLS | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CELLS eight cells of an automaton, a generation a step. |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -152,7 +152,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x20A | MORPH POSITION | 0 to 127 | 0 | Blends rhythm A (0) into rhythm B (full). |
 | 0x20B | MORPH RHYTHM A | 0 to 7 | 0 | Rhythm A: one of eight preset patterns. |
 | 0x20C | MORPH RHYTHM B | 0 to 7 | 2 | Rhythm B: one of eight preset patterns. |
-| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a star caught leaves the loop as it was; Euclid, Bounce, Awake, Poly and Quad have none. |
+| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a step plays its loop instead of the sky; Euclid, Bounce, Awake, Poly and Quad have none. |
 | 0x20E | EVOLVE EVERY | OFF, 1, 2, 4, 8, 16 | OFF | Bars between mutations; OFF keeps the phrase as it is. |
 | 0x20F | EVOLVE AMOUNT | 0 to 100 % | 30 | How much changes at each mutation. |
 | 0x210 | EVOLVE ROLL | 1 to 128 | 1 | The track's seed, 1 to 128: each one a line of its own, the same every time. Playing, a new one starts on the next bar line. |
@@ -167,7 +167,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x219 | GRIDS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |
 | 0x21A | GRIDS DENSITY | 0 to 100 % | 50 | How full the kick, snare and hat are: 0 silent, 100 every hit the map offers. |
 | 0x21B | BOUNCE SPEED | 1 to 64 | 24 | How far the ball travels each step: faster, more wall hits, more notes. In FALL, how fast the leaves fall. |
-| 0x21C | BOUNCE ANGLE | 0 to 90 | 37 | The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle between draws a longer loop. EVOLVE nudges it. In FALL it is the WIND: the middle is calm, lower blows the leaves left, higher right. |
+| 0x21C | BOUNCE ANGLE | 0 to 90 | 37 | The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle between draws a longer loop. EVOLVE nudges it. In FALL it is the WIND: the middle is calm, lower blows the leaves left (the melody leans low), higher right (high); further out, gusts hurry them down together. |
 | 0x21D | BOUNCE BALLS | 1 to 5 | 1 | How many balls: each one more starts from a place and an angle of its own, so they cross; balls hitting on the same step play together, three notes at most. Past 4, FALL: eight leaves fall at speeds of their own and play where they land (left low, right high; one in seven an octave down), rest, and fall again. |
 | 0x21E | AWAKE LENGTH A | 1 to 16 | 8 | Steps in loop A, the melody: its values are degrees of the scale or rests. ROLL draws them, EVOLVE changes a few; a white key picks a step: KNOB 1 its A, KNOB 2 its B. |
 | 0x21F | AWAKE LENGTH B | 1 to 16 | 7 | Steps in loop B, which lifts the melody up the scale; a length other than A's shifts it against A. |
@@ -191,10 +191,10 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x231 | NOTE LENGTH | STEP, FIXED, HIT | STEP | How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP. |
 | 0x232 | NOTE LENGTH LEN | 1/32, 1/16, 1/8, 1/4, 1/2, 1/1 | 1/8 | FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts. |
 | 0x233 | NOTE LENGTH KEYS | 1 to 4 | 4 | FIXED: how many notes may hold at once. One more ends the note nearest its end; the same pitch again ends the one before. |
-| 0x234 | CONSTELLATION Y | 0 to 14 | 7 | The height of the ship's crosshair in the sky: the stars crossing it are caught into the loop, so it sets where the melody sits. AUTO steers it instead. |
-| 0x235 | CONSTELLATION DENS | 0 to 100 % | 50 | How many stars the sky holds: more stars, more catches, a fuller loop. |
-| 0x236 | CONSTELLATION SIZE | 0 to 7 | 2 | How many rows either side of the crosshair a star is still caught in: 0 only its own row, higher a wider melody. Set by a mod (no knob of its own). |
-| 0x237 | CONSTELLATION AUTO | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, SEEK | OFF | Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; SEEK flies towards the next star. |
+| 0x234 | CONSTELLATION Y | 0 to 14 | 7 | The height of the ship's crosshair in the sky: the stars crossing it play as they cross, so it sets where the melody sits. AUTO steers it instead. |
+| 0x235 | CONSTELLATION DENS | 0 to 100 % | 50 | How many stars the sky holds: more stars, more notes. |
+| 0x236 | CONSTELLATION SIZE | 0 to 7 | 2 | How many rows either side of the crosshair a star still plays in: 0 only its own row, higher a wider melody. Set by a mod (no knob of its own). |
+| 0x237 | CONSTELLATION AUTO | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, SEEK | OFF | Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; SEEK flies towards the next star. Set by a mod (no knob of its own). |
 | 0x238 | SERIES START | 0 to 127 | 0 | Where in the infinity series the melody begins: each START a different line, all of them alike at every scale. EVOLVE picks new ones. |
 | 0x239 | SERIES INTV | 1 to 7 | 1 | How many degrees of the scale a step of the series is: 1 close and stepwise, higher wider leaps (folded back into two octaves). |
 | 0x23A | SERIES LOOP | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | OFF | OFF lets the series run on, never repeating; 1 to 16 plays that many steps of it round and round. |
@@ -290,3 +290,4 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | C DENS | the generator's step | Constellation's DENS: how many stars the sky holds |
 | S START | the generator's step | Series' START: where in the infinity series it plays |
 | CL RULE | the generator's step | Cells' RULE: how each generation follows the last |
+| C AUTO | the generator's step | Constellation's AUTO: who steers the ship (OFF, a wander, SEEK) |

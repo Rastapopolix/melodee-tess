@@ -264,10 +264,16 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         uint32_t w = b->hit, n = b->balls >= 1u && b->balls <= GEN_BOUNCE_MAX ? b->balls : 1u;
         if (b->balls == GEN_BOUNCE_FALL) {
             /* FALL: the floor (lit on a landing), the leaves tilting with their sway; a landed leaf on the floor, fading
-             * as it rests, a bass leaf the track's colour */
+             * as it rests, a bass leaf the track's colour; in a gust, streaks across the box, the wind's way */
             int32_t fy = top + bh - (w ? 2 : 1);
             cv_rect(x0, fy, sw, w ? 2 : 1, w ? T_TEXT : dim);
             static const uint8_t LEAF[4][2] = {{2, 3}, {1, 5}, {0, 5}, {1, 3}};   /* (a row's first pixel and length) */
+            if (b->gust)
+                for (uint32_t k = 0; k < 4u; k++) {                 /* (a streak beside every other leaf, moving with it) */
+                    int32_t gx = x0 + 4 + (int32_t)b->lx[k * 2u] * (sw - 40) / 255 + (b->angle > 45u ? -8 : 8) * (int32_t)b->gust;
+                    int32_t gy = top + 6 + (int32_t)((b->ly[k * 2u] + 97u * k) & 255u) * (bh - 20) / 255;
+                    cv_rect(gx < x0 ? x0 : gx, gy, 24, 1, dim);
+                }
             for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) {
                 int32_t lx = x0 + 2 + (int32_t)b->lx[k] * (sw - 10) / 255, ly = fy - 5 - (int32_t)b->ly[k] * (bh - 10) / 255;
                 int tilt = (((int32_t)b->ly[k] + (int32_t)k * 40) & 63) < 32;
@@ -355,17 +361,19 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         }
     } else if (mode == TESS_ENG_CONSTEL) {
         /* the sky scrolling left in three layers (the far two slower, dim: single dots, then pairs); the front layer's
-         * stars a plus their size, bright ones lit; the ship at the left, its thruster flickering, the crosshair's
-         * brackets SIZE rows round its height, the star just caught ringed. On the panel, the loop below: its stars
-         * joined into a constellation, the one playing ringed */
+         * stars a plus their size, bright ones lit; the ship mid-sky, its thruster flickering, the crosshair's brackets
+         * SIZE rows round its height, the star sounding now ringed. Behind the ship, the stars that sounded as they
+         * crossed, joined into a constellation (what was heard). On the panel with LOCK up, the loop below: its stars
+         * joined, the one played ringed when the step played the loop instead of the sky (the brackets dim then) */
         const gen_constel_t *g = tessera_constel(tr);
+        int lock = tessera.evolve[tr].lock != 0;
         int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 6 : y_base - 2;
-        int32_t sh = is_panel ? 66 : 26, cw = sw / 16, sx = x0 + 3 * cw + cw / 2;
-        int32_t row = g->ship >> 8, wd = g->size > 7u ? 7 : (int32_t)g->size, i;
+        int32_t sh = is_panel ? (lock ? 66 : 96) : 26, cw = sw / 16, sx = x0 + 7 * cw + cw / 2;
+        int32_t row = g->ship >> 8, wd = g->size > 7u ? 7 : (int32_t)g->size, i, px = 0, py = 0, pv = 0;
 #define CS_Y(r) (top + sh - 3 - (int32_t)(r) * (sh - 6) / (int32_t)(GEN_CS_ROWS - 1u))
         for (uint32_t l = 2; l > 0; l--) {
             uint32_t c0 = (uint32_t)g->col >> l;
-            for (i = -3; i < 13; i++) {
+            for (i = -7; i < 9; i++) {
                 uint32_t st = gen_cs_star(g->sky, c0 + (uint32_t)i, l, 30u);
                 int32_t x = sx + i * cw, y;
                 if (!st) continue;
@@ -374,21 +382,31 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 if (l == 1u) cv_rect(x + 2, y, 1, 1, dim);
             }
         }
-        for (i = -3; i < 13; i++) {
+        for (i = -7; i <= 0; i++) {                         /* (the constellation behind the ship: its lines first) */
+            uint32_t st = gen_cs_star(g->sky, (uint32_t)g->col + (uint32_t)i, 0, g->dens);
+            int32_t y;
+            if (!st || !((g->trail >> (uint32_t)-i) & 1u)) continue;
+            y = CS_Y((st & 15u) - 1u);
+            if (pv) cv_line(px, py, sx + i * cw, y, c);
+            px = sx + i * cw, py = y, pv = 1;
+        }
+        for (i = -7; i < 9; i++) {
             uint32_t st = gen_cs_star(g->sky, (uint32_t)g->col + (uint32_t)i, 0, g->dens);
             int32_t x = sx + i * cw, y, a;
+            int heard = i <= 0 && ((g->trail >> (uint32_t)-i) & 1u);
             if (!st) continue;
             y = CS_Y((st & 15u) - 1u);
             a = 1 + (int32_t)((st >> 6) & 3u) / 2;
-            cv_rect(x - a, y, 2 * a + 1, 1, (st >> 4) & 2u ? T_TEXT : c);
-            cv_rect(x, y - a, 1, 2 * a + 1, (st >> 4) & 2u ? T_TEXT : c);
+            cv_rect(x - a, y, 2 * a + 1, 1, heard || (st >> 4) & 2u ? T_TEXT : i < 0 ? dim : c);
+            cv_rect(x, y - a, 1, 2 * a + 1, heard || (st >> 4) & 2u ? T_TEXT : i < 0 ? dim : c);
             if (!i && g->caught) cv_ring(x, y, 9, T_ACCENT);
         }
         {
             int32_t y = CS_Y(row), yt = CS_Y(row + wd > 14 ? 14 : row + wd) - 4, yb = CS_Y(row - wd < 0 ? 0 : row - wd) + 4;
             int32_t f = (int32_t)(g->col & 1u);
-            cv_rect(sx - 4, yt, 9, 1, c); cv_rect(sx - 4, yt, 1, 3, c); cv_rect(sx + 4, yt, 1, 3, c);
-            cv_rect(sx - 4, yb, 9, 1, c); cv_rect(sx - 4, yb - 2, 1, 3, c); cv_rect(sx + 4, yb - 2, 1, 3, c);
+            uint16_t bc = g->held ? dim : c;
+            cv_rect(sx - 4, yt, 9, 1, bc); cv_rect(sx - 4, yt, 1, 3, bc); cv_rect(sx + 4, yt, 1, 3, bc);
+            cv_rect(sx - 4, yb, 9, 1, bc); cv_rect(sx - 4, yb - 2, 1, 3, bc); cv_rect(sx + 4, yb - 2, 1, 3, bc);
             cv_rect(sx - 22, y - 1, 9, 3, T_TEXT);                   /* the ship: body, nose, fins, thruster */
             cv_rect(sx - 13, y, 3, 1, T_TEXT);
             cv_rect(sx - 21, y - 3, 3, 2, T_TEXT);
@@ -396,9 +414,10 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rect(sx - 25 - 2 * f, y, 3 + 2 * f, 1, T_ACCENT);
         }
 #undef CS_Y
-        if (is_panel) {
-            int32_t ly = top + sh + 8, lh = 22, px = -1, py = 0;
-            uint32_t now = song.playing ? tessera.evolve[tr].pos_now & 15u : 16u;
+        if (is_panel && lock) {
+            int32_t ly = top + sh + 8, lh = 22;
+            uint32_t now = song.playing && g->held ? (uint32_t)g->held - 1u : 16u;
+            px = -1;
             cv_rect(x0, ly + lh + 2, sw, 1, dim);
             for (uint32_t k = 0; k < 16u; k++) {
                 uint32_t v = g->loop[k];
@@ -419,51 +438,6 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 cv_rect(x - 1, y - 1, 3, 3, (v >> 4) & 2u ? T_TEXT : c);
                 if (k == now) cv_ring(x, y, 9, T_TEXT);
             }
-        }
-    } else if (mode == TESS_ENG_SERIES) {
-        /* the series as a contour: the next 16 steps' degrees as bars (the one playing lit, a line through their tops), the
-         * loop's length marked under them; LOOP OFF a dashed line, the series running on */
-        const gen_series_t *g = tessera_series(tr);
-        int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 10 : y_base - 2;
-        int32_t sh = is_panel ? 88 : 26, cw = sw / 16, px = -1, py = 0;
-        gen_series_t p = *g;                                 /* (from the step just played) */
-        if (p.n) p.n--;
-        for (uint32_t k = 0; k < 16u; k++) {
-            uint32_t d = gen_sr_degree(&p, k), cur = song.playing && g->n && k == 0u;
-            int32_t x = x0 + (int32_t)k * cw, h = 3 + (int32_t)d * (sh - 3) / 14, y = top + sh - h;
-            cv_rect(x + 1, y, cw - 3, h, cur ? T_TEXT : c);
-            if (px >= 0) cv_line(px, py, x + cw / 2 - 1, y, dim);
-            px = x + cw / 2 - 1, py = y;
-        }
-        if (is_panel) {
-            int32_t ly = top + sh + 8;
-            uint32_t l = g->loop;
-            if (l) {
-                cv_rect(x0 + 1, ly, (int32_t)l * cw - 3, 2, c);
-                cv_rect(x0 + 1, ly - 3, 1, 5, c);
-                cv_rect(x0 + (int32_t)l * cw - 3, ly - 3, 1, 5, c);
-            } else
-                for (int32_t x = x0 + 1; x < x0 + sw - 3; x += 6) cv_rect(x, ly, 3, 2, dim);
-        }
-    } else if (mode == TESS_ENG_CELLS) {
-        /* the generations scrolling down: the newest at the top, a row each, a lit cell a block; TAP's column marked */
-        const gen_cells_t *g = tessera_cells(tr);
-        int32_t rows = is_panel ? (int32_t)GEN_CL_HIST + 1 : 3, ch = is_panel ? 9 : 8, cw = is_panel ? 24 : 26;
-        int32_t x0 = is_panel ? 18 + (202 - 8 * cw) / 2 : 13 + (218 - 8 * cw) / 2, top = is_panel ? 6 : y_base - 2;
-        uint32_t t = g->tap >= 1u && g->tap <= 8u ? g->tap - 1u : 0u;
-        if (!is_panel) ch = 9, cw = 26;
-        for (int32_t r = 0; r < rows; r++) {
-            uint32_t v = r ? g->hist[r - 1] : g->cells;
-            for (uint32_t i = 0; i < 8u; i++) {
-                int32_t x = x0 + (int32_t)(7u - i) * cw, y = top + r * ch;
-                if ((v >> i) & 1u) cv_rect(x + 1, y + 1, cw - 2, ch - 2, !r ? (i == t ? T_TEXT : c) : dim);
-                else if (!r) cv_rect(x + 1, y + ch - 2, cw - 2, 1, dim);
-            }
-        }
-        if (is_panel) {
-            int32_t x = x0 + (int32_t)(7u - t) * cw, y = top + rows * ch + 2;
-            cv_rect(x + cw / 2 - 3, y, 7, 2, T_ACCENT);
-            cv_rect(x + cw / 2 - 1, y + 2, 3, 2, T_ACCENT);
         }
     } else if (mode == TESS_ENG_QUAD) {
         /* the whole grid whatever track is selected: a row a track, a cell a bar at its pitch (a rest a dash), the cell
