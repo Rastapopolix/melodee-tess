@@ -482,6 +482,59 @@ static void s_evolve_poly(void)
     turns(tessera_form_knob, 0, 1);                   /* FORM AB */
 }
 
+/* TWEAK 2: BRANCH, LOGIC, COND (tessera_tweak2_knob) */
+static void s_branch_coin(void)
+{
+    gen(0, TESS_ENG_MARKOV);
+    knob(tessera_tweak2_knob, 0, 25);                 /* BRANCH 50 */
+    turns(tessera_tweak2_knob, 1, 1);                 /* TO T2 COIN (track 2: STEP) */
+}
+static void s_branch_toggle(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    knob(tessera_knob, 2, 3);                         /* 7 pulses */
+    gen(1, TESS_ENG_TURING);
+    sel(0);
+    knob(tessera_tweak2_knob, 0, 40);                 /* BRANCH 80 */
+    turns(tessera_tweak2_knob, 1, 2);                 /* TO T2 TOGGLE */
+}
+static void s_branch_latch(void)
+{
+    gen(0, TESS_ENG_BOUNCE);
+    knob(tessera_knob, 3, 1);                         /* 2 balls */
+    gen(2, TESS_ENG_EUCLID);
+    sel(0);
+    knob(tessera_tweak2_knob, 0, 30);                 /* BRANCH 60 */
+    turns(tessera_tweak2_knob, 1, 6);                 /* TO T3 LATCH */
+}
+static uint32_t lg_op;                                /* (s_logic: 1 AND .. 4 NOT) */
+static void s_logic(void)
+{
+    gen(0, TESS_ENG_EUCLID);
+    knob(tessera_knob, 2, 1);                         /* 5 pulses */
+    gen(1, TESS_ENG_MARKOV);                          /* (DENSITY 70: rests of its own) */
+    turns(tessera_tweak2_knob, 2, (int32_t)(1u + (lg_op - 1u) * 3u));   /* LOGIC op, T1 */
+}
+static void s_logic_and(void) { lg_op = TESS_LG_AND; s_logic(); }
+static void s_logic_or(void) { lg_op = TESS_LG_OR; s_logic(); }
+static void s_logic_xor(void) { lg_op = TESS_LG_XOR; s_logic(); }
+static void s_logic_not(void) { lg_op = TESS_LG_NOT; s_logic(); }
+static void s_logic_higher(void)                      /* track 1 reads track 2's step before */
+{
+    gen(1, TESS_ENG_EUCLID);
+    gen(0, TESS_ENG_TURING);
+    turns(tessera_tweak2_knob, 2, 1);                 /* AND T2 */
+}
+static void s_cond_form(void)
+{
+    gen(0, TESS_ENG_TURING);
+    turns(tessera_form_knob, 0, 1);                   /* FORM AB, 4 bars a section */
+    turns(tessera_tweak2_knob, 3, 4);                 /* COND 2:4 */
+    gen(1, TESS_ENG_GRIDS);
+    turns(tessera_tweak2_knob, 3, 10);                /* COND !FIRST */
+    turns(tessera_tweak2_knob, 2, 10);                /* NOT T1 */
+}
+
 static const scen_t SCEN[] = {
     {"turing", 8, 0x1001u, s_turing, 0},
     {"turing_len8_prob30_oct3", 8, 0x1002u, s_turing_var, 0},
@@ -527,6 +580,15 @@ static const scen_t SCEN[] = {
     {"poly", 4, 0x1029u, s_poly, 0},
     {"poly_div_4_3_5_7_span2_human40", 8, 0x102Au, s_poly_var, 0},
     {"evolve_poly_every1_amount100_ab", 16, 0x102Bu, s_evolve_poly, 0},
+    {"branch_markov_coin50_to_step_track", 8, 0x102Cu, s_branch_coin, 0},
+    {"branch_euclid_toggle80_to_turing", 8, 0x102Du, s_branch_toggle, 0},
+    {"branch_bounce_latch60_to_euclid", 8, 0x102Eu, s_branch_latch, 0},
+    {"logic_markov_and_euclid", 4, 0x102Fu, s_logic_and, 0},
+    {"logic_markov_or_euclid", 4, 0x102Fu, s_logic_or, 0},
+    {"logic_markov_xor_euclid", 4, 0x102Fu, s_logic_xor, 0},
+    {"logic_markov_not_euclid", 4, 0x102Fu, s_logic_not, 0},
+    {"logic_turing_and_higher_track", 4, 0x1030u, s_logic_higher, 0},
+    {"cond_2of4_form_ab_grids_notfirst_not", 16, 0x1031u, s_cond_form, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -690,6 +752,228 @@ static void roll_wait_check(char *res, size_t cap)
     snprintf(res, cap, "%u %u", same, n[0] + n[1]);
 }
 
+/* ------------------------------------------------------------- TWEAK 2 --- */
+/* The checks of tw2_run, each a bit of its result when it fails */
+static const char *const TW2_CHECK[] = {
+    "COND: each value (OFF 1:2 2:2 1:4 2:4 3:4 4:4 1:8 8:8 FIRST !FIRST) plays its bars of 8, every step in them",
+    "COND with FORM on: FIRST plays the first bar of each section (AB, EVERY 2: bars 1, 3, 5, 7)",
+    "LOGIC AND / OR / XOR / NOT with a lower track: the steps that play, step for step",
+    "BRANCH COIN 100: every hit on track TO, the same notes at the same time, none here",
+    "BRANCH TOGGLE 100: the hits alternate, the first on TO",
+    "BRANCH LATCH 50: each bar's hits all on one side, both sides used, none lost",
+    "BRANCH COIN 50: every hit on one side or the other, none lost, both used",
+    "BRANCH to a muted track: its share not played, the rest here",
+    "BRANCH: no note left sounding on the track TO after the stop",
+    "BRANCH 0, LOGIC and COND OFF: the same notes as without TWEAK 2",
+};
+#define TW2_N (sizeof TW2_CHECK / sizeof TW2_CHECK[0])
+static uint32_t tw2_mode, tw2_a, tw2_b, tw2_c;          /* (tw2_setup's: which set-up, its values) */
+static void tw2_setup(void)
+{
+    if (tw2_mode == 0u) {                               /* COND tw2_a on Euclid 16 of 16 */
+        gen(0, TESS_ENG_EUCLID);
+        knob(tessera_knob, 2, 12);
+        turns(tessera_tweak2_knob, 3, (int32_t)tw2_a);
+    } else if (tw2_mode == 1u) {                        /* COND FIRST, FORM AB of 2 bars, CONTRAST 0 */
+        gen(0, TESS_ENG_EUCLID);
+        knob(tessera_knob, 2, 12);
+        turns(tessera_form_knob, 0, 1);
+        knob(tessera_form_knob, 1, -30);
+        turns(tessera_evolve_knob, 1, -1);
+        turns(tessera_tweak2_knob, 3, TESS_COND_FIRST);
+    } else if (tw2_mode == 2u) {                        /* LOGIC tw2_a: Euclid 5 (track 1), Euclid 7 rot 3 with T1 */
+        gen(0, TESS_ENG_EUCLID);
+        knob(tessera_knob, 2, 1);
+        gen(1, TESS_ENG_EUCLID);
+        knob(tessera_knob, 2, 3);
+        knob(tessera_knob, 3, 3);
+        if (tw2_a) turns(tessera_tweak2_knob, 2, (int32_t)(1u + (tw2_a - 1u) * 3u));
+    } else {                                            /* BRANCH tw2_b % to T2 (STEP), mode tw2_a; tw2_c: T2 muted */
+        gen(0, TESS_ENG_EUCLID);
+        knob(tessera_knob, 2, 3);
+        knob(tessera_tweak2_knob, 0, (int32_t)tw2_b / 2);
+        if (tw2_b) turns(tessera_tweak2_knob, 1, (int32_t)(1u + tw2_a));
+        trk[1].p[P_MUTE] = (int16_t)tw2_c;
+    }
+}
+static const scen_t TW2_SC = {"tweak2", 8, 0x2001u, tw2_setup, 0};
+/* the scenario as set: its notes per track (blk << 16 | note << 8 | vel, at most 512 a track) */
+static uint32_t tw2_ev[2][512], tw2_n[2], tw2_held;
+static void tw2_go(uint32_t mode, uint32_t a, uint32_t b, uint32_t c)
+{
+    char r[96];
+    tw2_mode = mode, tw2_a = a, tw2_b = b, tw2_c = c;
+    tt_n = tt_blk = tt_lost = 0;
+    scen_run(&TW2_SC, 0, r, sizeof r);
+    tw2_n[0] = tw2_n[1] = 0;
+    for (uint32_t i = 0; i < tt_n; i++)
+        if (tt_ev[i].tr < 2u && tw2_n[tt_ev[i].tr] < 512u)
+            tw2_ev[tt_ev[i].tr][tw2_n[tt_ev[i].tr]++] = tt_ev[i].blk << 16 | (uint32_t)tt_ev[i].note << 8 | tt_ev[i].vel;
+    tw2_held = trk[1].seq_n;
+    for (uint32_t v = 0; v < NVOICE; v++) tw2_held += trk[1].v[v].gate != 0;
+}
+static uint32_t tw2_bar(uint32_t ev)                    /* the bar an event is in, to the nearest half step (the
+                                                         * blocks round the steps: a bar line's step falls early) */
+{
+    uint32_t b = 0, bar = tt_bar_blk[1] - tt_bar_blk[0], half = bar / 32u;
+    while (b + 1u < 64u && (ev >> 16) + half >= (tt_bar_blk[b + 1u] ? tt_bar_blk[b + 1u] : tt_bar_blk[b] + bar)) b++;
+    return b;                                           /* (past the scenario's last bar line: the bars after it) */
+}
+static int tw2_has(uint32_t tr, uint32_t blk)
+{
+    for (uint32_t i = 0; i < tw2_n[tr]; i++) if (tw2_ev[tr][i] >> 16 == blk) return 1;
+    return 0;
+}
+static void tw2_run(char *res, size_t cap)
+{
+    static const uint8_t PLAYS[TESS_COND_COUNT] = {0xFF, 0x55, 0xAA, 0x11, 0x22, 0x44, 0x88, 0x01, 0x80, 0x01, 0xFE};
+    static uint32_t a[512], b[512], na, nb;
+    uint32_t fail = 0, c, i, k;
+    for (c = 0; c < TESS_COND_COUNT; c++) {             /* COND */
+        uint32_t per[8] = {0};
+        tw2_go(0, c, 0, 0);
+        for (i = 0; i < tw2_n[0]; i++) if (tw2_bar(tw2_ev[0][i]) < 8u) per[tw2_bar(tw2_ev[0][i])]++;
+        for (k = 0; k < 8u; k++) if (per[k] != ((PLAYS[c] >> k) & 1u ? 16u : 0u)) fail |= 1u << 0;
+    }
+    {
+        uint32_t seen = 0;
+        tw2_go(1, 0, 0, 0);
+        for (i = 0; i < tw2_n[0]; i++) seen |= 1u << tw2_bar(tw2_ev[0][i]);
+        if ((seen & 0xFFu) != 0x55u) fail |= 1u << 1;
+    }
+    tw2_go(2, 0, 0, 0);                                 /* LOGIC: OFF first, then each against it */
+    na = tw2_n[0], nb = tw2_n[1];
+    for (i = 0; i < na; i++) a[i] = tw2_ev[0][i] >> 16;
+    for (i = 0; i < nb; i++) b[i] = tw2_ev[1][i] >> 16;
+    if (!na || !nb) fail |= 1u << 2;
+    for (uint32_t op = 1; op < TESS_LG_COUNT; op++) {
+        uint32_t steps[1024], ns = 0, want = 0;
+        tw2_go(2, op, 0, 0);
+        for (i = 0; i < na; i++) steps[ns++] = a[i];
+        for (i = 0; i < nb; i++) {
+            uint32_t j;
+            for (j = 0; j < na && a[j] != b[i]; j++) ;
+            if (j == na) steps[ns++] = b[i];
+        }
+        for (i = 0; i < ns; i++) {                      /* every step either track hit: track 2 plays the op of both */
+            int ha = 0, hb = 0, o;
+            for (k = 0; k < na; k++) ha |= a[k] == steps[i];
+            for (k = 0; k < nb; k++) hb |= b[k] == steps[i];
+            o = op == TESS_LG_AND ? ha && hb : op == TESS_LG_OR ? ha || hb : op == TESS_LG_XOR ? ha != hb : hb && !ha;
+            want += (uint32_t)o;
+            if (tw2_has(1, steps[i]) != o) fail |= 1u << 2;
+        }
+        if (tw2_n[1] != want) fail |= 1u << 2;
+    }
+    tw2_go(3, 0, 0, 0);                                 /* BRANCH: off first */
+    na = tw2_n[0];
+    memcpy(a, tw2_ev[0], na * sizeof a[0]);
+    if (!na || tw2_n[1]) fail |= 1u << 3;
+    if (tw2_held) fail |= 1u << 8;
+    tw2_go(3, TESS_BR_COIN, 100, 0);
+    if (tw2_n[0] || tw2_n[1] != na || memcmp(a, tw2_ev[1], na * sizeof a[0])) fail |= 1u << 3;
+    if (tw2_held) fail |= 1u << 8;
+    tw2_go(3, TESS_BR_TOGGLE, 100, 0);
+    if (tw2_n[0] + tw2_n[1] != na) fail |= 1u << 4;
+    for (i = 0; i < na; i++)                            /* hit i: on track 2 when i is even */
+        if (tw2_has(i % 2u ? 0u : 1u, a[i] >> 16) != 1) fail |= 1u << 4;
+    if (tw2_held) fail |= 1u << 8;
+    {
+        uint32_t side[8], used = 0;
+        tw2_go(3, TESS_BR_LATCH, 50, 0);
+        for (k = 0; k < 8u; k++) side[k] = 0;
+        for (uint32_t tr = 0; tr < 2u; tr++)
+            for (i = 0; i < tw2_n[tr]; i++) {
+                uint32_t bb = tw2_bar(tw2_ev[tr][i]) & 7u;
+                side[bb] |= 1u << tr;
+                used |= 1u << tr;
+            }
+        for (k = 0; k < 8u; k++) if (side[k] == 3u) fail |= 1u << 5;
+        if (used != 3u || tw2_n[0] + tw2_n[1] != na) fail |= 1u << 5;
+        if (tw2_held) fail |= 1u << 8;
+    }
+    tw2_go(3, TESS_BR_COIN, 50, 0);
+    if (tw2_n[0] + tw2_n[1] != na || !tw2_n[0] || !tw2_n[1]) fail |= 1u << 6;
+    for (i = 0; i < na; i++)
+        if (tw2_has(0, a[i] >> 16) + tw2_has(1, a[i] >> 16) != 1) fail |= 1u << 6;
+    if (tw2_held) fail |= 1u << 8;
+    nb = tw2_n[0];
+    tw2_go(3, TESS_BR_COIN, 50, 1);                     /* the same tosses, track 2 muted */
+    if (tw2_n[1] || tw2_n[0] != nb) fail |= 1u << 7;
+    tw2_go(3, TESS_BR_COIN, 0, 0);                      /* BRANCH 0 with TO set: as off */
+    if (tw2_n[0] != na || tw2_n[1] || memcmp(a, tw2_ev[0], na * sizeof a[0])) fail |= 1u << 9;
+    snprintf(res, cap, "%u", fail);
+}
+
+/* ------------------------------------------------------------ SLOTH, OCHD --- */
+static const char *const ORG_CHECK[] = {
+    "SLOTH: 6 hours at SPEED 100 (4 days at 50): every circuit in its range, swinging over most of it",
+    "SLOTH: APATHY turns about once a minute at SPEED 50, twice as often at 62.5",
+    "OCHD: 8 rates, slowest first, 64 s a turn for OCHD 1 at RATE 50; bent triangles within -1..1",
+    "PLAY: each track's from its SEED (the same again after PLAY), another SEED elsewhere",
+};
+#define ORG_N (sizeof ORG_CHECK / sizeof ORG_CHECK[0])
+static uint32_t org_turns(uint32_t tr, uint32_t k, uint32_t blocks)   /* upward zero crossings of output k */
+{
+    uint32_t n = 0;
+    int32_t was = organic_out(tr, k);
+    for (uint32_t i = 0; i < blocks; i++) {
+        int32_t v;
+        organic_tick();
+        v = organic_out(tr, k);
+        n += was < 0 && v >= 0;
+        was = v;
+    }
+    return n;
+}
+static void org_run(char *res, size_t cap)
+{
+    uint32_t fail = 0, tr, k, i, n1, n2;
+    const uint32_t BPS = 1378u;
+    int32_t lo[3] = {32767, 32767, 32767}, hi[3] = {-32767, -32767, -32767}, a[11];
+    host_tracks_init();
+    tessera_reset();
+    for (tr = 0; tr < TESSERA_TRACKS; tr++) { tessera.seed[tr] = (uint16_t)(1u + tr * 37u); tessera.org_speed[tr] = 100; }
+    organic_play();
+    organic_tick();
+    for (i = 0; i < 6u * 3600u * BPS; i++) {
+        organic_tick();
+        for (k = 0; k < 3u; k++) {
+            float x = organic[1].x[k];
+            int32_t v = organic_out(1, k);
+            if (!(x > -2.6f && x < 1.4f)) fail |= 1u << 0;
+            lo[k] = v < lo[k] ? v : lo[k], hi[k] = v > hi[k] ? v : hi[k];
+        }
+    }
+    for (k = 0; k < 3u; k++) if (lo[k] > -25000 || hi[k] < 15000) fail |= 1u << 0;
+    tessera.org_speed[0] = 50;
+    n1 = org_turns(0, 1, 30u * 60u * BPS);           /* 30 minutes of APATHY */
+    tessera.org_speed[0] = 62;                       /* (62.5: 62 is 2^0.96) */
+    n2 = org_turns(0, 1, 30u * 60u * BPS);
+    if (n1 < 20u || n1 > 45u || n2 * 10u < n1 * 17u || n2 * 10u > n1 * 23u) fail |= 1u << 1;
+    tessera.org_rate[0] = 50;
+    n1 = org_turns(0, 3, 640u * BPS);                /* OCHD 1: 10 turns in 640 s */
+    if (n1 < 9u || n1 > 11u) fail |= 1u << 2;
+    for (k = 4; k < 11u; k++) {
+        uint32_t m = org_turns(0, k, 64u * BPS);
+        if (m <= n1 / 10u) fail |= 1u << 2;
+        n1 = m * 10u;
+    }
+    for (i = 0; i < 100000u; i++) {
+        organic_tick();
+        for (k = 3; k < 11u; k++) if (organic_out(0, k) < -32767 || organic_out(0, k) > 32767) fail |= 1u << 2;
+    }
+    organic_play();
+    for (i = 0; i < 5000u; i++) organic_tick();
+    for (k = 0; k < 11u; k++) a[k] = organic_out(2, k);
+    organic_play();
+    for (i = 0; i < 5000u; i++) organic_tick();
+    for (k = 0; k < 11u; k++) if (organic_out(2, k) != a[k]) fail |= 1u << 3;
+    for (k = 0, n1 = 0; k < 11u; k++) n1 += organic_out(3, k) != a[k];
+    if (n1 < 9u) fail |= 1u << 3;
+    snprintf(res, cap, "%u", fail);
+}
+
 /* --------------------------------------------------------- saved block --- */
 static uint32_t pack_hash(const uint8_t *p)
 {
@@ -701,7 +985,7 @@ static uint32_t pack_hash(const uint8_t *p)
     return h;
 }
 
-/* "hash ok": the block of a project set up as s_all + s_tweak (track 2 FOLLOW) + FORM's FLOURISH; ok: it loads
+/* "hash ok": the block of a project set up as s_all + s_tweak (track 2 FOLLOW) + FORM's FLOURISH + TWEAK 2 (track 3); ok: it loads
  * back to the same block, and a block with any value out of range is refused, the live state untouched */
 static void pack_run(char *res, size_t cap)
 {
@@ -716,6 +1000,10 @@ static void pack_run(char *res, size_t cap)
     sel(2);
     knob(tessera_form_knob, 3, 2);
     knob(tessera_form_knob, 1, -5);
+    knob(tessera_tweak2_knob, 0, 20);                 /* track 3: BRANCH 40 TO T4 LATCH, LOGIC XOR T2, COND 3:4 */
+    turns(tessera_tweak2_knob, 1, 9);
+    turns(tessera_tweak2_knob, 2, 8);
+    turns(tessera_tweak2_knob, 3, 5);
     tessera_pack(a);
     ha = pack_hash(a);
     tessera_reset();
@@ -816,6 +1104,39 @@ static void pack_run(char *res, size_t cap)
         for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
             memcpy(c, a, sizeof c);
             c[3u * n4 + n3 + BAD[k][0]] = BAD[k][1];  /* (track 4's) */
+            ok &= tessera_unpack(c) == 0;
+        }
+        tessera_unpack(a);
+    }
+    {   /* SLOTH SPEED and OCHD RATE: their round trip */
+        tessera_param_set(3, TX_ORG_SPEED, 80);
+        tessera_param_set(3, TX_ORG_RATE, 7);
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.org_speed[3] == 80u && tessera.org_rate[3] == 7u;
+        tessera_unpack(a);
+    }
+    {   /* a version 4 block (before BRANCH, LOGIC, COND, SLOTH, OCHD: each track 8 bytes shorter) loads every setting, theirs off;
+         * each new setting out of range is refused */
+        static uint8_t v4[TESSERA_PK_BYTES_V4], v4b[TESSERA_PK_BYTES_V4];
+        static const uint8_t BAD[][2] = {{0, 101}, {1, 5}, {2, 3}, {3, 5}, {4, 5}, {5, 11}, {6, 101}, {7, 101}};
+        const uint32_t n5 = TESSERA_PK_BYTES / TESSERA_TRACKS, n4 = TESSERA_PK_BYTES_V4 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v4 + tr * n4, a + tr * n5, n4);
+        ok &= tessera.evolve[2].branch == 40u && tessera.evolve[2].br_to == 4u && tessera.evolve[2].br_mode == TESS_BR_LATCH &&
+              tessera.evolve[2].logic == TESS_LG_XOR && tessera.evolve[2].lg_with == 2u && tessera.evolve[2].cond == TESS_COND_3_4;
+        tessera_reset();
+        ok &= tessera_unpack_ver(4u, v4) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            const tessera_evolve_t *ev = &tessera.evolve[tr];
+            memcpy(v4b + tr * n4, b + tr * n5, n4);
+            ok &= !ev->branch && !ev->br_to && !ev->br_mode && !ev->logic && !ev->lg_with && !ev->cond;
+            ok &= tessera.org_speed[tr] == 50u && tessera.org_rate[tr] == 50u;
+        }
+        ok &= !memcmp(v4, v4b, sizeof v4);            /* every version 4 setting as it was */
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[1u * n5 + n4 + BAD[k][0]] = BAD[k][1];  /* (track 2's) */
             ok &= tessera_unpack(c) == 0;
         }
         tessera_unpack(a);
@@ -948,6 +1269,42 @@ int main(int argc, char **argv)
         bad += check(which == 0 ? "ROLL turned away and back: the same line again, note for note (Markov, Turing PROB 30)"
                                 : "PLAY again (EVOLVE off): the same line from the top, note for note (Markov)", same && differ);
         if (which == 0) bad += check("... and the other seed played another line meanwhile", differ);
+    }
+    {   /* TWEAK 2: COND, LOGIC, BRANCH */
+        unsigned fail = ~0u;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                tw2_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &fail);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        for (i = 0; i < TW2_N; i++) bad += check(TW2_CHECK[i], !((fail >> i) & 1u));
+    }
+    {   /* SLOTH, OCHD */
+        unsigned fail = ~0u;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                org_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &fail);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        for (i = 0; i < ORG_N; i++) bad += check(ORG_CHECK[i], !((fail >> i) & 1u));
     }
     {   /* ROLL mid-bar: the line playing until the bar line */
         unsigned same = 0, n = 0;

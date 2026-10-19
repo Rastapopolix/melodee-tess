@@ -17,13 +17,15 @@ static void help_find(uint32_t k)
     static const uint8_t EV[4] = {TX_EV_LOCK, TX_EV_EVERY, TX_EV_AMOUNT, TX_EV_SEED};
     static const uint8_t FM[4] = {TX_FM_FORM, TX_FM_CONTRAST, 0xFF, TX_FM_FLOURISH};
     static const uint8_t TW[4] = {TX_TW_SHIFT, TX_TW_DROP, TX_TW_HUMAN, TX_TW_FOLLOW};
+    static const uint8_t TW2[4] = {TX_TW_BRANCH, TX_TW_BR_TO, TX_TW_LOGIC, TX_TW_COND};
     static const uint8_t ENG[TESS_ENG_COUNT][3] = {{0xFF, 0xFF, 0xFF}, {TX_TUR_LEN, TX_TUR_PROB, TX_TUR_SPAN},
         {TX_EUC_STEPS, TX_EUC_PULSES, TX_EUC_ROT}, {TX_MKV_LEAP, TX_MKV_DENS, TX_MKV_SPAN}, {TX_MRP_POS, TX_MRP_SNPA, TX_MRP_SNPB},
         {TX_GRD_X, TX_GRD_Y, TX_GRD_DENS}, {TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_BALLS},
         {TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB}, {0xFF, TX_POL_DIV1, TX_POL_SPAN}};
     static const char *const CORD_TEXT[4] = {
         "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
-        "or CV, or DRIFT, a slow wander. -- leaves the mod a fixed move.",
+        "or CV, or DRIFT, a slow wander, or its SLOTH (TORPOR, APATHY, INERTIA) or OCHD 1-8 (LFO > ORGANIC). -- leaves "
+        "the mod a fixed move.",
         "Which of the 16 mods the other knobs edit.",
         "What it moves, on which track: the voices' pitch, cutoff, shape, gain, a sound setting, or a generator's.",
         "How far, and which way: at a full source, 100 % is the destination's whole range (pitch: an octave)."};
@@ -41,6 +43,8 @@ static void help_find(uint32_t k)
     }
     if (pg->graph == GR_EVOLVE) x = EV[k];
     else if (pg->graph == GR_TWEAK) x = TW[k];
+    else if (pg->graph == GR_TWEAK2) x = TW2[k];
+    else if (pg->graph == GR_ORGANIC && k < 2u) x = k ? TX_ORG_RATE : TX_ORG_SPEED;
     else if (pg->graph == GR_FORM) {
         x = FM[k];
         if (x == 0xFFu) {

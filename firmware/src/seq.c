@@ -800,6 +800,7 @@ static __attribute__((noinline)) void audition_tick(uint32_t n)
 static void seq_start(void)
 {
     tessera_ensure_init();
+    organic_play();                                 /* (SLOTH and OCHD from each track's SEED: a piece replays) */
     cin_left = 0; /* MIDI Start also cancels a pending local count-in. */
     uint32_t i;
     seq_erase_request = 0;
@@ -1062,6 +1063,8 @@ static void seq_grid_tick(track_t *t, uint32_t n)
                 tessera_clock_step(t);
             } else {
                 seq_step(t, s, step_gate(s) ? step_samples(t, period, t->seq_idx) : period, skip);
+                if (tr_idx < TESSERA_TRACKS)
+                    tessera.hit[tr_idx] = t->seq_n != 0;   /* (TWEAK 2's LOGIC on another track reads it) */
             }
         }
     }

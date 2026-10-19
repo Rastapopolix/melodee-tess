@@ -177,6 +177,14 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x223 | POLY RHYTHM 3 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | OFF | Every how many steps rhythm 3 moves the four notes on (OFF: never). |
 | 0x224 | POLY RHYTHM 4 | OFF, /1, /2, /3, /4, /5, /6, /7, /8, /9, /10, /11, /12, /13, /14, /15, /16 | OFF | Every how many steps rhythm 4 moves the four notes on (OFF: never). |
 | 0x225 | POLY SPAN | 1 to 3 | 1 | Octaves the four notes spread over; ROLL draws them, EVOLVE moves them a little. |
+| 0x226 | TWEAK BRANCH | 0 to 100 % | 0 | The chance a hit plays on track TO's sound instead of this one's, so two tracks answer each other; 0 is off. The tosses replay with the SEED. |
+| 0x227 | TWEAK BRANCH TO | OFF, T1, T2, T3, T4 | OFF | The track a branched hit plays on; OFF keeps every hit here. Turned on: COIN tosses each hit, TOGGLE switches side on a toss won, LATCH tosses once a bar. |
+| 0x228 | TWEAK BRANCH MODE | COIN, TOGGLE, LATCH | COIN | COIN tosses each hit; TOGGLE switches side on a toss won (100 alternates); LATCH tosses once a bar and keeps the bar's hits on one side. |
+| 0x229 | TWEAK LOGIC | OFF, AND, OR, XOR, NOT | OFF | Combines the hits with track WITH's: AND plays only when both hit, OR when either does, XOR when one does, NOT only when the other rests; OFF is its own. |
+| 0x22A | TWEAK LOGIC WITH | OFF, T1, T2, T3, T4 | OFF | The track LOGIC reads: a lower track's hit on this step, a higher one's on the step before. |
+| 0x22B | TWEAK COND | OFF, 1:2, 2:2, 1:4, 2:4, 3:4, 4:4, 1:8, 8:8, FIRST, !FIRST | OFF | The bars a hit may play in, counted from PLAY (with FORM on, from the section's start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest. |
+| 0x22C | SLOTH SPEED | 0 to 100 | 50 | How fast the track's SLOTH drifts (mods: TORPOR, APATHY, INERTIA): 50 is about 17, 1 and 3 minutes a turn; each 12.5 more twice as fast. |
+| 0x22D | OCHD RATE | 0 to 100 | 50 | How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for OCHD 8; each 12.5 more twice as fast. |
 
 ## Mods
 
@@ -198,6 +206,17 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | NOTE | the generator's last note (C4 = 0) |
 | CV | the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the degree it moved to |
 | DRIFT | a slow wander of the track's own, a new point every 12 s or so, eased between (a new project's default mods: each track's CUTOFF and FX SEND) |
+| TORPOR | (null) |
+| APATHY | (null) |
+| INERTIA | (null) |
+| OCHD 1 | (null) |
+| OCHD 2 | (null) |
+| OCHD 3 | (null) |
+| OCHD 4 | (null) |
+| OCHD 5 | (null) |
+| OCHD 6 | (null) |
+| OCHD 7 | (null) |
+| OCHD 8 | (null) |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |
@@ -248,3 +267,4 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | B SPEED | the generator's step | Bounce's speed: how far the balls move a step |
 | B ANGLE | the generator's step | Bounce's angle: the balls' paths |
 | A PROB | the generator's step | Awake's PROB: the chance a note plays |
+| BRANCH | the generator's step | TWEAK 2's BRANCH: the chance a hit plays on track TO |
