@@ -12,6 +12,9 @@ static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6"
 static const char *const TX_N_EVERY[] = {"OFF", "1", "2", "4", "8", "16"};
 static const char *const TX_N_FORM[] = {"OFF", "AB", "ABAC", "ABCB", "AABA", "ABCA", "AABC"};
 static const char *const TX_N_FOLLOW[] = {"OFF", "T1", "T2", "T3", "T4"};
+static const char *const TX_N_BRMODE[] = {"COIN", "TOGGLE", "LATCH"};
+static const char *const TX_N_LOGIC[] = {"OFF", "AND", "OR", "XOR", "NOT"};
+static const char *const TX_N_COND[] = {"OFF", "1:2", "2:2", "1:4", "2:4", "3:4", "4:4", "1:8", "8:8", "FIRST", "!FIRST"};
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
 static const param_desc_t TX_DESC[TX_COUNT] = {
@@ -53,6 +56,12 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_POL_DIV3] = {"DIV 3", F_ENUM, 0, 16, 0, TX_N_DIV, ""},
     [TX_POL_DIV4] = {"DIV 4", F_ENUM, 0, 16, 0, TX_N_DIV, ""},
     [TX_POL_SPAN] = PD("SPAN", F_INT, 1, 3, 1),
+    [TX_TW_BRANCH] = PD("BRANCH", F_PCT, 0, 100, 0),
+    [TX_TW_BR_TO] = PE("TO", TX_N_FOLLOW, 0),
+    [TX_TW_BR_MODE] = PE("BR MODE", TX_N_BRMODE, 0),
+    [TX_TW_LOGIC] = PE("LOGIC", TX_N_LOGIC, 0),
+    [TX_TW_LG_WITH] = PE("WITH", TX_N_FOLLOW, 0),
+    [TX_TW_COND] = PE("COND", TX_N_COND, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -269,6 +278,18 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_POL_DIV3, "POLY RHYTHM 3", "Every how many steps rhythm 3 moves the four notes on (OFF: never)."),
     X_(TX_POL_DIV4, "POLY RHYTHM 4", "Every how many steps rhythm 4 moves the four notes on (OFF: never)."),
     X_(TX_POL_SPAN, "POLY SPAN", "Octaves the four notes spread over; ROLL draws them, EVOLVE moves them a little."),
+    X_(TX_TW_BRANCH, "TWEAK BRANCH", "The chance a hit plays on track TO's sound instead of this one's, so two tracks "
+                                     "answer each other; 0 is off. The tosses replay with the SEED."),
+    X_(TX_TW_BR_TO, "TWEAK BRANCH TO", "The track a branched hit plays on; OFF keeps every hit here. Turned on: COIN "
+                                       "tosses each hit, TOGGLE switches side on a toss won, LATCH tosses once a bar."),
+    X_(TX_TW_BR_MODE, "TWEAK BRANCH MODE", "COIN tosses each hit; TOGGLE switches side on a toss won (100 alternates); "
+                                           "LATCH tosses once a bar and keeps the bar's hits on one side."),
+    X_(TX_TW_LOGIC, "TWEAK LOGIC", "Combines the hits with track WITH's: AND plays only when both hit, OR when either "
+                                   "does, XOR when one does, NOT only when the other rests; OFF is its own."),
+    X_(TX_TW_LG_WITH, "TWEAK LOGIC WITH", "The track LOGIC reads: a lower track's hit on this step, a higher one's on the "
+                                          "step before."),
+    X_(TX_TW_COND, "TWEAK COND", "The bars a hit may play in, counted from PLAY (with FORM on, from the section's "
+                                 "start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest."),
 };
 #undef T_
 #undef G_

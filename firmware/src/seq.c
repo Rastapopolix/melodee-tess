@@ -1062,6 +1062,8 @@ static void seq_grid_tick(track_t *t, uint32_t n)
                 tessera_clock_step(t);
             } else {
                 seq_step(t, s, step_gate(s) ? step_samples(t, period, t->seq_idx) : period, skip);
+                if (tr_idx < TESSERA_TRACKS)
+                    tessera.hit[tr_idx] = t->seq_n != 0;   /* (TWEAK 2's LOGIC on another track reads it) */
             }
         }
     }
