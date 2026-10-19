@@ -66,6 +66,8 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_CS_Y] = S_(CD_CS_Y, TX_CS_Y, "C Y", "Constellation's Y: the crosshair's height (AUTO OFF)"),
     [CD_CS_SIZE] = S_(CD_CS_SIZE, TX_CS_SIZE, "C SIZE", "Constellation's SIZE: how far from the crosshair a star is caught"),
     [CD_CS_DENS] = S_(CD_CS_DENS, TX_CS_DENS, "C DENS", "Constellation's DENS: how many stars the sky holds"),
+    [CD_SR_START] = S_(CD_SR_START, TX_SR_START, "S START", "Series' START: where in the infinity series it plays"),
+    [CD_CL_RULE] = S_(CD_CL_RULE, TX_CL_RULE, "CL RULE", "Cells' RULE: how each generation follows the last"),
 };
 #undef V_
 #undef B_
