@@ -459,7 +459,7 @@ enum { S_HOME, S_HOME_IDLE, S_HOME_NOTE, S_HOME_CHORD, S_HOME_INVERSION, S_HOME_
        S_REF_SHEET_MOTION, S_REF_MOD, S_REF_PICKER_MOD, S_REF_ARP, S_REF_PATTERN,
        S_REF_FMEG, S_REF_GRID, S_REF_SCALES, S_FX_PHASER, S_FX_WIDTH, S_FX_FORMANT, S_FX_TAPE, S_FX_SPIT, S_FX_ECHO, S_FX_ROOM, S_FX_REVERB, S_FX_CHORUS, S_FX_FULL, S_FX_SLOT2, S_FX_SLOT3, S_FX_SEND, S_FX_SEPARATE, S_FX_SENDS, S_FX_BUS1, S_FX_BUS2, S_FX_BUS3,
        S_GEN_TURING, S_GEN_EUCLID, S_GEN_MARKOV, S_GEN_MORPH, S_GEN_EVOLVE, S_CORDS, S_HELP, S_CORDS_PICK_SRC, S_CORDS_PICK_DST,
-       S_GEN_GRIDS, S_GEN_TWEAK, S_GEN_TWEAK_OFF, S_MOD_SHORTCUT, S_GEN_BOUNCE, S_GEN_AWAKE, S_GEN_POLY, S_GEN_TWEAK2, S_GEN_TWEAK2_OFF, S_ORGANIC, S_GEN_TWEAK2_COIN, S_COUNT };
+       S_GEN_GRIDS, S_GEN_TWEAK, S_GEN_TWEAK_OFF, S_MOD_SHORTCUT, S_GEN_BOUNCE, S_GEN_AWAKE, S_GEN_POLY, S_GEN_TWEAK2, S_GEN_TWEAK2_OFF, S_ORGANIC, S_GEN_TWEAK2_COIN, S_MODS_LIVE, S_MODS_LIVE_GEN, S_COUNT };
 static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "home_note", "home_chord", "home_inversion", "home_wide", "home_released", "home_fm6", "message", "message_key", "presets", "presets_nofav", "presets_cat", "presets_pending", "presets_recent", "user",
     "project", "project_boot", "tempo", "song_empty", "song", "step", "pattern", "motion", "drum",
     "mixer", "mixer_pan", "env", "env_dest", "lfo", "mod", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
@@ -479,7 +479,7 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "home_note", "h
     "notes_slide", "notes_mixed", "notes_chord", "notes_empty", "notes_raw", "notes_zoom", "notes_loop", "notes_drum", "notes_dense", "notes_rec", "notes_erase", "notes_drum_rec", "notes_drum_erase", "scl_micro", "scl_micro_layer", "scl_micro_chord", "scale_picker_edo", "scale_picker_historical", "scale_picker_favorites", "scale_picker_empty", "scale_settings_favorite", "menu_click", "menu_click_level", "menu_countin", "menu_preview", "menu_add", "menu_autosave_on", "menu_autosave_off", "drum_sound_808", "drum_sound_909", "drum_mix_909", "drum_hit_909", "drum_hit_free", "drum_hit_long",
     "stage_drum", "stage_cz", "stage_p5", "stage_queued", "stage_browse", "stage_stopped", "stage_filter", "patterns", "patterns_stopped", "patterns_sheet", "patterns_copy", "patterns_replace", "patterns_delete", "project_new", "new_key", "new_roles",
     "ref_stage_held", "ref_stage_released", "ref_stage_cutoff", "ref_stage_drum", "ref_browser", "ref_patterns", "ref_song", "ref_env", "ref_lfo", "ref_edit_osc", "ref_mixer", "ref_notes", "ref_settings", "ref_dialog", "ref_sheet_sound", "ref_sheet_song", "ref_picker_wave", "ref_picker_mode", "ref_sections_p5", "ref_map_p5", "ref_map_fm6", "ref_scl_list", "ref_sheet_project", "ref_sheet_note", "ref_sheet_hit", "ref_motion", "ref_sheet_motion", "ref_mod", "ref_picker_mod", "ref_arp", "ref_pattern", "ref_fmeg", "ref_grid", "ref_scales", "fx_phaser", "fx_width", "fx_formant", "fx_tape", "fx_spit", "fx_echo", "fx_room", "fx_reverb", "fx_chorus", "fx_full", "fx_slot2", "fx_slot3", "fx_send", "fx_separate", "fx_sends", "fx_bus1", "fx_bus2", "fx_bus3",
-    "gen_turing", "gen_euclid", "gen_markov", "gen_morph", "gen_evolve", "cords", "help", "cords_pick_src", "cords_pick_dst", "gen_grids", "gen_tweak", "gen_tweak_off", "mod_shortcut", "gen_bounce", "gen_awake", "gen_poly", "gen_tweak2", "gen_tweak2_off", "organic", "gen_tweak2_coin"};
+    "gen_turing", "gen_euclid", "gen_markov", "gen_morph", "gen_evolve", "cords", "help", "cords_pick_src", "cords_pick_dst", "gen_grids", "gen_tweak", "gen_tweak_off", "mod_shortcut", "gen_bounce", "gen_awake", "gen_poly", "gen_tweak2", "gen_tweak2_off", "organic", "gen_tweak2_coin", "mods_live", "mods_live_gen"};
 
 /* the scenes of the UI design screens: the state the UI-redesign
  * prototype drew them from (its setup(): two pattern tracks, the drum pattern on track 4, a synthetic scope),
@@ -1147,12 +1147,13 @@ static void setup(int s)
         }
         go_title("TWEAK");
         break;
+    case S_MODS_LIVE_GEN:                           /* TWEAK 2's BRANCH moved by a mod now: the card's live mark */
     case S_GEN_TWEAK2: case S_GEN_TWEAK2_OFF: case S_GEN_TWEAK2_COIN:   /* TWEAK 2: each knob's picture, set and off;
                                                                            * COIN: the fork shaded 70/30 */
         tessera_reset();
         song.sel = 0;
         tessera_knob(0, TESS_ENG_TURING);
-        if (s == S_GEN_TWEAK2_COIN) {
+        if (s == S_GEN_TWEAK2_COIN || s == S_MODS_LIVE_GEN) {
             tessera_tweak2_knob(0, 15);             /* BRANCH 30 */
             tessera_tweak2_knob(1, 1);              /* TO T2 COIN */
         }
@@ -1163,6 +1164,12 @@ static void setup(int s)
             for (int i = 0; i < 3; i++) tessera_tweak2_knob(3, 1);   /* COND 1:4 */
         }
         go_title("TWEAK 2");
+        if (s == S_MODS_LIVE_GEN) {
+            static const cord_t C1 = {CS_OCHD2, 0, CD_TW_BRANCH, 0, 70, 0};
+            cord_clear();
+            cord_set(0, &C1);
+            organic_play();
+        }
         break;
     case S_ORGANIC:                                 /* SLOTH and OCHD a while after PLAY */
         tessera_reset();
@@ -1206,6 +1213,16 @@ static void setup(int s)
         go_title("MODS");
         if (s == S_CORDS_PICK_SRC) pick_touch(0);
         else if (s == S_CORDS_PICK_DST) pick_touch(2);
+        break;
+    }
+    case S_MODS_LIVE: {                             /* SID's PW and MODEL moved by mods now: their live marks */
+        static const cord_t C2[2] = {{CS_OCHD1, 0, CD_E4, 0, 80, 0}, {CS_OCHD3, 0, CD_E1, 0, -60, 0}};
+        eng(3);
+        cord_clear();
+        cord_set(0, &C2[0]);
+        cord_set(1, &C2[1]);
+        organic_play();
+        go_title("EDIT 1");
         break;
     }
     case S_FX_BUS1: case S_FX_BUS2: case S_FX_BUS3:

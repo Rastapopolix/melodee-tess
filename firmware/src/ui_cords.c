@@ -62,6 +62,7 @@ static void cu_chip(int32_t x, int32_t y, int32_t w, uint32_t tr, const char *s,
 }
 
 static uint8_t cu_led_was[4];                           /* (cu_leds: the step each light shows; a row redrawn: none) */
+static uint8_t cu_bar_was[4];                           /* (and where each row's live mark is) */
 #define CU_Y 22                                         /* the rows: 48 px each from y 22 (as MOD's), the chips at 220 */
 #define CU_H 48
 static void cu_rows(void)
@@ -79,12 +80,13 @@ static void cu_rows(void)
     if (!ui.force && sg == sig)
         return;
     sig = sg;
-    memset(cu_led_was, 0xFF, sizeof cu_led_was);        /* (the rows over their lights: cu_leds again) */
+    memset(cu_led_was, 0xFF, sizeof cu_led_was);        /* (the rows over their lights and moves: cu_leds again) */
+    memset(cu_bar_was, 0xFF, sizeof cu_bar_was);
     for (k = 0; k < 4u; k++) {
         const cord_t *c = cord_get(top + k);
         int sel = top + k == cord_ui_sel, on = c->dst != CD_OFF && (c->amount || c->offset);
         uint16_t bg = sel ? T_LIFT : T_BG;
-        int32_t a = cu_pct(c), m = 128, x;
+        int32_t a = cu_pct(c);
         char b[16];
         cv_begin(240, CU_H, T_BG);
         if (sel) {
@@ -100,20 +102,32 @@ static void cu_rows(void)
         cu_chip(118, 6, 74, c->dst_trk, cu_dst_name(c), c->dst != CD_OFF, c->dst != CD_OFF, bg);
         cu_pct_text(b, a);
         cv_text_r(232, 9, &AF_X, b, on ? (sel ? T_THEME : T_SEC) : T_DIM, bg);
-        cv_rect(26, 30, 206, 3, T_LINE);                /* the move, from the middle */
-        x = 26 + (a + 100) * 206 / 200;
-        if (a)
-            cv_rect(x < m ? x : m, 30, x < m ? m - x : x - m, 3, on ? (sel ? T_THEME : ux_mix(bg, T_THEME, 60)) : T_DIM);
-        cv_rect(m, 28, 1, 7, T_MID);
-        cv_blit(0, (uint32_t)(CU_Y + (int32_t)k * CU_H));
+        cv_blit(0, (uint32_t)(CU_Y + (int32_t)k * CU_H));   /* (its move: cu_leds) */
     }
 }
 
 /* a row's activity light under its number (tessera-notes/docs/design/phase2/cords.png): how far the cord moves its destination
- * now (cord.c cord_share: the source by the amount, and the offset), in 8 steps of the theme's colour; each light
- * its own small canvas, sent when its step changes */
+ * now (cord.c cord_share: the source by the amount, and the offset), in 8 steps of the theme's colour; and its move,
+ * the bar from the middle (its AMOUNT, or OFFSET), with a mark where it moves the destination now. Each its own small
+ * canvas, sent when it changes */
 #define CU_LED_X 9                                      /* 8 x 8 at (9, a row's y + 28) */
 #define CU_LED_Y 28
+#define CU_BAR_X 24                                     /* the move: 210 x 9 at (24, a row's y + 27), the bar 206 long */
+#define CU_BAR_W 210
+static void cu_bar(uint32_t k, const cord_t *c, int sel, int32_t s)
+{
+    uint16_t bg = sel ? T_LIFT : T_BG;
+    int on = cord_live(c);
+    int32_t a = cu_pct(c), m = 104, x = 2 + (a + 100) * 206 / 200, lx = m + clamp(s, -32768, 32768) * 103 / 32768;
+    cv_begin(CU_BAR_W, 9, bg);
+    cv_rect(2, 3, 206, 3, T_LINE);
+    if (a)
+        cv_rect(x < m ? x : m, 3, x < m ? m - x : x - m, 3, on ? (sel ? T_THEME : ux_mix(bg, T_THEME, 60)) : T_DIM);
+    cv_rect(m, 1, 1, 7, T_MID);
+    if (on && c->src)                                   /* (a fixed OFFSET: no mark, the bar says it) */
+        cv_rect(lx - 1, 0, 3, 9, T_TEXT);
+    cv_blit(CU_BAR_X, (uint32_t)(CU_Y + (int32_t)k * CU_H + 27));
+}
 static void cu_leds(void)
 {
     uint8_t *was = cu_led_was;
@@ -123,7 +137,12 @@ static void cu_leds(void)
         int32_t s = cord_live(c) ? cord_share(c) : 0;
         uint8_t lv = (uint8_t)(cord_live(c) ? 1 + clamp((s < 0 ? -s : s) * 7 / 32768, 0, 7) : 0);
         uint8_t key = (uint8_t)(lv | (top + k == cord_ui_sel) << 4 | (ux.pal & 7u) << 5);
+        uint8_t bk = (uint8_t)(clamp(s, -32768, 32768) * 103 / 32768 + 104);   /* (the mark's x, 1 .. 207) */
         uint16_t bg = top + k == cord_ui_sel ? T_LIFT : T_BG;
+        if (ui.force || bk != cu_bar_was[k]) {
+            cu_bar_was[k] = bk;
+            cu_bar(k, c, top + k == cord_ui_sel, s);
+        }
         if (!ui.force && key == was[k])
             continue;
         was[k] = key;
