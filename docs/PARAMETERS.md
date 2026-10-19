@@ -206,17 +206,17 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | NOTE | the generator's last note (C4 = 0) |
 | CV | the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the degree it moved to |
 | DRIFT | a slow wander of the track's own, a new point every 12 s or so, eased between (a new project's default mods: each track's CUTOFF and FX SEND) |
-| TORPOR | (null) |
-| APATHY | (null) |
-| INERTIA | (null) |
-| OCHD 1 | (null) |
-| OCHD 2 | (null) |
-| OCHD 3 | (null) |
-| OCHD 4 | (null) |
-| OCHD 5 | (null) |
-| OCHD 6 | (null) |
-| OCHD 7 | (null) |
-| OCHD 8 | (null) |
+| TORPOR | SLOTH's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50) |
+| APATHY | SLOTH's fastest chaotic circuit, about 1 min a turn |
+| INERTIA | SLOTH's middle chaotic circuit, about 3 min a turn |
+| OCHD 1 | a free LFO, 64 s a turn (ORGANIC page, RATE 50) |
+| OCHD 2 | a free LFO, 40 s a turn |
+| OCHD 3 | a free LFO, 25 s a turn |
+| OCHD 4 | a free LFO, 15.6 s a turn |
+| OCHD 5 | a free LFO, 9.8 s a turn |
+| OCHD 6 | a free LFO, 6.1 s a turn |
+| OCHD 7 | a free LFO, 3.8 s a turn |
+| OCHD 8 | a free LFO, 2.4 s a turn |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |

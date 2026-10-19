@@ -78,7 +78,12 @@ static int reference(FILE *f)
             "1 while the track's generator plays a note", "the generator's last note (C4 = 0)",
             "the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the "
             "degree it moved to", "a slow wander of the track's own, a new point every 12 s or so, eased between "
-            "(a new project's default mods: each track's CUTOFF and FX SEND)"};
+            "(a new project's default mods: each track's CUTOFF and FX SEND)",
+            "SLOTH's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50)",
+            "SLOTH's fastest chaotic circuit, about 1 min a turn", "SLOTH's middle chaotic circuit, about 3 min a turn",
+            "a free LFO, 64 s a turn (ORGANIC page, RATE 50)", "a free LFO, 40 s a turn", "a free LFO, 25 s a turn",
+            "a free LFO, 15.6 s a turn", "a free LFO, 9.8 s a turn", "a free LFO, 6.1 s a turn", "a free LFO, 3.8 s a turn",
+            "a free LFO, 2.4 s a turn"};
         fprintf(f, "\n## Mods\n\nA mod (the MODS page, under LFO) moves a destination on any track by a source on any "
                    "track: by its AMOUNT (-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) "
                    "plus its OFFSET. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track "
@@ -86,8 +91,10 @@ static int reference(FILE *f)
                    "gone: the four routes a project or a sound was saved with become mods on their track, the same move "
                    "(a sound's go when another sound is loaded on the track, unless one was edited).\n\n"
                    "| Source | |\n| --- | --- |\n", CORD_MAX, CORD_LIVE);
-        for (i = 1; i < CS_N; i++)
+        for (i = 1; i < CS_N; i++) {
             fprintf(f, "| %s | %s |\n", cord_src_name(i), SRC_HELP[i]);
+            if (!SRC_HELP[i]) check("every mod source has its help in the reference", 0);
+        }
         fprintf(f, "\n| Destination | Moved at | What it moves |\n| --- | --- | --- |\n");
         for (i = 1; i < CD_N; i++) {
             const cord_dest_t *d = cord_dest(i);
