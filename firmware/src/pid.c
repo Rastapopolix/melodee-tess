@@ -16,6 +16,8 @@ static const char *const TX_N_FOLLOW[] = {"OFF", "T1", "T2", "T3", "T4"};
 static const char *const TX_N_BRMODE[] = {"COIN", "TOGGLE", "LATCH"};
 static const char *const TX_N_LOGIC[] = {"OFF", "AND", "OR", "XOR", "NOT"};
 static const char *const TX_N_COND[] = {"OFF", "1:2", "2:2", "1:4", "2:4", "3:4", "4:4", "1:8", "8:8", "FIRST", "!FIRST"};
+static const char *const TX_N_NLMODE[] = {"STEP", "FIXED", "HIT"};
+static const char *const TX_N_NLLEN[] = {"1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
 static const param_desc_t TX_DESC[TX_COUNT] = {
@@ -68,6 +70,9 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_QD_DIR] = PE("DIR", TX_N_QDIR, 0),
     [TX_QD_PROB] = PD("PROB", F_PCT, 0, 100, 100),
     [TX_QD_LINK] = PE("LINK", TX_N_FOLLOW, 0),
+    [TX_NL_MODE] = PE("LENGTH", TX_N_NLMODE, 0),
+    [TX_NL_LEN] = PE("LEN", TX_N_NLLEN, 2),
+    [TX_NL_KEYS] = PD("KEYS", F_INT, 1, 4, 4),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -306,6 +311,11 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_QD_PROB, "QUAD PROB", "The chance each of the row's notes plays: 100 every one, lower leaves gaps."),
     X_(TX_QD_LINK, "QUAD LINK", "Another QUAD track this one's steps also move on, played for this step's gate: a "
                                 "slow track pulled along by a fast one, or a HOLD track played only by this one."),
+    X_(TX_NL_MODE, "NOTE LENGTH", "How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever "
+                                  "DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP."),
+    X_(TX_NL_LEN, "NOTE LENGTH LEN", "FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts."),
+    X_(TX_NL_KEYS, "NOTE LENGTH KEYS", "FIXED: how many notes may hold at once. One more ends the note nearest its end; "
+                                       "the same pitch again ends the one before."),
 };
 #undef T_
 #undef G_

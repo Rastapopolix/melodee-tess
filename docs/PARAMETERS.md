@@ -188,6 +188,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x22E | QUAD DIRECTION | FWD, BACK, PEND, RAND, HOLD | FWD | How the track's playhead moves along its row of the grid: forward, back, back and forth, at random; HOLD rests on its own steps and moves only when a LINK moves it. |
 | 0x22F | QUAD PROB | 0 to 100 % | 100 | The chance each of the row's notes plays: 100 every one, lower leaves gaps. |
 | 0x230 | QUAD LINK | OFF, T1, T2, T3, T4 | OFF | Another QUAD track this one's steps also move on, played for this step's gate: a slow track pulled along by a fast one, or a HOLD track played only by this one. |
+| 0x231 | NOTE LENGTH | STEP, FIXED, HIT | STEP | How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP. |
+| 0x232 | NOTE LENGTH LEN | 1/32, 1/16, 1/8, 1/4, 1/2, 1/1 | 1/8 | FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts. |
+| 0x233 | NOTE LENGTH KEYS | 1 to 4 | 4 | FIXED: how many notes may hold at once. One more ends the note nearest its end; the same pitch again ends the one before. |
 
 ## Mods
 

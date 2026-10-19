@@ -795,6 +795,25 @@ static void draw_columns(void)
         draw_column(3, "", "", "", T_DIM, -1, ICON_NONE);
         return;
     }
+    if (cur_page()->graph == GR_NOTELEN) {               /* NOTE LENGTH (note_len.c); LEN and KEYS FIXED's alone */
+        uint32_t tr = song.sel % TESSERA_TRACKS, m = tessera.nl_mode[tr], fixed = m == NL_FIXED;
+        static const char *const MODE[NL_COUNT] = {"STEP", "FIXED", "HIT"};
+        static const char *const LEN[6] = {"1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
+        char k2[8];
+        int16_t *vp;
+        const param_desc_t *d = page_desc(cur_page(), 3u, &vp);
+        fmt_int(k2, tessera.nl_keys[tr]);
+        draw_column(0, "LENGTH", MODE[m % NL_COUNT], "", VAL(0u), (int32_t)m * 1000 / (NL_COUNT - 1), ICON_AUTO);
+        draw_column(1, "LEN", fixed ? LEN[tessera.nl_len[tr] % 6u] : "--", "", fixed ? VAL(1u) : T_DIM,
+                    fixed ? (int32_t)tessera.nl_len[tr] * 1000 / 5 : -1, ICON_AUTO);
+        draw_column(2, "KEYS", fixed ? k2 : "--", "", fixed ? VAL(2u) : T_DIM,
+                    fixed ? ((int32_t)tessera.nl_keys[tr] - 1) * 1000 / 3 : -1, ICON_AUTO);
+        if (d && vp) {                                   /* STEP's GATE (PATTERN's): dim while another mode holds */
+            param_format(d, *vp, val, &unit);
+            draw_column(3, d->label, val, unit, m == NL_STEP ? VAL(3u) : T_DIM, RATIO(d, *vp), param_icon(d, *vp));
+        }
+        return;
+    }
     if (cur_page()->graph == GR_TWEAK2) {
         static const char *const BRM[TESS_BR_COUNT] = {"COIN", "TGL", "LTCH"};
         static const char *const LGN[TESS_LG_COUNT] = {"OFF", "AND", "OR", "XOR", "NOT"};

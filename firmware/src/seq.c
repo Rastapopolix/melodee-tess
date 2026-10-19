@@ -1072,8 +1072,10 @@ static void seq_grid_tick(track_t *t, uint32_t n)
 
 /* Split at pattern boundaries so raw playback follows bank changes and fires
  * loop zero once. MIDI batches may cross several boundaries in one call. */
+void tessera_len_tick(track_t *t, uint32_t n);
 static void seq_tick(track_t *t, uint32_t n)
 {
+    tessera_len_tick(t, n);                         /* a generator's FIXED / HIT notes (note_len.c) */
     seq_erase_pass(t, t->seq_idx, 0);
     if (!((recording_tracks | song.rec) & (1u << trk_index(t)))) { seq_grid_tick(t, n); return; }
     if (!song.playing) { seq_grid_tick(t, n); return; }
@@ -1197,6 +1199,8 @@ static void events_block(uint32_t n)
     for (i = 0; i < NTRK; i++) {
         track_t *t = &trk[i];
         if ((pr >> i) & 1u) {
+            extern void tessera_len_stop(track_t *t);
+            tessera_len_stop(t);                    /* (a generator's FIXED / HIT notes: note_len.c) */
             midi_forget_track(i);
             recording_stop(t);
             t->rh_n = t->rskip_n = 0;

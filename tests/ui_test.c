@@ -481,7 +481,7 @@ static int test_phys_chrd_click(void)
 static int test_gen_family(void)
 {
     static const char STEP[] = "GEN NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
-                      GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 PATTERN TEMPO PATTERNS SONG";
+                      GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH PATTERN TEMPO PATTERNS SONG";
     char got[128];
     int bad = 0, in_seq = 0, pattern_seq = 0;
     uint32_t k, n = 0;
@@ -498,17 +498,31 @@ static int test_gen_family(void)
     bad += check("SEQ in ARP: back to ARP (its last page), ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN", str_eq(seq_taps(got, sizeof got, 9), ARP));
     if (!str_eq(got, ARP)) printf("    got: %s\n", got);
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);
-    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 9), GEN));
+    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 10), GEN));
     if (!str_eq(got, GEN)) printf("    got: %s\n", got);
     go_title("EVOLVE");
     press(B_ARP);
     bad += check("ARP on a generator's track: the MODE stays (the generator keeps playing), GEN opens",
                  seqm_get(song.sel) == 1u + TESS_ENG_TURING && !ui.home && str_eq(cur_page()->title, "GEN"));
+    go_title("LENGTH");                           /* NOTE LENGTH: KNOBS 1-3 its own, a step a turn; KNOB 4 PATTERN's GATE */
+    {
+        uint32_t tr = song.sel;
+        int16_t g = trk[tr].p[P_SGATE];
+        turn(EN_K1, 5);
+        turn(EN_K2, 1);
+        turn(EN_K3, -1);
+        turn(EN_K4, 3);
+        bad += check("LENGTH: MODE FIXED, LEN 1/4, KEYS 3 a step a turn; KNOB 4 the GATE",
+                     tessera.nl_mode[tr] == NL_FIXED && tessera.nl_len[tr] == 3u && tessera.nl_keys[tr] == 3u &&
+                     trk[tr].p[P_SGATE] > g);
+        turn(EN_K1, -5);
+        bad += check("LENGTH: back to STEP", tessera.nl_mode[tr] == NL_STEP);
+    }
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
     TSEL->p[P_AMODE] = 0;
     for (k = 0; k < NPAGES; k++)
         if (PAGES[k].fam == FAM_SEQ && (PAGES[k].graph == GR_EVOLVE || PAGES[k].graph == GR_FORM || PAGES[k].graph == GR_TWEAK ||
-                                        PAGES[k].graph == GR_TWEAK2))
+                                        PAGES[k].graph == GR_TWEAK2 || PAGES[k].graph == GR_NOTELEN))
             in_seq++;
         else if (PAGES[k].fam == FAM_SEQ && str_eq(PAGES[k].title, "PATTERN"))
             pattern_seq = 1;

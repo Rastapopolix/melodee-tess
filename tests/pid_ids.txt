@@ -170,3 +170,6 @@
 0x22e QUAD DIRECTION           track 0..4 def 0
 0x22f QUAD PROB                track 0..100 def 100
 0x230 QUAD LINK                track 0..4 def 0
+0x231 NOTE LENGTH              track 0..2 def 0
+0x232 NOTE LENGTH LEN          track 0..5 def 2
+0x233 NOTE LENGTH KEYS         track 1..4 def 4
