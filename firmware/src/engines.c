@@ -255,15 +255,18 @@ static uint32_t eng_step(uint32_t e, int32_t dir)
     return eng_vis((eng_rank(e % NENGINES) + (dir > 0 ? 1u : NENG_SHOWN - 1u)) % NENG_SHOWN);
 }
 
-/* The start for testing the generators on the device (Theo 2026-10-15): track 1 CZ-1 VIBRAPHONE, and the project at
- * power-on and NEW (melodee_init, project_new_blank) at 85 BPM, the melodic parts in minor pentatonic. 0: Melodee's
+/* The start for testing the generators on the device (Theo 2026-10-15): track 1 PHYS DRONE STRING (2026-10-19; was
+ * CZ-1 VIBRAPHONE), and the project at power-on and NEW (melodee_init, project_new_blank) at 85 BPM, the melodic parts
+ * in minor pentatonic. 0: Melodee's
  * (track 1 PROPHET FUNK BASS II, the parameters' defaults), which the host tests are written for (hostsim.c) */
 #ifndef TRK_START_TESS
 #define TRK_START_TESS 1
 #endif
-/* the parts at power-on (engine, preset; the steps empty): bass (TRK_START_TESS: mallet), pad, lead, drums */
+/* the parts at power-on (engine, preset; the steps empty): bass (TRK_START_TESS: a drone), pad, lead, drums */
 static const uint8_t TRK_DEF[NPART][2] = {
-#if TRK_START_TESS && MELODEE_CZ
+#if TRK_START_TESS && MELODEE_PHYS
+    {ENGI_PHYS, 7},                                 /* PHYS DRONE STRING (Theo 2026-10-19) */
+#elif TRK_START_TESS && MELODEE_CZ
     {ENGI_CZ, 42},                                  /* CZ-1 VIBRAPHONE */
 #elif !TRK_START_TESS && MELODEE_PROPHET
     {ENGI_PROPHET, 4},                              /* PROPHET FUNK BASS II (was ANALOG ACID) */
