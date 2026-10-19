@@ -1478,6 +1478,19 @@ static void page_tap(uint32_t b)
         for (i = 0; i < NPAGES; i++)
             if (PAGES[i].fam == FAM_ARP && PAGES[i].graph == GR_ARP) a = i;
             else if (PAGES[i].fam == FAM_ARP && PAGES[i].graph == GR_NONE) a2 = i;
+        if (seqm_get(song.sel) >= 2u) {                 /* a generator's track: ARP leaves its MODE (only GEN's KNOB 1
+                                                         * changes it, so a playing generator never goes quiet), GEN */
+            for (i = 0; i < NPAGES && !(PAGES[i].graph == GR_STEPS && str_eq(PAGES[i].title, "GEN")); i++)
+                ;
+            if (i < NPAGES) {
+                ui.page = (uint8_t)i;
+                ui.fam_last[fam_grp(PAGES[i].fam)] = ui.page;
+                ui.home = 0;
+                page_entered();
+            }
+            ui_message("ARP: MODE ON GEN");
+            return;
+        }
         if (a < NPAGES && a2 < NPAGES) {
             seqm_set(song.sel, 1);
             ui.page = (uint8_t)(!ui.home && ui.page == a ? a2 : a);
