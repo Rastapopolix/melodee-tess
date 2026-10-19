@@ -18,7 +18,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef TRK_START_TESS
 #define TRK_START_TESS 0                              /* (engines.c: Melodee's power-on start, what the tests are written for) */
+#endif
 #define __attribute__(x)
 #define memset melodee_memset
 #define memcpy melodee_memcpy

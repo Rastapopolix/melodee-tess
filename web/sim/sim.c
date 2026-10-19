@@ -8,6 +8,7 @@
  * runs main.c's loop (a frame every 15 ms, ui_input between).
  * Not simulated: flash (saves are lost on reload; web_flash_writes_count stays 0), USB, the CPU budget. */
 #define UI_TEST_NO_MAIN 1
+#define TRK_START_TESS 1                          /* the device's power-on start (engines.c), not the tests' */
 #include "ui_test.c"
 
 /* the real matrix (hal/fm1_input.h; ui_test.c leaves it empty): the LED places of the keys and buttons */
@@ -25,10 +26,15 @@ static const int8_t FM1_KEYMAP[6][FM1_NCOL] = {
 
 static uint32_t web_booted, web_last_frame, web_samples_due;
 
-/* power-on (main.c melodee_init via ui_test.c's ui_power_on), in the default palette */
+/* power-on (main.c melodee_init via ui_test.c's ui_power_on, with the device's BPM and scale), in the default palette */
 static void web_power_on(void)
 {
+    uint32_t i;
     ui_power_on();
+    song.g[G_BPM] = TRK_DEF_BPM;             /* (ui_power_on: the tests' start; main.c melodee_init: the device's) */
+    for (i = 0; i < NTRK; i++)
+        if (TRK_DEF[i][0] != ENGI_DRUM)
+            trk[i].p[P_SCALE] = TRK_DEF_SCALE;
     settings.palette = UI_DEFAULT_INDEX;     /* (ui_power_on: the tests' GRAY) */
     palette_set(settings.palette);
     song.master_q12 = 2048;                  /* until the page sends MASTER */
