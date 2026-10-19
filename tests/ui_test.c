@@ -481,7 +481,7 @@ static int test_gen_family(void)
     go_title("EVOLVE");
     press(B_ARP);
     bad += check("ARP on a generator's track: the MODE stays (the generator keeps playing), GEN opens",
-                 tessera.mode[song.sel] == TESS_ENG_TURING && !TSEL->p[P_AMODE] && !ui.home && str_eq(cur_page()->title, "GEN"));
+                 seqm_get(song.sel) == 1u + TESS_ENG_TURING && !ui.home && str_eq(cur_page()->title, "GEN"));
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
     TSEL->p[P_AMODE] = 0;
     for (k = 0; k < NPAGES; k++)
