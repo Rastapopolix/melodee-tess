@@ -3,6 +3,7 @@
 /* Melodee menu (HOME held): COLOR, HOLD (the layer threshold), LIGHTS (the keys' and buttons'
  * glow: ui_input.c ui_leds), KNOB ACCEL (ui_input.c accel_by), USB AUDIO (IN+OUT, IN, OUT or OFF; usb.c ua_off_set),
  * USB INPUT (stereo master or four track stems; usb.c ua_tracks_set),
+ * MIDI OUT (KEYS, ALL or OFF: the notes sent over USB) and CLOCK OUT (midi_out.c),
  * AUTOSAVE (automatic project saves after five seconds stopped and untouched),
  * CALIBRATION (the setup screen: HARDWARE CALIBRATION), ABOUT.
  * PRESETS scrolls from ABOUT through all credits. ui.menu: 1 list, 2 information. */
@@ -12,13 +13,13 @@ enum { MI_COLOR, MI_HOLD, MI_LIGHTS,
 #if MELODEE_USB_AUDIO
        MI_USB, MI_USB_INPUT,
 #endif
-       MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_ACCEL, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
+       MI_MIDI_OUT, MI_CLOCK_OUT, MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_ACCEL, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
                                               "USB AUDIO", "USB INPUT",
 #endif
-                                              "AUDIO CLICK", "CLICK LEVEL", "COUNT-IN", "NOTE PREVIEW", "CHORD ENTRY",
+                                              "MIDI OUT", "CLOCK OUT", "AUDIO CLICK", "CLICK LEVEL", "COUNT-IN", "NOTE PREVIEW", "CHORD ENTRY",
                                               "AUTOSAVE", "KNOB ACCEL", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
 /* USB AUDIO's four settings, as ua_off_want (UA_OFF_OUT | UA_OFF_IN) */
@@ -287,6 +288,8 @@ static void draw_menu(void)
                   i==MI_COUNTIN?(const char *const[]){"OFF","1 BAR","2 BARS"}[settings_countin%3u]:
                   i==MI_PREVIEW?(settings_preview?"ON":"OFF"):(settings_chord_add?"ADD":"HOLD");
             if (i == MI_ACCEL) value = PREF_BITS & PREF_ACCEL_OFF ? "OFF" : "ON";
+            if (i == MI_MIDI_OUT) value = (const char *const[]){"KEYS", "ALL", "OFF"}[settings_midi_out % MIDI_OUT_N];
+            if (i == MI_CLOCK_OUT) value = settings_clock_out ? "ON" : "OFF";
             if (i == MI_AUTOSAVE) value = settings_autosave ? "ON" : "OFF";
             if (i == MI_SCREEN) value = (const char *const[]){"NEVER", "5 MIN", "15 MIN", "30 MIN", "60 MIN"}[scr_get()];
             if (i == MI_LIGHTS) value = LIGHTS_NAME[settings_lights % LIGHTS_N];
@@ -407,6 +410,15 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         uint32_t on = s > 0 ? 1u : s < 0 ? 0u : !!(PREF_BITS & PREF_ACCEL_OFF);
         PREF_BITS = (uint8_t)(on ? PREF_BITS & ~PREF_ACCEL_OFF : PREF_BITS | PREF_ACCEL_OFF);
         ui.force=1; ok=0;
+    }
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_MIDI_OUT) {   /* KNOB 1 steps KEYS ALL OFF, OCT+ wraps */
+        uint32_t v = settings_midi_out % MIDI_OUT_N;
+        settings_midi_out = (uint8_t)(s > 0 ? (v + 1u < MIDI_OUT_N ? v + 1u : v) : s < 0 ? (v ? v - 1u : 0u) : (v + 1u) % MIDI_OUT_N);
+        ui.force = 1; ok = 0;                          /* (notes already sent still send their note-offs) */
+    }
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_CLOCK_OUT) {  /* KNOB 1 right ON, left OFF; OCT+ toggles */
+        settings_clock_out = (uint8_t)(s > 0 ? 1u : s < 0 ? 0u : !settings_clock_out);
+        ui.force = 1; ok = 0;                          /* (on: from the next PLAY; off: STOP goes out now) */
     }
     if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_SCREEN) {
         uint32_t value=scr_get(), top=4u;

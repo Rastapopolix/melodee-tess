@@ -48,9 +48,12 @@ static volatile uint8_t midi_hint;       /* MIDI IN played track n - 1, which is
 
 static uint32_t trk_index(const track_t *t) { return (uint32_t)(t - trk); }
 
-static uint32_t trk_midi_ch(uint32_t i) { return i % NTRK; }   /* MIDI channel 0..15 of track i (keys -> MIDI out) */
 
 static int drum_track(const track_t *t) { return ENGINES[eng_idx(t->eng_req)] == &ENG_DRUM; }
+static void midi_out_key(const track_t *t, uint32_t note, uint32_t vel);   /* midi_out.c */
+static void midi_out_start(void);
+static void midi_out_stop(void);
+static void midi_out_clock(uint32_t n, uint32_t beat);
 
 static void live_note_on(const track_t *t, uint32_t note, uint32_t vel)
 {
@@ -664,14 +667,14 @@ static void input_off(track_t *t, uint32_t note)
  * holds already sounds: it is not started again (nor sent to MIDI OUT); the key keeps its notes */
 static void key_on(uint32_t k, track_t *t)
 {
-    uint32_t n = chord_build(t, kb_note[k], kb_chord[k]), i, mc = trk_midi_ch(trk_index(t));
+    uint32_t n = chord_build(t, kb_note[k], kb_chord[k]), i;
     kb_chn[k] = 0;
     for (i = 0; i < n; i++) {
         uint32_t x = kb_chord[k][i];
         if (midi_local_held(t, x))
             continue;
         input_on(t, x, 100);
-        midi_out_event(0x09u | (0x90u | mc) << 8 | x << 16 | 100u << 24);
+        midi_out_key(t, x, 100);
     }
     kb_chn[k] = (uint8_t)n;
     last_note = kb_note[k];                         /* (step entry, the SAMPLE zone: the key's note) */
@@ -680,14 +683,14 @@ static void key_on(uint32_t k, track_t *t)
 /* key k is up: the notes it started end, but those another key still holds */
 static void key_off(uint32_t k, track_t *t)
 {
-    uint32_t n = kb_chn[k], i, mc = trk_midi_ch(trk_index(t));
+    uint32_t n = kb_chn[k], i;
     kb_chn[k] = 0;
     for (i = 0; i < n; i++) {
         uint32_t x = kb_chord[k][i];
         if (midi_local_held(t, x))
             continue;
         input_off(t, x);
-        midi_out_event(0x08u | (0x80u | mc) << 8 | x << 16);
+        midi_out_key(t, x, 0);
     }
 }
 
@@ -824,6 +827,7 @@ static void seq_start(void)
     song.tick = 0;
     beat_pos = 0; beat_n = 0;                      /* the ARP LED's beat from the top too */
     song.playing = 1;
+    midi_out_start();
     if (click_wanted()) click_req=2;
 }
 
@@ -930,6 +934,7 @@ static void seq_stop(void)
     chain_stop();
     for (i = 0; i < NTRK; i++) if (trk[i].pattern_next < NPAT) pattern_switch(&trk[i], trk[i].pattern_next);
     motion_end();
+    midi_out_stop();
 }
 
 /* play one step: TIE extends, REST releases, NOTE (re)triggers its notes, then its lane hits (their GM
@@ -1115,6 +1120,7 @@ static track_t *midi_track(uint32_t ch)
 
 #include "midi_control.c"
 #include "midi_clock.c"
+#include "midi_out.c"
 
 /* An armed stopped track starts with its first musical note, without a count-in.
  * A count-in explicitly started with PLAY keeps its normal pickup behavior.
@@ -1133,11 +1139,14 @@ static int rec_note_start(track_t *t)
 static void seq_advance(uint32_t n)
 {
     uint32_t i, beat = seq_beat_samples();
+    midi_out_clock(n, beat);
+    midi_out_seq = 1;                              /* (midi_out.c: these notes are the sequencer's) */
     chain_tick(n);
     for (i = 0; i < NTRK; i++)
         seq_tick(&trk[i], n);
     for (i = 0; i < NPART; i++)
         arp_step(&trk[i], song.playing || !song.g[G_CLOCK] ? n : 0u, n);
+    midi_out_seq = 0;
     beat_pos += n;
     while (beat_pos >= beat) {
         beat_pos -= beat;

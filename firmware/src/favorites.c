@@ -9,7 +9,8 @@
  *   row 15 (CZ-1: factory tones bits 0..64, native slots 65..192) 26 tagged USB INPUT (settings_persist.c), 27 SCREEN OFF,
  *          28 tagged AUTOSAVE OFF, 29 the PRESETS LIST (browse.c),
  *          30 bit 0 retired, bit 1 KNOB ACCEL OFF (ui.c PREF_BITS), bits 2..4 retired (OVERCLOCK until 1.3.4),
- *          31 the quick layers seen (ui_layer.c); free: 24 bits 1..7, 25, 30 bits 5..7
+ *             bits 5..6 MIDI OUT, bit 7 CLOCK OUT (midi_out.c, settings_persist.c),
+ *          31 the quick layers seen (ui_layer.c); free: 24 bits 1..7, 25
  *   row 0 bytes 2..27 hold all 201 Prophet factory stars, tagged in bytes 28..31;
  *         bytes 0..1 held retired ANALOG's stars.
  *   row 1 bytes 28..31 mark validated Melodee settings (MDS + version 1).
