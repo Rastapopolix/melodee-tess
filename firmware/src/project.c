@@ -910,6 +910,17 @@ static int project_erase(uint32_t slot)
     return 0;
 }
 
+/* CLK TUNE MIDI ROUT: the device's, not a project's (sync and routing belong to the setup, as on Elektron and Squarp
+ * boxes): kept as last used (settings ext.glo), and a project load, a backup or the template leaves them as they are.
+ * Projects still carry them (the record's layout is unchanged) */
+static const uint8_t GLO_KEPT[4] = {G_CLOCK, G_TUNE, G_MIDI, G_ROUTE};
+static int glo_kept(uint32_t i)
+{
+    for (uint32_t k = 0; k < 4u; k++)
+        if (GLO_KEPT[k] == i) return 1;
+    return 0;
+}
+
 static int project_restore_runtime(const project_t *input)
 {
     momentary_restore();
@@ -935,7 +946,7 @@ static int project_restore_runtime(const project_t *input)
     motion_base_valid = 0;
     ui.song_row = 0;
     for (i = 0; i < G_COUNT; i++)
-        if (i != G_SLOT && i != G_LOAD && i != G_SAVE)
+        if (i != G_SLOT && i != G_LOAD && i != G_SAVE && !glo_kept(i))
             song.g[i] = global_reserved(i) ? 0 : (int16_t)clamp(p->g[i], GP[i].min, GP[i].max);
     for (k = 0; k < NTRK; k++) {
         track_t *t = &trk[k];
@@ -1130,9 +1141,7 @@ static int tmpl_take(const uint8_t *b,uint32_t len)
     return 1;
 }
 
-/* CLK TUNE MIDI ROUT: the device keeps them as last used (settings ext.glo), not only the projects */
-static const uint8_t GLO_KEPT[4] = {G_CLOCK, G_TUNE, G_MIDI, G_ROUTE};
-static void glo_restore(void)                     /* power-on, before the BOOT project or the template (theirs win) */
+static void glo_restore(void)                     /* power-on: the device's as last used (GLO_KEPT) */
 {
     uint32_t k;
     for (k = 0; k < 4u; k++)

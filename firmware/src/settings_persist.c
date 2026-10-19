@@ -6,7 +6,7 @@
  * the other feature's saved preferences when either is built independently.
  * PER5 keeps the compatible layout; boot validates the complete object before import. Its ext block:
  * usb_off (the USB audio devices left out, USB AUDIO in the menu), boot (BOOT: 0 OFF, 1..4 the project power-on
- * loads), glo (CLK TUNE MIDI ROUT as last used, GLO_KEPT: restored at power-on, a project's own win), drumch
+ * loads), glo (CLK TUNE MIDI ROUT as last used, GLO_KEPT: restored at power-on, a project load keeps them), drumch
  * (GLO > SYSTEM DRUM: 0 channel 10, 1..16, 17 OFF), lights (the menu's LIGHTS: 0 MID, else OFF..FULL + 1); every
  * field 0 = the default, so spare words can take new ones. spare[1] holds tagged A4 concert pitch (0 = 440 Hz).
  * A saved template (project.c tmpl_t) follows the record.
