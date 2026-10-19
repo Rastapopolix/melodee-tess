@@ -315,21 +315,11 @@ static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32
 }
 
 /* ------------------------------------------------------------ the default patch --- */
-/* a new project's mods (phase 3: it sounds alive with nothing patched; ordinary mods, edited or cleared as any): each
- * track's brightness and its effects send wander slowly and a little, the send by another track's DRIFT (so a track
- * does not get brighter and wetter at once). Old projects and templates keep their own (none: as saved) */
+/* a new project's mods: none (automation is opt-in; until 1.3.3 each track's CUTOFF and FX SEND wandered by DRIFT).
+ * Old projects and templates keep their own (none: as saved) */
 void cord_defaults(void)
 {
-    uint32_t tr;
     cord_clear();
-    for (tr = 0; tr < NTRK; tr++) {
-        cord_t c = {CS_DRIFT, (uint8_t)tr, CD_CUTOFF, (uint8_t)tr, 12, 0};
-        cord_set(2u * tr, &c);
-        c.src_trk = (uint8_t)((tr + 2u) % NTRK);
-        c.dst = CD_FX_SEND;
-        c.amount = 10;
-        cord_set(2u * tr + 1u, &c);
-    }
 }
 
 /* ------------------------------------------------------------ MOD's routes --- */
