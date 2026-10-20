@@ -25,6 +25,7 @@ static const char *const TX_N_QLINK[] = {"OFF", "T1", "T2", "T12", "T3", "T13", 
                                          "T34", "T134", "T234", "T1234"};   /* (a mask of tracks; never the track's own) */
 static const char *const TX_N_QRANGE[] = {"3 OCT", "1 OCT", "2 OCT", "+-1"};
 static const char *const TX_N_QMOVE[] = {"STOP", "DOWN", "UP", "RAND"};
+static const char *const TX_N_CSFILL[] = {"OFF", "ARP"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
@@ -100,6 +101,8 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_QD_EVERY2] = PE("EVERY 2", TX_N_QEVERY, 3),
     [TX_QD_EVERY3] = PE("EVERY 3", TX_N_QEVERY, 3),
     [TX_QD_EVERY4] = PE("EVERY 4", TX_N_QEVERY, 3),
+    [TX_CS_LEN] = PD("LEN", F_INT, 1, 16, 16),
+    [TX_CS_FILL] = PE("FILL", TX_N_CSFILL, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -355,7 +358,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                    "cross, so it sets where the melody sits. AUTO steers it instead."),
     X_(TX_CS_DENS, "CONSTELLATION DENS", "How many stars the sky holds: more stars, more notes."),
     X_(TX_CS_SIZE, "CONSTELLATION SIZE", "How many rows either side of the crosshair a star still plays in: 0 only its "
-                                         "own row, higher a wider melody. Set by a mod (no knob of its own)."),
+                                         "own row, higher a wider melody. OCT+ held on GEN, KNOB 4."),
     X_(TX_CS_AUTO, "CONSTELLATION AUTO", "Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; "
                                          "SEEK flies towards the next star. Set by a mod (no knob of its own)."),
     X_(TX_SR_START, "SERIES START", "Where in the infinity series the melody begins: each START a different line, "
@@ -385,6 +388,10 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_QD_EVERY2, "QUAD EVERY 2", QD_EVERY_TEXT),
     X_(TX_QD_EVERY3, "QUAD EVERY 3", QD_EVERY_TEXT),
     X_(TX_QD_EVERY4, "QUAD EVERY 4", QD_EVERY_TEXT),
+    X_(TX_CS_LEN, "CONSTELLATION LEN", "How many steps the loop of stars is, 1 to 16: with LOCK up a short phrase "
+                                       "repeats. OCT+ held on GEN, KNOB 2."),
+    X_(TX_CS_FILL, "CONSTELLATION FILL", "What the steps between stars play: OFF a rest, ARP the last four stars "
+                                         "again, low to high and softer. OCT+ held on GEN, KNOB 3."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

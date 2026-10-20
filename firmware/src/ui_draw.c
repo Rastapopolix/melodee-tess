@@ -1019,6 +1019,20 @@ static void draw_columns(void)
                 draw_column(3, "SPAN", v3, "", VAL(3u), ((int32_t)g->span - 1) * 1000 / 14, ICON_AUTO);
             } else if (m == TESS_ENG_CONSTEL) {
                 const gen_constel_t *c = tessera_constel(tr);
+                if (cs_layer_on()) {                            /* OCT+ held: LOCK, LEN, FILL, SIZE */
+                    uint32_t lk = tessera.evolve[tr].lock;
+                    fmt_int(v1, lk);
+                    col_mods(PID_TESS(TX_EV_LOCK));
+                    draw_column(0, "LOCK", v1, "%", VAL(0u), (int32_t)lk * 10, ICON_AUTO);
+                    fmt_int(v2, c->len);
+                    draw_column(1, "LEN", v2, "", VAL(1u), ((int32_t)c->len - 1) * 1000 / 15, ICON_AUTO);
+                    draw_column(2, "FILL", c->fill == GEN_CS_FILL_ARP ? "ARP" : "OFF", "", VAL(2u),
+                                (int32_t)(c->fill == GEN_CS_FILL_ARP) * 1000, ICON_AUTO);
+                    fmt_int(v3, c->size);
+                    col_mods(PID_TESS(TX_CS_SIZE));
+                    draw_column(3, "SIZE", v3, "", VAL(3u), (int32_t)c->size * 1000 / 7, ICON_AUTO);
+                    return;
+                }
                 draw_column(0, "MODE", "CONSTL", "", VAL(0u), TESS_ENG_CONSTEL * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, c->y);
                 col_mods(PID_TESS(TX_CS_Y));
@@ -1027,7 +1041,7 @@ static void draw_columns(void)
                 col_mods(PID_TESS(TX_CS_DENS));
                 draw_column(2, "DENS", v2, "%", VAL(2u), (int32_t)c->dens * 10, ICON_AUTO);
                 str_cpy(v3, N_DIV[TSEL->p[P_SDIV] % 10], sizeof v3);   /* SPEED: the track's DIV, slow to fast */
-                draw_column(3, "SPEED", v3, "", VAL(3u), (int32_t)tessera_cs_speed(tr) * 1000 / 9, ICON_AUTO);
+                draw_column(3, "SPEED", v3, "", VAL(3u), (int32_t)tessera_cs_speed(tr) * 1000 / (TESS_CS_SPEEDS - 1u), ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
                 draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);

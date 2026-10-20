@@ -126,11 +126,15 @@ typedef struct {
  * column a step (the track's DIV its speed), each column's star (or none) worked out from the sky's seed (ROLL): its
  * height a scale degree, its brightness a velocity, its size the note's length. A star crossing the ship's crosshair at
  * height Y, within SIZE rows of it, plays as it crosses; the loop of 16 (the phrase loop's position) keeps what each step
- * caught. LOCK is the chance a step plays the loop it holds instead of the sky (100: the loop frozen).
+ * caught (LEN slots: the phrase position modulo LEN). LOCK is the chance a step plays the loop it holds instead of the
+ * sky (100: the loop frozen). FILL ARP: a step with nothing to play plays the last few stars played instead, low to high
+ * in turn, softer and at the GATE.
  * AUTO steers the ship: a wander, faster further up; at the top SEEK (towards the next star) */
 #define GEN_CS_ROWS 15u       /* heights 0..14: two octaves of the scale and one more degree */
 #define GEN_CS_SEEK 10u       /* AUTO: SEEK */
 #define GEN_CS_AHEAD 6u       /* SEEK looks this many columns ahead */
+#define GEN_CS_ARP 4u         /* FILL ARP: the stars it cycles through */
+enum { GEN_CS_FILL_OFF, GEN_CS_FILL_ARP, GEN_CS_FILL_COUNT };
 typedef struct {
     uint8_t  y;           /* 0..14: the crosshair's height (AUTO OFF) */
     uint8_t  dens;        /* 0..100: the chance a column has a star */
@@ -145,6 +149,11 @@ typedef struct {
     uint16_t col;         /* the sky's column at the crosshair */
     uint16_t ship;        /* the ship's height, rows x 256 */
     uint8_t  loop[16];    /* 0 empty, else bits 0..3 the height + 1, 4..5 the brightness, 6..7 the size */
+    uint8_t  len;         /* LEN 1..16: the loop's slots (the phrase position modulo LEN) */
+    uint8_t  fill;        /* GEN_CS_FILL_*: what a step with no star plays */
+    uint8_t  arp[GEN_CS_ARP];   /* FILL ARP: the last stars played, newest first (a loop slot's value; not saved) */
+    uint8_t  arp_n, arp_i;      /* how many, and the next to play (not saved) */
+    uint8_t  filled;      /* the last step's FILL note (a loop slot's value), 0 none (the picture's) */
 } gen_constel_t;
 
 /* 11. Series (after norns' nørgård and Per Nørgård's infinity series: the idea only, no code): the melody that is the

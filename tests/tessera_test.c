@@ -1587,6 +1587,35 @@ static void pack_run(char *res, size_t cap)
               tessera.qcol[2] == (GEN_QC_RAND | 5u << 2) && tessera_quad_every(2) == 8u;
         tessera_unpack(a);
     }
+    {   /* a version 10 block (before CONSTELLATION's LEN and FILL: each track a byte shorter) loads every setting, LEN 16,
+         * FILL OFF; a FILL out of range is refused; LEN and FILL round trip */
+        static uint8_t v10[TESSERA_PK_BYTES_V10], v10b[TESSERA_PK_BYTES_V10];
+        const uint32_t n11 = TESSERA_PK_BYTES / TESSERA_TRACKS, n10 = TESSERA_PK_BYTES_V10 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v10 + tr * n10, a + tr * n11, n10);
+        tessera_reset();
+        tessera.constel[2].len = 5, tessera.constel[2].fill = GEN_CS_FILL_ARP;
+        ok &= tessera_unpack_ver(10u, v10) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            memcpy(v10b + tr * n10, b + tr * n11, n10);
+            ok &= tessera.constel[tr].len == 16u && tessera.constel[tr].fill == GEN_CS_FILL_OFF;
+        }
+        ok &= !memcmp(v10, v10b, sizeof v10);         /* every other version 10 setting as it was */
+        memcpy(c, a, sizeof c);
+        c[2u * n11 + n10] = (uint8_t)(GEN_CS_FILL_COUNT << 4);   /* (track 3's) */
+        ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+        tessera_param_set(1, TX_CS_LEN, 6);
+        tessera_param_set(1, TX_CS_FILL, GEN_CS_FILL_ARP);
+        tessera_param_set(3, TX_CS_LEN, 0);            /* (kept to 1..16) */
+        tessera_param_set(3, TX_CS_FILL, 9);
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.constel[1].len == 6u && tessera.constel[1].fill == GEN_CS_FILL_ARP &&
+              tessera.constel[3].len == 1u && tessera.constel[3].fill == GEN_CS_FILL_COUNT - 1u &&
+              tessera_param_get(1, TX_CS_LEN) == 6 && tessera_param_get(1, TX_CS_FILL) == GEN_CS_FILL_ARP;
+        tessera_unpack(a);
+    }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */
         static const uint8_t P[4] = {20, 16, 5, 15};
         tessera.poly[3].span = 3;
