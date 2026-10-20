@@ -1007,6 +1007,16 @@ static void draw_columns(void)
                 if (g->loop) fmt_int(v3, g->loop);
                 else str_cpy(v3, "OFF", sizeof v3);
                 draw_column(3, "LOOP", v3, "", VAL(3u), (int32_t)g->loop * 1000 / GEN_SR_LOOP, ICON_AUTO);
+            } else if (m == TESS_ENG_CHORD) {
+                const gen_chord_t *g = tessera_chord(tr);
+                draw_column(0, "MODE", "CHORD", "", VAL(0u), TESS_ENG_CHORD * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                col_mods(PID_TESS(TX_CH_PROG));
+                draw_column(1, "PROG", pid_desc(PID_TESS(TX_CH_PROG), tr)->names[g->prog % GEN_CH_PROGS], "", VAL(1u),
+                            (int32_t)(g->prog % GEN_CH_PROGS) * 1000 / (GEN_CH_PROGS - 1), ICON_AUTO);
+                draw_column(2, "BARS", pid_desc(PID_TESS(TX_CH_BARS), tr)->names[g->bars % GEN_CH_BARS], "", VAL(2u),
+                            (int32_t)(g->bars % GEN_CH_BARS) * 1000 / (GEN_CH_BARS - 1), ICON_AUTO);
+                draw_column(3, "HIT", pid_desc(PID_TESS(TX_CH_HIT), tr)->names[g->hit % GEN_CH_HITS], "", VAL(3u),
+                            (int32_t)(g->hit % GEN_CH_HITS) * 1000 / (GEN_CH_HITS - 1), ICON_AUTO);
             } else if (m == TESS_ENG_CONSTEL) {
                 const gen_constel_t *c = tessera_constel(tr);
                 if (cs_layer_on()) {                            /* OCT+ held: LOCK, LEN, FILL, SIZE */

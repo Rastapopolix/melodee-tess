@@ -24,7 +24,7 @@ static void help_find(uint32_t k)
         {TX_GRD_X, TX_GRD_Y, TX_GRD_DENS}, {TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_BALLS},
         {TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB}, {0xFF, TX_POL_DIV1, TX_POL_SPAN},
         {TX_QD_DIR, TX_QD_PROB, TX_QD_LINK}, {TX_CS_Y, TX_CS_DENS, TX_CS_AUTO},
-        {TX_SR_START, TX_SR_INTV, TX_SR_LOOP}};
+        {TX_SR_START, TX_SR_INTV, TX_SR_LOOP}, {TX_CH_PROG, TX_CH_BARS, TX_CH_HIT}};
     static const char *const CORD_TEXT[4] = {
         "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
         "or CV, or DRIFT, a slow wander, or its SLOTH (TORPOR, APATHY, INERTIA) or OCHD 1-8 (LFO > ORGANIC). -- leaves "
