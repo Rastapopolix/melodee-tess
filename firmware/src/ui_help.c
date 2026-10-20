@@ -94,10 +94,16 @@ static void help_find(uint32_t k)
             help.pid = (uint16_t)PID_TESS(k == 1u ? TX_QD_MOVE1 + c : k == 2u ? TX_QD_EVERY1 + c : TX_QD_RANGE);
             return;
         }
+        if (cs_layer_on()) {                            /* (CONSTELLATION, OCT+ held: LOCK, LEN, FILL, SIZE) */
+            static const uint8_t CSL[4] = {TX_EV_LOCK, TX_CS_LEN, TX_CS_FILL, TX_CS_SIZE};
+            help.pid = (uint16_t)PID_TESS(CSL[k & 3u]);
+            return;
+        }
         if (tessera.mode[tr] == TESS_ENG_CONSTEL && k == 3u) {   /* (SPEED: the track's DIV, in another order) */
             help.name = "CONSTELLATION SPEED";
             help.text = "How fast the sky flies by: a column a step, so this is the track's DIV (PATTERN's too), from 4 "
-                        "bars a step to 1/32. AUTO, the ship's steering, is a mod's to set.";
+                        "bars a step to 1/32, straight divisions only, so the notes land on the beat. Hold OCT+ for "
+                        "LOCK, LEN, FILL and SIZE.";
             return;
         }
         if (tessera.mode[tr] == TESS_ENG_POLY && k == 2u) x += tessera_poly(tr)->sel & 3u;

@@ -54,6 +54,15 @@ static int quad_cols_on(void)
            cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_QUAD &&
            ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
 }
+/* CONSTELLATION on GEN with OCT+ held: the knobs are LOCK, LEN, FILL and SIZE (tessera.c tessera_constel_layer_knob) */
+static int cs_layer_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && song.sel < TESSERA_TRACKS && cur_page()->fam == FAM_GEN &&
+           cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_CONSTEL &&
+           ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
+}
+/* a generator's OCT+ layer is on (QUAD's or CONSTELLATION's): no octave, no sheet */
+static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on(); }
 /* QUAD's LINK as its card shows it: OFF, or "T" and the linked tracks ("T24") */
 static void quad_link_text(uint32_t m, char *b)
 {
@@ -383,7 +392,8 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
          * stars a plus their size, bright ones lit; the ship mid-sky, its thruster flickering, the crosshair's brackets
          * SIZE rows round its height, the star sounding now ringed. Behind the ship, the stars that sounded as they
          * crossed, joined into a constellation (what was heard). On the panel with LOCK up, the loop below: its stars
-         * joined, the one played ringed when the step played the loop instead of the sky (the brackets dim then) */
+         * joined, the one played ringed when the step played the loop instead of the sky (the brackets dim then), a bar
+         * where LEN ends it. A step FILL ARP filled: a hollow diamond at the crosshair, at the note it played */
         const gen_constel_t *g = tessera_constel(tr);
         int lock = tessera.evolve[tr].lock != 0;
         int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 6 : y_base - 2;
@@ -431,14 +441,22 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             cv_rect(sx - 21, y - 3, 3, 2, T_TEXT);
             cv_rect(sx - 21, y + 2, 3, 2, T_TEXT);
             cv_rect(sx - 25 - 2 * f, y, 3 + 2 * f, 1, T_ACCENT);
+            if (g->filled && song.playing) {
+                int32_t fy = CS_Y(g->filled - 1u);
+                cv_rect(sx - 2, fy - 1, 1, 1, c); cv_rect(sx + 2, fy - 1, 1, 1, c);
+                cv_rect(sx - 2, fy + 1, 1, 1, c); cv_rect(sx + 2, fy + 1, 1, 1, c);
+                cv_rect(sx - 3, fy, 1, 1, c); cv_rect(sx + 3, fy, 1, 1, c);
+                cv_rect(sx - 1, fy - 2, 3, 1, c); cv_rect(sx - 1, fy + 2, 3, 1, c);
+            }
         }
 #undef CS_Y
         if (is_panel && lock) {
             int32_t ly = top + sh + 8, lh = 22;
-            uint32_t now = song.playing && g->held ? (uint32_t)g->held - 1u : 16u;
+            uint32_t now = song.playing && g->held ? (uint32_t)g->held - 1u : 16u, n = g->len >= 1u && g->len <= 16u ? g->len : 16u;
             px = -1;
-            cv_rect(x0, ly + lh + 2, sw, 1, dim);
-            for (uint32_t k = 0; k < 16u; k++) {
+            cv_rect(x0, ly + lh + 2, (int32_t)n * cw, 1, dim);
+            if (n < 16u) cv_rect(x0 + (int32_t)n * cw, ly - 2, 1, lh + 5, c);
+            for (uint32_t k = 0; k < n; k++) {
                 uint32_t v = g->loop[k];
                 int32_t x = x0 + (int32_t)k * cw + cw / 2, y;
                 if (!(v & 15u)) {
@@ -449,7 +467,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 if (px >= 0) cv_line(px, py, x, y, dim);
                 px = x, py = y;
             }
-            for (uint32_t k = 0; k < 16u; k++) {
+            for (uint32_t k = 0; k < n; k++) {
                 uint32_t v = g->loop[k];
                 int32_t x = x0 + (int32_t)k * cw + cw / 2, y;
                 if (!(v & 15u)) continue;

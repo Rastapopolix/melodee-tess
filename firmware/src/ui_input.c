@@ -856,6 +856,14 @@ static void edit_param(uint32_t slot, int32_t steps)
             ui.force = 1;
             return;
         }
+        if (cs_layer_on()) {                            /* CONSTELLATION, OCT+ held: LOCK, LEN, FILL, SIZE */
+            tessera_constel_layer_knob(slot, steps);
+            oct_eat |= 2u;
+            ui.oct_t0 |= 2u;
+            oct_deferred = 0;
+            ui.force = 1;
+            return;
+        }
         if (sel_tr < TESSERA_TRACKS) {
             if (slot == 0u && !(tessera.mode[sel_tr] == TESS_ENG_AWAKE && tessera_awake(sel_tr)->edit)) {
                 seqm_set(sel_tr, (int32_t)seqm_get(sel_tr) + steps);   /* MODE: STEP ARP and the generators (ui.c) */
@@ -1771,15 +1779,15 @@ static void ui_input(void)
     if (octup == BT_HOLD) {
         oct_eat |= 2u;                                  /* (its release is no OCT+) */
         oct_deferred = 0;
-        if(bulk_context())ui.bulk_hold=1;else if(!quad_cols_on())page_sheet_open();   /* (QUAD on GEN: its columns) */
+        if(bulk_context())ui.bulk_hold=1;else if(!gen_layer_on())page_sheet_open();   /* (QUAD, CONSTELLATION on GEN: their layer) */
     } else if (octup == BT_TAP && oct_deferred) {
         song.octave += song.octave < 3 ? 1 : 0;         /* (OCT+ pressed on a page with a sheet: on release) */
     }
     if (octup != BT_NONE || !((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u))
         oct_deferred = 0;
     {
-        static uint8_t qc_was;                          /* QUAD's OCT+ layer shown or gone: the cards again */
-        uint8_t qc = (uint8_t)quad_cols_on();
+        static uint8_t qc_was;                          /* a generator's OCT+ layer shown or gone: the cards again */
+        uint8_t qc = (uint8_t)gen_layer_on();
         if (qc != qc_was) qc_was = qc, ui.force = 1;
     }
     if(ui.bulk_hold && !(fm1_in.buttons&(1u<<panel.btn[B_OCTUP]))){

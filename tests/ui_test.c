@@ -601,11 +601,12 @@ static int test_awake_entry(void)
     return bad;
 }
 
-/* CONSTELLATION on GEN: KNOB 4 is SPEED, the track's DIV from the slowest (4BAR) to the fastest (1/32), clockwise
- * faster, stopping at both ends; its help its own; AUTO left to the mods */
+/* CONSTELLATION on GEN: KNOB 4 is SPEED, the track's straight DIVs from the slowest (4BAR) to the fastest (1/32),
+ * clockwise faster, stopping at both ends; a triplet DIV (from PATTERN) turns to the straight one next to it; its help
+ * its own; AUTO left to the mods */
 static int test_constel_speed(void)
 {
-    static const uint8_t ORDER[10] = {9, 8, 7, 6, 0, 4, 1, 5, 2, 3};   /* (4BAR 2BAR 1/1 1/2 1/4 8T 1/8 16T 1/16 1/32) */
+    static const uint8_t ORDER[8] = {9, 8, 7, 6, 0, 1, 2, 3};   /* (4BAR 2BAR 1/1 1/2 1/4 1/8 1/16 1/32) */
     int bad = 0, n = 1;
     uint32_t i, au;
     ui_power_on();
@@ -615,14 +616,20 @@ static int test_constel_speed(void)
     au = tessera_constel(song.sel)->autop;
     for (i = 0; i < 12u; i++) turn(EN_K1 + 3u, -1);
     n &= TSEL->p[P_SDIV] == 9 && tessera_cs_speed(song.sel) == 0u;
-    for (i = 1; i < 10u; i++) {
+    for (i = 1; i < 8u; i++) {
         turn(EN_K1 + 3u, 1);
         n &= TSEL->p[P_SDIV] == ORDER[i] && tessera_cs_speed(song.sel) == i;
     }
     turn(EN_K1 + 3u, 1);
     n &= TSEL->p[P_SDIV] == 3;
-    bad += check("CONSTELLATION KNOB 4: SPEED, DIV 4BAR .. 1/32 slow to fast, stopping at both ends; AUTO untouched",
+    bad += check("CONSTELLATION KNOB 4: SPEED, DIV 4BAR .. 1/32 straight, slow to fast, stopping at both ends; AUTO untouched",
                  n && tessera_constel(song.sel)->autop == au);
+    TSEL->p[P_SDIV] = 5;                                /* (16T, set on PATTERN) */
+    turn(EN_K1 + 3u, 1);
+    n = TSEL->p[P_SDIV] == 2;
+    TSEL->p[P_SDIV] = 5;
+    turn(EN_K1 + 3u, -1);
+    bad += check("..from a triplet: 1/16 faster, 1/8 slower", n && TSEL->p[P_SDIV] == 1);
     help_find(3);
     bad += check("..its help: CONSTELLATION SPEED", help.pid == PID_NONE && help.name && str_eq(help.name, "CONSTELLATION SPEED"));
     TSEL->p[P_SDIV] = 2;
@@ -668,6 +675,48 @@ static int test_quad_cols(void)
     frame();
     tessera.qcol[2] = 3u << 2;
     tessera_param_set(song.sel, TX_QD_RANGE, 0);
+    return bad;
+}
+
+/* CONSTELLATION on GEN, OCT+ held: KNOB 1 LOCK, 2 LEN, 3 FILL, 4 SIZE; the octave stays, no sheet opens; let go,
+ * the generator's knobs again */
+static int test_constel_layer(void)
+{
+    int bad = 0;
+    uint32_t i, tr;
+    int32_t oct;
+    ui_power_on();
+    go_title("GEN");
+    tr = song.sel;
+    tessera_param_set(tr, TX_MODE, TESS_ENG_CONSTEL);
+    tessera_param_set(tr, TX_EV_LOCK, 0);
+    tessera_param_set(tr, TX_CS_SIZE, 2);
+    frame();
+    oct = song.octave;
+    fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+    host_pressed |= 1u << panel.btn[B_OCTUP];
+    frame();
+    for (i = 0; i < 5u; i++) turn(EN_K1, 1);            /* LOCK 10 */
+    for (i = 0; i < 8u; i++) turn(EN_K1 + 1u, -1);      /* LEN 8 */
+    turn(EN_K1 + 2u, 1);                                /* FILL ARP */
+    turn(EN_K1 + 3u, 1);                                /* SIZE 3 */
+    for (i = 0; i < 6u; i++) { frame(); fm1_ms += 200u; host_ticks += 200000u; }   /* (held 1.2 s) */
+    help_find(2);
+    bad += check("CONSTELLATION, OCT+ held: KNOB 1 LOCK 10, KNOB 2 LEN 8, KNOB 3 FILL ARP, KNOB 4 SIZE 3; its help",
+                 tessera.evolve[tr].lock == 10u && tessera_constel(tr)->len == 8u &&
+                 tessera_constel(tr)->fill == GEN_CS_FILL_ARP && tessera_constel(tr)->size == 3u &&
+                 help.pid == PID_TESS(TX_CS_FILL) && pid_find(help.pid));
+    bad += check("..the octave as it was, no sheet open", song.octave == oct && pop.on != POP_SHEET);
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
+    frame();
+    turn(EN_K1 + 2u, 1);
+    bad += check("OCT+ let go: KNOB 3 is DENS again, FILL kept", tessera_constel(tr)->dens == 52u &&
+                 tessera_constel(tr)->fill == GEN_CS_FILL_ARP && song.octave == oct);
+    tessera_param_set(tr, TX_CS_DENS, 50);
+    tessera_param_set(tr, TX_CS_LEN, 16);
+    tessera_param_set(tr, TX_CS_FILL, 0);
+    tessera_param_set(tr, TX_CS_SIZE, 2);
+    tessera_param_set(tr, TX_EV_LOCK, 0);
     return bad;
 }
 
@@ -5147,6 +5196,7 @@ int main(void)
     bad += test_grid();
     bad += test_awake_entry();
     bad += test_constel_speed();
+    bad += test_constel_layer();
     bad += test_quad_cols();
     bad += test_screen();
     bad += test_favorites();
