@@ -44,8 +44,10 @@ int main(int argc, char **argv)
     static const uint8_t pd[] = {0x08, 0xf0};
     const aafont_t probe = {1, 1, 'A', 'A', 0, 0, pg, pd, 0, 0, 0};
     double worst = 100;
-    assert(NPALETTES == 3u && !strcmp(UI_PALETTES[0].name, "NIGHT") && !strcmp(UI_PALETTES[1].name, "DAY") &&
-           !strcmp(UI_PALETTES[2].name, "CONTRAST") && !strcmp(UI_PALETTES[UI_GRAY_INDEX].name, "GRAY"));
+    assert(NPALETTES == 6u && !strcmp(UI_PALETTES[0].name, "NIGHT") && !strcmp(UI_PALETTES[1].name, "DAY") &&
+           !strcmp(UI_PALETTES[2].name, "CONTRAST") && !strcmp(UI_PALETTES[3].name, "SMALTI") &&
+           !strcmp(UI_PALETTES[4].name, "MARMO") && !strcmp(UI_PALETTES[5].name, "VITRO") &&
+           UI_DEFAULT_INDEX == 3u && !strcmp(UI_PALETTES[UI_GRAY_INDEX].name, "GRAY"));
     for (unsigned pt = 0; pt < UI_PAL_ENTRIES * 4u; pt++) {
         unsigned p = pt / 4u, t = pt % 4u;
         uint16_t *tok = &ux.bg;
