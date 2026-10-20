@@ -239,6 +239,11 @@ static void arp_off(track_t *t)                  /* the sounding arp note ends (
 /* n and gate_n: sample time (INT), musical units (MIDI); a stopped external
  * transport uses real time converted to musical units for a tapped note's gate. */
 static volatile uint32_t beat_pos, beat_n;      /* clock units into the beat, beat of the bar (0..3) */
+static volatile uint32_t bar_n;                  /* bars since PLAY (seq_phase: the slowest DIV is 4 bars) */
+static uint32_t seq_period_was[NTRK];            /* each track's step length last block (0: from PLAY) */
+static uint32_t seq_lag;                         /* the first block after PLAY: the tracks' step 0 starts after it */
+/* clock units since the last 4-bar line from PLAY: every DIV's grid divides it */
+static uint32_t seq_phase(uint32_t beat) { return (((bar_n & 3u) << 2) + beat_n) * beat + beat_pos; }
 static void arp_step(track_t *t, uint32_t n, uint32_t gate_n)
 {
     uint32_t period, cnt, list[64], len = 0, i, j, o;
@@ -825,7 +830,8 @@ static void seq_start(void)
     cap_from = cap_w;                              /* capture and the jam log: this run */
     jam.n = 0;
     song.tick = 0;
-    beat_pos = 0; beat_n = 0;                      /* the ARP LED's beat from the top too */
+    beat_pos = 0; beat_n = 0; bar_n = 0;           /* the ARP LED's beat from the top too */
+    memset(seq_period_was, 0, sizeof seq_period_was);
     song.playing = 1;
     midi_out_start();
     if (click_wanted()) click_req=2;
@@ -1018,6 +1024,16 @@ static void seq_grid_tick(track_t *t, uint32_t n)
         t->rh_elapsed += n;
     period = seq_div_samples((uint32_t)t->p[P_SDIV]);
     len = (uint32_t)t->p[P_SLEN];
+    {   /* DIV or tempo changed while playing: the step's place moves onto the new grid from PLAY, so the track stays
+         * in time with the others (it kept the old step's offset before, until the next PLAY). Just past a line of the
+         * new grid with the old step more than half done: that step is due, so it plays now */
+        uint32_t *was = &seq_period_was[trk_index(t)];
+        if (*was && *was != period && t->seq_pos < 0x7FFFFFFFu && !chain.running) {
+            uint32_t ph = (seq_phase(seq_beat_samples()) % period + period - seq_lag % period) % period;
+            t->seq_pos = ph + (t->seq_pos >= *was / 2u && ph < period / 2u ? step_samples(t, period, t->seq_idx) : 0u);
+        }
+        *was = period;
+    }
     t->seq_pos += n;
     for (;;) {
         uint32_t cur_len = step_samples(t, period, t->seq_idx);
@@ -1025,6 +1041,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             break;
         uint32_t starting = t->seq_pos >= 0x7FFFFFFFu;
         uint32_t punch_in = 0;
+        if (starting) seq_lag = n;
         t->seq_pos = starting ? (chain.running ? chain.carry : 0u) : t->seq_pos - cur_len;
         t->seq_idx = (uint16_t)((t->seq_idx + 1u) % (len ? len : 1u));
         if (!t->seq_idx && !starting && !chain.running) {
@@ -1040,6 +1057,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             pattern_switch(t, t->pattern_next);
             t->seq_idx = 0;
             period = seq_div_samples((uint32_t)t->p[P_SDIV]);
+            seq_period_was[trk_index(t)] = period;    /* (a pattern of another DIV starts here, as it is) */
             len = (uint32_t)t->p[P_SLEN];
         }
         cap_step[trk_index(t)]++;
@@ -1153,6 +1171,7 @@ static void seq_advance(uint32_t n)
     while (beat_pos >= beat) {
         beat_pos -= beat;
         beat_n = (beat_n + 1u) & 3u;
+        if (!beat_n) bar_n++;
         if(song.playing && click_wanted())click_req=beat_n?1:2;
     }
 }

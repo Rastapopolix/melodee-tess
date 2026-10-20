@@ -81,7 +81,7 @@ static uint8_t sync_reload;                  /* engine / preset / project / user
 
 #define ACC T_THEME                /* values, curves */
 #define VAL(c) ((void)(c), T_TEXT)   /* a value (the knob just turned: its card tinted and outlined, ui_draw.c) */
-#define RATIO(d, v) ((d)->max > (d)->min ? ((int32_t)(v) - (d)->min) * 1000 / ((d)->max - (d)->min) : -1)
+#define RATIO(d, v) param_ratio((d), (int32_t)(v))
 /* layout (docs/design): header 0..18, four cards 22..66 (54 px at x 4 + 58 c), the panel 70..194 (the graphs live
  * in it; Stage: its own panel and lanes, ui_stage.c), footer 198..240; BG between them */
 #define Y_HEAD 0

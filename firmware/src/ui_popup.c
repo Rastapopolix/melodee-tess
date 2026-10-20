@@ -388,10 +388,12 @@ static int32_t enum_rows(const param_desc_t *d)
 }
 static int32_t enum_rank(const param_desc_t *d,int32_t value)
 {
+    if(enum_order(d))return enum_order_pos(d,value);   /* (N_DIV: slow to fast) */
     int32_t rank=0;for(int32_t v=d->min;v<value;v++)rank+=d->names[v-d->min][0]!=0;return rank;
 }
 static int32_t enum_value(const param_desc_t *d,int32_t rank)
 {
+    if(enum_order(d))return enum_order(d)[clamp(rank,0,d->max-d->min)];
     for(int32_t v=d->min;v<=d->max;v++)if(d->names[v-d->min][0] && !rank--)return v;return d->min;
 }
 static struct { uint8_t page, slot; int16_t sel; } vl;
@@ -418,7 +420,7 @@ static void vlist_input(int32_t k2, uint32_t oct)
         return;
     }
     if (k2)
-        vl.sel = (int16_t)enum_step(d,vl.sel,clamp(vl.sel + (k2 > 0 ? 1 : -1), d->min, d->max));
+        vl.sel = (int16_t)enum_turn(d, vl.sel, k2 > 0 ? 1 : -1);
     if (oct & 1u) {
         pop_close();
     } else if (oct & 2u) {                              /* (its page edits it, as if it were shown) */
