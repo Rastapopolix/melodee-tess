@@ -134,8 +134,56 @@ static int migrated_bank_rename(void)
 {
     return 0;
 }
+/* DIV or tempo turned while playing: the track's steps move onto the grid from PLAY and land with the other tracks'
+ * (they kept the old step's offset before, out of time until the next PLAY). Within a block: a 1/16 is a whole number
+ * of samples, so it may drift a sample or two from the beat */
+static int steps_together(track_t *a, track_t *b, uint32_t blocks)
+{
+    uint32_t pb = 0xFFFFu, pa = 0xFFFFu, k, n = 0;
+    int ok = 1;
+    for (k = 0; k < blocks; k++) {
+        uint32_t ia = a->seq_idx, ib = b->seq_idx;
+        events_block(32);
+        if (b->seq_idx != ib) {
+            if (pa != 0xFFFFu && k - pa > 1u) ok = 0;       /* (a stepped a block ago, b none since) */
+            if (pa != 0xFFFFu) pa = 0xFFFFu;
+            pb = k;
+        }
+        if (a->seq_idx != ia) {
+            n++;
+            if (pb == k || pb + 1u == k) pb = 0xFFFFu;      /* (b stepped now or a block ago) */
+            else pa = k;
+        }
+    }
+    return ok && pa == 0xFFFFu && n >= 2u;
+}
+static int div_change_in_time(void)
+{
+    int bad = 0;
+    ui_power_on();
+    track_t *a = &trk[0], *b = &trk[1];
+    for (uint32_t k = 0; k < 2; k++) { track_defaults_steps(&trk[k]); trk[k].p[P_SLEN] = 16; trk[k].p[P_SSWING] = 0; }
+    a->p[P_SDIV] = 0; b->p[P_SDIV] = 2;                 /* 1/4, 1/16 */
+    song.g[G_BPM] = 120;
+    seq_start(); events_block(32);
+    uint32_t q = div_samples(0);
+    while (seq_phase(seq_beat_samples()) < q + 3u * q / 4u - 32u) events_block(32);   /* (3/16 into beat 2) */
+    b->p[P_SDIV] = 0;                                   /* 1/16 -> 1/4 */
+    bad += check("DIV 1/16 -> 1/4 mid-beat: the track steps on the beat with a 1/4 track", steps_together(b, a, 4u * q / 32u));
+    b->p[P_SDIV] = 2;                                   /* back to 1/16, a while later 1/4 -> 1/8 */
+    for (uint32_t i = 0; i < 77u; i++) events_block(32);
+    a->p[P_SDIV] = 1;
+    bad += check("..1/4 -> 1/16 and 1/4 -> 1/8: every 1/8 step lands with a 1/16 step", steps_together(a, b, 4u * q / 32u));
+    song.g[G_BPM] = 97;
+    for (uint32_t i = 0; i < 51u; i++) events_block(32);
+    bad += check("..the tempo turned to 97: still together", steps_together(a, b, 4u * q / 32u));
+    seq_stop();
+    song.g[G_BPM] = 120;
+    return bad;
+}
+
 int main(void)
 {
-    int bad = banks_and_chords()+independent_switches()+all_banks_persist()+panel_banks()+arranged_chords()+replaced_motion()+migrated_bank_rename();
+    int bad = div_change_in_time()+banks_and_chords()+independent_switches()+all_banks_persist()+panel_banks()+arranged_chords()+replaced_motion()+migrated_bank_rename();
     printf("%s\n",bad ? "PATTERN TEST FAILED" : "pattern bank tests passed"); return !!bad;
 }
