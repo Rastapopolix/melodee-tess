@@ -22,9 +22,11 @@ enum {
     TESS_ENG_QUAD,        /* a row each of a 4 x 4 grid the tracks share (norns' initenere) */
     TESS_ENG_CONSTEL,     /* a ship catches the stars of a scrolling sky into a loop (norns' Constellation) */
     TESS_ENG_SERIES,      /* Nørgård's infinity series (norns' nørgård) */
-    TESS_ENG_CELLS,       /* eight cells of an elementary automaton (norns' less concepts) */
-    TESS_ENG_COUNT
+    TESS_ENG_COUNT        /* (12 was CELLS, cut 2026-10-20: TESS_ENG_RETIRED_CELLS) */
 };
+/* CELLS (an elementary automaton, cut 2026-10-20 as too like the others): a saved track of it loads as TURING. A new
+ * mode does not take this number: put a placeholder at 12 first */
+#define TESS_ENG_RETIRED_CELLS 12u
 
 /* The generators' own state lives in gen.h (the names below kept for the adapter and the UI) */
 typedef gen_turing_t tessera_turing_t;
@@ -38,7 +40,6 @@ typedef gen_poly_t   tessera_poly_t;
 typedef gen_quad_t   tessera_quad_t;
 typedef gen_constel_t tessera_constel_t;
 typedef gen_series_t tessera_series_t;
-typedef gen_cells_t  tessera_cells_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
@@ -108,7 +109,6 @@ typedef struct {
     uint8_t          qcol_sel;                /* the column OCT+ held on GEN edits, 0..3 (the page's, not saved) */
     tessera_constel_t constel[TESSERA_TRACKS];
     tessera_series_t series[TESSERA_TRACKS];
-    tessera_cells_t  cells[TESSERA_TRACKS];
     tessera_evolve_t evolve[TESSERA_TRACKS];
     tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
@@ -195,7 +195,7 @@ enum {
     TX_NL_MODE, TX_NL_LEN, TX_NL_KEYS,
     TX_CS_Y, TX_CS_DENS, TX_CS_SIZE, TX_CS_AUTO,
     TX_SR_START, TX_SR_INTV, TX_SR_LOOP,
-    TX_CL_RULE, TX_CL_TAP, TX_CL_SPAN,
+    TX_CL_RULE_RETIRED, TX_CL_TAP_RETIRED, TX_CL_SPAN_RETIRED,   /* (CELLS's, cut 2026-10-20: gaps, no parameter) */
     TX_QD_RANGE, TX_QD_MOVE1, TX_QD_MOVE2, TX_QD_MOVE3, TX_QD_MOVE4, TX_QD_EVERY1, TX_QD_EVERY2, TX_QD_EVERY3, TX_QD_EVERY4,
     TX_CS_LEN, TX_CS_FILL,
     TX_COUNT
@@ -223,6 +223,5 @@ uint32_t tessera_cs_speed(uint32_t tr);                 /* Constellation's SPEED
 #define TESS_CS_SPEEDS 8u                               /* (4BAR .. 1/32, the straight DIVs) */
 void tessera_constel_layer_knob(uint32_t k, int32_t s);   /* OCT+ held on GEN in CONSTELLATION: LOCK, LEN, FILL, SIZE */
 const gen_series_t *tessera_series(uint32_t tr);
-const gen_cells_t *tessera_cells(uint32_t tr);
 
 #endif

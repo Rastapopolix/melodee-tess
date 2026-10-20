@@ -313,12 +313,12 @@ static int tessera_archive(void)
         bad += check("... and the whole object again: the cord back", ok && cord_count() == 1u);
     }
     memcpy(bad_obj, obj, sizeof bad_obj);
-    bad_obj[4u + 4u + 1u * (TESSERA_PK_BYTES / TESSERA_TRACKS)] = TESS_ENG_COUNT;   /* slot 1's block: track 2's engine out of range */
+    bad_obj[4u + 4u + 1u * (TESSERA_PK_BYTES / TESSERA_TRACKS)] = TESS_ENG_COUNT + 1u;   /* slot 1's block: track 2's engine out of range */
     before = erases; tessera_pack(live);
     ok = put_all(28, bad_obj, sizeof bad_obj, st_crc32(bad_obj, sizeof bad_obj)) == 2 && erases == before;
     tessera_pack(now);
     bad += check("a damaged slot block is refused before any erase, the live state kept", ok && !memcmp(now, live, sizeof live));
-    memcpy(now, live, sizeof now); now[1u * (TESSERA_PK_BYTES / TESSERA_TRACKS)] = TESS_ENG_COUNT;
+    memcpy(now, live, sizeof now); now[1u * (TESSERA_PK_BYTES / TESSERA_TRACKS)] = TESS_ENG_COUNT + 1u;
     ok = put_all(29, now, sizeof now, st_crc32(now, sizeof now)) == 2;
     tessera_pack(now);
     bad += check("a damaged live state is refused, nothing changed", ok && !memcmp(now, live, sizeof live));

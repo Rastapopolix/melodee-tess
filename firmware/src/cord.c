@@ -67,7 +67,6 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_CS_SIZE] = S_(CD_CS_SIZE, TX_CS_SIZE, "C SIZE", "Constellation's SIZE: how far from the crosshair a star is caught"),
     [CD_CS_DENS] = S_(CD_CS_DENS, TX_CS_DENS, "C DENS", "Constellation's DENS: how many stars the sky holds"),
     [CD_SR_START] = S_(CD_SR_START, TX_SR_START, "S START", "Series' START: where in the infinity series it plays"),
-    [CD_CL_RULE] = S_(CD_CL_RULE, TX_CL_RULE, "CL RULE", "Cells' RULE: how each generation follows the last"),
     [CD_CS_AUTO] = S_(CD_CS_AUTO, TX_CS_AUTO, "C AUTO", "Constellation's AUTO: who steers the ship (OFF, a wander, SEEK)"),
 };
 #undef V_
@@ -246,6 +245,7 @@ static int cord_unpack(const uint8_t *in)
         cord_t *c = &got[i];
         c->src = in[0]; c->src_trk = in[1] & 0x7Fu; c->uni = in[1] >> 7; c->dst = in[2]; c->dst_trk = in[3];
         c->amount = (int8_t)in[4]; c->offset = (int8_t)in[5];
+        if (c->dst == CD_RETIRED_CL_RULE) memset(c, 0, sizeof *c);   /* (to CELLS' RULE, cut: the cord gone) */
         if (c->src >= CS_N || c->src_trk >= NTRK || c->dst >= CD_N || !cord_dest(c->dst) || c->dst_trk >= NTRK ||
             c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100)
             return 0;

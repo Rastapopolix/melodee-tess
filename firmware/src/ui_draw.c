@@ -1007,16 +1007,6 @@ static void draw_columns(void)
                 if (g->loop) fmt_int(v3, g->loop);
                 else str_cpy(v3, "OFF", sizeof v3);
                 draw_column(3, "LOOP", v3, "", VAL(3u), (int32_t)g->loop * 1000 / GEN_SR_LOOP, ICON_AUTO);
-            } else if (m == TESS_ENG_CELLS) {
-                const gen_cells_t *g = tessera_cells(tr);
-                draw_column(0, "MODE", "CELLS", "", VAL(0u), TESS_ENG_CELLS * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
-                fmt_int(v1, g->rule);
-                col_mods(PID_TESS(TX_CL_RULE));
-                draw_column(1, "RULE", v1, "", VAL(1u), (int32_t)g->rule * 1000 / 255, ICON_AUTO);
-                fmt_int(v2, g->tap);
-                draw_column(2, "TAP", v2, "", VAL(2u), ((int32_t)g->tap - 1) * 1000 / 7, ICON_AUTO);
-                fmt_int(v3, g->span);
-                draw_column(3, "SPAN", v3, "", VAL(3u), ((int32_t)g->span - 1) * 1000 / 14, ICON_AUTO);
             } else if (m == TESS_ENG_CONSTEL) {
                 const gen_constel_t *c = tessera_constel(tr);
                 if (cs_layer_on()) {                            /* OCT+ held: LOCK, LEN, FILL, SIZE */

@@ -121,7 +121,7 @@
 0x127 FX RETURN                global 0..127 def 100
 0x128 FX MODE                  global 0..1 def 0
 0x129 VOICE BUDGET             global device 8..32 def 16
-0x200 GENERATOR MODE           track 0..12 def 0
+0x200 GENERATOR MODE           track 0..11 def 0
 0x201 TURING LENGTH            track 2..16 def 16
 0x202 TURING PROB              track 0..100 def 0
 0x203 TURING SPAN              track 1..3 def 2
@@ -180,9 +180,6 @@
 0x238 SERIES START             track 0..127 def 0
 0x239 SERIES INTV              track 1..7 def 1
 0x23a SERIES LOOP              track 0..16 def 0
-0x23b CELLS RULE               track 0..255 def 30
-0x23c CELLS TAP                track 1..8 def 1
-0x23d CELLS SPAN               track 1..15 def 14
 0x23e QUAD RANGE               track 0..3 def 0
 0x23f QUAD MOVE 1              track 0..3 def 0
 0x240 QUAD MOVE 2              track 0..3 def 0

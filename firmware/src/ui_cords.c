@@ -23,9 +23,12 @@ static void cu_adopt(void)
 }
 
 #define CU_NSRC (1u + NTRK * (CS_N - 1u))               /* KNOB 1's list: --, then track by track */
-#define CU_NDST (1u + NTRK * (CD_N - 1u))
+#define CU_DPT (CD_N - 2u)                              /* a track's destinations (none, the retired one: not listed) */
+#define CU_NDST (1u + NTRK * CU_DPT)
 static uint32_t cu_src_of(const cord_t *c) { return c->src ? 1u + c->src_trk * (CS_N - 1u) + c->src - 1u : 0u; }
-static uint32_t cu_dst_of(const cord_t *c) { return c->dst ? 1u + c->dst_trk * (CD_N - 1u) + c->dst - 1u : 0u; }
+static uint32_t cu_dst_k(uint32_t code) { return code - 1u - (code > CD_RETIRED_CL_RULE); }   /* code -> its place */
+static uint32_t cu_dst_code(uint32_t k) { return k + 1u + (k + 1u >= CD_RETIRED_CL_RULE); }
+static uint32_t cu_dst_of(const cord_t *c) { return c->dst ? 1u + c->dst_trk * CU_DPT + cu_dst_k(c->dst) : 0u; }
 
 /* the source's name, "+" after it when UNI folds it (cord.c cord_fold_on) */
 static const char *cu_src_name(const cord_t *c)
@@ -209,8 +212,8 @@ static const char *cu_pick_name(uint32_t col, int32_t i, int32_t *tr)
         *tr = (i - 1) / (int32_t)(CS_N - 1u);
         return cord_src_name((uint32_t)((i - 1) % (int32_t)(CS_N - 1u) + 1));
     }
-    *tr = (i - 1) / (int32_t)(CD_N - 1u);
-    c.dst = (uint8_t)((i - 1) % (int32_t)(CD_N - 1u) + 1);
+    *tr = (i - 1) / (int32_t)CU_DPT;
+    c.dst = (uint8_t)cu_dst_code((uint32_t)(i - 1) % CU_DPT);
     c.dst_trk = (uint8_t)*tr;
     return cu_dst_name(&c);
 }
@@ -248,8 +251,8 @@ static void cu_knob(uint32_t slot, int32_t steps)
     } else if (slot == 2u) {
         int was = c.dst != CD_OFF;
         v = clamp((int32_t)cu_dst_of(&c) + list_accel(EN_K1 + 2u, steps, CU_NDST, 0), 0, CU_NDST - 1);
-        c.dst = v ? (uint8_t)((v - 1) % (CD_N - 1u) + 1u) : CD_OFF;
-        c.dst_trk = v ? (uint8_t)((v - 1) / (CD_N - 1u)) : 0u;
+        c.dst = v ? (uint8_t)cu_dst_code((uint32_t)(v - 1) % CU_DPT) : CD_OFF;
+        c.dst_trk = v ? (uint8_t)((uint32_t)(v - 1) / CU_DPT) : 0u;
         if (!was && c.dst && !c.amount && !c.offset) {  /* (connected: a move to hear at once) */
             if (c.src) c.amount = 50;
             else c.offset = 25;

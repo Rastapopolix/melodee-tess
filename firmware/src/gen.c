@@ -835,69 +835,6 @@ static void gen_series_load(gen_series_t *g, const gen_sec_t *s)
     g->loop = (uint8_t)(l > GEN_SR_LOOP ? GEN_SR_LOOP : l);
 }
 
-/* Cells: the next generation of eight cells in a ring: each cell's next state RULE's bit for it and its two
- * neighbours (left the high bit) */
-static uint32_t gen_cl_next(uint32_t c, uint32_t rule)
-{
-    uint32_t o = 0;
-    for (uint32_t i = 0; i < 8u; i++) {
-        uint32_t l = (c >> ((i + 1u) & 7u)) & 1u, m = (c >> i) & 1u, r = (c >> ((i + 7u) & 7u)) & 1u;
-        o |= ((rule >> (l << 2 | m << 1 | r)) & 1u) << i;
-    }
-    return o;
-}
-/* Cells from a seed (ROLL): a new first generation, never empty */
-static void gen_cells_fill(gen_cells_t *g, uint32_t seed)
-{
-    uint32_t v = (gen_stream(seed * 71u + 3u) >> 8) & 255u;
-    g->row0 = (uint8_t)(v ? v : 1u);
-}
-/* Cells back to the first generation (PLAY, a new section) */
-static void gen_cells_start(gen_cells_t *g)
-{
-    g->cells = g->row0;
-    memset(g->hist, 0, sizeof g->hist);
-    g->n = 0;
-}
-/* Cells: a generation a step; cell TAP lit plays the eight cells as a number over SPAN degrees, its velocity from how
- * many are lit. The CV: that number */
-static void gen_cells_tick(gen_cells_t *g, gen_out_t *out)
-{
-    uint32_t c, ones = 0, t = g->tap >= 1u && g->tap <= 8u ? g->tap - 1u : 0u;
-    for (uint32_t i = GEN_CL_HIST - 1u; i; i--) g->hist[i] = g->hist[i - 1u];   /* no memmove: this runs from RAM */
-    g->hist[0] = g->cells;
-    g->cells = (uint8_t)gen_cl_next(g->cells, g->rule);
-    g->n++;
-    c = g->cells;
-    out->cv = (int16_t)(c * 32767u / 255u);
-    for (uint32_t v = c; v; v &= v - 1u) ones++;
-    if ((c >> t) & 1u) {
-        uint32_t sp = g->span < 1u ? 1u : g->span > 15u ? 15u : g->span, deg = c * sp / 256u;
-        out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);
-        out->vel = (uint8_t)(64u + ones * 7u);
-        out->gate = 1;
-    }
-}
-/* Cells: each cell turned over at AMOUNT % (a stuck ring set going again) */
-static void gen_cells_mutate(gen_cells_t *g, uint32_t amt, uint32_t *rnd)
-{
-    for (uint32_t i = 0; i < 8u; i++)
-        if (gen_rnd(rnd, 100u) < amt) g->cells ^= (uint8_t)(1u << i);
-}
-static void gen_cells_save(const gen_cells_t *g, gen_sec_t *s)
-{
-    s->reg = (uint16_t)(g->rule | g->row0 << 8);
-    s->p0 = (uint8_t)((g->tap & 15u) | (g->span & 15u) << 4);
-}
-static void gen_cells_load(gen_cells_t *g, const gen_sec_t *s)
-{
-    uint32_t t = s->p0 & 15u, sp = s->p0 >> 4;
-    g->rule = (uint8_t)s->reg;
-    g->row0 = (uint8_t)((s->reg >> 8) ? s->reg >> 8 : 1u);
-    g->tap = (uint8_t)(t >= 1u && t <= 8u ? t : 1u);
-    g->span = (uint8_t)(sp ? sp : 1u);
-}
-
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
