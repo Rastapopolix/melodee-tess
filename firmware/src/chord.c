@@ -85,13 +85,13 @@ static uint32_t chord_tones(const track_t *t, uint32_t mode, int32_t *root, int3
     }
 }
 
-/* the chord on note `root` as track t plays it now -> out (ascending), the number of notes (1..CHORD_MAX);
+/* the chord `mode` (CH_*) on note `root` as track t plays it now -> out (ascending), the number of notes (1..CHORD_MAX);
  * *rp its root, *maskp its tones above the root (bit i: i semitones; 0 = no chord). The root alone when CHRD
  * is OFF, on a kit, or for MONO / LEGATO / UNISON (their chord's root) */
-static uint32_t chord_make(const track_t *t, uint32_t root, uint8_t *out, int32_t *rp, uint16_t *maskp)
+static uint32_t chord_make_as(const track_t *t, uint32_t mode, uint32_t root, uint8_t *out, int32_t *rp, uint16_t *maskp)
 {
     int32_t iv[CHORD_MAX + 1u], r = (int32_t)root, x;
-    uint32_t mode = (uint32_t)t->p[P_CHRD], n, i, j, m = 0;
+    uint32_t n, i, j, m = 0;
     int32_t period = (int32_t)scale_note_period(t);
     uint16_t mask = 0;
     *rp = r;
@@ -155,6 +155,12 @@ static uint32_t chord_make(const track_t *t, uint32_t root, uint8_t *out, int32_
         return 1;
     }
     return m;
+}
+
+/* chord_make_as with the track's CHRD (a CHORD generator passes its own: tessera.c tess_chord_play) */
+static uint32_t chord_make(const track_t *t, uint32_t root, uint8_t *out, int32_t *rp, uint16_t *maskp)
+{
+    return chord_make_as(t, (uint32_t)t->p[P_CHRD], root, out, rp, maskp);
 }
 
 /* chord_make for a note played now: a chord is kept in chord_last (the CHORD page shows it) */

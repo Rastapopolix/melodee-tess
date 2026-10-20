@@ -151,7 +151,9 @@ static uint32_t kb_map(const track_t *t, uint32_t k)
     if (e->keys && (n = e->keys(t, k)) >= 0)           /* the engine's own key map (GM kit, slices) */
         return (uint32_t)n;
     n = 53 + (int32_t)k;
-    if (t->p[P_QUANT] == Q_SNAP) {                     /* SNAP: every key, rounded down to the scale */
+    if (t->p[P_QUANT] == Q_SNAP || t->p[P_QUANT] == Q_CHRD) {   /* SNAP: every key, rounded down to the scale; CHRD:
+                                                                 * then to the nearest note of the CHORD track's chord */
+        uint32_t pcs = t->p[P_QUANT] == Q_CHRD ? tessera_chord_pcs() : 0u;
         if (micro_active(t)) {
             uint32_t note = micro_snap(t, n + t->p[P_TRANS]);
             return note == KB_SILENT ? note : micro_degree_map(t, (int32_t)note - 60, 12 * song.octave, 1);
@@ -160,7 +162,7 @@ static uint32_t kb_map(const track_t *t, uint32_t k)
         n += 12 * song.octave + t->p[P_TRANS];
         while (guard-- && !((mask >> (uint32_t)((n - t->p[P_ROOT] + 120) % 12)) & 1u))
             n--;
-        return (uint32_t)clamp(n, 0, 127);
+        return pcs ? tessera_chord_snap(pcs, n) : (uint32_t)clamp(n, 0, 127);
     }
     return scale_map(t, n, 12 * song.octave);
 }
@@ -179,8 +181,10 @@ static uint32_t midi_map(const track_t *t, uint32_t note)
         return scale_degree_map(t, (int32_t)note - 21 + mpc_degree(t) - 1, 12 * song.octave, 1);
     if (t->p[P_QUANT] == Q_WHITE || t->p[P_QUANT] == Q_ALL)
         return scale_map(t, (int32_t)note, 0);
-    if (micro_active(t) && t->p[P_QUANT] == Q_SNAP)
+    if (micro_active(t) && (t->p[P_QUANT] == Q_SNAP || t->p[P_QUANT] == Q_CHRD))
         return micro_snap(t, (int32_t)note + t->p[P_TRANS]);
+    if (t->p[P_QUANT] == Q_CHRD && tessera_chord_pcs())   /* CHRD: to the nearest note of the CHORD track's chord */
+        return tessera_chord_snap(tessera_chord_pcs(), (int32_t)note);
     return note;
 }
 

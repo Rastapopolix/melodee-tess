@@ -35,7 +35,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x018 | ARP ORDER | NOTE, PLAY | NOTE | NOTE: the held notes from low to high; PLAY: in the order they were pressed. |
 | 0x019 | ROOT | 0 to 11 | 0 | The scale's key note. |
 | 0x01A | SCALE | CHR, MAJ, MIN, DOR, MIX, PEN, MPEN, HARM, PHRY, LYD, LOC, MEL, BLUES, WHOLE, DIMHW, DIMWH, 5EDO, 7EDO, 9EDO, 10EDO, 13EDO, 14EDO, 15EDO, 16EDO, 17EDO, 18EDO, 19EDO, 20EDO, 21EDO, 22EDO, 23EDO, 24EDO, 26EDO, 27EDO, 29EDO, 31EDO, 34EDO, 36EDO, 41EDO, 53EDO, JI-MAJ, JI-MIN, JI-12, JI-7L, JI-7, HARM8, HARM16, PARTCH, HARRIS, PYTH, MT-1/4, MT-1/3, MT-1/6, WERCK3, KIRN3, VALLOT, YOUNG2, RAST-J, SABA-J, SHRUTI, SLENDR, PELOG, BP-ET, BP-JI, RAST, BAYATI, HIJAZ, SABA, HUSAYN, SIKAH | CHR | The scale the keys and the generators play in. |
-| 0x01B | QUANTIZE | OFF, SNAP, WHITE, ALL, MPC | OFF | How the keys meet the scale: OFF plays every key, SNAP moves a note into the scale, WHITE puts the scale on the white keys, ALL and MPC lay it out over the keys or MPC pads. |
+| 0x01B | QUANTIZE | OFF, SNAP, WHITE, ALL, MPC, CHRD | OFF | How the keys meet the scale: OFF plays every key, SNAP moves a note into the scale, WHITE puts the scale on the white keys, ALL and MPC lay it out over the keys or MPC pads; CHRD snaps the keys, MIDI and the generators to the nearest note of the chord a CHORD track plays (no CHORD track: as SNAP). |
 | 0x01C | TRANSPOSE | -24 to 24 semitones | 0 | Moves the track's notes up or down by semitones. |
 | 0x01D | PATTERN LENGTH | 1 to 64 | 16 | How many steps the track's pattern has. |
 | 0x01E | PATTERN DIVISION | 1/4, 1/8, 1/16, 1/32, 8T, 16T, 1/2, 1/1, 2BAR, 4BAR | 1/16 | How long one step is. |
@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series. |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CHORD | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the other tracks follow them). |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -209,6 +209,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x246 | QUAD EVERY 4 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
 | 0x247 | CONSTELLATION LEN | 1 to 16 | 16 | How many steps the loop of stars is, 1 to 16: with LOCK up a short phrase repeats. OCT+ held on GEN, KNOB 2. |
 | 0x248 | CONSTELLATION FILL | OFF, ARP | OFF | What the steps between stars play: OFF a rest, ARP the last four stars again, low to high and softer. OCT+ held on GEN, KNOB 3. |
+| 0x249 | CHORD PROG | POP, 50S, 2-5-1, CIRCLE, TWO, DRONE, WALK | POP | The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, 2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four chords of the track's SEED (ROLL another, EVOLVE changes one). SCL CHORD's CHRD and VOIC shape the chords (CHRD OFF: triads). |
+| 0x24A | CHORD BARS | 1/2, 1, 2, 4 | 1 | How long each chord lasts: half a bar, 1, 2 or 4 bars. |
+| 0x24B | CHORD HIT | HOLD, BEAT, STEP | HOLD | How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; STEP every step, for the step's GATE. |
 
 ## Mods
 
@@ -298,3 +301,4 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | C DENS | the generator's step | Constellation's DENS: how many stars the sky holds |
 | S START | the generator's step | Series' START: where in the infinity series it plays |
 | C AUTO | the generator's step | Constellation's AUTO: who steers the ship (OFF, a wander, SEEK) |
+| CH PROG | the generator's step | Chord's PROG: which progression its chords follow |

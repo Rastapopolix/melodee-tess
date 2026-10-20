@@ -835,6 +835,61 @@ static void gen_series_load(gen_series_t *g, const gen_sec_t *s)
     g->loop = (uint8_t)(l > GEN_SR_LOOP ? GEN_SR_LOOP : l);
 }
 
+/* Chord pad: the progressions as degrees of the scale (0 = the tonic): POP I V vi IV, 50S I vi IV V, 251 ii V I I,
+ * CIRCLE the scale's fifths down (I IV vii iii vi ii V), TWO I IV, DRONE I alone; WALK the seed's (gen_chord_fill) */
+static const uint8_t GEN_CH_PROG[GEN_CH_PROGS - 1u][8] = {
+    {0, 4, 5, 3}, {0, 5, 3, 4}, {1, 4, 0, 0}, {0, 3, 6, 2, 5, 1, 4}, {0, 3}, {0},
+};
+static const uint8_t GEN_CH_PROG_N[GEN_CH_PROGS] = {4, 4, 4, 7, 2, 1, GEN_CH_WALK_N};
+static uint32_t gen_chord_len(const gen_chord_t *g) { return GEN_CH_PROG_N[g->prog < GEN_CH_PROGS ? g->prog : 0u]; }
+/* the degree of chord i of the progression (from ROT on) */
+static uint32_t gen_chord_degree(const gen_chord_t *g, uint32_t i)
+{
+    uint32_t p = g->prog < GEN_CH_PROGS ? g->prog : 0u, k = (i + g->rot) % GEN_CH_PROG_N[p];
+    return (p == GEN_CH_WALK ? g->walk[k] : GEN_CH_PROG[p][k]) % 7u;
+}
+/* a chord's length in steps: BARS of the clock's bars (1/2 bar: at least a step) */
+static uint32_t gen_chord_steps(const gen_chord_t *g, uint32_t steps_per_bar)
+{
+    uint32_t spb = steps_per_bar ? steps_per_bar : 16u;
+    return g->bars ? spb << (g->bars > 3u ? 2u : g->bars - 1u) : (spb / 2u ? spb / 2u : 1u);
+}
+/* a walk from the tonic: each chord a fourth or fifth from the last, or the relative a third down (no chord twice) */
+static void gen_chord_fill(gen_chord_t *g, uint32_t seed)
+{
+    static const uint8_t MOVE[4] = {3, 4, 5, 2};      /* (degrees up: a fourth, a fifth, a third down, a third up) */
+    uint32_t r = gen_stream(seed * 97u + 11u), d = 0;
+    g->walk[0] = 0;
+    for (uint32_t i = 1; i < GEN_CH_WALK_N; i++) {
+        d = (d + MOVE[gen_rnd(&r, 4u)]) % 7u;
+        g->walk[i] = (uint8_t)d;
+    }
+}
+static void gen_chord_start(gen_chord_t *g) { g->n = 0; }
+/* Chord pad: a strike on the chord's first step (HOLD: held to its end), on every beat (BEAT) or every step (STEP).
+ * The note: the chord's degree (tessera.c makes the chord); the first strike of a chord louder. The CV: the degree */
+static void gen_chord_tick(gen_chord_t *g, const gen_clock_t *clk, gen_out_t *out)
+{
+    uint32_t len = gen_chord_steps(g, clk->steps_per_bar), in = g->n % len, beat = clk->steps_per_bar / 4u;
+    uint32_t i = (g->n / len) % gen_chord_len(g), deg = gen_chord_degree(g, i);
+    if (!beat) beat = 1u;
+    g->idx = (uint8_t)i;
+    g->deg = (uint8_t)deg;
+    out->gate = (uint8_t)(!in || g->hit == GEN_CH_STEP || (g->hit == GEN_CH_BEAT && !(in % beat)));
+    g->hold = (uint16_t)(g->hit == GEN_CH_HOLD ? len : g->hit == GEN_CH_BEAT ? (len - in < beat ? len - in : beat) : 0u);
+    out->note = (uint8_t)deg;
+    out->vel = (uint8_t)(in ? 84u : 104u);
+    out->cv = (int16_t)(deg * 32767u / 6u);
+    g->n++;
+}
+/* Chord pad: at AMOUNT %, WALK changes one of its chords (never the first), another progression turns a chord on */
+static void gen_chord_mutate(gen_chord_t *g, uint32_t amt, uint32_t *rnd)
+{
+    if (gen_rnd(rnd, 100u) >= amt) return;
+    if (g->prog == GEN_CH_WALK) g->walk[1u + gen_rnd(rnd, GEN_CH_WALK_N - 1u)] = (uint8_t)gen_rnd(rnd, 7u);
+    else g->rot = (uint8_t)((g->rot + 1u) & 7u);
+}
+
 /* ------------------------------------------------------------------ FORM sections --- */
 static void gen_turing_save(const gen_turing_t *g, gen_sec_t *s) { s->reg = g->reg; }
 static void gen_turing_load(gen_turing_t *g, const gen_sec_t *s) { g->reg = s->reg; }
@@ -904,4 +959,20 @@ static void gen_constel_load(gen_constel_t *g, const gen_sec_t *s)
     g->y = (uint8_t)((s->p0 & 15u) < GEN_CS_ROWS ? s->p0 & 15u : GEN_CS_ROWS - 1u);
     g->size = (uint8_t)((s->p0 >> 4) & 7u);
     g->dens = s->p1 > 100u ? 100u : s->p1;
+}
+/* Chord pad: a section's progression, BARS, HIT, ROT and walk */
+static void gen_chord_save(const gen_chord_t *g, gen_sec_t *s)
+{
+    s->reg = (uint16_t)((g->walk[0] & 7u) | (g->walk[1] & 7u) << 3 | (g->walk[2] & 7u) << 6 | (g->walk[3] & 7u) << 9 |
+                        (g->rot & 7u) << 12);
+    s->p0 = (uint8_t)((g->prog & 7u) | (g->bars & 3u) << 3 | (g->hit & 3u) << 5);
+}
+static void gen_chord_load(gen_chord_t *g, const gen_sec_t *s)
+{
+    uint32_t p = s->p0 & 7u, h = (s->p0 >> 5) & 3u;
+    for (uint32_t i = 0; i < GEN_CH_WALK_N; i++) g->walk[i] = (uint8_t)(((s->reg >> (3u * i)) & 7u) % 7u);
+    g->rot = (uint8_t)((s->reg >> 12) & 7u);
+    g->prog = (uint8_t)(p < GEN_CH_PROGS ? p : GEN_CH_POP);
+    g->bars = (uint8_t)((s->p0 >> 3) & 3u);
+    g->hit = (uint8_t)(h < GEN_CH_HITS ? h : GEN_CH_HOLD);
 }
