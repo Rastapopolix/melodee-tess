@@ -477,20 +477,25 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             }
         }
     } else if (mode == TESS_ENG_SERIES) {
-        /* the series as a contour: the next 16 steps' degrees as bars (the one playing lit, a line through their tops), the
-         * loop's length marked under them; LOOP OFF a dashed line, the series running on */
+        /* the series as a contour: the next 16 steps' degrees as bars (the one playing lit, a line joining their tops
+         * behind them, so it never crosses a bar), the loop's length marked under them; LOOP OFF a dashed line, the series
+         * running on */
         const gen_series_t *g = tessera_series(tr);
         int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 202 : 218, top = is_panel ? 10 : y_base - 2;
         int32_t sh = is_panel ? 88 : 26, cw = sw / 16, px = -1, py = 0;
         gen_series_t p = *g;                                 /* (from the step just played) */
         if (p.n) p.n--;
-        for (uint32_t k = 0; k < 16u; k++) {
-            uint32_t d = gen_sr_degree(&p, k), cur = song.playing && g->n && k == 0u;
-            int32_t x = x0 + (int32_t)k * cw, h = 3 + (int32_t)d * (sh - 3) / 14, y = top + sh - h;
-            cv_rect(x + 1, y, cw - 3, h, cur ? T_TEXT : c);
-            if (px >= 0) cv_line(px, py, x + cw / 2 - 1, y, dim);
-            px = x + cw / 2 - 1, py = y;
-        }
+        for (int pass = 0; pass < 2; pass++)                 /* (the line first, the bars over it) */
+            for (uint32_t k = 0; k < 16u; k++) {
+                uint32_t d = gen_sr_degree(&p, k), cur = song.playing && g->n && k == 0u;
+                int32_t x = x0 + (int32_t)k * cw, h = 3 + (int32_t)d * (sh - 3) / 14, y = top + sh - h;
+                if (pass) {
+                    cv_rect(x + 1, y, cw - 3, h, cur ? T_TEXT : c);
+                    continue;
+                }
+                if (px >= 0) cv_line(px, py, x + cw / 2 - 1, y, dim);
+                px = x + cw / 2 - 1, py = y;
+            }
         if (is_panel) {
             int32_t ly = top + sh + 8;
             uint32_t l = g->loop;
