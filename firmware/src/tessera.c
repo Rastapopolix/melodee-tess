@@ -906,7 +906,7 @@ static void tess_chord_play(track_t *t, uint32_t tr, uint32_t gate)
     seq_release(t);
     t->seq_n = 0;
     for (i = 0; i < n; i++) {
-        x = (int32_t)out[i] + t->p[P_TRANS] + tw->shift;
+        x = (int32_t)out[i] + 12 * g->oct + t->p[P_TRANS] + tw->shift;
         x = x < 0 ? 0 : x > 127 ? 127 : x;
         if (t->seq_n && t->seq_notes[t->seq_n - 1u] == (uint8_t)x) continue;
         trk_note_on(t, (uint32_t)x, vel);
@@ -1371,6 +1371,17 @@ void tessera_constel_layer_knob(uint32_t k, int32_t s)
     TESS_IRQ_ON();
 }
 
+/* CHORD with OCT+ held on GEN, KNOB 1: OCT (KNOB 2 and 3 are the track's CHRD and VOIC: ui_input.c) */
+void tessera_chord_oct_knob(int32_t s)
+{
+    uint32_t tr = song.sel;
+    tessera_ensure_init();
+    if (tr >= TESSERA_TRACKS || !s) return;
+    TESS_IRQ_OFF();
+    tess_param_set_body(tr, TX_CH_OCT, (int32_t)tessera.chord[tr].oct + (s > 0 ? 1 : -1));
+    TESS_IRQ_ON();
+}
+
 void tessera_knob(uint32_t k, int32_t s)
 {
     TESS_IRQ_OFF();
@@ -1434,7 +1445,8 @@ uint32_t tessera_sig(uint32_t tr)
         h = (h ^ (a->start | a->intv << 8 | a->loop << 16) ^ (uint32_t)a->n << 7) * 16777619u;
         break; }
     case TESS_ENG_CHORD: { const tessera_chord_t *a = &tessera.chord[tr];
-        h = (h ^ (a->prog | a->bars << 4 | a->hit << 8 | a->rot << 12 | (uint32_t)a->deg << 16 | (uint32_t)a->idx << 20)) *
+        h = (h ^ (a->prog | a->bars << 4 | a->hit << 8 | a->rot << 12 | (uint32_t)a->deg << 16 | (uint32_t)a->idx << 20 |
+                  (uint32_t)(a->oct + 2) << 24)) *
             16777619u;
         h = (h ^ (a->walk[0] | a->walk[1] << 4 | a->walk[2] << 8 | a->walk[3] << 12) ^ (uint32_t)a->n << 16) * 16777619u;
         break; }
@@ -1603,10 +1615,11 @@ static uint8_t *tess_put_v11(uint8_t *o, const tessera_constel_t *c)
     *o++ = (uint8_t)(((c->len >= 1u && c->len <= 16u ? c->len : 16u) - 1u) | c->fill << 4);
     return o;
 }
-/* version 12's part (after version 11's 130 bytes): Chord's PROG, BARS | HIT << 2, ROT, its walk (3 bits a chord) */
+/* version 12's part (after version 11's 130 bytes): Chord's PROG, BARS | HIT << 2 | OCT << 4 (3 bits, -2..2 as 6 7 0 1
+ * 2), ROT, its walk (3 bits a chord) */
 static uint8_t *tess_put_v12(uint8_t *o, const tessera_chord_t *c)
 {
-    *o++ = c->prog; *o++ = (uint8_t)(c->bars | c->hit << 2); *o++ = c->rot;
+    *o++ = c->prog; *o++ = (uint8_t)(c->bars | c->hit << 2 | ((uint32_t)c->oct & 7u) << 4); *o++ = c->rot;
     return tess_put16(o, (uint16_t)(c->walk[0] | c->walk[1] << 3 | c->walk[2] << 6 | c->walk[3] << 9));
 }
 uint32_t tessera_pack(uint8_t *o)
@@ -1711,7 +1724,8 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     if (sc[0] > 127u || sc[1] < 1u || sc[1] > 7u || sc[2] > GEN_SR_LOOP) return 0;
     if (qc[0] >= GEN_QR_COUNT || (qc[1] >> 2) >= GEN_QC_EVERY_N) return 0;   /* (MOVE: any 2 bits) */
     if ((cl[0] >> 4) >= GEN_CS_FILL_COUNT) return 0;   /* (LEN - 1: any 4 bits) */
-    if (ch[0] >= GEN_CH_PROGS || ch[1] >= (GEN_CH_HITS << 2) || ch[2] > 7u || walk >> 12) return 0;
+    if (ch[0] >= GEN_CH_PROGS || ((ch[1] >> 2) & 3u) >= GEN_CH_HITS || ch[2] > 7u || walk >> 12) return 0;
+    if (ch[1] >> 7 || ((ch[1] >> 4) - 3u) < 3u) return 0;   /* (OCT: -2..2) */
     for (i = 0; i < GEN_CH_WALK_N; i++)
         if (((walk >> (3u * i)) & 7u) > 6u) return 0;
     if (!apply) return 1;
@@ -1766,7 +1780,8 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     gen_constel_start(&tessera.constel[tr]);
     tessera.series[tr].start = sc[0]; tessera.series[tr].intv = sc[1]; tessera.series[tr].loop = sc[2];
     gen_series_start(&tessera.series[tr]);
-    tessera.chord[tr].prog = ch[0]; tessera.chord[tr].bars = ch[1] & 3u; tessera.chord[tr].hit = (uint8_t)(ch[1] >> 2);
+    tessera.chord[tr].prog = ch[0]; tessera.chord[tr].bars = ch[1] & 3u; tessera.chord[tr].hit = (uint8_t)((ch[1] >> 2) & 3u);
+    tessera.chord[tr].oct = (int8_t)((ch[1] >> 4) >= 6u ? (int32_t)(ch[1] >> 4) - 8 : (int32_t)(ch[1] >> 4));
     tessera.chord[tr].rot = ch[2];
     for (i = 0; i < GEN_CH_WALK_N; i++) tessera.chord[tr].walk[i] = (uint8_t)((walk >> (3u * i)) & 7u);
     gen_chord_start(&tessera.chord[tr]);
@@ -2033,6 +2048,7 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_CH_PROG: return tessera.chord[tr].prog;
     case TX_CH_BARS: return tessera.chord[tr].bars;
     case TX_CH_HIT: return tessera.chord[tr].hit;
+    case TX_CH_OCT: return tessera.chord[tr].oct;
     }
     return 0;
 }
@@ -2180,6 +2196,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_CH_PROG: tessera.chord[tr].prog = (uint8_t)tess_clampi(v, 0, GEN_CH_PROGS - 1); return;
     case TX_CH_BARS: tessera.chord[tr].bars = (uint8_t)tess_clampi(v, 0, GEN_CH_BARS - 1); return;
     case TX_CH_HIT: tessera.chord[tr].hit = (uint8_t)tess_clampi(v, 0, GEN_CH_HITS - 1); return;
+    case TX_CH_OCT: tessera.chord[tr].oct = (int8_t)tess_clampi(v, -2, 2); return;
     default:
         return;
     }

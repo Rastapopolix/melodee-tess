@@ -856,6 +856,20 @@ static void edit_param(uint32_t slot, int32_t steps)
             ui.force = 1;
             return;
         }
+        if (ch_layer_on()) {                            /* CHORD, OCT+ held: OCT, the track's CHRD and VOIC */
+            if (slot == 0u) {
+                tessera_chord_oct_knob(steps);
+            } else if (slot < 3u) {
+                uint32_t p = slot == 1u ? P_CHRD : P_VOIC;
+                const param_desc_t *dp = track_desc(TSEL, p);
+                TSEL->p[p] = (int16_t)clamp(TSEL->p[p] + (steps > 0 ? 1 : -1), dp->min, dp->max);
+            }
+            oct_eat |= 2u;
+            ui.oct_t0 |= 2u;
+            oct_deferred = 0;
+            ui.force = 1;
+            return;
+        }
         if (cs_layer_on()) {                            /* CONSTELLATION, OCT+ held: LOCK, LEN, FILL, SIZE */
             tessera_constel_layer_knob(slot, steps);
             oct_eat |= 2u;

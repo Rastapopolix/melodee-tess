@@ -205,6 +205,7 @@ enum {
     TX_QD_RANGE, TX_QD_MOVE1, TX_QD_MOVE2, TX_QD_MOVE3, TX_QD_MOVE4, TX_QD_EVERY1, TX_QD_EVERY2, TX_QD_EVERY3, TX_QD_EVERY4,
     TX_CS_LEN, TX_CS_FILL,
     TX_CH_PROG, TX_CH_BARS, TX_CH_HIT,
+    TX_CH_OCT,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -229,6 +230,7 @@ const gen_constel_t *tessera_constel(uint32_t tr);
 uint32_t tessera_cs_speed(uint32_t tr);                 /* Constellation's SPEED: the track's DIV, 0 the slowest .. 7 */
 #define TESS_CS_SPEEDS 8u                               /* (4BAR .. 1/32, the straight DIVs) */
 void tessera_constel_layer_knob(uint32_t k, int32_t s);   /* OCT+ held on GEN in CONSTELLATION: LOCK, LEN, FILL, SIZE */
+void tessera_chord_oct_knob(int32_t s);                    /* OCT+ held on GEN in CHORD, KNOB 1: OCT */
 const gen_series_t *tessera_series(uint32_t tr);
 const gen_chord_t *tessera_chord(uint32_t tr);
 uint32_t tessera_chord_pcs(void);     /* QNT CHRD: the chord the first CHORD track plays (pitch classes, bit 0 C), 0 none */

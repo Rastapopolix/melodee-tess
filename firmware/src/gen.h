@@ -180,6 +180,7 @@ typedef struct {
     uint8_t  bars;        /* 0..3: 1/2, 1, 2, 4 bars a chord */
     uint8_t  hit;         /* GEN_CH_HOLD, _BEAT, _STEP */
     uint8_t  rot;         /* 0..7: the progression begins this many chords in (EVOLVE turns it) */
+    int8_t   oct;         /* -2..2: octaves from the chords' home (around C3; tessera.c, not a section's) */
     uint8_t  walk[GEN_CH_WALK_N];   /* WALK's degrees, 0..6 */
     uint8_t  deg;         /* the degree of the chord playing (the picture's) */
     uint8_t  idx;         /* its place in the progression (the picture's) */

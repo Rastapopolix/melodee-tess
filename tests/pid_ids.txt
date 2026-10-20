@@ -194,3 +194,4 @@
 0x249 CHORD PROG               track 0..6 def 0
 0x24a CHORD BARS               track 0..3 def 1
 0x24b CHORD HIT                track 0..2 def 0
+0x24c CHORD OCT                track -2..2 def 0

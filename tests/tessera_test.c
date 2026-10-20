@@ -469,6 +469,7 @@ static void s_chord_var(void)
     turns(tessera_knob, 2, -1);                       /* BARS 1/2 */
     turns(tessera_knob, 3, 1);                        /* HIT BEAT */
     trk[0].p[P_CHRD] = CH_DIA7;                       /* (SCL CHORD: sevenths) */
+    tessera_chord_oct_knob(-1);                       /* OCT -1 (OCT+ held, KNOB 1) */
 }
 static void s_chord_link(void)                        /* QNT CHRD: TURING and MARKOV follow the chords of track 1 */
 {
@@ -1667,9 +1668,9 @@ static void pack_run(char *res, size_t cap)
     }
     {   /* a version 11 block (before CHORD: each track 5 bytes shorter) loads every setting, CHORD's defaults with the
          * walk of the track's seed; a CELLS track (12, CHORD's number now) loads as TURING; PROG, BARS and HIT out of
-         * range are refused; PROG, BARS, HIT and the walk round trip */
+         * range are refused, OCT too; PROG, BARS, HIT, OCT and the walk round trip */
         static uint8_t v11[TESSERA_PK_BYTES_V11], v11b[TESSERA_PK_BYTES_V11];
-        static const uint8_t BAD[][2] = {{0, GEN_CH_PROGS}, {1, GEN_CH_HITS << 2}, {2, 8}, {4, 0x10}};
+        static const uint8_t BAD[][2] = {{0, GEN_CH_PROGS}, {1, GEN_CH_HITS << 2}, {1, 3u << 4}, {1, 8u << 4}, {2, 8}, {4, 0x10}};
         const uint32_t n12 = TESSERA_PK_BYTES / TESSERA_TRACKS, n11 = TESSERA_PK_BYTES_V11 / TESSERA_TRACKS;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v11 + tr * n11, a + tr * n12, n11);
         tessera_reset();
@@ -1682,7 +1683,7 @@ static void pack_run(char *res, size_t cap)
             gen_chord_fill(&fc, tessera.seed[tr]);
             memcpy(v11b + tr * n11, b + tr * n12, n11);
             ok &= tessera.chord[tr].prog == GEN_CH_POP && tessera.chord[tr].bars == 1u && tessera.chord[tr].hit == 0u &&
-                  !memcmp(tessera.chord[tr].walk, fc.walk, GEN_CH_WALK_N);
+                  tessera.chord[tr].oct == 0 && !memcmp(tessera.chord[tr].walk, fc.walk, GEN_CH_WALK_N);
         }
         ok &= !memcmp(v11, v11b, sizeof v11);         /* every other version 11 setting as it was */
         v11[1u * n11] = TESS_ENG_RETIRED_CELLS;
@@ -1697,12 +1698,15 @@ static void pack_run(char *res, size_t cap)
         tessera_param_set(1, TX_CH_BARS, 3);
         tessera_param_set(1, TX_CH_HIT, GEN_CH_STEP);
         tessera_param_set(3, TX_CH_PROG, 99);          /* (kept to the last) */
+        tessera_param_set(1, TX_CH_OCT, -2);
+        tessera_param_set(3, TX_CH_OCT, 9);            /* (kept to +2) */
         tessera.chord[1].walk[3] = 6;
         tessera_pack(b);
         tessera_reset();
         ok &= tessera_unpack(b) == 1 && tessera.chord[1].prog == GEN_CH_WALK && tessera.chord[1].bars == 3u &&
               tessera.chord[1].hit == GEN_CH_STEP && tessera.chord[1].walk[3] == 6u &&
-              tessera.chord[3].prog == GEN_CH_PROGS - 1u && tessera_param_get(1, TX_CH_HIT) == GEN_CH_STEP;
+              tessera.chord[3].prog == GEN_CH_PROGS - 1u && tessera_param_get(1, TX_CH_HIT) == GEN_CH_STEP &&
+              tessera.chord[1].oct == -2 && tessera_param_get(3, TX_CH_OCT) == 2;
         tessera_unpack(a);
     }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */

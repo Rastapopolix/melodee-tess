@@ -61,8 +61,15 @@ static int cs_layer_on(void)
            cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_CONSTEL &&
            ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
 }
-/* a generator's OCT+ layer is on (QUAD's or CONSTELLATION's): no octave, no sheet */
-static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on(); }
+/* CHORD on GEN with OCT+ held: the knobs are OCT, the track's CHRD and VOIC (ui_input.c ch_layer_knob) */
+static int ch_layer_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && song.sel < TESSERA_TRACKS && cur_page()->fam == FAM_GEN &&
+           cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_CHORD &&
+           ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
+}
+/* a generator's OCT+ layer is on (QUAD's, CONSTELLATION's or CHORD's): no octave, no sheet */
+static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on() || ch_layer_on(); }
 /* QUAD's LINK as its card shows it: OFF, or "T" and the linked tracks ("T24") */
 static void quad_link_text(uint32_t m, char *b)
 {

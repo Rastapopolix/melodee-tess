@@ -107,6 +107,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_CH_PROG] = PE("PROG", TX_N_CHPROG, 0),
     [TX_CH_BARS] = PE("BARS", TX_N_CHBARS, 1),
     [TX_CH_HIT] = PE("HIT", TX_N_CHHIT, 0),
+    [TX_CH_OCT] = PD("OCT", F_INT, -2, 2, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -395,10 +396,12 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_CH_PROG, "CHORD PROG", "The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, "
                                  "2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four "
                                  "chords of the track's SEED (ROLL another, EVOLVE changes one). SCL CHORD's CHRD and "
-                                 "VOIC shape the chords (CHRD OFF: triads)."),
+                                 "VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC."),
     X_(TX_CH_BARS, "CHORD BARS", "How long each chord lasts: half a bar, 1, 2 or 4 bars."),
     X_(TX_CH_HIT, "CHORD HIT", "How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; "
                                "STEP every step, for the step's GATE."),
+    X_(TX_CH_OCT, "CHORD OCT", "The chords' register, -2 to +2 octaves from their home around C3. OCT+ held on GEN, "
+                               "KNOB 1; KNOB 2 and 3 there are SCL CHORD's CHRD and VOIC."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
