@@ -22,10 +22,11 @@ enum {
     TESS_ENG_QUAD,        /* a row each of a 4 x 4 grid the tracks share (norns' initenere) */
     TESS_ENG_CONSTEL,     /* a ship catches the stars of a scrolling sky into a loop (norns' Constellation) */
     TESS_ENG_SERIES,      /* Nørgård's infinity series (norns' nørgård) */
-    TESS_ENG_COUNT        /* (12 was CELLS, cut 2026-10-20: TESS_ENG_RETIRED_CELLS) */
+    TESS_ENG_CHORD,       /* the chord pad: a progression's chords in the track's scale (QNT CHRD: the others follow) */
+    TESS_ENG_COUNT
 };
-/* CELLS (an elementary automaton, cut 2026-10-20 as too like the others): a saved track of it loads as TURING. A new
- * mode does not take this number: put a placeholder at 12 first */
+/* CELLS (an elementary automaton, cut 2026-10-20 as too like the others) had 12 in blocks up to version 11: such a
+ * track loads as TURING (tess_v11_track); CHORD has 12 from version 12 */
 #define TESS_ENG_RETIRED_CELLS 12u
 
 /* The generators' own state lives in gen.h (the names below kept for the adapter and the UI) */
@@ -40,6 +41,7 @@ typedef gen_poly_t   tessera_poly_t;
 typedef gen_quad_t   tessera_quad_t;
 typedef gen_constel_t tessera_constel_t;
 typedef gen_series_t tessera_series_t;
+typedef gen_chord_t  tessera_chord_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
@@ -109,6 +111,9 @@ typedef struct {
     uint8_t          qcol_sel;                /* the column OCT+ held on GEN edits, 0..3 (the page's, not saved) */
     tessera_constel_t constel[TESSERA_TRACKS];
     tessera_series_t series[TESSERA_TRACKS];
+    tessera_chord_t  chord[TESSERA_TRACKS];
+    uint16_t         chord_pc[TESSERA_TRACKS]; /* CHORD: the pitch classes of the chord it plays (bit 0 C), 0 none yet
+                                               * (QNT CHRD's: tessera_chord_pcs; not saved) */
     tessera_evolve_t evolve[TESSERA_TRACKS];
     tessera_sec_t    sec[TESSERA_TRACKS][3];
     uint8_t          last_note[TESSERA_TRACKS];
@@ -157,7 +162,8 @@ void organic_play(void);                            /* seq.c, PLAY: SLOTH and OC
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 520u                       /* the saved state, version 11 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES 540u                       /* the saved state, version 12 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V11 520u                   /* version 11 (before CHORD) */
 #define TESSERA_PK_BYTES_V10 516u                   /* version 10 (before CONSTELLATION's LEN and FILL) */
 #define TESSERA_PK_BYTES_V9 508u                    /* version 9 (before QUAD's columns, RANGE and LINK to several) */
 #define TESSERA_PK_BYTES_V8 480u                    /* version 8 (before SERIES and CELLS) */
@@ -170,9 +176,9 @@ const char *tessera_form_name(uint32_t form);
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..11) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..12) */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
-void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 11 */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 12 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
@@ -198,6 +204,8 @@ enum {
     TX_CL_RULE_RETIRED, TX_CL_TAP_RETIRED, TX_CL_SPAN_RETIRED,   /* (CELLS's, cut 2026-10-20: gaps, no parameter) */
     TX_QD_RANGE, TX_QD_MOVE1, TX_QD_MOVE2, TX_QD_MOVE3, TX_QD_MOVE4, TX_QD_EVERY1, TX_QD_EVERY2, TX_QD_EVERY3, TX_QD_EVERY4,
     TX_CS_LEN, TX_CS_FILL,
+    TX_CH_PROG, TX_CH_BARS, TX_CH_HIT,
+    TX_CH_OCT,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -222,6 +230,12 @@ const gen_constel_t *tessera_constel(uint32_t tr);
 uint32_t tessera_cs_speed(uint32_t tr);                 /* Constellation's SPEED: the track's DIV, 0 the slowest .. 7 */
 #define TESS_CS_SPEEDS 8u                               /* (4BAR .. 1/32, the straight DIVs) */
 void tessera_constel_layer_knob(uint32_t k, int32_t s);   /* OCT+ held on GEN in CONSTELLATION: LOCK, LEN, FILL, SIZE */
+void tessera_chord_oct_knob(int32_t s);                    /* OCT+ held on GEN in CHORD, KNOB 1: OCT */
 const gen_series_t *tessera_series(uint32_t tr);
+const gen_chord_t *tessera_chord(uint32_t tr);
+uint32_t tessera_chord_pcs(void);     /* QNT CHRD: the chord the first CHORD track plays (pitch classes, bit 0 C), 0 none */
+uint32_t tessera_chord_snap(uint32_t pcs, int32_t n);   /* n moved to the nearest note of pcs (a tie: down), 0..127 */
+uint32_t tessera_chord_at(uint32_t tr, uint32_t i, char *name);   /* chord i of its progression: name (12 B) -> pitch
+                                                                 * classes (bit 0 C) | its root's << 12 */
 
 #endif

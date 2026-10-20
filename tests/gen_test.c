@@ -637,6 +637,90 @@ static void series_tests(void)
     check("series: EVOLVE picks a new START (AMOUNT 0: none); a section keeps START, INTV and LOOP", mut && sec);
 }
 
+/* ---------------------------------------------------------- Chord --- */
+static void chord_tests(void)
+{
+    static const uint8_t POP[4] = {0, 4, 5, 3};
+    int prog = 1, hits = 1, bars = 1, walk = 1, mut = 1, sec = 1;
+    gen_clock_t clk = {0, 16, 0};
+    {                                                  /* POP, a bar a chord, HOLD: a strike a bar, held 16 steps */
+        gen_chord_t g;
+        memset(&g, 0, sizeof g);
+        g.bars = 1;
+        for (uint32_t i = 0; i < 64u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            prog &= o.note == POP[(i / 16u) % 4u] && g.idx == (i / 16u) % 4u;
+            hits &= o.gate == !(i % 16u) && g.hold == 16u && o.vel == (i % 16u ? 84u : 104u);
+        }
+    }
+    {                                                  /* BEAT: every 4 steps, held to the beat; STEP: every step */
+        gen_chord_t g;
+        memset(&g, 0, sizeof g);
+        g.bars = 1, g.hit = GEN_CH_BEAT;
+        for (uint32_t i = 0; i < 32u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            hits &= o.gate == !(i % 4u) && (!o.gate || g.hold == 4u);
+        }
+        memset(&g, 0, sizeof g);
+        g.bars = 1, g.hit = GEN_CH_STEP;
+        for (uint32_t i = 0; i < 16u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            hits &= o.gate && !g.hold;
+        }
+    }
+    for (uint32_t b = 0; b < GEN_CH_BARS; b++) {      /* BARS: 1/2, 1, 2, 4 bars (8, 16, 32, 64 steps at 1/16) */
+        gen_chord_t g;
+        uint32_t n = 0, len = b ? 16u << (b - 1u) : 8u;
+        memset(&g, 0, sizeof g);
+        g.bars = (uint8_t)b, g.prog = GEN_CH_TWO;
+        for (uint32_t i = 0; i < 128u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            n += o.gate;
+            bars &= o.note == ((i / len) % 2u ? 3u : 0u);
+        }
+        bars &= n == 128u / len;
+    }
+    for (uint32_t sd = 1; sd <= 128u; sd++) {         /* WALK: from the tonic, a fourth, fifth or third at a time */
+        gen_chord_t g;
+        memset(&g, 0, sizeof g);
+        gen_chord_fill(&g, sd);
+        walk &= !g.walk[0];
+        for (uint32_t i = 1; i < GEN_CH_WALK_N; i++) {
+            uint32_t d = (g.walk[i] + 7u - g.walk[i - 1u]) % 7u;
+            walk &= g.walk[i] < 7u && (d == 2u || d == 3u || d == 4u || d == 5u);
+        }
+    }
+    {
+        gen_chord_t g, f, h;
+        gen_sec_t s = {0, 0, 0};
+        memset(&g, 0, sizeof g);
+        gen_chord_fill(&g, 7u);
+        f = g;
+        gen_chord_mutate(&g, 0, &rng_state);
+        mut &= !memcmp(&g, &f, sizeof g);
+        gen_chord_mutate(&g, 100, &rng_state);
+        mut &= g.rot == 1u;                            /* (POP: a turn) */
+        g.prog = GEN_CH_WALK;
+        for (uint32_t i = 0; i < 40u; i++) gen_chord_mutate(&g, 100, &rng_state);
+        mut &= !g.walk[0] && memcmp(g.walk, f.walk, GEN_CH_WALK_N);
+        g.bars = 3, g.hit = GEN_CH_BEAT, g.rot = 5;
+        memset(&h, 0, sizeof h);
+        gen_chord_save(&g, &s);
+        gen_chord_load(&h, &s);
+        sec &= h.prog == GEN_CH_WALK && h.bars == 3u && h.hit == GEN_CH_BEAT && h.rot == 5u &&
+               !memcmp(h.walk, g.walk, GEN_CH_WALK_N);
+    }
+    check("chord: POP plays I V vi IV, a chord a bar, its degree as the note, the first strike louder", prog);
+    check("chord: HIT HOLD strikes once a chord, BEAT every beat, STEP every step, each held as long", hits);
+    check("chord: BARS 1/2, 1, 2 and 4 bars a chord", bars);
+    check("chord: WALK starts on the tonic, each chord a third, fourth or fifth from the last", walk);
+    check("chord: EVOLVE turns a progression or changes a WALK chord (AMOUNT 0: none); a section keeps them", mut && sec);
+}
+
 /* ---------------------------------------------------------- Constellation --- */
 static gen_constel_t constel_at(uint32_t y, uint32_t dens, uint32_t size, uint32_t autop, uint32_t seed)
 {
@@ -1203,6 +1287,7 @@ int main(void)
     fall_tests();
     constel_tests();
     series_tests();
+    chord_tests();
     awake_tests();
     poly_tests();
     quad_tests();

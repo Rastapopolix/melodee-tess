@@ -27,7 +27,7 @@
 0x018 ARP ORDER                track 0..1 def 0
 0x019 ROOT                     track 0..11 def 0
 0x01a SCALE                    track 0..69 def 0
-0x01b QUANTIZE                 track 0..4 def 0
+0x01b QUANTIZE                 track 0..5 def 0
 0x01c TRANSPOSE                track -24..24 def 0
 0x01d PATTERN LENGTH           track 1..64 def 16
 0x01e PATTERN DIVISION         track 0..9 def 2
@@ -121,7 +121,7 @@
 0x127 FX RETURN                global 0..127 def 100
 0x128 FX MODE                  global 0..1 def 0
 0x129 VOICE BUDGET             global device 8..32 def 16
-0x200 GENERATOR MODE           track 0..11 def 0
+0x200 GENERATOR MODE           track 0..12 def 0
 0x201 TURING LENGTH            track 2..16 def 16
 0x202 TURING PROB              track 0..100 def 0
 0x203 TURING SPAN              track 1..3 def 2
@@ -191,3 +191,7 @@
 0x246 QUAD EVERY 4             track 0..6 def 3
 0x247 CONSTELLATION LEN        track 1..16 def 16
 0x248 CONSTELLATION FILL       track 0..1 def 0
+0x249 CHORD PROG               track 0..6 def 0
+0x24a CHORD BARS               track 0..3 def 1
+0x24b CHORD HIT                track 0..2 def 0
+0x24c CHORD OCT                track -2..2 def 0

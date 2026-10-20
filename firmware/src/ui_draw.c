@@ -1007,6 +1007,31 @@ static void draw_columns(void)
                 if (g->loop) fmt_int(v3, g->loop);
                 else str_cpy(v3, "OFF", sizeof v3);
                 draw_column(3, "LOOP", v3, "", VAL(3u), (int32_t)g->loop * 1000 / GEN_SR_LOOP, ICON_AUTO);
+            } else if (m == TESS_ENG_CHORD) {
+                const gen_chord_t *g = tessera_chord(tr);
+                if (ch_layer_on()) {                            /* OCT+ held: OCT, the track's CHRD and VOIC */
+                    const param_desc_t *dc = pid_desc(PID_TRACK(P_CHRD), tr), *dv = pid_desc(PID_TRACK(P_VOIC), tr);
+                    uint32_t cv = (uint32_t)TSEL->p[P_CHRD], vv = (uint32_t)TSEL->p[P_VOIC];
+                    v1[0] = g->oct > 0 ? '+' : g->oct < 0 ? '-' : '0';
+                    v1[1] = g->oct ? (char)('0' + (g->oct < 0 ? -g->oct : g->oct)) : 0;
+                    v1[2] = 0;
+                    draw_column(0, "OCT", v1, "", VAL(0u), ((int32_t)g->oct + 2) * 1000 / 4, ICON_AUTO);
+                    col_mods(PID_TRACK(P_CHRD));
+                    draw_column(1, "CHRD", cv <= (uint32_t)dc->max ? dc->names[cv] : "?", "", VAL(1u),
+                                (int32_t)cv * 1000 / (dc->max ? dc->max : 1), ICON_AUTO);
+                    col_mods(PID_TRACK(P_VOIC));
+                    draw_column(2, "VOIC", vv <= (uint32_t)dv->max ? dv->names[vv] : "?", "", VAL(2u),
+                                (int32_t)vv * 1000 / (dv->max ? dv->max : 1), ICON_AUTO);
+                    return;
+                }
+                draw_column(0, "MODE", "CHORD", "", VAL(0u), TESS_ENG_CHORD * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                col_mods(PID_TESS(TX_CH_PROG));
+                draw_column(1, "PROG", pid_desc(PID_TESS(TX_CH_PROG), tr)->names[g->prog % GEN_CH_PROGS], "", VAL(1u),
+                            (int32_t)(g->prog % GEN_CH_PROGS) * 1000 / (GEN_CH_PROGS - 1), ICON_AUTO);
+                draw_column(2, "BARS", pid_desc(PID_TESS(TX_CH_BARS), tr)->names[g->bars % GEN_CH_BARS], "", VAL(2u),
+                            (int32_t)(g->bars % GEN_CH_BARS) * 1000 / (GEN_CH_BARS - 1), ICON_AUTO);
+                draw_column(3, "HIT", pid_desc(PID_TESS(TX_CH_HIT), tr)->names[g->hit % GEN_CH_HITS], "", VAL(3u),
+                            (int32_t)(g->hit % GEN_CH_HITS) * 1000 / (GEN_CH_HITS - 1), ICON_AUTO);
             } else if (m == TESS_ENG_CONSTEL) {
                 const gen_constel_t *c = tessera_constel(tr);
                 if (cs_layer_on()) {                            /* OCT+ held: LOCK, LEN, FILL, SIZE */

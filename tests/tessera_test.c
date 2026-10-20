@@ -461,6 +461,30 @@ static void s_series_var(void)
     turns(tessera_knob, 2, 2);                        /* INTV 3 */
     turns(tessera_knob, 3, 6);                        /* LOOP 6 */
 }
+static void s_chord(void) { gen(0, TESS_ENG_CHORD); }
+static void s_chord_var(void)
+{
+    gen(0, TESS_ENG_CHORD);
+    turns(tessera_knob, 1, GEN_CH_WALK);              /* PROG WALK */
+    turns(tessera_knob, 2, -1);                       /* BARS 1/2 */
+    turns(tessera_knob, 3, 1);                        /* HIT BEAT */
+    trk[0].p[P_CHRD] = CH_DIA7;                       /* (SCL CHORD: sevenths) */
+    tessera_chord_oct_knob(-1);                       /* OCT -1 (OCT+ held, KNOB 1) */
+}
+static void s_chord_link(void)                        /* QNT CHRD: TURING and MARKOV follow the chords of track 1 */
+{
+    gen(0, TESS_ENG_CHORD);
+    gen(1, TESS_ENG_TURING);
+    gen(2, TESS_ENG_MARKOV);
+    for (uint32_t k = 0; k < NTRK; k++) trk[k].p[P_QUANT] = Q_CHRD;
+}
+static void s_chord_form(void)
+{
+    gen(0, TESS_ENG_CHORD);
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 bar */
+    knob(tessera_evolve_knob, 2, 35);                 /* AMOUNT 100 */
+    turns(tessera_form_knob, 0, 1);                   /* FORM AB */
+}
 static void s_constel_var(void)
 {
     gen(0, TESS_ENG_CONSTEL);
@@ -691,6 +715,10 @@ static const scen_t SCEN[] = {
     {"series_start20_intv3_loop6", 8, 0x103Cu, s_series_var, 0},
     {"quad_cols_link2_range", 8, 0x103Fu, s_quad_cols, 0},
     {"evolve_quad_cols", 8, 0x1040u, s_evolve_quad_cols, 0},
+    {"chord", 8, 0x1041u, s_chord, 0},
+    {"chord_walk_half_beat_dia7", 8, 0x1042u, s_chord_var, 0},
+    {"chord_link_turing_markov", 8, 0x1043u, s_chord_link, 0},
+    {"chord_form_ab_evolve", 8, 0x1044u, s_chord_form, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -770,6 +798,40 @@ static int scen_fork(const scen_t *sc, const char *logdir, char *res, size_t cap
     if (n <= 0) return 1;
     res[n] = 0;
     return 0;
+}
+
+/* QNT CHRD, checked note by note: every note TURING and MARKOV play is a note of the chord track 1 sounds then (its
+ * notes of the latest block it struck in); its chords' lowest notes walk POP in C major, a bar each. "notes wrong roots" */
+static void chord_link_run(char *res, size_t cap)
+{
+    const scen_t *sc = 0;
+    uint32_t i, j, n = 0, bad = 0, roots = 0, k = 0, last = ~0u;
+    static const uint8_t POP[4] = {48, 55, 57, 53};   /* (C G A F, from C3) */
+    for (i = 0; i < NSCEN; i++) if (!strcmp(SCEN[i].name, "chord_link_turing_markov")) sc = &SCEN[i];
+    scen_run(sc, 0, res, cap);
+    for (i = 0; i < tt_n; i++) {
+        uint32_t pcs = 0;
+        if (tt_ev[i].tr == 0u) {
+            if (tt_ev[i].blk != last) {               /* a chord's first (lowest) note */
+                roots += tt_ev[i].note == POP[k++ % 4u];
+                last = tt_ev[i].blk;
+            }
+            continue;
+        }
+        for (j = i; j-- > 0;)                         /* the chord sounding: track 1's notes of its latest strike */
+            if (tt_ev[j].tr == 0u) {
+                uint32_t b = tt_ev[j].blk;
+                for (; j < tt_n && (tt_ev[j].tr != 0u || tt_ev[j].blk == b); j--) {
+                    if (tt_ev[j].tr == 0u) pcs |= 1u << (tt_ev[j].note % 12u);
+                    if (!j) break;
+                }
+                break;
+            }
+        if (!pcs) continue;
+        n++;
+        bad += !((pcs >> (tt_ev[i].note % 12u)) & 1u);
+    }
+    snprintf(res, cap, "%u %u %u %u", n, bad, roots, k);
 }
 
 /* FOLLOW of a STEP track, checked note by note: each note track 2 plays is two scale degrees above (a third, in C
@@ -1523,9 +1585,14 @@ static void pack_run(char *res, size_t cap)
             ok &= tessera_unpack(c) == 0;
         }
         memcpy(c, a, sizeof c);
-        c[2u * n9] = TESS_ENG_RETIRED_CELLS;              /* (track 3 a CELLS track, its bytes as CELLS left them) */
-        c[2u * n9 + n8 + 3u] = 110u; c[2u * n9 + n8 + 4u] = 9u; c[2u * n9 + n8 + 6u] = 0u;
-        ok &= tessera_unpack(c) == 1 && tessera.mode[2] == TESS_ENG_TURING;
+        c[2u * n9] = TESS_ENG_RETIRED_CELLS;              /* (track 3 a CELLS track of version 9, its bytes as CELLS left */
+        c[2u * n9 + n8 + 3u] = 110u; c[2u * n9 + n8 + 4u] = 9u; c[2u * n9 + n8 + 6u] = 0u;   /* them; 12 is CHORD now) */
+        {
+            static uint8_t v9c[TESSERA_PK_BYTES_V9];
+            const uint32_t m9 = TESSERA_PK_BYTES_V9 / TESSERA_TRACKS;
+            for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v9c + tr * m9, c + tr * n9, m9);
+            ok &= tessera_unpack_ver(9u, v9c) == 1 && tessera.mode[2] == TESS_ENG_TURING;
+        }
         tessera_unpack(a);
         tessera_param_set(1, TX_SR_START, 99);
         tessera_param_set(1, TX_SR_INTV, 5);
@@ -1597,6 +1664,49 @@ static void pack_run(char *res, size_t cap)
         ok &= tessera_unpack(b) == 1 && tessera.constel[1].len == 6u && tessera.constel[1].fill == GEN_CS_FILL_ARP &&
               tessera.constel[3].len == 1u && tessera.constel[3].fill == GEN_CS_FILL_COUNT - 1u &&
               tessera_param_get(1, TX_CS_LEN) == 6 && tessera_param_get(1, TX_CS_FILL) == GEN_CS_FILL_ARP;
+        tessera_unpack(a);
+    }
+    {   /* a version 11 block (before CHORD: each track 5 bytes shorter) loads every setting, CHORD's defaults with the
+         * walk of the track's seed; a CELLS track (12, CHORD's number now) loads as TURING; PROG, BARS and HIT out of
+         * range are refused, OCT too; PROG, BARS, HIT, OCT and the walk round trip */
+        static uint8_t v11[TESSERA_PK_BYTES_V11], v11b[TESSERA_PK_BYTES_V11];
+        static const uint8_t BAD[][2] = {{0, GEN_CH_PROGS}, {1, GEN_CH_HITS << 2}, {1, 3u << 4}, {1, 8u << 4}, {2, 8}, {4, 0x10}};
+        const uint32_t n12 = TESSERA_PK_BYTES / TESSERA_TRACKS, n11 = TESSERA_PK_BYTES_V11 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v11 + tr * n11, a + tr * n12, n11);
+        tessera_reset();
+        tessera.chord[2].prog = GEN_CH_TWO;
+        ok &= tessera_unpack_ver(11u, v11) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            gen_chord_t fc;
+            memset(&fc, 0, sizeof fc);
+            gen_chord_fill(&fc, tessera.seed[tr]);
+            memcpy(v11b + tr * n11, b + tr * n12, n11);
+            ok &= tessera.chord[tr].prog == GEN_CH_POP && tessera.chord[tr].bars == 1u && tessera.chord[tr].hit == 0u &&
+                  tessera.chord[tr].oct == 0 && !memcmp(tessera.chord[tr].walk, fc.walk, GEN_CH_WALK_N);
+        }
+        ok &= !memcmp(v11, v11b, sizeof v11);         /* every other version 11 setting as it was */
+        v11[1u * n11] = TESS_ENG_RETIRED_CELLS;
+        ok &= tessera_unpack_ver(11u, v11) == 1 && tessera.mode[1] == TESS_ENG_TURING;
+        for (uint32_t k = 0; k < sizeof BAD / sizeof BAD[0]; k++) {
+            memcpy(c, a, sizeof c);
+            c[2u * n12 + n11 + BAD[k][0]] = BAD[k][1];   /* (track 3's) */
+            ok &= tessera_unpack(c) == 0;
+        }
+        tessera_unpack(a);
+        tessera_param_set(1, TX_CH_PROG, GEN_CH_WALK);
+        tessera_param_set(1, TX_CH_BARS, 3);
+        tessera_param_set(1, TX_CH_HIT, GEN_CH_STEP);
+        tessera_param_set(3, TX_CH_PROG, 99);          /* (kept to the last) */
+        tessera_param_set(1, TX_CH_OCT, -2);
+        tessera_param_set(3, TX_CH_OCT, 9);            /* (kept to +2) */
+        tessera.chord[1].walk[3] = 6;
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.chord[1].prog == GEN_CH_WALK && tessera.chord[1].bars == 3u &&
+              tessera.chord[1].hit == GEN_CH_STEP && tessera.chord[1].walk[3] == 6u &&
+              tessera.chord[3].prog == GEN_CH_PROGS - 1u && tessera_param_get(1, TX_CH_HIT) == GEN_CH_STEP &&
+              tessera.chord[1].oct == -2 && tessera_param_get(3, TX_CH_OCT) == 2;
         tessera_unpack(a);
     }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */
@@ -1750,6 +1860,26 @@ int main(int argc, char **argv)
         }
         snprintf(line, sizeof line, "FOLLOW a STEP melody: all %u notes a third above it (in C major)", n2);
         bad += check(line, n2 > 16u && !wrong);
+    }
+    {   /* QNT CHRD: the other generators on the chord's notes */
+        unsigned n = 0, wrong = 1, roots = 0, chords = 0;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                chord_link_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u %u %u %u", &n, &wrong, &roots, &chords);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        snprintf(line, sizeof line, "CHORD POP a bar each (C G Am F: %u of %u), QNT CHRD: all %u notes of TURING and MARKOV "
+                 "in the chord", roots, chords, n);
+        bad += check(line, chords >= 8u && roots == chords && n > 32u && !wrong);
     }
     for (int which = 0; which < 2; which++) {   /* SEED back, PLAY again: in a child, as the scenarios */
         unsigned same = 0, differ = 0;

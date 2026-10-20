@@ -56,3 +56,4 @@
 53 S START  step  SERIES START
 54 ?        ?     -
 55 C AUTO   step  CONSTELLATION AUTO
+56 CH PROG  step  CHORD PROG

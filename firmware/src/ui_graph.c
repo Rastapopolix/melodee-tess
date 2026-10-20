@@ -61,8 +61,15 @@ static int cs_layer_on(void)
            cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_CONSTEL &&
            ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
 }
-/* a generator's OCT+ layer is on (QUAD's or CONSTELLATION's): no octave, no sheet */
-static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on(); }
+/* CHORD on GEN with OCT+ held: the knobs are OCT, the track's CHRD and VOIC (ui_input.c ch_layer_knob) */
+static int ch_layer_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && song.sel < TESSERA_TRACKS && cur_page()->fam == FAM_GEN &&
+           cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_CHORD &&
+           ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
+}
+/* a generator's OCT+ layer is on (QUAD's, CONSTELLATION's or CHORD's): no octave, no sheet */
+static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on() || ch_layer_on(); }
 /* QUAD's LINK as its card shows it: OFF, or "T" and the linked tracks ("T24") */
 static void quad_link_text(uint32_t m, char *b)
 {
@@ -505,6 +512,37 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 cv_rect(x0 + (int32_t)l * cw - 3, ly - 3, 1, 5, c);
             } else
                 for (int32_t x = x0 + 1; x < x0 + sw - 3; x += 6) cv_rect(x, ly, 3, 2, dim);
+        }
+    } else if (mode == TESS_ENG_CHORD) {
+        /* the progression as a row of cards, a chord's name each, the one playing filled with a bar under it for how far
+         * through it is; the panel adds an octave of keys from C, the playing chord's notes lit (its root ACCENT) */
+        static const uint8_t BLACK[12] = {0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0};
+        const gen_chord_t *g = tessera_chord(tr);
+        int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 204 : 216, top = is_panel ? 10 : y_base - 2;
+        int32_t ch = is_panel ? 40 : 22;
+        uint32_t n = gen_chord_len(g), cur = g->n ? g->idx : 0u, pcs = 0, len = gen_chord_steps(g, tess_steps_per_bar(&trk[tr]));
+        int32_t cw = sw / (int32_t)n;
+        char b[12];
+        for (uint32_t i = 0; i < n; i++) {
+            int32_t x = x0 + (int32_t)i * cw;
+            uint32_t at = tessera_chord_at(tr, i, b), on = i == cur;
+            const aafont_t *f = is_panel && n <= 4u ? &AF_M : &AF_S;
+            if (on) pcs = at;
+            if (on) cv_rrect(x + 1, top, cw - 3, ch, 3, c, bg);
+            else cv_frame(x + 1, top, cw - 3, ch, dim);
+            cv_text_c(x + cw / 2 - 1, top + ch / 2 - (f == &AF_M ? 9 : 6), f, b, on ? bg : c, on ? c : bg);
+            if (on && song.playing && g->n) {
+                uint32_t in = (g->n - 1u) % len + 1u;
+                cv_rect(x + 1, top + ch + 3, (cw - 3) * (int32_t)in / (int32_t)len, 2, T_TEXT);
+            }
+        }
+        if (is_panel) {
+            int32_t ky = top + ch + 12, kw = sw / 12;
+            for (uint32_t k = 0; k < 12u; k++) {
+                uint32_t lit = (pcs >> k) & 1u, root = k == (pcs >> 12);
+                cv_rrect(x0 + (int32_t)k * kw + 1, BLACK[k] ? ky : ky + 8, kw - 3, BLACK[k] ? 26 : 28, 2,
+                         !lit ? T_RAISE : root ? T_ACCENT : c, bg);
+            }
         }
     } else if (mode == TESS_ENG_QUAD) {
         /* the whole grid whatever track is selected: a row a track, a cell a bar at its pitch (a rest a dash), the cell

@@ -43,6 +43,7 @@ static void tess_seed_apply(uint32_t tr)
     gen_quad_fill(&tessera.quad[tr], sd);
     gen_constel_fill(&tessera.constel[tr], sd);
     gen_series_fill(&tessera.series[tr], sd);
+    gen_chord_fill(&tessera.chord[tr], sd);
     gen_bounce_serve(&tessera.bounce[tr], sd);
 }
 /* A track still without a seed (never played, nor loaded from a project) gets a random one now. Saved projects
@@ -143,6 +144,7 @@ void tessera_init(void)
         tessera.constel[i].len = 16;                    /* (the whole loop; FILL OFF) */
         gen_constel_start(&tessera.constel[i]);
         tessera.series[i].intv = 1;                     /* 11. Series: from its start, a degree a unit, on and on */
+        tessera.chord[i].bars = 1;                      /* 12. Chord: POP, a chord a bar, held */
         gen_bounce_serve(&tessera.bounce[i], 0u);
 
         /* 9. Evolve */
@@ -188,6 +190,7 @@ void tessera_stop_all(void)
         tessera.hit[i] = 0;
         tessera.br_in[i] = 0;
         tess_realign(i);
+        gen_chord_start(&tessera.chord[i]);                   /* (not on EVOLVE's boundaries: the progression goes on) */
         tess_form_reset(i);
         if (tessera.seed[i]) {                                /* the next PLAY: the seed's random choices from the top */
             tessera.rnd[i] = gen_stream(tessera.seed[i]);
@@ -294,6 +297,7 @@ void tessera_mutate(uint32_t tr)
     case TESS_ENG_QUAD:   tess_quad_mutate(tr, amt); break;
     case TESS_ENG_CONSTEL: gen_constel_mutate(&tessera.constel[tr], amt, &tessera.rnd[tr]); break;
     case TESS_ENG_SERIES: gen_series_mutate(&tessera.series[tr], amt, &tessera.rnd[tr]); break;
+    case TESS_ENG_CHORD:  gen_chord_mutate(&tessera.chord[tr], amt, &tessera.rnd[tr]); break;
     }
     tessera.evolve[tr].flash = 4;
     tess_realign(tr);
@@ -348,6 +352,7 @@ static void tess_save_sec(uint32_t tr)
     case TESS_ENG_QUAD:   gen_quad_save(&tessera.quad[tr], &g); break;
     case TESS_ENG_CONSTEL: gen_constel_save(&tessera.constel[tr], &g); break;
     case TESS_ENG_SERIES: gen_series_save(&tessera.series[tr], &g); break;
+    case TESS_ENG_CHORD:  gen_chord_save(&tessera.chord[tr], &g); break;
     }
     s->reg = g.reg;
     s->p0 = g.p0;
@@ -382,6 +387,10 @@ static void tess_load_sec(uint32_t tr)
     case TESS_ENG_QUAD:   gen_quad_load(&tessera.quad[tr], &g); break;
     case TESS_ENG_CONSTEL: gen_constel_load(&tessera.constel[tr], &g); break;
     case TESS_ENG_SERIES: gen_series_load(&tessera.series[tr], &g); break;
+    case TESS_ENG_CHORD:                                     /* (a section begins its progression from the top) */
+        gen_chord_load(&tessera.chord[tr], &g);
+        gen_chord_start(&tessera.chord[tr]);
+        break;
     }
     tess_realign(tr);
     ev->valid = v;
@@ -848,6 +857,70 @@ static uint32_t tess_gate_len(const track_t *t, uint32_t period, uint32_t len)
     return period * g / 128u;
 }
 
+/* Chord: the chord on degree deg of the track's scale, from an octave below middle C (CHR: ROOT's major scale, as SCL
+ * CHORD's DIA chords), as its SCL CHORD makes it (CHRD, DIA3 when OFF; VOIC) -> its notes (before TRN and SHIFT); *rp
+ * its root, *maskp its tones above the root */
+static uint32_t tess_chord_build(const track_t *t, uint32_t deg, uint8_t *out, int32_t *rp, uint16_t *maskp)
+{
+    uint32_t m = scale_mask(t) & 0xFFFu, mode = (uint32_t)t->p[P_CHRD], guard = 84;
+    int32_t x = 48 + t->p[P_ROOT] % 12;
+    if (m == 0xFFFu || !m) m = SCALE_MASK[1];
+    while (deg && guard--)
+        if ((m >> (uint32_t)((++x - t->p[P_ROOT] + 1200) % 12)) & 1u) deg--;
+    return chord_make_as(t, mode && mode <= CH_POW ? mode : CH_DIA3, (uint32_t)x, out, rp, maskp);
+}
+/* chord i of the track's progression: its name ("Am", 12 bytes) -> its pitch classes (bit 0 C), its root's << 12 */
+uint32_t tessera_chord_at(uint32_t tr, uint32_t i, char *name)
+{
+    const track_t *t = &trk[tr % TESSERA_TRACKS];
+    uint8_t out[CHORD_MAX];
+    int32_t r;
+    uint16_t mask;
+    uint32_t pc;
+    tr %= TESSERA_TRACKS;
+    tess_chord_build(t, gen_chord_degree(&tessera.chord[tr], i), out, &r, &mask);
+    pc = (uint32_t)((r + t->p[P_TRANS] + tessera.evolve[tr].shift) % 12 + 12) % 12;
+    mask = mask ? mask : 1u;
+    chord_name(name, pc, mask);
+    return (((uint32_t)mask << pc | (uint32_t)mask >> (12u - pc)) & 0xFFFu) | pc << 12;
+}
+
+/* Chord: the chord on the degree the generator gives (tess_chord_build), transposed (TRN, SHIFT's semitones). A new chord lets the last go; HOLD
+ * holds it to its end, BEAT to the next beat, STEP for the step's GATE. DROP and HUMAN as on any hit; FOLLOW, FLOURISH,
+ * BRANCH and NOTE LENGTH pass it by. Its pitch classes are QNT CHRD's (tessera_chord_pcs) */
+static void tess_chord_play(track_t *t, uint32_t tr, uint32_t gate)
+{
+    const tessera_chord_t *g = &tessera.chord[tr];
+    const tessera_evolve_t *tw = &tessera.evolve[tr];
+    uint8_t out[CHORD_MAX];
+    int32_t r, x;
+    uint16_t mask;
+    uint32_t vel = gate, n, i, period;
+    if (!gate) return;
+    if (tw->drop && gen_rnd(&tessera.rnd[tr], 100u) < tw->drop) return;
+    if (tw->human) {
+        int32_t j = (int32_t)(tw->human / 5u), v = (int32_t)vel + (int32_t)gen_rnd(&tessera.rnd[tr], (uint32_t)(2 * j + 1)) - j;
+        vel = (uint32_t)(v < 1 ? 1 : v > 127 ? 127 : v);
+    }
+    n = tess_chord_build(t, g->deg, out, &r, &mask);
+    seq_release(t);
+    t->seq_n = 0;
+    for (i = 0; i < n; i++) {
+        x = (int32_t)out[i] + 12 * g->oct + t->p[P_TRANS] + tw->shift;
+        x = x < 0 ? 0 : x > 127 ? 127 : x;
+        if (t->seq_n && t->seq_notes[t->seq_n - 1u] == (uint8_t)x) continue;
+        trk_note_on(t, (uint32_t)x, vel);
+        t->seq_notes[t->seq_n++] = (uint8_t)x;
+    }
+    r += t->p[P_TRANS] + tw->shift;
+    mask = mask ? mask : 1u;                             /* (a kit: the root alone) */
+    tessera.chord_pc[tr] = (uint16_t)(((uint32_t)mask << ((r % 12 + 12) % 12) | (uint32_t)mask >> (12 - (r % 12 + 12) % 12)) & 0xFFFu);
+    tessera.hit[tr] = 1;
+    tessera.last_note[tr] = t->seq_notes[0];             /* (FOLLOW of it: the chord's lowest note) */
+    period = seq_div_samples((uint32_t)t->p[P_SDIV]);
+    t->seq_off = g->hold ? period * g->hold - period / 16u : tess_gate_len(t, period, 0);
+}
+
 static void tess_clock_step_body(track_t *t, uint32_t tr)
 {
     tess_seed_fresh(tr);                                    /* before EVOLVE captures the phrase's start */
@@ -920,6 +993,11 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
     case TESS_ENG_SERIES:
         gen_series_tick(&tessera.series[tr], &out);
         break;
+    case TESS_ENG_CHORD:
+        gen_chord_tick(&tessera.chord[tr], &clk, &out);
+        tessera.cv[tr] = out.cv;
+        tess_chord_play(t, tr, tess_logic(tr, out.gate) && tess_cond(tr) ? out.vel : 0u);
+        return;
     }
     uint8_t note = out.note, vel = out.vel;
     int should_trigger = out.gate;
@@ -1037,6 +1115,7 @@ static uint32_t tess_link_idx(uint32_t tr, uint32_t mask)
     return 0;
 }
 
+static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v);
 static void tess_knob_body(uint32_t k, int32_t s)
 {
     tessera_ensure_init();
@@ -1217,6 +1296,12 @@ static void tess_knob_body(uint32_t k, int32_t s)
             v = (int32_t)g->loop + d;
             g->loop = (uint8_t)(v < 0 ? 0 : v > (int32_t)GEN_SR_LOOP ? (int32_t)GEN_SR_LOOP : v);
         }
+    } else if (mode == TESS_ENG_CHORD) {                     /* PROG, BARS, HIT: a setting a click */
+        const tessera_chord_t *c = &tessera.chord[tr];
+        int32_t d = s > 0 ? 1 : -1;
+        if (k == 1u) tess_param_set_body(tr, TX_CH_PROG, (int32_t)c->prog + d);
+        else if (k == 2u) tess_param_set_body(tr, TX_CH_BARS, (int32_t)c->bars + d);
+        else if (k == 3u) tess_param_set_body(tr, TX_CH_HIT, (int32_t)c->hit + d);
     } else if (mode == TESS_ENG_CONSTEL) {
         tessera_constel_t *c = &tessera.constel[tr];
         if (k == 1u) {                                      /* Y: a row a click */
@@ -1286,6 +1371,17 @@ void tessera_constel_layer_knob(uint32_t k, int32_t s)
     TESS_IRQ_ON();
 }
 
+/* CHORD with OCT+ held on GEN, KNOB 1: OCT (KNOB 2 and 3 are the track's CHRD and VOIC: ui_input.c) */
+void tessera_chord_oct_knob(int32_t s)
+{
+    uint32_t tr = song.sel;
+    tessera_ensure_init();
+    if (tr >= TESSERA_TRACKS || !s) return;
+    TESS_IRQ_OFF();
+    tess_param_set_body(tr, TX_CH_OCT, (int32_t)tessera.chord[tr].oct + (s > 0 ? 1 : -1));
+    TESS_IRQ_ON();
+}
+
 void tessera_knob(uint32_t k, int32_t s)
 {
     TESS_IRQ_OFF();
@@ -1348,14 +1444,40 @@ uint32_t tessera_sig(uint32_t tr)
     case TESS_ENG_SERIES: { const tessera_series_t *a = &tessera.series[tr];
         h = (h ^ (a->start | a->intv << 8 | a->loop << 16) ^ (uint32_t)a->n << 7) * 16777619u;
         break; }
+    case TESS_ENG_CHORD: { const tessera_chord_t *a = &tessera.chord[tr];
+        h = (h ^ (a->prog | a->bars << 4 | a->hit << 8 | a->rot << 12 | (uint32_t)a->deg << 16 | (uint32_t)a->idx << 20 |
+                  (uint32_t)(a->oct + 2) << 24)) *
+            16777619u;
+        h = (h ^ (a->walk[0] | a->walk[1] << 4 | a->walk[2] << 8 | a->walk[3] << 12) ^ (uint32_t)a->n << 16) * 16777619u;
+        break; }
     }
     return h;
 }
 
-/* Force a note down into the nearest active scale degree of the track */
+/* QNT CHRD's chord: the one the first CHORD track plays (the merged picker may choose later), 0 none */
+uint32_t tessera_chord_pcs(void)
+{
+    for (uint32_t i = 0; i < TESSERA_TRACKS; i++)
+        if (tessera.mode[i] == TESS_ENG_CHORD && tessera.chord_pc[i]) return tessera.chord_pc[i];
+    return 0;
+}
+uint32_t tessera_chord_snap(uint32_t pcs, int32_t n)
+{
+    n = n < 0 ? 0 : n > 127 ? 127 : n;
+    if (pcs & 0xFFFu)
+        for (int32_t d = 0; d < 12; d++) {
+            if (n - d >= 0 && ((pcs >> ((n - d) % 12)) & 1u)) return (uint32_t)(n - d);
+            if (d && n + d <= 127 && ((pcs >> ((n + d) % 12)) & 1u)) return (uint32_t)(n + d);
+        }
+    return (uint32_t)n;
+}
+
+/* Force a note down into the nearest active scale degree of the track; QNT CHRD with a CHORD track playing: to the
+ * nearest note of its chord */
 int32_t tessera_snap_note(const track_t *t, int32_t n)
 {
-    uint32_t mask = scale_mask(t), guard = 12;
+    uint32_t mask = scale_mask(t), guard = 12, pcs;
+    if (t->p[P_QUANT] == Q_CHRD && (pcs = tessera_chord_pcs()) != 0u) return (int32_t)tessera_chord_snap(pcs, n);
     while (guard-- && !((mask >> (uint32_t)((n - t->p[P_ROOT] + 120) % 12)) & 1u))
         n--;
     return n;
@@ -1413,7 +1535,8 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
  * EVOLVE / FORM / TWEAK settings and the settings of the remembered sections (A, B, C). Not stored: the recorded
  * Markov / Morph phrases (a loaded project records them again on its first pass: RAM is the limit, see
  * project.c), the playheads and the counters. A block that fails any range check is refused whole. */
-#define TESS_PK_TRACK 130u                           /* version 11: version 10's 129 bytes, then Constellation's LEN, FILL (1) */
+#define TESS_PK_TRACK 135u                           /* version 12: version 11's 130 bytes, then Chord (5) */
+#define TESS_PK_TRACK_V11 130u                       /* version 11: version 10's 129 bytes, then Constellation's LEN, FILL (1) */
 #define TESS_PK_TRACK_V10 129u                       /* version 10: version 9's 127 bytes, then Quad's RANGE, a column (2) */
 #define TESS_PK_TRACK_V9 127u                        /* version 9: version 8's 120 bytes, then Series (3), Cells (4) */
 #define TESS_PK_TRACK_V8 120u                        /* version 8: version 7's 98 bytes, then Constellation (22) */
@@ -1425,6 +1548,7 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
 #define TESS_PK_TRACK_V2 47u                         /* version 2: version 1's 45 bytes, then SEED (2) */
 #define TESS_PK_TRACK_V1 45u
 _Static_assert(TESSERA_PK_BYTES == TESSERA_TRACKS * TESS_PK_TRACK, "TESSERA_PK_BYTES (tessera.h)");
+_Static_assert(TESSERA_PK_BYTES_V11 == TESSERA_TRACKS * TESS_PK_TRACK_V11, "TESSERA_PK_BYTES_V11 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V10 == TESSERA_TRACKS * TESS_PK_TRACK_V10, "TESSERA_PK_BYTES_V10 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V9 == TESSERA_TRACKS * TESS_PK_TRACK_V9, "TESSERA_PK_BYTES_V9 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V8 == TESSERA_TRACKS * TESS_PK_TRACK_V8, "TESSERA_PK_BYTES_V8 (tessera.h)");
@@ -1491,6 +1615,13 @@ static uint8_t *tess_put_v11(uint8_t *o, const tessera_constel_t *c)
     *o++ = (uint8_t)(((c->len >= 1u && c->len <= 16u ? c->len : 16u) - 1u) | c->fill << 4);
     return o;
 }
+/* version 12's part (after version 11's 130 bytes): Chord's PROG, BARS | HIT << 2 | OCT << 4 (3 bits, -2..2 as 6 7 0 1
+ * 2), ROT, its walk (3 bits a chord) */
+static uint8_t *tess_put_v12(uint8_t *o, const tessera_chord_t *c)
+{
+    *o++ = c->prog; *o++ = (uint8_t)(c->bars | c->hit << 2 | ((uint32_t)c->oct & 7u) << 4); *o++ = c->rot;
+    return tess_put16(o, (uint16_t)(c->walk[0] | c->walk[1] << 3 | c->walk[2] << 6 | c->walk[3] << 9));
+}
 uint32_t tessera_pack(uint8_t *o)
 {
     tessera_ensure_init();
@@ -1525,6 +1656,7 @@ uint32_t tessera_pack(uint8_t *o)
         o = tess_put_v9(o, &tessera.series[tr]);
         o = tess_put_v10(o, &tessera.quad[tr], tessera.qcol[tr]);
         o = tess_put_v11(o, &tessera.constel[tr]);
+        o = tess_put_v12(o, &tessera.chord[tr]);
     }
     return TESSERA_PK_BYTES;
 }
@@ -1559,10 +1691,10 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     const uint8_t *grd = rec + TESS_PK_TRACK_V2, *bnc = rec + TESS_PK_TRACK_V3, *awk = bnc + 3, *pol = awk + 19;
     const uint8_t *tw2 = rec + TESS_PK_TRACK_V4, *qd = rec + TESS_PK_TRACK_V5, *nl = rec + TESS_PK_TRACK_V6;
     const uint8_t *cs = rec + TESS_PK_TRACK_V7, *sc = rec + TESS_PK_TRACK_V8, *qc = rec + TESS_PK_TRACK_V9;
-    const uint8_t *cl = rec + TESS_PK_TRACK_V10;
-    uint32_t i;
+    const uint8_t *cl = rec + TESS_PK_TRACK_V10, *ch = rec + TESS_PK_TRACK_V11;
+    uint32_t i, walk = tess_get16(ch + 3);
 
-    if ((mode >= TESS_ENG_COUNT && mode != TESS_ENG_RETIRED_CELLS) || v_seed > TESS_SEED_LOAD_MAX) return 0;
+    if (mode >= TESS_ENG_COUNT || v_seed > TESS_SEED_LOAD_MAX) return 0;
     if (t_len < 2u || t_len > 16u || t_prob > 100u || t_oct > 3u) return 0;
     if (e_steps < 1u || e_steps > 32u || e_pulses > e_steps || e_rot >= e_steps) return 0;
     if (k_tens > 100u || k_dens > 100u || k_oct > 3u) return 0;
@@ -1592,9 +1724,13 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     if (sc[0] > 127u || sc[1] < 1u || sc[1] > 7u || sc[2] > GEN_SR_LOOP) return 0;
     if (qc[0] >= GEN_QR_COUNT || (qc[1] >> 2) >= GEN_QC_EVERY_N) return 0;   /* (MOVE: any 2 bits) */
     if ((cl[0] >> 4) >= GEN_CS_FILL_COUNT) return 0;   /* (LEN - 1: any 4 bits) */
+    if (ch[0] >= GEN_CH_PROGS || ((ch[1] >> 2) & 3u) >= GEN_CH_HITS || ch[2] > 7u || walk >> 12) return 0;
+    if (ch[1] >> 7 || ((ch[1] >> 4) - 3u) < 3u) return 0;   /* (OCT: -2..2) */
+    for (i = 0; i < GEN_CH_WALK_N; i++)
+        if (((walk >> (3u * i)) & 7u) > 6u) return 0;
     if (!apply) return 1;
 
-    tessera.mode[tr] = (uint8_t)(mode == TESS_ENG_RETIRED_CELLS ? TESS_ENG_TURING : mode);   /* (CELLS: cut) */
+    tessera.mode[tr] = (uint8_t)mode;
     tessera.turing[tr].reg = (uint16_t)t_reg; tessera.turing[tr].len = (uint8_t)t_len;
     tessera.turing[tr].prob = (uint8_t)t_prob; tessera.turing[tr].oct_span = (uint8_t)t_oct;
     tessera.euclid[tr].steps = (uint8_t)e_steps; tessera.euclid[tr].pulses = (uint8_t)e_pulses;
@@ -1644,7 +1780,27 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     gen_constel_start(&tessera.constel[tr]);
     tessera.series[tr].start = sc[0]; tessera.series[tr].intv = sc[1]; tessera.series[tr].loop = sc[2];
     gen_series_start(&tessera.series[tr]);
+    tessera.chord[tr].prog = ch[0]; tessera.chord[tr].bars = ch[1] & 3u; tessera.chord[tr].hit = (uint8_t)((ch[1] >> 2) & 3u);
+    tessera.chord[tr].oct = (int8_t)((ch[1] >> 4) >= 6u ? (int32_t)(ch[1] >> 4) - 8 : (int32_t)(ch[1] >> 4));
+    tessera.chord[tr].rot = ch[2];
+    for (i = 0; i < GEN_CH_WALK_N; i++) tessera.chord[tr].walk[i] = (uint8_t)((walk >> (3u * i)) & 7u);
+    gen_chord_start(&tessera.chord[tr]);
+    tessera.chord_pc[tr] = 0;
     return 1;
+}
+
+/* A version 11 track record (130 bytes, before CHORD) -> version 12 (135): Chord's defaults, its walk from the track's
+ * seed (as ROLL would give it). A track of CELLS (cut; its number is CHORD's now) loads as TURING. out may not overlap
+ * in */
+static void tess_v11_track(const uint8_t *in, uint8_t *out)
+{
+    tessera_chord_t c;
+    memset(&c, 0, sizeof c);
+    c.bars = 1;
+    gen_chord_fill(&c, tess_get16(in + TESS_PK_TRACK_V1));
+    memcpy(out, in, TESS_PK_TRACK_V11);
+    if (out[0] == TESS_ENG_RETIRED_CELLS) out[0] = TESS_ENG_TURING;
+    tess_put_v12(out + TESS_PK_TRACK_V11, &c);
 }
 
 /* A version 10 track record (129 bytes, before CONSTELLATION's LEN and FILL) -> version 11 (130): the whole loop, FILL
@@ -1757,15 +1913,16 @@ static void tess_v1_track(const uint8_t *in, uint8_t *out)
 }
 uint32_t tessera_pk_bytes(uint32_t ver)
 {
-    return ver == 11u ? TESSERA_PK_BYTES : ver == 10u ? TESSERA_PK_BYTES_V10 : ver == 9u ? TESSERA_PK_BYTES_V9 : ver == 8u ? TESSERA_PK_BYTES_V8 : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
+    return ver == 12u ? TESSERA_PK_BYTES : ver == 11u ? TESSERA_PK_BYTES_V11 : ver == 10u ? TESSERA_PK_BYTES_V10 : ver == 9u ? TESSERA_PK_BYTES_V9 : ver == 8u ? TESSERA_PK_BYTES_V8 : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
            ver == 2u ? TESSERA_PK_BYTES_V2 : ver == 1u ? TESSERA_PK_BYTES_V1 : 0u;
 }
-/* A track record of version ver (1..11) -> version 11, a version at a time. out may not overlap in */
+/* A track record of version ver (1..12) -> version 12, a version at a time. out may not overlap in */
 void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
 {
     uint8_t v2[TESS_PK_TRACK_V2], v3[TESS_PK_TRACK_V3], v4[TESS_PK_TRACK_V4], v5[TESS_PK_TRACK_V5], v6[TESS_PK_TRACK_V6];
     uint8_t v7[TESS_PK_TRACK_V7], v8[TESS_PK_TRACK_V8], v9[TESS_PK_TRACK_V9], v10[TESS_PK_TRACK_V10];
-    if (ver >= 11u) {
+    uint8_t v11[TESS_PK_TRACK_V11];
+    if (ver >= 12u) {
         memcpy(out, in, TESS_PK_TRACK);
         return;
     }
@@ -1778,7 +1935,8 @@ void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
     if (ver <= 7u) { tess_v7_track(in, v8); in = v8; }
     if (ver <= 8u) { tess_v8_track(in, v9); in = v9; }
     if (ver <= 9u) { tess_v9_track(in, v10); in = v10; }
-    tess_v10_track(in, out);
+    if (ver <= 10u) { tess_v10_track(in, v11); in = v11; }
+    tess_v11_track(in, out);
 }
 
 /* 1 = loaded; 0 = refused, `tessera` untouched */
@@ -1799,7 +1957,7 @@ int tessera_unpack_ver(uint32_t ver, const uint8_t *in)
     uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
     uint32_t n = tessera_pk_bytes(ver) / TESSERA_TRACKS;
     if (!n) return 0;
-    if (ver == 11u) return tessera_unpack(in);
+    if (ver == 12u) return tessera_unpack(in);
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
     return tessera_unpack(b);
@@ -1887,6 +2045,10 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_SR_START: return tessera.series[tr].start;
     case TX_SR_INTV: return tessera.series[tr].intv;
     case TX_SR_LOOP: return tessera.series[tr].loop;
+    case TX_CH_PROG: return tessera.chord[tr].prog;
+    case TX_CH_BARS: return tessera.chord[tr].bars;
+    case TX_CH_HIT: return tessera.chord[tr].hit;
+    case TX_CH_OCT: return tessera.chord[tr].oct;
     }
     return 0;
 }
@@ -2031,6 +2193,10 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_SR_START: tessera.series[tr].start = (uint8_t)tess_clampi(v, 0, 127); return;
     case TX_SR_INTV: tessera.series[tr].intv = (uint8_t)tess_clampi(v, 1, 7); return;
     case TX_SR_LOOP: tessera.series[tr].loop = (uint8_t)tess_clampi(v, 0, GEN_SR_LOOP); return;
+    case TX_CH_PROG: tessera.chord[tr].prog = (uint8_t)tess_clampi(v, 0, GEN_CH_PROGS - 1); return;
+    case TX_CH_BARS: tessera.chord[tr].bars = (uint8_t)tess_clampi(v, 0, GEN_CH_BARS - 1); return;
+    case TX_CH_HIT: tessera.chord[tr].hit = (uint8_t)tess_clampi(v, 0, GEN_CH_HITS - 1); return;
+    case TX_CH_OCT: tessera.chord[tr].oct = (int8_t)tess_clampi(v, -2, 2); return;
     default:
         return;
     }
@@ -2073,6 +2239,7 @@ void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v)
     case TX_CS_SIZE: tessera.constel[tr].size = (uint8_t)tess_clampi(v, 0, 7); break;
     case TX_CS_AUTO: tessera.constel[tr].autop = (uint8_t)tess_clampi(v, 0, GEN_CS_SEEK); break;
     case TX_SR_START: tessera.series[tr].start = (uint8_t)tess_clampi(v, 0, 127); break;
+    case TX_CH_PROG: tessera.chord[tr].prog = (uint8_t)tess_clampi(v, 0, GEN_CH_PROGS - 1); break;
     default: break;                                 /* (the others are no cord's: cord.c's destinations) */
     }
 }
@@ -2097,6 +2264,7 @@ const gen_poly_t *tessera_poly(uint32_t tr) { return &tessera.poly[tr % TESSERA_
 const gen_quad_t *tessera_quad(uint32_t tr) { return &tessera.quad[tr % TESSERA_TRACKS]; }
 const gen_constel_t *tessera_constel(uint32_t tr) { return &tessera.constel[tr % TESSERA_TRACKS]; }
 const gen_series_t *tessera_series(uint32_t tr) { return &tessera.series[tr % TESSERA_TRACKS]; }
+const gen_chord_t *tessera_chord(uint32_t tr) { return &tessera.chord[tr % TESSERA_TRACKS]; }
 void tessera_awake_select(uint32_t tr, uint32_t step)
 {
     uint8_t e;

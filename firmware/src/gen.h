@@ -168,15 +168,35 @@ typedef struct {
     uint16_t n;           /* the steps played since PLAY */
 } gen_series_t;
 
+/* 12. Chord pad: one chord at a time on a degree of the track's scale, from a progression, BARS long (tessera.c builds
+ * its tones with the track's SCL CHORD: CHRD, VOIC). HIT: held for the chord, struck every beat, or every step. WALK is
+ * the seed's own four chords (ROLL a new walk, EVOLVE changes one); the others are fixed progressions */
+enum { GEN_CH_POP, GEN_CH_50S, GEN_CH_251, GEN_CH_CIRCLE, GEN_CH_TWO, GEN_CH_DRONE, GEN_CH_WALK, GEN_CH_PROGS };
+enum { GEN_CH_HOLD, GEN_CH_BEAT, GEN_CH_STEP, GEN_CH_HITS };
+#define GEN_CH_BARS 4u     /* BARS 0..3: 1/2, 1, 2, 4 bars a chord */
+#define GEN_CH_WALK_N 4u
+typedef struct {
+    uint8_t  prog;        /* GEN_CH_*: the progression */
+    uint8_t  bars;        /* 0..3: 1/2, 1, 2, 4 bars a chord */
+    uint8_t  hit;         /* GEN_CH_HOLD, _BEAT, _STEP */
+    uint8_t  rot;         /* 0..7: the progression begins this many chords in (EVOLVE turns it) */
+    int8_t   oct;         /* -2..2: octaves from the chords' home (around C3; tessera.c, not a section's) */
+    uint8_t  walk[GEN_CH_WALK_N];   /* WALK's degrees, 0..6 */
+    uint8_t  deg;         /* the degree of the chord playing (the picture's) */
+    uint8_t  idx;         /* its place in the progression (the picture's) */
+    uint16_t hold;        /* the last strike's length in steps, 0: the step's GATE (tessera.c) */
+    uint16_t n;           /* the steps played since PLAY or the section's start */
+} gen_chord_t;
+
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
  * Each generator saves and loads only its own fields; the others keep what they held */
 typedef struct {
     uint16_t reg;         /* Turing: base register; Euclid: pitch seed; Morph: snapshot A; Grids: x, y << 8; Bounce:
                            * balls; Poly: the pitches' low 4 bits each; Quad: cells 1..3, 5 bits each; Constellation: the sky;
-                           * Series: START */
+                           * Series: START; Chord: WALK, 3 bits a chord, | ROT << 12 */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos; Bounce: angle, speed; Awake: the
                            * lengths; Poly: span, the pitches' fifth bits from bit 4; Quad: cell 4; Constellation: Y | SIZE << 4,
-                           * DENS; Series: INTV | LOOP << 3 */
+                           * DENS; Series: INTV | LOOP << 3; Chord: PROG | BARS << 3 | HIT << 5 */
 } gen_sec_t;
 
 /* One step of an input phrase (phase 6: STEP as seed) */

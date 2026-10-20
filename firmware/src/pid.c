@@ -6,7 +6,8 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL", "SERIES"};
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL", "SERIES",
+                                        "CHORD"};
 static const char *const TX_N_QDIR[] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
 static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10", "/11", "/12",
                                          "/13", "/14", "/15", "/16"};   /* (every n steps: no unit, "st" read as semitones) */
@@ -26,6 +27,9 @@ static const char *const TX_N_QLINK[] = {"OFF", "T1", "T2", "T12", "T3", "T13", 
 static const char *const TX_N_QRANGE[] = {"3 OCT", "1 OCT", "2 OCT", "+-1"};
 static const char *const TX_N_QMOVE[] = {"STOP", "DOWN", "UP", "RAND"};
 static const char *const TX_N_CSFILL[] = {"OFF", "ARP"};
+static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO", "DRONE", "WALK"};   /* (GEN_CH_*) */
+static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
+static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
@@ -100,6 +104,10 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_QD_EVERY4] = PE("EVERY 4", TX_N_QEVERY, 3),
     [TX_CS_LEN] = PD("LEN", F_INT, 1, 16, 16),
     [TX_CS_FILL] = PE("FILL", TX_N_CSFILL, 0),
+    [TX_CH_PROG] = PE("PROG", TX_N_CHPROG, 0),
+    [TX_CH_BARS] = PE("BARS", TX_N_CHBARS, 1),
+    [TX_CH_HIT] = PE("HIT", TX_N_CHHIT, 0),
+    [TX_CH_OCT] = PD("OCT", F_INT, -2, 2, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -138,7 +146,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     T_(P_SCALE, "SCALE", "The scale the keys and the generators play in."),
     T_(P_QUANT, "QUANTIZE",
         "How the keys meet the scale: OFF plays every key, SNAP moves a note into the scale, WHITE puts the "
-        "scale on the white keys, ALL and MPC lay it out over the keys or MPC pads."),
+        "scale on the white keys, ALL and MPC lay it out over the keys or MPC pads; CHRD snaps the keys, MIDI and "
+        "the generators to the nearest note of the chord a CHORD track plays (no CHORD track: as SNAP)."),
     T_(P_TRANS, "TRANSPOSE", "Moves the track's notes up or down by semitones."),
     T_(P_SLEN, "PATTERN LENGTH", "How many steps the track's pattern has."),
     T_(P_SDIV, "PATTERN DIVISION", "How long one step is."),
@@ -271,7 +280,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                   "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
                                   "QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) "
                                   "plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity "
-                                  "series."),
+                                  "series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the "
+                                  "other tracks follow them)."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
@@ -383,6 +393,15 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                        "repeats. OCT+ held on GEN, KNOB 2."),
     X_(TX_CS_FILL, "CONSTELLATION FILL", "What the steps between stars play: OFF a rest, ARP the last four stars "
                                          "again, low to high and softer. OCT+ held on GEN, KNOB 3."),
+    X_(TX_CH_PROG, "CHORD PROG", "The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, "
+                                 "2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four "
+                                 "chords of the track's SEED (ROLL another, EVOLVE changes one). SCL CHORD's CHRD and "
+                                 "VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC."),
+    X_(TX_CH_BARS, "CHORD BARS", "How long each chord lasts: half a bar, 1, 2 or 4 bars."),
+    X_(TX_CH_HIT, "CHORD HIT", "How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; "
+                               "STEP every step, for the step's GATE."),
+    X_(TX_CH_OCT, "CHORD OCT", "The chords' register, -2 to +2 octaves from their home around C3. OCT+ held on GEN, "
+                               "KNOB 1; KNOB 2 and 3 there are SCL CHORD's CHRD and VOIC."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
