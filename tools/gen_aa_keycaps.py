@@ -44,8 +44,8 @@ LABELS = [("PRESETS", "PRESETS"), ("SELECT", "SELECT"), ("ALGO", "ALGO"), ("OCTD
           ("MUTE", "MUTE"), ("ARM", "ARM"), ("HOLD", "HOLD"), ("ON", "ON"), ("OFF", "OFF"),
           ("K14", "K1-4"), ("SCL", "SCL")]
 
-KNOBS = [("BIG", 17, 2), ("SMALL", 10, 2), ("RING", 14, 3), ("LEVEL", 20, 4)]   # outer radius, the ring's width
-# (RING: Stage's levels, the pages' knobs; LEVEL: MIXER's)
+KNOBS = [("BIG", 17, 2), ("SMALL", 10, 2), ("RING", 14, 5), ("LEVEL", 20, 4)]   # outer radius, the ring's width
+# (RING: Stage's levels, the pages' knobs, 5 px: the newer Elektron dial, filled, no pointer; LEVEL: MIXER's)
 
 
 def pill_cov(w, h, r):
