@@ -722,8 +722,8 @@ static gen_clock_t cs_clk(uint32_t pos) { gen_clock_t c = {(uint8_t)pos, 16, 0};
 static void constel_tests(void)
 {
     int range = 1, window = 1, manual = 1, frozen = 1, loops = 1, same = 1, wander = 1, seek = 1, mut = 1, sec = 1, empty = 1;
-    int heard = 1, mixed = 1;
-    uint32_t caught = 0, draws = 1, held = 0, live = 0;
+    int heard = 1, mixed = 1, lenw = 1, arp = 1;
+    uint32_t caught = 0, draws = 1, held = 0, live = 0, fills = 0;
     for (uint32_t sd = 1; sd < 60u; sd += 11)
         for (uint32_t size = 0; size <= 7u; size += 3)
             for (uint32_t dens = 0; dens <= 100u; dens += 25) {
@@ -852,6 +852,67 @@ static void constel_tests(void)
             sec = b.sky == a.sky && b.y == 11u && b.size == 5u && b.dens == 37u;
         }
     }
+    {   /* LEN 5: the loop's slot is the step's place in 5 */
+        gen_constel_t g = constel_at(7, 80, 7, 0, 5);
+        g.len = 5;
+        for (uint32_t i = 0; i < 40; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t o = step_out();
+            gen_constel_tick(&g, &c, &rng_state, &o);
+            if (g.caught) lenw &= g.caught == (i % 5u) + 1u;
+        }
+        g.keep = 100;
+        {
+            gen_out_t a[5];
+            for (uint32_t i = 0; i < 30; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out();
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                lenw &= g.held == (i % 5u) + 1u;
+                if (i < 5u) a[i] = o;
+                else lenw &= o.gate == a[i % 5u].gate && o.note == a[i % 5u].note;
+            }
+        }
+    }
+    {   /* FILL ARP: an empty step plays the last four stars heard, low to high in turn, at 60; FILL OFF rests */
+        for (uint32_t sd = 1; sd < 40u; sd += 7) {
+            gen_constel_t g = constel_at(7, 30, 7, 0, sd), h;
+            uint8_t up[GEN_CS_ARP];
+            uint32_t n = 0, j = 0;
+            g.fill = GEN_CS_FILL_ARP;
+            h = g;
+            h.fill = GEN_CS_FILL_OFF;
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out(), p = step_out();
+                uint32_t r1 = rng_state;
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                rng_state = r1;
+                gen_constel_tick(&h, &c, &rng_state, &p);
+                arp &= g.loop[i & 15u] == h.loop[i & 15u];    /* (FILL leaves the loop as it is) */
+                if (g.caught) {
+                    arp &= o.gate && !g.filled;
+                    n = 0;
+                    for (uint32_t k = 0; k < g.arp_n; k++) {      /* (the list, low to high, for the next fills) */
+                        uint32_t q = 0;
+                        for (uint32_t m = 0; m < g.arp_n; m++)
+                            if ((g.arp[m] & 15u) < (g.arp[k] & 15u) || ((g.arp[m] & 15u) == (g.arp[k] & 15u) && m < k)) q++;
+                        up[q] = (uint8_t)(g.arp[k] & 15u);
+                    }
+                    n = g.arp_n;
+                    j = g.arp_i;
+                } else if (n) {
+                    uint32_t v = up[j++ % n];
+                    fills++;
+                    arp &= o.gate && g.filled == v && o.vel == 60u &&
+                           o.note == 48u + 12u * ((v - 1u) / 7u) + GEN_SCALE_MIN[(v - 1u) % 7u] && !p.gate;
+                }
+            }
+        }
+    }
+    check("constellation: LEN 5 catches into slots 1..5, and LOCK 100 plays those 5 round", lenw);
+    check("constellation: FILL ARP plays the stars heard, low to high, between them (soft); the loop as without it",
+          arp && fills > 100u);
     check("constellation: a star crossing the crosshair within SIZE rows is caught into the step's slot, others not",
           window && caught > 100u);
     check("constellation: LOCK 0 plays a star as it crosses and only then (the picture's trail), its size the length",

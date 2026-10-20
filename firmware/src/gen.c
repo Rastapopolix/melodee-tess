@@ -142,6 +142,8 @@ static void gen_constel_start(gen_constel_t *g)
     g->caught = 0;
     g->held = 0;
     g->trail = 0;
+    g->arp_n = g->arp_i = 0;
+    g->filled = 0;
 }
 
 /* ------------------------------------------------------------------ the generators, one step each --- */
@@ -580,7 +582,7 @@ static void gen_cs_steer(gen_constel_t *g, uint32_t *rnd)
  * (half the GATE to twice it). The CV: the ship's height */
 static void gen_constel_tick(gen_constel_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
-    uint32_t slot = clk->pos & 15u, st, v, hit = 0;
+    uint32_t slot = clk->pos % (g->len >= 1u && g->len <= 16u ? g->len : 16u), st, v, hit = 0;
     int32_t row;
     g->col++;
     gen_cs_steer(g, rnd);
@@ -602,6 +604,28 @@ static void gen_constel_tick(gen_constel_t *g, const gen_clock_t *clk, uint32_t 
     g->trail = (uint8_t)(g->trail << 1 | hit);
     out->cv = (int16_t)(row * 32767 / (int32_t)(GEN_CS_ROWS - 1u));
     v = g->loop[slot];
+    g->filled = 0;
+    if (v & 15u) {
+        if (!g->arp_n || g->arp[0] != v) {             /* (FILL ARP's list: newest first, no repeat of the last) */
+            for (uint32_t k = GEN_CS_ARP - 1u; k > 0u; k--) g->arp[k] = g->arp[k - 1u];
+            g->arp[0] = (uint8_t)v;
+            if (g->arp_n < GEN_CS_ARP) g->arp_n++;
+        }
+    } else if (g->fill == GEN_CS_FILL_ARP && g->arp_n) {   /* the stars played, low to high in turn */
+        uint32_t k, i = g->arp_i++ % g->arp_n;
+        for (k = 0; k < g->arp_n; k++) {                 /* (the i-th lowest; equal heights: the newer first) */
+            uint32_t q = 0, j;
+            for (j = 0; j < g->arp_n; j++)
+                if ((g->arp[j] & 15u) < (g->arp[k] & 15u) || ((g->arp[j] & 15u) == (g->arp[k] & 15u) && j < k)) q++;
+            if (q == i) break;
+        }
+        v = g->arp[k < g->arp_n ? k : 0u] & 15u;         /* (brightness and size dropped: soft, at the GATE) */
+        g->filled = (uint8_t)v;
+        out->note = (uint8_t)(48u + 12u * ((v - 1u) / 7u) + GEN_SCALE_MIN[(v - 1u) % 7u]);
+        out->vel = 60;
+        out->gate = 1;
+        return;
+    }
     if (v & 15u) {
         uint32_t deg = (v & 15u) - 1u;
         out->note = (uint8_t)(48u + 12u * (deg / 7u) + GEN_SCALE_MIN[deg % 7u]);

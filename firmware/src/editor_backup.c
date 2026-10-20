@@ -14,7 +14,8 @@
 static const uint8_t ED_BK_IDS[30] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29};
 #if MELODEE_FLASH
 #define ED_BK_TESS_OBJ TESS_OBJ_BYTES_CRD         /* (with the cords) */
-#define ED_BK_TESS_OK(len) ((len) == TESS_OBJ_BYTES_CRD || (len) == TESS_OBJ_BYTES || (len) == TESS_OBJ_BYTES_V9_CRD || \
+#define ED_BK_TESS_OK(len) ((len) == TESS_OBJ_BYTES_CRD || (len) == TESS_OBJ_BYTES || (len) == TESS_OBJ_BYTES_V10_CRD || \
+    (len) == TESS_OBJ_BYTES_V10 || (len) == TESS_OBJ_BYTES_V9_CRD || \
     (len) == TESS_OBJ_BYTES_V9 || (len) == TESS_OBJ_BYTES_V8_CRD || \
     (len) == TESS_OBJ_BYTES_V8 || (len) == TESS_OBJ_BYTES_V7_CRD || \
     (len) == TESS_OBJ_BYTES_V7 || (len) == TESS_OBJ_BYTES_V6_CRD || \
@@ -30,7 +31,7 @@ static uint8_t ed_bk_tess_live[TESSERA_PK_BYTES]; /* id 29, as LIST found it */
 static uint32_t ed_bk_tess_ver(uint32_t len)      /* id 29: the block's version by its length (older: converted), 0 none */
 {
     uint32_t v;
-    for (v = 10u; v && tessera_pk_bytes(v) != len; v--) ;
+    for (v = 11u; v && tessera_pk_bytes(v) != len; v--) ;
     return v;
 }
 static uint32_t ed_bk_tess_len;                   /* id 28: TESS_OBJ_BYTES_CRD, 0 none stored */

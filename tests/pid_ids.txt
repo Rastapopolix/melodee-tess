@@ -192,3 +192,5 @@
 0x244 QUAD EVERY 2             track 0..6 def 3
 0x245 QUAD EVERY 3             track 0..6 def 3
 0x246 QUAD EVERY 4             track 0..6 def 3
+0x247 CONSTELLATION LEN        track 1..16 def 16
+0x248 CONSTELLATION FILL       track 0..1 def 0

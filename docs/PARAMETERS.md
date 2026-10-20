@@ -193,7 +193,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x233 | NOTE LENGTH KEYS | 1 to 4 | 4 | FIXED: how many notes may hold at once. One more ends the note nearest its end; the same pitch again ends the one before. |
 | 0x234 | CONSTELLATION Y | 0 to 14 | 7 | The height of the ship's crosshair in the sky: the stars crossing it play as they cross, so it sets where the melody sits. AUTO steers it instead. |
 | 0x235 | CONSTELLATION DENS | 0 to 100 % | 50 | How many stars the sky holds: more stars, more notes. |
-| 0x236 | CONSTELLATION SIZE | 0 to 7 | 2 | How many rows either side of the crosshair a star still plays in: 0 only its own row, higher a wider melody. Set by a mod (no knob of its own). |
+| 0x236 | CONSTELLATION SIZE | 0 to 7 | 2 | How many rows either side of the crosshair a star still plays in: 0 only its own row, higher a wider melody. OCT+ held on GEN, KNOB 4. |
 | 0x237 | CONSTELLATION AUTO | OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, SEEK | OFF | Who steers the ship: OFF your Y; 1 to 9 a wander of its own, faster further up; SEEK flies towards the next star. Set by a mod (no knob of its own). |
 | 0x238 | SERIES START | 0 to 127 | 0 | Where in the infinity series the melody begins: each START a different line, all of them alike at every scale. EVOLVE picks new ones. |
 | 0x239 | SERIES INTV | 1 to 7 | 1 | How many degrees of the scale a step of the series is: 1 close and stepwise, higher wider leaps (folded back into two octaves). |
@@ -210,6 +210,8 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x244 | QUAD EVERY 2 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
 | 0x245 | QUAD EVERY 3 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
 | 0x246 | QUAD EVERY 4 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
+| 0x247 | CONSTELLATION LEN | 1 to 16 | 16 | How many steps the loop of stars is, 1 to 16: with LOCK up a short phrase repeats. OCT+ held on GEN, KNOB 2. |
+| 0x248 | CONSTELLATION FILL | OFF, ARP | OFF | What the steps between stars play: OFF a rest, ARP the last four stars again, low to high and softer. OCT+ held on GEN, KNOB 3. |
 
 ## Mods
 
