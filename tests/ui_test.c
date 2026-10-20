@@ -678,6 +678,41 @@ static int test_quad_cols(void)
     return bad;
 }
 
+/* PATTERN's DIV and ARP's RATE turn slowest to fastest, each triplet between its straight neighbours; the stored
+ * values (upstream's order) and the list's rows follow the same order */
+static int test_div_order(void)
+{
+    static const uint8_t ORDER[10] = {9, 8, 7, 6, 0, 4, 1, 5, 2, 3};   /* (4BAR 2BAR 1/1 1/2 1/4 8T 1/8 16T 1/16 1/32) */
+    int bad = 0, n = 1;
+    uint32_t i;
+    ui_power_on();
+    go_title("PATTERN");
+    TSEL->p[P_SDIV] = 2;
+    for (i = 0; i < 12u; i++) turn(EN_K1 + 1u, -1);
+    n &= TSEL->p[P_SDIV] == 9;
+    for (i = 1; i < 10u; i++) {
+        turn(EN_K1 + 1u, 1);
+        n &= TSEL->p[P_SDIV] == ORDER[i];
+    }
+    turn(EN_K1 + 1u, 1);
+    n &= TSEL->p[P_SDIV] == 3;
+    bad += check("PATTERN DIV: 4BAR 2BAR 1/1 1/2 1/4 8T 1/8 16T 1/16 1/32, a click each, stopping at both ends", n);
+    bad += check("..its arc by that order (1/32 full, 4BAR empty)", RATIO(&TP[P_SDIV], 3) == 1000 && RATIO(&TP[P_SDIV], 9) == 0 &&
+                 RATIO(&TP[P_SDIV], 0) == 4 * 1000 / 9);
+    bad += check("..the list's rows in that order", enum_rows(&TP[P_SDIV]) == 10 && enum_value(&TP[P_SDIV], 0) == 9 &&
+                 enum_value(&TP[P_SDIV], 5) == 4 && enum_rank(&TP[P_SDIV], 5) == 7);
+    go_title("ARP");
+    TSEL->p[P_ARATE] = 1;                               /* 1/8 */
+    turn(EN_K1 + 1u, -1);
+    n = TSEL->p[P_ARATE] == 4;
+    turn(EN_K1 + 1u, 1);
+    turn(EN_K1 + 1u, 1);
+    bad += check("ARP RATE the same: 1/8 slower is 8T, faster 16T", n && TSEL->p[P_ARATE] == 5);
+    TSEL->p[P_SDIV] = 2;
+    TSEL->p[P_ARATE] = 2;
+    return bad;
+}
+
 /* CONSTELLATION on GEN, OCT+ held: KNOB 1 LOCK, 2 LEN, 3 FILL, 4 SIZE; the octave stays, no sheet opens; let go,
  * the generator's knobs again */
 static int test_constel_layer(void)
@@ -5197,6 +5232,7 @@ int main(void)
     bad += test_awake_entry();
     bad += test_constel_speed();
     bad += test_constel_layer();
+    bad += test_div_order();
     bad += test_quad_cols();
     bad += test_screen();
     bad += test_favorites();

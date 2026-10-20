@@ -6,6 +6,9 @@ static const uint8_t LSYNC_DIV[11] = {0, 9, 8, 7, 6, 0, 1, 4, 2, 5, 3};
 static const char *const N_LWAVE[] = {"SIN", "TRI", "SAW", "SQR", "S&H"};
 static const char *const N_AMODE[] = {"OFF", "UP", "DN", "UPDN", "RND", "ORD", "REPEAT"};
 static const char *const N_DIV[] = {"1/4", "1/8", "1/16", "1/32", "8T", "16T", "1/2", "1/1", "2BAR", "4BAR"};
+/* N_DIV as the knobs and lists step through it: slowest to fastest, each triplet between its straight neighbours (the
+ * stored values keep upstream's order, slow rates appended) */
+static const uint8_t N_DIV_ORDER[10] = {9, 8, 7, 6, 0, 4, 1, 5, 2, 3};
 static const char *const N_RECQ[] = {"OFF", "1/4", "1/8", "1/16", "1/32", "8T", "16T", "1/2", "1/1", "2BAR", "4BAR"};
 static const char *const N_LTRIG[] = {"NOTE", "FREE"};
 static const char *const N_LPOL[] = {"BI", "UNI"};
@@ -320,6 +323,34 @@ static int32_t enum_step(const param_desc_t *d, int32_t from, int32_t v)
     while (v != from && enum_orig(d, v) != v)
         v = v + dir > d->max || v + dir < d->min ? from : v + dir;
     return v;
+}
+
+/* an F_ENUM shown in an order of its own (N_DIV): the order, 0 = its values' */
+static const uint8_t *enum_order(const param_desc_t *d)
+{
+    return d->fmt == F_ENUM && d->names == N_DIV && d->min == 0 && d->max == 9 ? N_DIV_ORDER : 0;
+}
+static int32_t enum_order_pos(const param_desc_t *d, int32_t v)   /* v's place in its order */
+{
+    const uint8_t *o = enum_order(d);
+    int32_t i;
+    if (!o) return v - d->min;
+    for (i = 0; i <= d->max - d->min && o[i] != v; i++)
+        ;
+    return i <= d->max - d->min ? i : 0;
+}
+/* a knob turned an F_ENUM steps from `from`: by its order where it has one, else past any alias -> the new value */
+static int32_t enum_turn(const param_desc_t *d, int32_t from, int32_t steps)
+{
+    const uint8_t *o = enum_order(d);
+    if (o) return o[clamp(enum_order_pos(d, from) + steps, 0, d->max - d->min)];
+    return enum_step(d, from, clamp(from + steps, d->min, d->max));
+}
+/* how far along its range a value is, 0..1000 (-1: no range): an ordered F_ENUM by its place */
+static int32_t param_ratio(const param_desc_t *d, int32_t v)
+{
+    if (d->max <= d->min) return -1;
+    return (enum_order(d) ? enum_order_pos(d, v) : v - d->min) * 1000 / (d->max - d->min);
 }
 
 static uint8_t fmt_named;        /* the last param_format was a name (F_ENUM, even "4"): ui_draw.c's digits do not roll it */

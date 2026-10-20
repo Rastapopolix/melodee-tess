@@ -940,6 +940,7 @@ static void edit_param(uint32_t slot, int32_t steps)
     if (!d || !vp || d->max == d->min)
         return;
     v = d->fmt == F_INT && d->names ? zone_step(d, *vp, steps)
+                                    : enum_order(d) ? enum_turn(d, *vp, steps)
                                     : enum_step(d, *vp, clamp(*vp + accel(EN_K1 + slot, steps, desc_range(d)), d->min, d->max));
     *vp = (int16_t)v;
     if(pg->scope==SC_P5){
