@@ -506,26 +506,6 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             } else
                 for (int32_t x = x0 + 1; x < x0 + sw - 3; x += 6) cv_rect(x, ly, 3, 2, dim);
         }
-    } else if (mode == TESS_ENG_CELLS) {
-        /* the generations scrolling down: the newest at the top, a row each, a lit cell a block; TAP's column marked */
-        const gen_cells_t *g = tessera_cells(tr);
-        int32_t rows = is_panel ? (int32_t)GEN_CL_HIST + 1 : 3, ch = is_panel ? 9 : 8, cw = is_panel ? 24 : 26;
-        int32_t x0 = is_panel ? 18 + (202 - 8 * cw) / 2 : 13 + (218 - 8 * cw) / 2, top = is_panel ? 6 : y_base - 2;
-        uint32_t t = g->tap >= 1u && g->tap <= 8u ? g->tap - 1u : 0u;
-        if (!is_panel) ch = 9, cw = 26;
-        for (int32_t r = 0; r < rows; r++) {
-            uint32_t v = r ? g->hist[r - 1] : g->cells;
-            for (uint32_t i = 0; i < 8u; i++) {
-                int32_t x = x0 + (int32_t)(7u - i) * cw, y = top + r * ch;
-                if ((v >> i) & 1u) cv_rect(x + 1, y + 1, cw - 2, ch - 2, !r ? (i == t ? T_TEXT : c) : dim);
-                else if (!r) cv_rect(x + 1, y + ch - 2, cw - 2, 1, dim);
-            }
-        }
-        if (is_panel) {
-            int32_t x = x0 + (int32_t)(7u - t) * cw, y = top + rows * ch + 2;
-            cv_rect(x + cw / 2 - 3, y, 7, 2, T_ACCENT);
-            cv_rect(x + cw / 2 - 1, y + 2, 3, 2, T_ACCENT);
-        }
     } else if (mode == TESS_ENG_QUAD) {
         /* the whole grid whatever track is selected: a row a track, a cell a bar at its pitch (a rest a dash), the cell
          * each QUAD row plays lit; a row not in QUAD dim. Panel, on all four sides: above each column its MOVE (an arrow

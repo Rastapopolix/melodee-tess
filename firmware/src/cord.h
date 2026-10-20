@@ -38,7 +38,7 @@ enum {
     CD_BNC_SPEED, CD_BNC_ANGLE, CD_AWK_PROB,
     CD_TW_BRANCH, CD_QD_PROB,
     CD_CS_Y, CD_CS_SIZE, CD_CS_DENS,
-    CD_SR_START, CD_CL_RULE,
+    CD_SR_START, CD_RETIRED_CL_RULE,                                /* (CELLS' RULE, cut: a gap, no destination) */
     CD_CS_AUTO,
     CD_N
 };

@@ -120,6 +120,9 @@ static int behaviour(void)
               cord_unpack(pk) && cord_get(0)->uni == 1u && cord_get(0)->src_trk == 0u);
         pk[1] &= 0x7Fu;
         check("...a mod saved before UNI (the bit 0): BI", cord_unpack(pk) && cord_get(0)->uni == 0u);
+        pk[6 + 0] = CS_LFO; pk[6 + 2] = CD_RETIRED_CL_RULE; pk[6 + 3] = 1; pk[6 + 4] = 40;   /* (cord 2: to CELLS' RULE) */
+        check("...a cord to CELLS' RULE (cut): gone, the others loaded",
+              cord_unpack(pk) && !cord_get(1)->src && !cord_get(1)->dst && cord_get(0)->src == CS_LFO);
         trk[0].p[P_LPOL] = 1;                         /* the LFO's own POL UNI: the mod's BI/UNI still decides */
         trk[0].lfo_val = 0;                           /* (POL UNI's bottom) */
         c.uni = 0;
@@ -429,6 +432,7 @@ int main(int argc, char **argv)
     tessera_reset();
     for (c = 0; c < CD_N; c++) {
         const cord_dest_t *d = cord_dest(c);
+        if (c == CD_RETIRED_CL_RULE) { placed &= !d; continue; }   /* (CELLS' RULE, cut: a gap) */
         if (!d || d->code != c) { placed = 0; continue; }
         if (!d->name[0] || strlen(d->name) > 7u || !d->full[0]) names = 0;
         for (k = 0; k < c; k++)

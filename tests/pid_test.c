@@ -18,6 +18,10 @@ static void check(const char *what, int ok)
     bad += !ok;
 }
 
+static int tx_retired(uint32_t x)                 /* CELLS' (cut 2026-10-20): gaps in the TX ids */
+{
+    return x == TX_CL_RULE_RETIRED || x == TX_CL_TAP_RETIRED || x == TX_CL_SPAN_RETIRED;
+}
 static int retired(uint32_t p)                    /* DIGITAL's OP ENV / OP LEVEL (params.c: inert, on no page) */
 {
     return p >= P_FM1_ATK && p <= P_FM4_LEVEL;
@@ -120,7 +124,7 @@ int main(int argc, char **argv)
         const param_desc_t *d = pid_desc(e->pid, 0);
         uint32_t id = e->pid;
         if (i && pid_at(i - 1)->pid >= id) ordered = 0;
-        if (id >= PID_TESS(0)) real &= id < PID_TESS(TX_COUNT);
+        if (id >= PID_TESS(0)) real &= id < PID_TESS(TX_COUNT) && !tx_retired(id - PID_TESS(0));
         else if (id >= PID_GLOBAL(0)) real &= id < PID_GLOBAL(G_COUNT) && !global_reserved(id - PID_GLOBAL(0));
         else real &= id < P_COUNT && !param_reserved(id) && !retired(id);
         for (j = 0; j < i; j++)
@@ -141,12 +145,12 @@ int main(int argc, char **argv)
     for (i = 0; i < G_COUNT; i++)
         missing += !global_reserved(i) && i != G_INFO && !pid_find(PID_GLOBAL(i));   /* (G_INFO: the CPU meter) */
     for (i = 0; i < TX_COUNT; i++)
-        missing += !pid_find(PID_TESS(i));
+        missing += !tx_retired(i) && !pid_find(PID_TESS(i));
     check("every live P_*, G_* (but the CPU meter) and TX_* has an id", !missing);
     check("pid_find: nothing for a gap (a reserved id, past the end)",
           !pid_find(PID_TRACK(P_RESERVED33)) && !pid_find(PID_GLOBAL(G_COUNT)) && !pid_find(PID_TESS(TX_COUNT)));
     snprintf(what, sizeof what, "help: every one of the %u has its text (Tessera's %u among them)", n, helped_x);
-    check(what, helped == n && helped_x == TX_COUNT);
+    check(what, helped == n && helped_x == TX_COUNT - 3u);
 
     /* get and set: both ends, and past them clamped (every track: PULSES and ROT need STEPS 32 first) */
     pid_set(PID_TESS(TX_MODE), 1, TESS_ENG_MARKOV);           /* (LOCK: Markov's own) */
