@@ -389,7 +389,7 @@ static void stage_col(uint32_t k)
         stage_grid_at(t, page, ph, tc, bg, ox);
         cv_oy = 0;
     }
-    {   /* the level: a ring (KNOB_RING, 3 px, from 7:30), its dB inside */
+    {   /* the level: a ring (KNOB_RING, 5 px, from 7:30), its dB inside */
         char v[8];
         int32_t a1 = lvl ? -KA_END + (int32_t)lvl * 2 * KA_END / 127 : -KA_END - 1;
         knob_arc(27 - KNOB_RING_R, 136 - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE, tc, bg);

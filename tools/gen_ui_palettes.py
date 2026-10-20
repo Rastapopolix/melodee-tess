@@ -5,7 +5,8 @@
 
   gen_ui_palettes.py OUT.h [--report]
 
-Melodee's palettes: NIGHT (the default: warm ink), DAY (light) and CONTRAST (black and white). A palette is BG
+Melodee's palettes: NIGHT (warm ink), DAY (light) and CONTRAST (black and white); Tessera's: SMALTI (the default:
+lapis and gold mosaic glass), MARMO (marble) and VITRO (glass), added after them so saved ids keep their palette. A palette is BG
 (background), SURF (surface: cards, dialogs, menu rows), TEXT, ACCENT (the one active thing: hot knob, cursor,
 playhead) and four track colours: the selected track's is THEME (values, curves, gauges, selection), so the screen
 takes the colour of the track ALGORITHM picks (src/gfx.c palette_track). The firmware derives the rest with fixed
@@ -36,7 +37,14 @@ PALETTES = [
      ((160, 42, 22), (116, 68, 0), (0, 92, 72), (78, 56, 184))),
     ("CONTRAST", (0, 0, 0),       (34, 34, 34),    (255, 255, 255), (255, 255, 255),
      ((255, 128, 96), (255, 214, 0), (0, 236, 188), (176, 160, 255))),
+    ("SMALTI",   (13, 19, 38),    (24, 33, 60),    (246, 240, 224), (255, 226, 150),     # Tessera's: lapis and gold
+     ((236, 184, 72), (236, 120, 86), (86, 206, 140), (120, 176, 255))),
+    ("MARMO",    (21, 19, 17),    (36, 33, 30),    (240, 233, 218), (255, 250, 240),     # marble
+     ((84, 204, 170), (226, 170, 76), (234, 116, 112), (138, 164, 236))),
+    ("VITRO",    (8, 25, 30),     (17, 41, 47),    (232, 244, 242), (255, 255, 255),     # glass
+     ((62, 210, 222), (238, 190, 64), (244, 134, 168), (170, 222, 92))),
 ]
+DEFAULT = "SMALTI"                 # a fresh install's (and an unknown stored id's); NIGHT stays index 0 for saved ids
 TEST_GRAY = ("GRAY", (14, 14, 14), (36, 36, 36), (204, 204, 204), (255, 255, 255),
              ((232, 232, 232), (220, 220, 220), (208, 208, 208), (244, 244, 244)))
 PAL_TAG = 96                       # stored id = PAL_TAG + index (ids below: earlier firmware, read as the default)
@@ -164,7 +172,7 @@ def main():
                "static const ui_pal_t UI_PALETTES[] = {"]
         out += [row(p) for p in PALETTES]
         out += ["#ifdef UI_TEST_PALETTE", row(TEST_GRAY), "#endif", "};",
-                f"#define UI_NPALETTES {len(PALETTES)}u", "#define UI_DEFAULT_INDEX 0u",
+                f"#define UI_NPALETTES {len(PALETTES)}u", f"#define UI_DEFAULT_INDEX {names.index(DEFAULT)}u      /* {DEFAULT} */",
                 f"#define UI_GRAY_INDEX {len(PALETTES)}u      /* (UI_TEST_PALETTE only) */",
                 f"#define UI_PAL_TAG {PAL_TAG}u          /* stored id = UI_PAL_TAG + index */"]
         out += [f"#define UI_{k}_PCT {v}" for k, v in PCT.items()] + [f"#define UI_RAISE_PCT {RAISE_PCT}   /* SURF -> TEXT */"]

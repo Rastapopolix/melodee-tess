@@ -172,13 +172,13 @@ static void pv_value_c(uint32_t c, int32_t xc, int32_t y, const char *val, const
     if (uw)
         cv_text_on(x + 2, y + 6, &AF_X, unit, T_MID, bg);
 }
-/* a ring's pointer: the arc's end, 33 places from 7:30 to 4:30 (12.5 px from the centre) */
+/* a place on a ring: 33 from 7:30 to 4:30 (12.5 px from the centre; the mods' dot) */
 static const int8_t PV_DOT[33][2] = {
     {-9, 9}, {-10, 7}, {-11, 6}, {-12, 4}, {-12, 2}, {-12, 1}, {-12, -1}, {-12, -3}, {-12, -5}, {-11, -6}, {-10, -8},
     {-8, -9}, {-7, -10}, {-5, -11}, {-4, -12}, {-2, -12}, {0, -12}, {2, -12}, {4, -12}, {5, -11}, {7, -10}, {8, -9},
     {10, -8}, {11, -6}, {12, -5}, {12, -3}, {12, -1}, {12, 1}, {12, 2}, {12, 4}, {11, 6}, {10, 7}, {9, 9}};
-/* CS_RING: a 58 x 80 cell: the label (9 px, the track's colour), the ring (3 px, KNOB_RING) with a dot at its value,
- * the value under it; the knob just turned: lifted, outlined */
+/* CS_RING: a 58 x 80 cell: the label (9 px, the track's colour), the ring (5 px, KNOB_RING: the newer Elektron dial,
+ * filled to its value, no pointer), the value under it; the knob just turned: lifted, outlined */
 /* a ring's words as the mockups write them: its label in full ("OCT" -> "OCTAVES", when it fits), a name value in
  * sentence case ("SAW" -> "Saw"; numbers and notes as they are), a unit in lower case ("STEP" -> "steps") */
 static const struct { const char *k, *w; } PV_LABEL[] = {
@@ -221,7 +221,7 @@ static void pv_ring(uint32_t c, const char *label0, const char *val0, const char
     if (label[0] || val[0]) {
         cv_text_c(29, 2, &AF_X, label, lc, bg);
         if (ratio >= 0) {
-            int32_t r = ratio > 1000 ? 1000 : ratio, a1 = -KA_END + r * 2 * KA_END / 1000, k = (r * 32 + 500) / 1000;
+            int32_t r = ratio > 1000 ? 1000 : ratio, a1 = -KA_END + r * 2 * KA_END / 1000;
             knob_arc(29 - KNOB_RING_R, cy - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE,
                      lc, bg);
             if (pv_live >= 0) {                         /* the mods (ui_draw.c col_mods): where they move it, a dot */
@@ -229,8 +229,6 @@ static void pv_ring(uint32_t c, const char *label0, const char *val0, const char
                 cv_disc(29 + PV_DOT[q][0], cy + PV_DOT[q][1], 6, bg, 0);
                 cv_disc(29 + PV_DOT[q][0], cy + PV_DOT[q][1], 4, ux_mix(bg, T_TEXT, 85), 0);
             }
-            cv_disc(29 + PV_DOT[k][0], cy + PV_DOT[k][1], 8, bg, 0);
-            cv_disc(29 + PV_DOT[k][0], cy + PV_DOT[k][1], 6, T_TEXT, 0);
         } else {                                        /* (a list of names: the ring alone) */
             knob_arc(29 - KNOB_RING_R, cy - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END,
                      -KA_END - 1, T_LINE, lc, bg);

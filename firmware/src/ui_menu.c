@@ -311,7 +311,7 @@ static void draw_menu(void)
                     int on = k == settings.palette % NPALETTES;
                     cv_rrect(x + 12 * (int32_t)k, y + 5, 10, 10, 2, on ? T_THEME : T_MID, bg);
                     cv_rrect(x + 12 * (int32_t)k + 1, y + 6, 8, 8, 2,   /* (GRAY, the tests': greys) */
-                             ux.mono ? ux_mix(T_BG, T_TEXT, 40 * k) : UI_PALETTES[k].bg, on ? T_THEME : T_MID);
+                             ux.mono ? ux_mix(T_BG, T_TEXT, 20u + 60u * k / (NPALETTES - 1u)) : UI_PALETTES[k].bg, on ? T_THEME : T_MID);
                 }
             } else if (value) {
                 menu_words(w, value, sizeof w);
