@@ -483,13 +483,14 @@ static int test_phys_chrd_click(void)
 }
 static int test_gen_family(void)
 {
-    static const char STEP[] = "GEN NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
+    static const char STEP[] = "GEN EVOLVE NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
                       GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH PATTERN TEMPO PATTERNS SONG";
     char got[128];
     int bad = 0, in_seq = 0, pattern_seq = 0;
     uint32_t k, n = 0;
     ui_power_on();
-    bad += check("SEQ in STEP: GEN NOTES PATTERN TEMPO PATTERNS SONG, then GEN again", str_eq(seq_taps(got, sizeof got, 7), STEP));
+    bad += check("SEQ in STEP: GEN EVOLVE (STEP EVOLVE) NOTES PATTERN TEMPO PATTERNS SONG, then GEN again",
+                 str_eq(seq_taps(got, sizeof got, 8), STEP));
     if (!str_eq(got, STEP)) printf("    got: %s\n", got);
     press(B_ARP);
     n = !ui.home && str_eq(cur_page()->title, "ARP") && seqm_get(song.sel) == 1u && TSEL->p[P_AMODE];
@@ -760,6 +761,60 @@ static int test_constel_layer(void)
 
 /* CHORD USER on GEN with OCT+ held: the keys play its chords in, silent (a key's note rounded down to the scale, the
  * first key of a hold a new progression, up to eight), KNOB 4 its LEN; no octave, no sheet */
+/* STEP EVOLVE: a STEP track's EVOLVE page: LOCK, EVERY, AMOUNT, CLEAR; the steps as written while it plays, REC held
+ * keeps the changes (EDIT held undoes it) */
+static int test_step_evolve(void)
+{
+    static const uint8_t MEL[8] = {60, 62, 64, 0, 67, 65, 0, 72};
+    int bad = 0, ok;
+    uint32_t i, tr, n;
+    step_t as[NSTEP];
+    ui_power_on();
+    tessera_reset();
+    recording_reset();
+    track_defaults_steps(TSEL);
+    tr = song.sel;
+    for (i = 0; i < 8u; i++) {
+        TSEL->step[i].n = MEL[i] ? 1u : 0u;
+        TSEL->step[i].note[0] = MEL[i];
+        TSEL->step[i].time = MEL[i] ? ST_NOTE : ST_REST;
+        TSEL->step[i].vel = 100;
+    }
+    TSEL->p[P_SLEN] = 8;
+    TSEL->p[P_SCALE] = 1;
+    memcpy(as, TSEL->step, sizeof as);
+    go_title("EVOLVE");
+    bad += check("STEP EVOLVE: a STEP track has its EVOLVE page", page_visible(ui.page) && cur_page()->graph == GR_EVOLVE &&
+                 tessera_step_on(tr));
+    turn(EN_K1 + 2u, 40);
+    turn(EN_K1 + 0u, 5);
+    help_find(2);
+    ok = help.pid == PID_TESS(TX_SV_AMOUNT);
+    help_find(3);
+    bad += check("..KNOB 1 LOCK, 3 AMOUNT (from OFF), their help; 4 CLEAR's", tessera_param_get(tr, TX_SV_AMOUNT) == 80 &&
+                 tessera_param_get(tr, TX_SV_LOCK) == 60 && tessera_param_get(tr, TX_SV_EVERY) == 1 && ok &&
+                 help.name && str_eq(help.name, "STEP EVOLVE CLEAR"));
+    transport_req = 1;
+    events_block(1);
+    while (cap_step[0] != 40u) events_block(1);         /* two bars and a half */
+    n = tessera_step_varied(tr);
+    bad += check("..played: steps changed as they play, the steps as written", n > 0u && !memcmp(as, TSEL->step, sizeof as));
+    hold(B_REC);
+    bad += check("..REC held keeps them: they become the steps, KEPT n STEPS", ui.msg_t && !strncmp(ui.msg, "KEPT ", 5) &&
+                 !tessera_step_varied(tr) && memcmp(as, TSEL->step, sizeof as));
+    hold(B_EDIT);
+    bad += check("..EDIT held: the steps as written again", !memcmp(as, TSEL->step, sizeof as));
+    while (cap_step[0] != 80u) events_block(1);
+    turn(EN_K1 + 3u, 1);
+    bad += check("..KNOB 4 CLEAR: none changed", !tessera_step_varied(tr) && !memcmp(as, TSEL->step, sizeof as));
+    turn(EN_K1 + 2u, -40);
+    while (cap_step[0] != 120u) events_block(1);
+    bad += check("..AMOUNT back to OFF: the steps as written, nothing changed (its off position)",
+                 tessera_param_get(tr, TX_SV_AMOUNT) == 0 && !tessera_step_varied(tr) && !memcmp(as, TSEL->step, sizeof as));
+    stop_transport();
+    track_defaults_steps(TSEL);
+    return bad;
+}
 static int test_chord_user(void)
 {
     int bad = 0;
@@ -5520,6 +5575,7 @@ int main(void)
     bad += test_constel_layer();
     bad += test_grids_layer();
     bad += test_chord_user();
+    bad += test_step_evolve();
     bad += test_div_order();
     bad += test_quad_cols();
     bad += test_screen();
