@@ -1300,10 +1300,53 @@ static int test_help_gesture(void)
                  help.on && help.pid == PID_TESS(TX_EV_AMOUNT) && tessera_param_get(0, TX_EV_AMOUNT) == was);
     turn(EN_K1, 1);
     bad += check("...another knob while held: its help instead (LOCK)", help.on && help.pid == PID_TESS(TX_EV_LOCK));
+    {   /* turning LOCK on: larger while it all fits, then nothing (and no redraw); back: smaller, then nothing */
+        int ok = help.zoom == 0u || help.knob != 0u;
+        uint32_t k, z = 0;
+        help.zoom = help.top = 0;
+        for (k = 0; k < 6u; k++) {
+            ui.force = 0;
+            help_knob(0, 1);
+            if (ui.force) z++;
+            ok &= help_count(help.zoom) <= help_rows(help.zoom) && !help.top;
+        }
+        for (k = 0; k < 2u && help_count(k + 1u) <= help_rows(k + 1u); k++) ;
+        ok &= k > 0u && z == k && help.zoom == k;       /* (as large as LOCK's text fits: AF_S) */
+        ui.force = 0;
+        help_knob(0, 1);
+        ok &= !ui.force;
+        for (k = 0; k < 4u; k++) help_knob(0, -1);
+        ui.force = 0;
+        help_knob(0, -1);
+        bad += check("..turning it on: the text larger while all of it fits, then no redraw; back to the smallest",
+                     ok && !ui.force && help.zoom == 0u);
+    }
     fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
     frame();
     frame();
     bad += check("ARP let go: the help closes, and no page opens (still EVOLVE)", !help.on && str_eq(cur_page()->title, "EVOLVE"));
+    {   /* GEN's MODE: longer than the card even at the smallest, so turning on scrolls it, to its end; back to the top */
+        uint32_t k, n, most = 0;
+        int ok;
+        go_title("GEN");
+        fm1_in.buttons |= 1u << panel.btn[B_ARP];
+        frame();
+        turn(EN_K1, 1);
+        n = help_count(0);
+        ok = help.on && help.pid == PID_TESS(TX_MODE) && help.zoom == 0u && n > help_rows(0);
+        for (k = 0; k < 40u; k++) {
+            help_knob(0, 1);
+            most = help.top > most ? help.top : most;
+        }
+        ok &= help.zoom == 0u && most == n - help_rows(0) && help.top == most;
+        for (k = 0; k < 40u; k++) help_knob(0, -1);
+        bad += check("GEN's MODE help, longer than the card: turning on scrolls to its last line, back to its first",
+                     ok && !help.top && !help.zoom);
+        fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
+        frame();
+        frame();
+        go_title("EVOLVE");
+    }
     {                                             /* the selectors' lists (ui_popup.c pick_*) */
         int32_t n, cur, tr;
         go_title("MODS");
