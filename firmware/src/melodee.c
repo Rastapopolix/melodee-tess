@@ -124,4 +124,5 @@
 #if MELODEE_CDC
 #include "console.c"
 #endif
+#include "splash.c"             /* the boot screen (main.c) */
 #include "main.c"

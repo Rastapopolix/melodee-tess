@@ -4854,7 +4854,7 @@ static int test_bughunt_ui2(void)
 /* L is a sparse face (tools/gen_aa_font.py L_CHARS): every string drawn in it has all its glyphs */
 static int test_large_face(void)
 {
-    static const char *const FIXED[] = {"MELODEE", "0123456789", "C#4 / .."};   /* main.c, ui_menu.c; ui_draw.c draw_uboot */
+    static const char *const FIXED[] = {"TESSERA", "0123456789", "C#4 / .."};   /* splash.c, ui_menu.c; ui_draw.c draw_uboot */
     uint32_t i, missing = 0;
     const char *s;
     for (i = 0; i < NB + NE + sizeof FIXED / sizeof FIXED[0]; i++)                              /* ui_input.c setup_show: the control names */
