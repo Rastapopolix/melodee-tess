@@ -1897,6 +1897,31 @@ static void pack_run(char *res, size_t cap)
               tessera_param_get(3, TX_GRD_TOMS) == 0 && tessera.grids[1].thin[0] == 70u;
         tessera_unpack(a);
     }
+    {   /* GRIDS PART4: the fourth part's sound round trips; a key's DRUM lane picks it (not the kick's); a version 14
+         * block plays the tom; a sound past BELL is refused; the part plays its note */
+        static uint8_t v14[TESSERA_PK_BYTES_V14];
+        const uint32_t n15 = TESSERA_PK_BYTES / TESSERA_TRACKS, n14 = TESSERA_PK_BYTES_V14 / TESSERA_TRACKS;
+        gen_grids_t g;
+        tessera_reset();
+        tessera_param_set(1, TX_GRD_PART4, 3);
+        tessera_param_set(3, TX_GRD_PART4, 9);          /* (kept to BELL) */
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera_param_get(1, TX_GRD_PART4) == 3 && tessera_param_get(0, TX_GRD_PART4) == 0 &&
+              tessera_param_get(3, TX_GRD_PART4) == 4 && !strcmp(tessera_grids_part4_name(1), "RIM");
+        ok &= tessera_grids_part4_note(2, 39) == 1 && tessera_param_get(2, TX_GRD_PART4) == 1 &&
+              tessera_grids_part4_note(2, 36) == 0 && tessera_param_get(2, TX_GRD_PART4) == 1;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v14 + tr * n14, b + tr * n15, n14);
+        ok &= tessera_unpack_ver(14u, v14) == 1 && tessera_param_get(1, TX_GRD_PART4) == 0;
+        memcpy(c, b, sizeof c);
+        c[1u * n15 + n14] = GEN_GRIDS_P4_N;
+        ok &= tessera_unpack(c) == 0;
+        memset(&g, 0, sizeof g);
+        ok &= gen_grids_note(&g, GEN_GRIDS_TOM) == 45u;
+        g.part4 = 1;
+        ok &= gen_grids_note(&g, GEN_GRIDS_TOM) == 39u && gen_grids_note(&g, 0) == 36u;
+        tessera_unpack(a);
+    }
     {   /* CHORD USER: a key's note rounded down to the track's scale is the chord's root (D dorian: E ii, F# rounded to
          * F iii, C vii, D I); the degrees and LEN round trip; a degree over 6 or a LEN of 0 or 9 is refused */
         const uint32_t n13 = TESSERA_PK_BYTES / TESSERA_TRACKS, n12 = TESSERA_PK_BYTES_V12 / TESSERA_TRACKS;

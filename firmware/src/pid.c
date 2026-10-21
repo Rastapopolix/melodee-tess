@@ -30,6 +30,7 @@ static const char *const TX_N_CSFILL[] = {"OFF", "ARP"};
 static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO", "DRONE", "WALK", "USER"};   /* (GEN_CH_*) */
 static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
 static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
+static const char *const TX_N_GRP4[] = {"TOM", "CLAP", "HATOP", "RIM", "BELL"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
@@ -116,6 +117,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_SV_LOCK] = PD("LOCK", F_PCT, 0, 100, 50),
     [TX_SV_EVERY] = {"EVERY", F_ENUM, 0, 5, 1, TX_N_EVERY, "bar"},
     [TX_SV_AMOUNT] = PD("AMOUNT", F_PCT, 0, 100, 0),
+    [TX_GRD_PART4] = PE("PART4", TX_N_GRP4, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -419,9 +421,10 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                   "KNOB 2."),
     X_(TX_GRD_HAT, "GRIDS HAT", "How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, "
                                 "KNOB 3."),
-    X_(TX_GRD_TOMS, "GRIDS TOMS", "A fourth part, on the kit's tom (GM 45): the hits the kick and snare only just "
-                                  "miss, so fills follow the groove. 0 none; up, misses further under the line play too "
-                                  "(DENSITY scales it). OCT+ held on GEN, KNOB 4."),
+    X_(TX_GRD_TOMS, "GRIDS TOMS", "A fourth part, on the tom or the sound PART4 picks: the hits the kick and snare "
+                                  "only just miss, so fills follow the groove. 0 none; up, misses further under the line "
+                                  "play too (DENSITY scales it). OCT+ held on GEN, KNOB 4; with it held, a black key picks "
+                                  "the sound."),
     X_(TX_CH_ULEN, "CHORD USER LEN", "How many of USER's chords play, 1 to 8: playing them in on the keys (OCT+ held "
                                      "on GEN) sets it; shorten it to leave the last ones out. OCT+ held on GEN, KNOB 4."),
     X_(TX_SV_LOCK, "STEP EVOLVE LOCK", "A STEP track's EVOLVE page: how much of the variation stays from round to "
@@ -432,6 +435,9 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                            "a note moved by a degree or two or an octave, a step dropped, two notes "
                                            "swapped, a ghost note in a rest. 0 plays the steps as written; the steps "
                                            "themselves never change until REC held keeps the changes."),
+    X_(TX_GRD_PART4, "GRIDS PART4", "The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM "
+                                    "lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black "
+                                    "key (as on the drum grid: CP OH TM RS CB)."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

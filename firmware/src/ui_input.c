@@ -1758,6 +1758,27 @@ static void chord_user_keys(uint32_t pressed)
     }
 }
 
+/* GRIDS, OCT+ held on GEN: a black key picks the fourth part's sound, the drum grid's lane of that key (TOM, CLAP, OPEN
+ * HAT, RIM, BELL; the kick, snare and closed hat are the other three parts) */
+static void grids_part4_keys(uint32_t pressed)
+{
+    for (uint32_t k = 0; k < 27u; k++) {
+        char m[20];
+        if (!((pressed >> k) & 1u)) continue;
+        oct_eat |= 2u;
+        ui.oct_t0 |= 2u;
+        oct_deferred = 0;
+        if (key_black(k) && key_place(k) < NLANE && tessera_grids_part4_note(song.sel, DRUM_LANE_NOTE[key_place(k)])) {
+            str_cpy(m, "PART4: ", sizeof m);
+            str_cpy(m + 7, tessera_grids_part4_name(song.sel), sizeof m - 7);
+            ui_message(m);
+        } else {
+            ui_message("PART4: CP OH TM RS CB");
+        }
+        ui.force = 1;
+    }
+}
+
 static int bulk_context(void)
 {
     return !ui.home&&!ui.menu&&!ui.confirm&&!ui.layer&&!pop.on&&!name_on()&&!sx_import.count&&
@@ -2247,6 +2268,9 @@ static void ui_input(void)
         seq_midi_events(0);
     } else if (ch_user_entry_on()) {                   /* CHORD USER, OCT+ held: its chords */
         chord_user_keys(notes);
+        seq_midi_events(0);
+    } else if (gr_layer_on()) {                        /* GRIDS, OCT+ held: the fourth part's sound */
+        grids_part4_keys(notes);
         seq_midi_events(0);
     } else if (song.grid) {
         if (!seq_erase_active(TSEL)) grid_keys(notes);

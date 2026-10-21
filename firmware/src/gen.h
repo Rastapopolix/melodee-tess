@@ -49,10 +49,12 @@ typedef struct {
 } gen_morph_t;
 
 /* 5. Grids (Mutable Instruments Grids' drum map, gen_grids.h): kick, snare and hat from a point on a 5 x 5 map of
- * patterns, blended between the four nearest; TOMS a fourth part, the kick's and the snare's near misses (OCT+ held on
- * GEN: KICK, SNR, HAT, TOMS) */
-#define GEN_GRIDS_PARTS 4u   /* kick, snare, hat, tom */
+ * patterns, blended between the four nearest; TOMS a fourth part, the kick's and the snare's near misses, on a sound
+ * of its own (PART4: a tom, the clap, the open hat, the rim, the bell) (OCT+ held on GEN: KICK, SNR, HAT, TOMS; a
+ * black key its sound) */
+#define GEN_GRIDS_PARTS 4u   /* kick, snare, hat, the fourth */
 #define GEN_GRIDS_TOM 3u     /* (the part TOMS plays: no pattern of its own on the map) */
+#define GEN_GRIDS_P4_N 5u    /* the fourth part's sounds (gen.c GEN_GRIDS_P4_NOTE) */
 typedef struct {
     uint8_t  x, y;        /* 0..255: the point on the map */
     uint8_t  dens;        /* 0..100: how full the parts are (Grids' FILL, one for all) */
@@ -61,7 +63,8 @@ typedef struct {
     uint8_t  perturb[3];  /* this bar's random push per part, 0..63 (drawn on the bar's first step) */
     uint8_t  thin[3];     /* 0..100: KICK, SNR, HAT turned round: how much of DENS the part loses (0: all of it, as
                            * before; the knobs show 100 - thin) */
-    uint8_t  toms;        /* 0..100: how far under the line a kick or snare may miss and still play the tom; 0 none */
+    uint8_t  toms;        /* 0..100: how far under the line a kick or snare may miss and still play the fourth; 0 none */
+    uint8_t  part4;       /* the fourth part's sound, 0..GEN_GRIDS_P4_N - 1: TOM, CLAP, HATOP, RIM, BELL */
 } gen_grids_t;
 
 /* 6. Bounce (Theo's): balls crossing a 256 x 256 box a fixed distance a step, no gravity; a wall a ball hits plays a

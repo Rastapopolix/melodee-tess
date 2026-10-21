@@ -862,8 +862,9 @@ static void tess_cap(const track_t *t, uint32_t note, uint32_t vel, uint32_t off
     cap_gen(t, note, vel, period ? (uint32_t)((uint64_t)off * 256u / period) : 256u);
 }
 
-/* Grids: every part that hits plays its GM drum note (kick 36, snare 38, closed hat 42, tom 45; a DRUM track's kit),
- * each thinned by DROP and its velocity varied by HUMAN; the tom, a near miss, a little softer; no scale, SHIFT, FOLLOW
+/* Grids: every part that hits plays its GM drum note (kick 36, snare 38, closed hat 42, the fourth its PART4: tom 45,
+ * clap 39, open hat 46, rim 37, bell 56; a DRUM track's lanes),
+ * each thinned by DROP and its velocity varied by HUMAN; the fourth, a near miss, a little softer; no scale, SHIFT, FOLLOW
  * or FLOURISH: they are drums. LOCK's replay is CHAOS turned round (gen_grids_tick). The first part sounding is the
  * track's note (FOLLOW, GATE, NOTE) */
 static void tess_grids_play(track_t *t, uint32_t tr, const gen_out_t *out)
@@ -878,9 +879,9 @@ static void tess_grids_play(track_t *t, uint32_t tr, const gen_out_t *out)
             int32_t j = (int32_t)(tw->human / 5u), v = (int32_t)vel + (int32_t)gen_rnd(&tessera.rnd[tr], (uint32_t)(2 * j + 1)) - j;
             vel = (uint32_t)(v < 1 ? 1 : v > 127 ? 127 : v);
         }
-        trk_note_on(t, GEN_GRIDS_NOTE[p], vel);
-        tess_cap(t, GEN_GRIDS_NOTE[p], vel, off);
-        t->seq_notes[n++] = GEN_GRIDS_NOTE[p];
+        trk_note_on(t, gen_grids_note(&tessera.grids[tr], p), vel);
+        tess_cap(t, gen_grids_note(&tessera.grids[tr], p), vel, off);
+        t->seq_notes[n++] = (uint8_t)gen_grids_note(&tessera.grids[tr], p);
     }
     if (!n) return;
     tessera.hit[tr] = 1;
@@ -1427,6 +1428,22 @@ void tessera_constel_layer_knob(uint32_t k, int32_t s)
     TESS_IRQ_ON();
 }
 
+/* GRIDS' fourth part: its sound's name; OCT+ held on GEN, a key: the sound of its note picked when it is one of them
+ * (the DRUM lanes' black keys: CP OH TM RS CB), 0 else (BD, SD, CH: the other parts') */
+const char *tessera_grids_part4_name(uint32_t tr)
+{
+    static const char *const N[GEN_GRIDS_P4_N] = {"TOM", "CLAP", "HATOP", "RIM", "BELL"};
+    return N[tessera.grids[tr % TESSERA_TRACKS].part4 % GEN_GRIDS_P4_N];
+}
+int tessera_grids_part4_note(uint32_t tr, uint32_t note)
+{
+    for (uint32_t i = 0; i < GEN_GRIDS_P4_N; i++)
+        if (GEN_GRIDS_P4_NOTE[i] == note && tr < TESSERA_TRACKS) {
+            tessera_param_set(tr, TX_GRD_PART4, (int32_t)i);
+            return 1;
+        }
+    return 0;
+}
 /* GRIDS with OCT+ held on GEN: KNOB 1 KICK, 2 SNR, 3 HAT (each part's share of DENS), 4 TOMS; 2 % a click, as DENS */
 void tessera_grids_layer_knob(uint32_t k, int32_t s)
 {
@@ -1642,7 +1659,8 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
  * EVOLVE / FORM / TWEAK settings and the settings of the remembered sections (A, B, C). Not stored: the recorded
  * Markov / Morph phrases (a loaded project records them again on its first pass: RAM is the limit, see
  * project.c), the playheads and the counters. A block that fails any range check is refused whole. */
-#define TESS_PK_TRACK 146u                           /* version 14: version 13's 143 bytes, then STEP EVOLVE (3) */
+#define TESS_PK_TRACK 147u                           /* version 15: version 14's 146 bytes, then Grids' PART4 (1) */
+#define TESS_PK_TRACK_V14 146u                       /* version 14: version 13's 143 bytes, then STEP EVOLVE (3) */
 #define TESS_PK_TRACK_V13 143u                       /* version 13: version 12's 135 bytes, then Grids' parts (4), Chord's USER (4) */
 #define TESS_PK_TRACK_V12 135u                       /* version 12: version 11's 130 bytes, then Chord (5) */
 #define TESS_PK_TRACK_V11 130u                       /* version 11: version 10's 129 bytes, then Constellation's LEN, FILL (1) */
@@ -1657,6 +1675,7 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
 #define TESS_PK_TRACK_V2 47u                         /* version 2: version 1's 45 bytes, then SEED (2) */
 #define TESS_PK_TRACK_V1 45u
 _Static_assert(TESSERA_PK_BYTES == TESSERA_TRACKS * TESS_PK_TRACK, "TESSERA_PK_BYTES (tessera.h)");
+_Static_assert(TESSERA_PK_BYTES_V14 == TESSERA_TRACKS * TESS_PK_TRACK_V14, "TESSERA_PK_BYTES_V14 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V13 == TESSERA_TRACKS * TESS_PK_TRACK_V13, "TESSERA_PK_BYTES_V13 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V12 == TESSERA_TRACKS * TESS_PK_TRACK_V12, "TESSERA_PK_BYTES_V12 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V11 == TESSERA_TRACKS * TESS_PK_TRACK_V11, "TESSERA_PK_BYTES_V11 (tessera.h)");
@@ -1750,6 +1769,12 @@ static uint8_t *tess_put_v14(uint8_t *o, uint32_t tr)
     *o++ = tessera.sv_lock[tr]; *o++ = tessera.sv_every[tr]; *o++ = tessera.sv_amount[tr];
     return o;
 }
+/* version 15's part (after version 14's 146 bytes): Grids' PART4 */
+static uint8_t *tess_put_v15(uint8_t *o, const tessera_grids_t *g)
+{
+    *o++ = g->part4;
+    return o;
+}
 uint32_t tessera_pack(uint8_t *o)
 {
     tessera_ensure_init();
@@ -1787,6 +1812,7 @@ uint32_t tessera_pack(uint8_t *o)
         o = tess_put_v12(o, &tessera.chord[tr]);
         o = tess_put_v13(o, &tessera.grids[tr], &tessera.chord[tr]);
         o = tess_put_v14(o, tr);
+        o = tess_put_v15(o, &tessera.grids[tr]);
     }
     return TESSERA_PK_BYTES;
 }
@@ -1822,7 +1848,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     const uint8_t *tw2 = rec + TESS_PK_TRACK_V4, *qd = rec + TESS_PK_TRACK_V5, *nl = rec + TESS_PK_TRACK_V6;
     const uint8_t *cs = rec + TESS_PK_TRACK_V7, *sc = rec + TESS_PK_TRACK_V8, *qc = rec + TESS_PK_TRACK_V9;
     const uint8_t *cl = rec + TESS_PK_TRACK_V10, *ch = rec + TESS_PK_TRACK_V11, *gp = rec + TESS_PK_TRACK_V12;
-    const uint8_t *sv = rec + TESS_PK_TRACK_V13;
+    const uint8_t *sv = rec + TESS_PK_TRACK_V13, *p4 = rec + TESS_PK_TRACK_V14;
     uint32_t i, walk = tess_get16(ch + 3), user = gp[4] | (uint32_t)gp[5] << 8 | (uint32_t)gp[6] << 16;
 
     if (mode >= TESS_ENG_COUNT || v_seed > TESS_SEED_LOAD_MAX) return 0;
@@ -1862,7 +1888,7 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     for (i = 0; i < GEN_CH_USER_N; i++)
         if (((user >> (3u * i)) & 7u) > 6u) return 0;
     if (gp[7] < 1u || gp[7] > GEN_CH_USER_N) return 0;
-    if (sv[0] > 100u || sv[1] > 5u || sv[2] > 100u) return 0;
+    if (sv[0] > 100u || sv[1] > 5u || sv[2] > 100u || p4[0] >= GEN_GRIDS_P4_N) return 0;
     if (!apply) return 1;
 
     tessera.mode[tr] = (uint8_t)mode;
@@ -1924,10 +1950,18 @@ static int tess_pk_track(const uint8_t *in, uint32_t tr, int apply)
     tessera.chord[tr].ulen = gp[7];
     gen_chord_start(&tessera.chord[tr]);
     tessera.sv_lock[tr] = sv[0]; tessera.sv_every[tr] = sv[1]; tessera.sv_amount[tr] = sv[2];
+    tessera.grids[tr].part4 = p4[0];
     tessera.chord_pc[tr] = 0;
     return 1;
 }
 
+/* A version 14 track record (146 bytes, before Grids' PART4) -> version 15 (147): the fourth part a tom, as it played.
+ * out may not overlap in */
+static void tess_v14_track(const uint8_t *in, uint8_t *out)
+{
+    memcpy(out, in, TESS_PK_TRACK_V14);
+    out[TESS_PK_TRACK_V14] = 0;
+}
 /* A version 13 track record (143 bytes, before STEP EVOLVE) -> version 14 (146): STEP EVOLVE's defaults, AMOUNT 0
  * (the steps as written). out may not overlap in */
 static void tess_v13_track(const uint8_t *in, uint8_t *out)
@@ -2072,16 +2106,16 @@ static void tess_v1_track(const uint8_t *in, uint8_t *out)
 }
 uint32_t tessera_pk_bytes(uint32_t ver)
 {
-    return ver == 14u ? TESSERA_PK_BYTES : ver == 13u ? TESSERA_PK_BYTES_V13 : ver == 12u ? TESSERA_PK_BYTES_V12 : ver == 11u ? TESSERA_PK_BYTES_V11 : ver == 10u ? TESSERA_PK_BYTES_V10 : ver == 9u ? TESSERA_PK_BYTES_V9 : ver == 8u ? TESSERA_PK_BYTES_V8 : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
+    return ver == 15u ? TESSERA_PK_BYTES : ver == 14u ? TESSERA_PK_BYTES_V14 : ver == 13u ? TESSERA_PK_BYTES_V13 : ver == 12u ? TESSERA_PK_BYTES_V12 : ver == 11u ? TESSERA_PK_BYTES_V11 : ver == 10u ? TESSERA_PK_BYTES_V10 : ver == 9u ? TESSERA_PK_BYTES_V9 : ver == 8u ? TESSERA_PK_BYTES_V8 : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
            ver == 2u ? TESSERA_PK_BYTES_V2 : ver == 1u ? TESSERA_PK_BYTES_V1 : 0u;
 }
-/* A track record of version ver (1..14) -> version 14, a version at a time. out may not overlap in */
+/* A track record of version ver (1..15) -> version 15, a version at a time. out may not overlap in */
 void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
 {
     uint8_t v2[TESS_PK_TRACK_V2], v3[TESS_PK_TRACK_V3], v4[TESS_PK_TRACK_V4], v5[TESS_PK_TRACK_V5], v6[TESS_PK_TRACK_V6];
     uint8_t v7[TESS_PK_TRACK_V7], v8[TESS_PK_TRACK_V8], v9[TESS_PK_TRACK_V9], v10[TESS_PK_TRACK_V10];
-    uint8_t v11[TESS_PK_TRACK_V11], v12[TESS_PK_TRACK_V12], v13[TESS_PK_TRACK_V13];
-    if (ver >= 14u) {
+    uint8_t v11[TESS_PK_TRACK_V11], v12[TESS_PK_TRACK_V12], v13[TESS_PK_TRACK_V13], v14[TESS_PK_TRACK_V14];
+    if (ver >= 15u) {
         memcpy(out, in, TESS_PK_TRACK);
         return;
     }
@@ -2097,7 +2131,8 @@ void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
     if (ver <= 10u) { tess_v10_track(in, v11); in = v11; }
     if (ver <= 11u) { tess_v11_track(in, v12); in = v12; }
     if (ver <= 12u) { tess_v12_track(in, v13); in = v13; }
-    tess_v13_track(in, out);
+    if (ver <= 13u) { tess_v13_track(in, v14); in = v14; }
+    tess_v14_track(in, out);
 }
 
 /* 1 = loaded; 0 = refused, `tessera` untouched */
@@ -2118,7 +2153,7 @@ int tessera_unpack_ver(uint32_t ver, const uint8_t *in)
     uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
     uint32_t n = tessera_pk_bytes(ver) / TESSERA_TRACKS;
     if (!n) return 0;
-    if (ver == 14u) return tessera_unpack(in);
+    if (ver == 15u) return tessera_unpack(in);
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
     return tessera_unpack(b);
@@ -2178,6 +2213,7 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_SV_LOCK: return tessera.sv_lock[tr];
     case TX_SV_EVERY: return tessera.sv_every[tr];
     case TX_SV_AMOUNT: return tessera.sv_amount[tr];
+    case TX_GRD_PART4: return tessera.grids[tr].part4;
     case TX_BNC_SPEED: return tessera.bounce[tr].speed;
     case TX_BNC_ANGLE: return tessera.bounce[tr].angle;
     case TX_BNC_BALLS: return tessera.bounce[tr].balls;
@@ -2313,6 +2349,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_SV_LOCK: tessera.sv_lock[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_SV_EVERY: tessera.sv_every[tr] = (uint8_t)tess_clampi(v, 0, 5); tess_sv.steps[tr] = 0; return;
     case TX_SV_AMOUNT: tessera.sv_amount[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_GRD_PART4: tessera.grids[tr].part4 = (uint8_t)tess_clampi(v, 0, GEN_GRIDS_P4_N - 1); return;
     case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); eng = TESS_ENG_BOUNCE; break;
     case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); eng = TESS_ENG_BOUNCE; break;
     case TX_BNC_BALLS: tessera.bounce[tr].balls = (uint8_t)tess_clampi(v, 1, GEN_BOUNCE_FALL); eng = TESS_ENG_BOUNCE; break;
@@ -2408,6 +2445,7 @@ void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v)
     case TX_CH_ULEN: tessera.chord[tr].ulen = (uint8_t)tess_clampi(v, 1, GEN_CH_USER_N); break;
     case TX_SV_LOCK: tessera.sv_lock[tr] = (uint8_t)tess_clampi(v, 0, 100); break;
     case TX_SV_AMOUNT: tessera.sv_amount[tr] = (uint8_t)tess_clampi(v, 0, 100); break;
+    case TX_GRD_PART4: tessera.grids[tr].part4 = (uint8_t)tess_clampi(v, 0, GEN_GRIDS_P4_N - 1); break;
     case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); break;
     case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); break;
     case TX_AWK_PROB: tessera.awake[tr].prob = (uint8_t)tess_clampi(v, 0, 100); break;
