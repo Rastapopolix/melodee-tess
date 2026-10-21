@@ -106,7 +106,11 @@ static const engine_t *const ENGINES[NENGINES] = {
 #else
     &ENG_RETIRED,                /* 2: retired PHASE; stored ID reserved (its core: CZ-1's) */
 #endif
+#if MELODEE_SID
     &ENG_SID,                    /* 3: SID replaces LOFI without reusing a stored ID */
+#else
+    &ENG_RETIRED,                /* 3: SID left out (core.h); its tracks load FM's INIT */
+#endif
     &ENG_RETIRED,                /* 4: retired SAMPLE; reserved to preserve stored indices */
 #if MELODEE_LEGACY_EXTRAS
     &ENG_FORMANT,                /* 5 VOICE (eng_formant.c: "voice" is a sounding note in voice.c) */
@@ -203,7 +207,9 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
 #if MELODEE_CZ
     ENGI_CZ,                     /* CZ-1 */
 #endif
+#if MELODEE_SID
     3,                           /* SID */
+#endif
 #if MELODEE_TRIO
     6,                           /* TRIO */
 #endif
@@ -270,15 +276,22 @@ static const uint8_t TRK_DEF[NPART][2] = {
     {ENGI_CZ, 42},                                  /* CZ-1 VIBRAPHONE */
 #elif !TRK_START_TESS && MELODEE_PROPHET
     {ENGI_PROPHET, 4},                              /* PROPHET FUNK BASS II (was ANALOG ACID) */
-#else
+#elif MELODEE_SID
     {ENGI_SID, 26},                                 /* (without it: SID BELL RING) */
+#else
+    {ENGI_FALLBACK, 0},
 #endif
 #if MELODEE_FM6
     {ENGI_FM6, 4},                                  /* FM6 PAD (was DIGITAL PAD) */
 #else
     {ENGI_SID, 19},                                 /* (without it: SID 8580 PAD) */
 #endif
-    {3, 0}, {ENGI_DRUM, 0}};                        /* SID INIT SID, DRUM KIT */
+#if MELODEE_SID
+    {3, 0},                                         /* SID INIT SID */
+#else
+    {ENGI_FALLBACK, 0},                             /* (without SID: FM's first voice) */
+#endif
+    {ENGI_DRUM, 0}};                                /* DRUM KIT */
 /* the power-on presets when project format 1 was written (project.c PROJ_DEF_SOUND): fixed, whatever TRK_DEF becomes */
 static const uint8_t TRK_DEF_V1[NPART] = {4, 4, 0, 0};
 #if TRK_START_TESS
