@@ -1,16 +1,18 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
-/* The engines left out of the build (phase 4, tessera-notes/docs/design/phase4/PLAN.md): FM6, CZ-1 and Prophet off. Never
- * offered; a project's track of one loads SID's INIT with its common settings; the power-on sounds are built ones;
- * the parts play. Built with -DMELODEE_FM6=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0 (run_tests.sh). */
-#if MELODEE_FM6 || MELODEE_CZ || MELODEE_PROPHET
-#error "engine_switch_test: build it with the three engines off"
-#endif
+/* The engines left out of the build (phase 4, tessera-notes/docs/design/phase4/PLAN.md): FM6, CZ-1 and Prophet off; or
+ * (2026-10-21, FM back) SID, CZ-1 and Prophet off. Never offered; a project's track of one loads the fallback's INIT
+ * (SID's, or FM's) with its common settings; the power-on sounds are built ones; the parts play. Built with
+ * -DMELODEE_FM6=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0, and with -DMELODEE_SID=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0
+ * (run_tests.sh). */
 static unsigned char host_samples[3][0x14000];
 #define SMP_USER_XIP(k) host_samples[k]
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
+#if MELODEE_CZ || MELODEE_PROPHET || (MELODEE_FM6 == MELODEE_SID)
+#error "engine_switch_test: build it with CZ-1, Prophet and one of FM6 or SID off"
+#endif
 
 static int32_t fm1_enc_take(uint32_t e) { (void)e; return 0; }
 static void fm1_irq_off(void) {}
@@ -50,11 +52,13 @@ static project_t p;
 
 int main(void)
 {
-    static const uint32_t GONE[3] = {12u, 15u, 19u};
+    static const uint32_t GONE[3] = {MELODEE_FM6 ? ENGI_SID : 12u, 15u, 19u};
     uint32_t k, shown = 0, ok = 1;
     for (k = 0; k < NENGINES; k++) shown += eng_ok(k);
-    check("FM6, CZ-1 and Prophet never offered; SID, TRIO, PHYS and DRUM are", !eng_ok(12) && !eng_ok(15) && !eng_ok(19) &&
-          eng_ok(ENGI_SID) && eng_ok(6) && eng_ok(ENGI_PHYS) && eng_ok(ENGI_DRUM) && shown == NENG_SHOWN && NENG_SHOWN == 4u);
+    check(MELODEE_FM6 ? "SID, CZ-1 and Prophet never offered; FM6, TRIO, PHYS and DRUM are" :
+                        "FM6, CZ-1 and Prophet never offered; SID, TRIO, PHYS and DRUM are",
+          !eng_ok(GONE[0]) && !eng_ok(15) && !eng_ok(19) && eng_ok(ENGI_FALLBACK) && eng_ok(6) && eng_ok(ENGI_PHYS) &&
+          eng_ok(ENGI_DRUM) && shown == NENG_SHOWN && NENG_SHOWN == 4u);
     for (k = 0; k < NENG_SHOWN; k++) ok &= ENG_BUILT(eng_vis(k));
     for (k = 0; k < NPART; k++) ok &= ENG_BUILT(TRK_DEF[k][0]) && eng_ok(TRK_DEF[k][0]);
     check("the engine list and the power-on sounds: built engines only", ok);
@@ -73,10 +77,11 @@ int main(void)
     check("(the project with them taken: a valid record)", !project_restore_runtime(&p));
     for (k = 0, ok = 1; k < 3u; k++) {
         uint32_t i;
-        ok &= trk[k].eng_req == ENGI_SID && trk[k].preset == 0 && trk[k].p[P_ATK] == (int16_t)(20 + k);
-        for (i = 0; i < 8u; i++) ok &= trk[k].p[P_E0 + i] == ENGINES[ENGI_SID]->edit[i].def;
+        ok &= trk[k].eng_req == ENGI_FALLBACK && trk[k].preset == 0 && trk[k].p[P_ATK] == (int16_t)(20 + k);
+        for (i = 0; i < 8u; i++) ok &= trk[k].p[P_E0 + i] == ENGINES[ENGI_FALLBACK]->edit[i].def;
     }
-    check("a project's FM6, CZ-1, Prophet tracks: SID INIT, its common settings kept (ATTACK)", ok);
+    check(MELODEE_FM6 ? "a project's SID, CZ-1, Prophet tracks: FM6 INIT, its common settings kept (ATTACK)" :
+                        "a project's FM6, CZ-1, Prophet tracks: SID INIT, its common settings kept (ATTACK)", ok);
     check("...the other track as saved (DRUM)", trk[3].eng_req == ENGI_DRUM);
     {
         int32_t o[2 * CTL];
