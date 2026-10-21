@@ -188,21 +188,34 @@ static void head_chip_text(char *b)
         str_cpy(b, t, 16);
     }
 }
-/* the page's place in its family: a dot a page, the page's a pill in the track's colour (no room: "3/12") */
-static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1: where the transport's marks, or the
-                                                         * battery, start) */
+/* the page's place in its family: n pages, the page the k-th (an engine in sections: the section's pages; the
+ * designer: its stage's) */
+static void page_place(uint32_t *pn, uint32_t *pk)
 {
     const page_t *pg = cur_page();
     uint32_t i, n = 0, k = 0, sc = sec_on() ? sec_of(ui.page) + 1u : 0u;
-    if (designer_on() && !name_on())                    /* the designer: its stage's pages */
+    if (designer_on() && !name_on())
         designer_pages(&n, &k);
-    else for (i = 0; i < NPAGES; i++)                   /* (an engine in sections: the section's pages) */
+    else for (i = 0; i < NPAGES; i++)
         if (PAGES[i].fam == pg->fam && page_visible(i) &&
             (!sc || (PAGES[i].scope == SC_FMOP ? PAGES[ui.page].scope == SC_FMOP : sec_of(i) + 1u == sc))) {
             if (i == ui.page)
                 k = n;
             n++;
         }
+    *pn = n;
+    *pk = k;
+}
+static int pv_tabs_on(void);                            /* (below) */
+/* the page's place in the header: a dot a page, the page's a pill in the track's colour (no room: "3/12"); none
+ * where the foot has the page tabs (pv_tabs_on) */
+static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1: where the transport's marks, or the
+                                                         * battery, start) */
+{
+    uint32_t i, n, k;
+    if (pv_tabs_on())
+        return;
+    page_place(&n, &k);
     if (n < 2u)
         return;
     if (x + (int32_t)n * 9 + 8 > x1 - 6) {              /* (no room for the dots; none for that either: nothing) */
@@ -219,6 +232,32 @@ static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1
         cv_rrect(x, 7, w, 4, 2, i == k ? T_THEME : T_LINE, T_BG);
         x += w + 5;
     }
+}
+/* Tessera's page tabs, right-aligned to x1 at row y: a numbered tile a page, the page's in the track's colour
+ * (no room right of x0: "3/12"); returns their left edge (one page: x1, nothing drawn) */
+static int32_t page_tabs(int32_t x0, int32_t x1, int32_t y)
+{
+    uint32_t i, n, k;
+    int32_t w, x;
+    char d[8];
+    page_place(&n, &k);
+    if (n < 2u)
+        return x1;
+    w = n > 9u ? 14 : 10;                               /* (a tile: 12 rows, its numeral's width and a margin) */
+    if (x1 - (int32_t)n * (w + 2) + 2 < x0) {
+        fmt_int(d, (int32_t)k + 1);
+        str_cpy(d + str_len(d), "/", 2);
+        fmt_int(d + str_len(d), (int32_t)n);
+        return cv_text_r(x1, y, &AF_X, d, T_MID, T_BG);
+    }
+    x = x1 - (int32_t)n * (w + 2) + 2;
+    for (i = 0; i < n; i++, x += w + 2) {
+        uint16_t c = i == k ? T_THEME : T_SURF;
+        fmt_int(d, (int32_t)i + 1);
+        cv_rrect(x, y, w, 12, 2, c, T_BG);
+        cv_text_c(x + w / 2, y, &AF_X, d, i == k ? T_INK : T_MID, c);
+    }
+    return x1 - (int32_t)n * (w + 2) + 2;
 }
 static void draw_head(void)
 {
@@ -1422,6 +1461,14 @@ static int own_screen(void)                             /* a page drawn whole by
 {
     uint32_t g = cur_page()->graph;
     return !ui.home && (g == GR_BROWSE || g == GR_PATGRID || g == GR_SONG || g == GR_SCALE_PICKER);
+}
+/* the sound's strip at the foot (ui_pages.c pv_sound) has the page tabs, the header then no dots: the pages pv_draw
+ * draws with it, not the designer's (its stages are its tabs) */
+static int pv_tabs_on(void)
+{
+    uint32_t k = pv_kind();
+    return !designer_on() && !own_screen() && !slot_kind() && !motion_page() && !list_on() &&
+           (k == PV_CURVE || k == PV_RINGS || k == PV_FADERS || k == PV_NOTES || k == PV_GRID);
 }
 /* the page (or Stage): its own screen, the redesign's, else its cards, panel and footer */
 static void draw_page(void)
