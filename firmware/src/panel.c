@@ -55,10 +55,18 @@ static uint32_t panel_btn_of(uint32_t matrix_id)        /* label of a matrix but
     return NB;
 }
 
+/* TRACK KNOB (menu): RIGHT (0) the ALGORITHM knob picks the track and PRESETS browses the sounds, as printed; LEFT (1)
+ * the two swap roles, so the left knob picks the track. Saved in favorites.factory[15][25] as KNOB_SWAP_TAG
+ * (settings_persist.c); HARDWARE CALIBRATION still learns the printed labels */
+#define KNOB_SWAP_TAG 0xA5u
+static uint8_t settings_knob_swap;
+
 /* steps of a role, + = clockwise */
 static uint8_t panel_moved;
 static int32_t panel_enc(uint32_t role)
 {
+    if (settings_knob_swap && (role == EN_ALGO || role == EN_PRESET))
+        role = role == EN_ALGO ? EN_PRESET : EN_ALGO;
     int32_t value=fm1_enc_take(panel.enc[role]) * panel.dir[role];
     panel_moved |= value != 0;
     return value;
