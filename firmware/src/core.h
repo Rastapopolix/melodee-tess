@@ -62,13 +62,14 @@
 #define MELODEE_TRIO 1           /* TRIO (eng_trio.c), back 2026-10-17 beside SID and DRUM (MACRO out: too costly) */
 #endif
 #ifndef MELODEE_PHYS
-#define MELODEE_PHYS 1           /* PHYS (eng_phys.c), back 2026-10-18 after TRIO */
+#define MELODEE_PHYS 1           /* PHYS (eng_phys.c), back 2026-10-18 after TRIO; out of device builds 2026-10-21 (build.py) */
 #endif
 #ifndef MELODEE_PLAITS
 #define MELODEE_PLAITS 0         /* MACRO (eng_macro.c): Plaits' synthesis, C++ (build.py); the prototype: off by default */
 #endif
-#define ENG_BUILT(e) ((e) == 3u ? MELODEE_SID : (e) == 12u ? MELODEE_FM6 : (e) == 15u ? MELODEE_CZ : (e) == 19u ? MELODEE_PROPHET : \
-                      (e) == 21u ? MELODEE_PLAITS : 1)   /* SID FM6 CZ-1 PROPHET MACRO */
+#define ENG_BUILT(e) ((e) == 3u ? MELODEE_SID : (e) == 9u ? PHYS_ON : (e) == 12u ? MELODEE_FM6 : (e) == 15u ? MELODEE_CZ : (e) == 19u ? MELODEE_PROPHET : \
+                      (e) == 21u ? MELODEE_PLAITS : 1)   /* SID PHYS FM6 CZ-1 PROPHET MACRO (PHYS: left out, not retired,
+                                                   * since 2026-10-21: its tracks load FM's first voice) */
 #define TRIO_ON (MELODEE_TRIO || MELODEE_LEGACY_EXTRAS)
 #define PHYS_ON (MELODEE_PHYS || MELODEE_LEGACY_EXTRAS)
 #define ENGI_SID 3u

@@ -332,8 +332,8 @@ if core && [ $TABLES = 1 ]; then
     t "full backup: CRC before writes, stale runtime, USB reset / timeout, malformed objects, older projects" backup_test $FW
     t "engines off (FM6, CZ-1, Prophet left out): never offered, a project's tracks of them SID INIT, the parts play" \
         engine_switch_test $FW -DMELODEE_FM6=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0
-    t "engines off (SID, CZ-1, Prophet left out, FM back): never offered, a project's tracks of them FM6 INIT, the parts play" \
-        engine_switch_sid:engine_switch_test $FW -DMELODEE_SID=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0
+    t "engines off (SID, PHYS, CZ-1, Prophet left out, FM back): never offered, their tracks FM6's first voice, the parts play" \
+        engine_switch_fm:engine_switch_test $FW -DMELODEE_SID=0 -DMELODEE_PHYS=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0
     t "editor: real C protocol, malformed transfers and queue recovery" editor_test $FW
     t "DX7 librarian: USB voice/bank receive, dump replies and malformed frame recovery" fm6_sysex_test $FW
     t "SWING: track + global at most 100, sequencer step lengths, the SWG display" swing_test -O2 $FW

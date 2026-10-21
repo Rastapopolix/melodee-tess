@@ -233,7 +233,7 @@ static int eng_extra_retired(uint32_t e)
 #if !MELODEE_PROPHET_PROTOTYPE
     if (e == ENGI_ANALOG) return 1;
 #endif
-    return e == ENGI_DIGITAL || (!MELODEE_LEGACY_EXTRAS && (e == 2u || e == 5u || (e == 6u && !MELODEE_TRIO) || e == 7u || (e == 9u && !MELODEE_PHYS) || e == 11u));
+    return e == ENGI_DIGITAL || (!MELODEE_LEGACY_EXTRAS && (e == 2u || e == 5u || (e == 6u && !MELODEE_TRIO) || e == 7u || e == 11u));
 }
 /* the engines one can pick, in ENGINE_ORDER: eng_ok(e), the n-th of them
  * eng_vis(n), e's place among them eng_rank(e), the next / previous one eng_step(e, dir) (wraps) */
@@ -279,7 +279,7 @@ static const uint8_t TRK_DEF[NPART][2] = {
 #elif MELODEE_SID
     {ENGI_SID, 26},                                 /* (without it: SID BELL RING) */
 #else
-    {ENGI_FALLBACK, 0},
+    {ENGI_FM6, 16},                                 /* FM6 GLASS PAD (FM back, PHYS and SID out: 2026-10-21) */
 #endif
 #if MELODEE_FM6
     {ENGI_FM6, 4},                                  /* FM6 PAD (was DIGITAL PAD) */
@@ -289,7 +289,7 @@ static const uint8_t TRK_DEF[NPART][2] = {
 #if MELODEE_SID
     {3, 0},                                         /* SID INIT SID */
 #else
-    {ENGI_FALLBACK, 0},                             /* (without SID: FM's first voice) */
+    {ENGI_FM6, 19},                                 /* FM6 KALIMBA (without SID) */
 #endif
     {ENGI_DRUM, 0}};                                /* DRUM KIT */
 /* the power-on presets when project format 1 was written (project.c PROJ_DEF_SOUND): fixed, whatever TRK_DEF becomes */
