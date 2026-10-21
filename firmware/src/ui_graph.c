@@ -149,13 +149,13 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
     uint16_t c = T_THEME;
     uint16_t bg = is_panel ? T_PANEL : T_SURF;
     uint16_t dim = is_panel ? T_LINE : T_RAISE;
-    int32_t y_base = is_panel ? 38 : 14;
+    int32_t y_base = is_panel ? 10 : 14;           /* (the panel: tall bars, filling it as GRIDS' lanes do) */
 
     if (mode == TESS_ENG_TURING) {
         const gen_turing_t *tur = tessera_turing(tr);
         uint32_t len = tur->len ? tur->len : 16u;
         int step_w = is_panel ? 10 : 11;
-        int h = is_panel ? 14 : 18;
+        int h = is_panel ? 82 : 18;
 
         for (uint32_t i = 0; i < 16u; i++) {
             int32_t sx = is_panel ? (18 + i * 12 + (i / 4u) * 4) : (13 + i * 13 + (i / 4u) * 4);
@@ -188,7 +188,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         const gen_euclid_t *euc = tessera_euclid(tr);
         uint32_t len = euc->steps ? euc->steps : 16u;
         uint32_t max_vis = len > 16 ? 32 : 16;
-        int h = is_panel ? 14 : 18;
+        int h = is_panel ? 82 : 18;
 
         for (uint32_t i = 0; i < max_vis; i++) {
             int step_w = is_panel ? 10 : 11;
@@ -221,7 +221,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         }
     } else if (mode == TESS_ENG_MARKOV) {
         const gen_markov_t *mk = tessera_markov(tr);
-        int h = is_panel ? 14 : 18;
+        int h = is_panel ? 82 : 18;
         int step_w = is_panel ? 16 : 18;
         int col = is_panel ? 25 : 27;
         int32_t x0 = is_panel ? 18 : 14;
@@ -250,7 +250,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         }
     } else if (mode == TESS_ENG_MORPH) {
         const gen_morph_t *mo = tessera_morph(tr);
-        int h = is_panel ? 14 : 18;
+        int h = is_panel ? 74 : 18;
         int step_w = is_panel ? 10 : 11;
         int lane = (h - 2) / 2;
         uint32_t cur = mo->step_idx & 0x0Fu;
@@ -538,11 +538,23 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         for (uint32_t i = 0; i < n; i++) {
             int32_t x = x0 + (int32_t)i * cw;
             uint32_t at = tessera_chord_at(tr, i, b), on = i == cur;
-            const aafont_t *f = is_panel && n <= 4u ? &AF_M : &AF_S;
+            static const aafont_t *const FIT[3] = {&AF_M, &AF_S, &AF_X};
+            const aafont_t *f = 0;
+            uint16_t tc = on ? bg : c, tb = on ? c : bg;
+            for (uint32_t k = is_panel && n <= 4u ? 0u : 1u; k < 3u && !f; k++)   /* (the largest the card holds) */
+                if (text_w(FIT[k], b) <= cw - 6) f = FIT[k];
             if (on) pcs = at;
             if (on) cv_rrect(x + 1, top, cw - 3, ch, 3, c, bg);
             else cv_frame(x + 1, top, cw - 3, ch, dim);
-            cv_text_c(x + cw / 2 - 1, top + ch / 2 - (f == &AF_M ? 9 : 6), f, b, on ? bg : c, on ? c : bg);
+            if (f) {
+                cv_text_c(x + cw / 2 - 1, top + (ch - f->h) / 2, f, b, tc, tb);
+            } else {                                     /* too wide for one line: the root over its quality */
+                uint32_t rl = b[1] == '#' || b[1] == 'b' ? 2u : 1u;
+                char r[3] = {b[0], rl > 1u ? b[1] : 0, 0};
+                int32_t y = top + (ch - (is_panel ? 26 : 22)) / 2;
+                cv_text_c(x + cw / 2 - 1, y, is_panel ? &AF_S : &AF_X, r, tc, tb);
+                cv_text_c(x + cw / 2 - 1, y + (is_panel ? 14 : 10), &AF_X, b + rl, tc, tb);
+            }
             if (on && song.playing && g->n) {
                 uint32_t in = (g->n - 1u) % len + 1u;
                 cv_rect(x + 1, top + ch + 3, (cw - 3) * (int32_t)in / (int32_t)len, 2, T_TEXT);
