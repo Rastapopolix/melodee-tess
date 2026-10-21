@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CHORD | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the other tracks follow them). |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CHORD | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the other tracks follow them). |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -165,7 +165,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x217 | TWEAK FOLLOW | OFF, T1, T2, T3, T4 | OFF | Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own. |
 | 0x218 | GRIDS X | 0 to 255 | 128 | Where on the map of drum patterns, left to right; between two, a blend of both. |
 | 0x219 | GRIDS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |
-| 0x21A | GRIDS DENSITY | 0 to 100 % | 50 | How full the kick, snare and hat are: 0 silent, 100 every hit the map offers. |
+| 0x21A | GRIDS DENSITY | 0 to 100 % | 50 | How full the kick, snare, hat and toms are: 0 silent, 100 every hit the map offers. Hold OCT+ on GEN for each part's own: KICK, SNR, HAT and TOMS. |
 | 0x21B | BOUNCE SPEED | 1 to 64 | 24 | How far the ball travels each step: faster, more wall hits, more notes. In FALL, how fast the leaves fall. |
 | 0x21C | BOUNCE ANGLE | 0 to 90 | 37 | The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle between draws a longer loop. EVOLVE nudges it. In FALL it is the WIND: the middle is calm, lower blows the leaves left (the melody leans low), higher right (high); further out, gusts hurry them down together. |
 | 0x21D | BOUNCE BALLS | 1 to 5 | 1 | How many balls: each one more starts from a place and an angle of its own, so they cross; balls hitting on the same step play together, three notes at most. Past 4, FALL: eight leaves fall at speeds of their own and play where they land (left low, right high; one in seven an octave down), rest, and fall again. |
@@ -209,10 +209,15 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x246 | QUAD EVERY 4 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
 | 0x247 | CONSTELLATION LEN | 1 to 16 | 16 | How many steps the loop of stars is, 1 to 16: with LOCK up a short phrase repeats. OCT+ held on GEN, KNOB 2. |
 | 0x248 | CONSTELLATION FILL | OFF, ARP | OFF | What the steps between stars play: OFF a rest, ARP the last four stars again, low to high and softer. OCT+ held on GEN, KNOB 3. |
-| 0x249 | CHORD PROG | POP, 50S, 2-5-1, CIRCLE, TWO, DRONE, WALK | POP | The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, 2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four chords of the track's SEED (ROLL another, EVOLVE changes one). SCL CHORD's CHRD and VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC. |
+| 0x249 | CHORD PROG | POP, 50S, 2-5-1, CIRCLE, TWO, DRONE, WALK, USER | POP | The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, 2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four chords of the track's SEED (ROLL another, EVOLVE changes one); USER up to eight of your own: hold OCT+ on GEN and play their roots on the keys, one key a chord (rounded down to the scale; letting OCT+ go ends it). SCL CHORD's CHRD and VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC. |
 | 0x24A | CHORD BARS | 1/2, 1, 2, 4 | 1 | How long each chord lasts: half a bar, 1, 2 or 4 bars. |
 | 0x24B | CHORD HIT | HOLD, BEAT, STEP | HOLD | How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; STEP every step, for the step's GATE. |
 | 0x24C | CHORD OCT | -2 to 2 | 0 | The chords' register, -2 to +2 octaves from their home around C3. OCT+ held on GEN, KNOB 1; KNOB 2 and 3 there are SCL CHORD's CHRD and VOIC. |
+| 0x24D | GRIDS KICK | 0 to 100 % | 100 | How much of DENSITY the kick gets: 100 all of it, 50 half, 0 none (the kick silent). OCT+ held on GEN, KNOB 1. |
+| 0x24E | GRIDS SNARE | 0 to 100 % | 100 | How much of DENSITY the snare gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 2. |
+| 0x24F | GRIDS HAT | 0 to 100 % | 100 | How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 3. |
+| 0x250 | GRIDS TOMS | 0 to 100 % | 0 | A fourth part, on the kit's tom (GM 45): the hits the kick and snare only just miss, so fills follow the groove. 0 none; up, misses further under the line play too (DENSITY scales it). OCT+ held on GEN, KNOB 4. |
+| 0x251 | CHORD USER LEN | 1 to 8 | 4 | How many of USER's chords play, 1 to 8: playing them in on the keys (OCT+ held on GEN) sets it; shorten it to leave the last ones out. OCT+ held on GEN, KNOB 4. |
 
 ## Mods
 
@@ -303,3 +308,7 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | S START | the generator's step | Series' START: where in the infinity series it plays |
 | C AUTO | the generator's step | Constellation's AUTO: who steers the ship (OFF, a wander, SEEK) |
 | CH PROG | the generator's step | Chord's PROG: which progression its chords follow |
+| G KICK | the generator's step | Grids' KICK: how much of its density the kick gets |
+| G SNR | the generator's step | Grids' SNR: how much of its density the snare gets |
+| G HAT | the generator's step | Grids' HAT: how much of its density the hat gets |
+| G TOMS | the generator's step | Grids' TOMS: how many of the near misses play the tom |

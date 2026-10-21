@@ -27,7 +27,7 @@ static const char *const TX_N_QLINK[] = {"OFF", "T1", "T2", "T12", "T3", "T13", 
 static const char *const TX_N_QRANGE[] = {"3 OCT", "1 OCT", "2 OCT", "+-1"};
 static const char *const TX_N_QMOVE[] = {"STOP", "DOWN", "UP", "RAND"};
 static const char *const TX_N_CSFILL[] = {"OFF", "ARP"};
-static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO", "DRONE", "WALK"};   /* (GEN_CH_*) */
+static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO", "DRONE", "WALK", "USER"};   /* (GEN_CH_*) */
 static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
 static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
@@ -108,6 +108,11 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_CH_BARS] = PE("BARS", TX_N_CHBARS, 1),
     [TX_CH_HIT] = PE("HIT", TX_N_CHHIT, 0),
     [TX_CH_OCT] = PD("OCT", F_INT, -2, 2, 0),
+    [TX_GRD_KICK] = PD("KICK", F_PCT, 0, 100, 100),
+    [TX_GRD_SNR] = PD("SNR", F_PCT, 0, 100, 100),
+    [TX_GRD_HAT] = PD("HAT", F_PCT, 0, 100, 100),
+    [TX_GRD_TOMS] = PD("TOMS", F_PCT, 0, 100, 0),
+    [TX_CH_ULEN] = PD("LEN", F_INT, 1, 8, 4),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -276,7 +281,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
        "How much sound work the FM-1 shares out between the tracks; lower leaves more headroom, higher allows more voices."),
     X_(TX_MODE, "GENERATOR MODE", "SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the "
                                   "keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; "
-                                  "GRIDS plays kick, snare and hat (best on a DRUM track); BOUNCE plays where a ball "
+                                  "GRIDS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball "
                                   "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
                                   "QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) "
                                   "plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity "
@@ -312,7 +317,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_TW_FOLLOW, "TWEAK FOLLOW", "Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own."),
     X_(TX_GRD_X, "GRIDS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
     X_(TX_GRD_Y, "GRIDS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
-    X_(TX_GRD_DENS, "GRIDS DENSITY", "How full the kick, snare and hat are: 0 silent, 100 every hit the map offers."),
+    X_(TX_GRD_DENS, "GRIDS DENSITY", "How full the kick, snare, hat and toms are: 0 silent, 100 every hit the map "
+                                     "offers. Hold OCT+ on GEN for each part's own: KICK, SNR, HAT and TOMS."),
     X_(TX_BNC_SPEED, "BOUNCE SPEED", "How far the ball travels each step: faster, more wall hits, more notes. In FALL, how fast the "
                                      "leaves fall."),
     X_(TX_BNC_ANGLE, "BOUNCE ANGLE", "The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle "
@@ -395,13 +401,26 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                          "again, low to high and softer. OCT+ held on GEN, KNOB 3."),
     X_(TX_CH_PROG, "CHORD PROG", "The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, "
                                  "2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four "
-                                 "chords of the track's SEED (ROLL another, EVOLVE changes one). SCL CHORD's CHRD and "
-                                 "VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC."),
+                                 "chords of the track's SEED (ROLL another, EVOLVE changes one); USER up to eight of "
+                                 "your own: hold OCT+ on GEN and play their roots on the keys, one key a chord (rounded "
+                                 "down to the scale; letting OCT+ go ends it). SCL CHORD's CHRD and VOIC shape the "
+                                 "chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC."),
     X_(TX_CH_BARS, "CHORD BARS", "How long each chord lasts: half a bar, 1, 2 or 4 bars."),
     X_(TX_CH_HIT, "CHORD HIT", "How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; "
                                "STEP every step, for the step's GATE."),
     X_(TX_CH_OCT, "CHORD OCT", "The chords' register, -2 to +2 octaves from their home around C3. OCT+ held on GEN, "
                                "KNOB 1; KNOB 2 and 3 there are SCL CHORD's CHRD and VOIC."),
+    X_(TX_GRD_KICK, "GRIDS KICK", "How much of DENSITY the kick gets: 100 all of it, 50 half, 0 none (the kick "
+                                  "silent). OCT+ held on GEN, KNOB 1."),
+    X_(TX_GRD_SNR, "GRIDS SNARE", "How much of DENSITY the snare gets: 100 all of it, 0 none. OCT+ held on GEN, "
+                                  "KNOB 2."),
+    X_(TX_GRD_HAT, "GRIDS HAT", "How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, "
+                                "KNOB 3."),
+    X_(TX_GRD_TOMS, "GRIDS TOMS", "A fourth part, on the kit's tom (GM 45): the hits the kick and snare only just "
+                                  "miss, so fills follow the groove. 0 none; up, misses further under the line play too "
+                                  "(DENSITY scales it). OCT+ held on GEN, KNOB 4."),
+    X_(TX_CH_ULEN, "CHORD USER LEN", "How many of USER's chords play, 1 to 8: playing them in on the keys (OCT+ held "
+                                     "on GEN) sets it; shorten it to leave the last ones out. OCT+ held on GEN, KNOB 4."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

@@ -69,6 +69,10 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_SR_START] = S_(CD_SR_START, TX_SR_START, "S START", "Series' START: where in the infinity series it plays"),
     [CD_CS_AUTO] = S_(CD_CS_AUTO, TX_CS_AUTO, "C AUTO", "Constellation's AUTO: who steers the ship (OFF, a wander, SEEK)"),
     [CD_CH_PROG] = S_(CD_CH_PROG, TX_CH_PROG, "CH PROG", "Chord's PROG: which progression its chords follow"),
+    [CD_GRD_KICK] = S_(CD_GRD_KICK, TX_GRD_KICK, "G KICK", "Grids' KICK: how much of its density the kick gets"),
+    [CD_GRD_SNR] = S_(CD_GRD_SNR, TX_GRD_SNR, "G SNR", "Grids' SNR: how much of its density the snare gets"),
+    [CD_GRD_HAT] = S_(CD_GRD_HAT, TX_GRD_HAT, "G HAT", "Grids' HAT: how much of its density the hat gets"),
+    [CD_GRD_TOMS] = S_(CD_GRD_TOMS, TX_GRD_TOMS, "G TOMS", "Grids' TOMS: how many of the near misses play the tom"),
 };
 #undef V_
 #undef B_

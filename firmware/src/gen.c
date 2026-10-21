@@ -264,21 +264,47 @@ static uint32_t gen_grids_level(uint32_t step, uint32_t part, uint32_t x, uint32
 /* Grids: steps in its bar: 32 (Grids' own 32nds) when the track's division makes 32 a bar, else 16 (its 16ths) */
 static uint32_t gen_grids_steps(uint32_t steps_per_bar) { return steps_per_bar >= 32u ? 32u : 16u; }
 
-/* 1 = part `part` hits on step `step` of its bar (steps of them): the map's chance plus the bar's push over the
- * threshold DENSITY sets (Grids' EvaluateDrums); *acc: 1 when it is an accent */
-static int gen_grids_hit(const gen_grids_t *g, uint32_t step, uint32_t steps, uint32_t part, uint32_t push, int *acc)
+/* Grids: part `part`'s line (0..255) its chance has to pass: DENS times the part's KICK, SNR or HAT (Grids'
+ * EvaluateDrums' threshold, one a part) */
+static uint32_t gen_grids_thr(const gen_grids_t *g, uint32_t part)
 {
-    uint32_t lv = gen_grids_level(step * (32u / steps), part, g->x, g->y);
-    uint32_t thr = 255u - (uint32_t)(g->dens > 100u ? 100u : g->dens) * 255u / 100u;
-    lv = lv < 255u - push ? lv + push : 255u;
-    if (acc) *acc = lv > 192u;
-    return lv > thr;
+    uint32_t d = g->dens > 100u ? 100u : g->dens, s = g->thin[part] > 100u ? 0u : 100u - g->thin[part];
+    return 255u - d * s * 255u / 10000u;
+}
+/* Grids: part `part`'s chance on step `step` of its bar (steps of them) plus the bar's push (none: push 0) */
+static uint32_t gen_grids_lv(const gen_grids_t *g, uint32_t step, uint32_t steps, uint32_t part, const uint8_t *push)
+{
+    uint32_t lv = gen_grids_level(step * (32u / steps), part, g->x, g->y), u = push ? push[part] : 0u;
+    return lv < 255u - u ? lv + u : 255u;
+}
+/* 1 = part `part` hits on step `step` of its bar (steps of them): the map's chance plus the bar's push (push 0: none)
+ * over the part's line; *acc: 1 when it is an accent. The tom (GEN_GRIDS_TOM): neither the kick nor the snare hits,
+ * but one of them is offered a hit and misses its line by less than TOMS' window (TOMS x DENS: half the scale at most),
+ * never an accent */
+static int gen_grids_hit(const gen_grids_t *g, uint32_t step, uint32_t steps, uint32_t part, const uint8_t *push, int *acc)
+{
+    uint32_t p, lv[2], win;
+    if (acc) *acc = 0;
+    if (part < 3u) {
+        lv[0] = gen_grids_lv(g, step, steps, part, push);
+        if (acc) *acc = lv[0] > 192u;
+        return lv[0] > gen_grids_thr(g, part);
+    }
+    win = (uint32_t)(g->toms > 100u ? 100u : g->toms) * (g->dens > 100u ? 100u : g->dens) * 128u / 10000u;
+    if (!win) return 0;
+    for (p = 0; p < 2u; p++) {
+        lv[p] = gen_grids_lv(g, step, steps, p, push);
+        if (lv[p] > gen_grids_thr(g, p)) return 0;            /* (the kick or the snare plays) */
+    }
+    for (p = 0; p < 2u; p++)                                  /* (a step the map offers nothing: no near miss) */
+        if (gen_grids_level(step * (32u / steps), p, g->x, g->y) && lv[p] + win > gen_grids_thr(g, p)) return 1;
+    return 0;
 }
 
-/* Grids: kick, snare and hat of this step, from the map at x, y. CHAOS draws each part's push at the bar's start (none
- * drawn at 0: the pattern alone); the note is the first part's (GM 36 kick, 38 snare, 42 closed hat), the adapter
- * plays every part (tessera.c) */
-static const uint8_t GEN_GRIDS_NOTE[3] = {36, 38, 42};
+/* Grids: kick, snare, hat and tom of this step, from the map at x, y. CHAOS draws the kick's, snare's and hat's push
+ * at the bar's start (none drawn at 0: the pattern alone); the note is the first part's (GM 36 kick, 38 snare, 42
+ * closed hat, 45 tom), the adapter plays every part (tessera.c) */
+static const uint8_t GEN_GRIDS_NOTE[GEN_GRIDS_PARTS] = {36, 38, 42, 45};
 static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
     uint32_t steps = gen_grids_steps(clk->steps_per_bar), cur = g->step_idx % steps, p;
@@ -287,9 +313,9 @@ static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd
         for (p = 0; p < 3u; p++)
             g->perturb[p] = (uint8_t)(g->chaos ? (gen_rnd(rnd, 256u) * ((uint32_t)g->chaos * 255u / 100u >> 2)) >> 8 : 0u);
     out->cv = (int16_t)(gen_grids_level(cur * (32u / steps), 0u, g->x, g->y) * 32767u / 255u);   /* the kick's chance */
-    for (p = 0; p < 3u; p++) {
+    for (p = 0; p < GEN_GRIDS_PARTS; p++) {
         int acc;
-        if (!gen_grids_hit(g, cur, steps, p, g->perturb[p], &acc)) continue;
+        if (!gen_grids_hit(g, cur, steps, p, g->perturb, &acc)) continue;
         if (!out->parts) {
             out->note = GEN_GRIDS_NOTE[p];
             out->vel = acc ? 127 : 96;
@@ -836,17 +862,33 @@ static void gen_series_load(gen_series_t *g, const gen_sec_t *s)
 }
 
 /* Chord pad: the progressions as degrees of the scale (0 = the tonic): POP I V vi IV, 50S I vi IV V, 251 ii V I I,
- * CIRCLE the scale's fifths down (I IV vii iii vi ii V), TWO I IV, DRONE I alone; WALK the seed's (gen_chord_fill) */
-static const uint8_t GEN_CH_PROG[GEN_CH_PROGS - 1u][8] = {
+ * CIRCLE the scale's fifths down (I IV vii iii vi ii V), TWO I IV, DRONE I alone; WALK the seed's (gen_chord_fill),
+ * USER the keys' (its own length) */
+static const uint8_t GEN_CH_PROG[GEN_CH_WALK][8] = {
     {0, 4, 5, 3}, {0, 5, 3, 4}, {1, 4, 0, 0}, {0, 3, 6, 2, 5, 1, 4}, {0, 3}, {0},
 };
-static const uint8_t GEN_CH_PROG_N[GEN_CH_PROGS] = {4, 4, 4, 7, 2, 1, GEN_CH_WALK_N};
-static uint32_t gen_chord_len(const gen_chord_t *g) { return GEN_CH_PROG_N[g->prog < GEN_CH_PROGS ? g->prog : 0u]; }
+static const uint8_t GEN_CH_PROG_N[GEN_CH_PROGS] = {4, 4, 4, 7, 2, 1, GEN_CH_WALK_N, 0};
+static uint32_t gen_chord_ulen(const gen_chord_t *g) { return g->ulen >= 1u && g->ulen <= GEN_CH_USER_N ? g->ulen : 1u; }
+static uint32_t gen_chord_len(const gen_chord_t *g)
+{
+    if (g->prog == GEN_CH_USER) return gen_chord_ulen(g);
+    return GEN_CH_PROG_N[g->prog < GEN_CH_PROGS ? g->prog : 0u];
+}
 /* the degree of chord i of the progression (from ROT on) */
 static uint32_t gen_chord_degree(const gen_chord_t *g, uint32_t i)
 {
-    uint32_t p = g->prog < GEN_CH_PROGS ? g->prog : 0u, k = (i + g->rot) % GEN_CH_PROG_N[p];
-    return (p == GEN_CH_WALK ? g->walk[k] : GEN_CH_PROG[p][k]) % 7u;
+    uint32_t p = g->prog < GEN_CH_PROGS ? g->prog : 0u, k = (i + g->rot) % gen_chord_len(g);
+    return (p == GEN_CH_WALK ? g->walk[k] : p == GEN_CH_USER ? g->user[k] : GEN_CH_PROG[p][k]) % 7u;
+}
+/* USER's progression, a key at a time (first: a new one): degree deg (0..6) the next chord, up to eight; 1 taken, 0
+ * full (the eighth already in) */
+static int gen_chord_user_add(gen_chord_t *g, uint32_t deg, int first)
+{
+    if (first) g->ulen = 0;
+    if (g->ulen >= GEN_CH_USER_N) return 0;
+    g->user[g->ulen++] = (uint8_t)(deg % 7u);
+    g->rot = 0;                                         /* (the progression from its first chord, as played in) */
+    return 1;
 }
 /* a chord's length in steps: BARS of the clock's bars (1/2 bar: at least a step) */
 static uint32_t gen_chord_steps(const gen_chord_t *g, uint32_t steps_per_bar)

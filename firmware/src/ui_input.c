@@ -889,7 +889,17 @@ static void edit_param(uint32_t slot, int32_t steps)
                 uint32_t p = slot == 1u ? P_CHRD : P_VOIC;
                 const param_desc_t *dp = track_desc(TSEL, p);
                 TSEL->p[p] = (int16_t)clamp(TSEL->p[p] + (steps > 0 ? 1 : -1), dp->min, dp->max);
+            } else if (tessera_chord(sel_tr)->prog == GEN_CH_USER) {
+                tessera_chord_ulen_knob(steps);         /* (USER: its LEN) */
             }
+            oct_eat |= 2u;
+            ui.oct_t0 |= 2u;
+            oct_deferred = 0;
+            ui.force = 1;
+            return;
+        }
+        if (gr_layer_on()) {                            /* GRIDS, OCT+ held: KICK, SNR, HAT, TOMS */
+            tessera_grids_layer_knob(slot, steps);
             oct_eat |= 2u;
             ui.oct_t0 |= 2u;
             oct_deferred = 0;
@@ -1703,6 +1713,33 @@ static void page_knob(uint32_t k, int32_t s)
     }
 }
 
+/* CHORD USER with OCT+ held on GEN: each key pressed the next chord, its root the key's note (rounded down to the
+ * scale: tessera.c); the first key of a hold starts a new progression. Silent (keys_mode); OCT+'s release then does
+ * nothing else */
+static uint8_t ch_user_first = 1;
+static void chord_user_keys(uint32_t pressed)
+{
+    for (uint32_t k = 0; k < 27u; k++) {
+        uint32_t n;
+        char m[16];
+        if (!((pressed >> k) & 1u)) continue;
+        n = tessera_chord_user_key(song.sel, 53u + k, ch_user_first);
+        ch_user_first = 0;
+        oct_eat |= 2u;
+        ui.oct_t0 |= 2u;
+        oct_deferred = 0;
+        if (!n) {
+            ui_message("USER FULL: 8");
+        } else {
+            str_cpy(m, "USER: ", sizeof m);
+            fmt_int(m + 6, (int32_t)n);
+            str_cpy(m + str_len(m), n == 1u ? " CHORD" : " CHORDS", sizeof m - str_len(m));
+            ui_message(m);
+        }
+        ui.force = 1;
+    }
+}
+
 static int bulk_context(void)
 {
     return !ui.home&&!ui.menu&&!ui.confirm&&!ui.layer&&!pop.on&&!name_on()&&!sx_import.count&&
@@ -2178,6 +2215,7 @@ static void ui_input(void)
             go_home();
         }
     }
+    if (!ch_user_entry_on()) ch_user_first = 1;       /* (OCT+ let go: the next key starts a new progression) */
     song.grid = (uint8_t)keys_mode();                 /* (seq.c: the keys are the grid's) */
 #if MELODEE_SLICE
     if (notes && slice_page_on())                       /* SLICES: a key picks the slice it plays */
@@ -2188,6 +2226,9 @@ static void ui_input(void)
         seq_midi_events(0);
     } else if (awake_entry_on()) {                     /* AWAKE's steps (ui_awake.c) */
         awake_keys(notes);
+        seq_midi_events(0);
+    } else if (ch_user_entry_on()) {                   /* CHORD USER, OCT+ held: its chords */
+        chord_user_keys(notes);
         seq_midi_events(0);
     } else if (song.grid) {
         if (!seq_erase_active(TSEL)) grid_keys(notes);

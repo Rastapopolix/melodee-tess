@@ -372,6 +372,51 @@ static void grids_tests(void)
         for (uint32_t n = 0; n < 200; n++) gen_grids_mutate(&g, amt, &rng_state);
         mut &= g.dens == 40 && g.chaos == 20 && g.step_idx == 5 && (amt || (g.x == 3 && g.y == 250));
     }
+    {   /* KICK, SNR, HAT (thin: turned round): 0 % a part silent; 50 % at DENS 100 the part as at DENS 50. TOMS: never with
+         * the kick or the snare, never at TOMS 0 or DENS 0, only where one of them is offered a hit under its line;
+         * some at TOMS 100, more than at 30; GM 45 at 96 */
+        int share = 1, toms = 1;
+        uint32_t n30 = 0, n100 = 0;
+        for (uint32_t x = 0; x <= 255; x += 51)
+            for (uint32_t y = 0; y <= 255; y += 85) {
+                for (uint32_t p = 0; p < 3u; p++) {
+                    gen_grids_t g = {(uint8_t)x, (uint8_t)y, 100, 0, 0, {0, 0, 0}, {0, 0, 0}, 0};
+                    gen_grids_t h = {(uint8_t)x, (uint8_t)y, 50, 0, 0, {0, 0, 0}, {0, 0, 0}, 0};
+                    g.thin[p] = 50;
+                    for (uint32_t i = 0; i < 16; i++) {
+                        gen_out_t a = step_out(), b = step_out();
+                        gen_grids_tick(&g, &CLK0, &rng_state, &a);
+                        gen_grids_tick(&h, &CLK0, &rng_state, &b);
+                        share &= ((a.parts ^ b.parts) >> p & 1u) == 0u;
+                    }
+                    g.thin[p] = 100;
+                    for (uint32_t i = 0; i < 16; i++) {
+                        gen_out_t a = step_out();
+                        gen_grids_tick(&g, &CLK0, &rng_state, &a);
+                        share &= !((a.parts >> p) & 1u);
+                    }
+                }
+                for (uint32_t dens = 0; dens <= 100; dens += 25)
+                    for (uint32_t t = 0; t <= 100; t += 10) {
+                        gen_grids_t g = {(uint8_t)x, (uint8_t)y, (uint8_t)dens, 40, 0, {0, 0, 0}, {0, 0, 0}, (uint8_t)t};
+                        for (uint32_t i = 0; i < 32; i++) {
+                            gen_out_t o = step_out();
+                            uint32_t st = g.step_idx, tom;
+                            gen_grids_tick(&g, &CLK0, &rng_state, &o);
+                            tom = (o.parts >> GEN_GRIDS_TOM) & 1u;
+                            toms &= o.parts < 16u && !((o.accent >> GEN_GRIDS_TOM) & 1u);
+                            if (!tom) continue;
+                            toms &= t && dens && !(o.parts & 3u) &&
+                                    (gen_grids_level(st * 2u, 0u, x, y) || gen_grids_level(st * 2u, 1u, x, y));
+                            if (o.parts == 1u << GEN_GRIDS_TOM) toms &= o.note == 45 && o.vel == 96;
+                            if (dens == 50u) n30 += t == 30u, n100 += t == 100u;
+                        }
+                    }
+            }
+        toms &= n100 > n30 && n30 > 0u;
+        check("grids: KICK, SNR, HAT: 0 % silences the part, 50 % at DENS 100 plays it as DENS 50", share);
+        check("grids: TOMS plays 45 where the kick and snare just miss, never with them; none at 0, more as it rises", toms);
+    }
     check("grids: the map reads as Grids' ReadDrumMap, on and between its patterns", ref);
     check("grids: hits play 36/38/42 at velocity 96 or 127 (accent); a rest keeps note 60, vel 100", range && rest);
     check("grids: CHAOS draws three a bar (on its first step), none at 0", draws);
@@ -713,6 +758,26 @@ static void chord_tests(void)
         gen_chord_load(&h, &s);
         sec &= h.prog == GEN_CH_WALK && h.bars == 3u && h.hit == GEN_CH_BEAT && h.rot == 5u &&
                !memcmp(h.walk, g.walk, GEN_CH_WALK_N);
+    }
+    {   /* USER: the keys' degrees in order, its own length (0: one, the tonic), eight at most, a new one from the first */
+        gen_chord_t g;
+        const gen_clock_t clk = {0, 16, 0};
+        int ok = 1;
+        memset(&g, 0, sizeof g);
+        g.prog = GEN_CH_USER, g.bars = 1, g.rot = 3;
+        ok &= gen_chord_len(&g) == 1u && gen_chord_degree(&g, 0) == 0u;
+        ok &= gen_chord_user_add(&g, 2, 1) && gen_chord_user_add(&g, 9, 0) && gen_chord_user_add(&g, 4, 0);
+        ok &= g.ulen == 3u && g.rot == 0u && gen_chord_len(&g) == 3u && gen_chord_degree(&g, 1) == 2u &&
+              gen_chord_degree(&g, 5) == 4u;          /* (9: 2; and round again) */
+        for (uint32_t i = 0; i < 64u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            if (!(i % 16u)) ok &= o.gate && o.note == g.user[i / 16u % 3u];   /* (a chord a bar: 2 2 4) */
+        }
+        for (uint32_t i = 0; i < 5u; i++) ok &= gen_chord_user_add(&g, 1, 0);
+        ok &= !gen_chord_user_add(&g, 1, 0) && g.ulen == GEN_CH_USER_N;
+        ok &= gen_chord_user_add(&g, 6, 1) && g.ulen == 1u && gen_chord_degree(&g, 5) == 6u;
+        check("chord: USER plays the keys' chords in order, up to eight, a new progression from the first key", ok);
     }
     check("chord: POP plays I V vi IV, a chord a bar, its degree as the note, the first strike louder", prog);
     check("chord: HIT HOLD strikes once a chord, BEAT every beat, STEP every step, each held as long", hits);

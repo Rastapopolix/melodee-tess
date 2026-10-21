@@ -49,13 +49,19 @@ typedef struct {
 } gen_morph_t;
 
 /* 5. Grids (Mutable Instruments Grids' drum map, gen_grids.h): kick, snare and hat from a point on a 5 x 5 map of
- * patterns, blended between the four nearest */
+ * patterns, blended between the four nearest; TOMS a fourth part, the kick's and the snare's near misses (OCT+ held on
+ * GEN: KICK, SNR, HAT, TOMS) */
+#define GEN_GRIDS_PARTS 4u   /* kick, snare, hat, tom */
+#define GEN_GRIDS_TOM 3u     /* (the part TOMS plays: no pattern of its own on the map) */
 typedef struct {
     uint8_t  x, y;        /* 0..255: the point on the map */
-    uint8_t  dens;        /* 0..100: how full the three parts are (Grids' FILL, one for all three) */
+    uint8_t  dens;        /* 0..100: how full the parts are (Grids' FILL, one for all) */
     uint8_t  chaos;       /* 0..100: random hits added each bar (Grids' CHAOS; LOCK turned round) */
     uint8_t  step_idx;    /* the next step, 0..31 */
     uint8_t  perturb[3];  /* this bar's random push per part, 0..63 (drawn on the bar's first step) */
+    uint8_t  thin[3];     /* 0..100: KICK, SNR, HAT turned round: how much of DENS the part loses (0: all of it, as
+                           * before; the knobs show 100 - thin) */
+    uint8_t  toms;        /* 0..100: how far under the line a kick or snare may miss and still play the tom; 0 none */
 } gen_grids_t;
 
 /* 6. Bounce (Theo's): balls crossing a 256 x 256 box a fixed distance a step, no gravity; a wall a ball hits plays a
@@ -170,11 +176,13 @@ typedef struct {
 
 /* 12. Chord pad: one chord at a time on a degree of the track's scale, from a progression, BARS long (tessera.c builds
  * its tones with the track's SCL CHORD: CHRD, VOIC). HIT: held for the chord, struck every beat, or every step. WALK is
- * the seed's own four chords (ROLL a new walk, EVOLVE changes one); the others are fixed progressions */
-enum { GEN_CH_POP, GEN_CH_50S, GEN_CH_251, GEN_CH_CIRCLE, GEN_CH_TWO, GEN_CH_DRONE, GEN_CH_WALK, GEN_CH_PROGS };
+ * the seed's own four chords (ROLL a new walk, EVOLVE changes one); USER up to eight played in on the keys (OCT+ held
+ * on GEN: tessera_chord_user_key); the others are fixed progressions */
+enum { GEN_CH_POP, GEN_CH_50S, GEN_CH_251, GEN_CH_CIRCLE, GEN_CH_TWO, GEN_CH_DRONE, GEN_CH_WALK, GEN_CH_USER, GEN_CH_PROGS };
 enum { GEN_CH_HOLD, GEN_CH_BEAT, GEN_CH_STEP, GEN_CH_HITS };
 #define GEN_CH_BARS 4u     /* BARS 0..3: 1/2, 1, 2, 4 bars a chord */
 #define GEN_CH_WALK_N 4u
+#define GEN_CH_USER_N 8u   /* USER's chords at most */
 typedef struct {
     uint8_t  prog;        /* GEN_CH_*: the progression */
     uint8_t  bars;        /* 0..3: 1/2, 1, 2, 4 bars a chord */
@@ -186,6 +194,8 @@ typedef struct {
     uint8_t  idx;         /* its place in the progression (the picture's) */
     uint16_t hold;        /* the last strike's length in steps, 0: the step's GATE (tessera.c) */
     uint16_t n;           /* the steps played since PLAY or the section's start */
+    uint8_t  user[GEN_CH_USER_N];   /* USER's degrees, 0..6 */
+    uint8_t  ulen;        /* USER's chords, 1..8 (0: one, the tonic) */
 } gen_chord_t;
 
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).
@@ -215,7 +225,7 @@ typedef struct {
     uint8_t gate;           /* 1 = a note starts on this step */
     uint8_t note, vel;      /* the raw note (before LOCK, the scale snap, transpose, SHIFT) */
     int16_t cv;             /* the generator's CV for the signal bus (phase 2; 0 until then) */
-    uint8_t parts;          /* Grids: the drum parts that hit, bit 0 kick, 1 snare, 2 hat (gate: any); else 0 */
+    uint8_t parts;          /* Grids: the drum parts that hit, bit 0 kick, 1 snare, 2 hat, 3 tom (gate: any); else 0 */
     uint8_t accent;         /* Grids: the parts among them accented */
     uint8_t more[2];        /* Bounce: notes after `note` on the same step (raw, as note), more_n of them */
     uint8_t more_n;
