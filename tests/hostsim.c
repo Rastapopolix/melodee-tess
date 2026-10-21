@@ -218,7 +218,7 @@ static uint32_t started_since(const track_t *t, uint32_t a0)
 }
 
 /* the demo song: T1 the power-on bass (TRK_DEF: PROPHET FUNK BASS II; ANALOG ACID until 2.0) (16 steps), T2 the
- * power-on pad (TRK_DEF: FM6 PAD; DIGITAL PAD until it was retired) (32 steps, tied chords), T3 SID INIT SID
+ * power-on pad (TRK_DEF: FM6 GLASS PAD; FM6 PAD, DIGITAL PAD before) (32 steps, tied chords), T3 SID INIT SID
  * (12 steps: 3 against 4), T4 808 DRUM drums (16 steps, up to 3 notes a step); 120 BPM, 8 bars. Bars 5..6:
  * live recording: a clap into the drums just before step 4 (quantised onto it, not triggered twice),
  * MIDI ch 3 into the lead, a two-key chord on the keys into an empty pad step. solo: 0 = the mix,

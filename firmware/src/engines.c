@@ -279,17 +279,17 @@ static const uint8_t TRK_DEF[NPART][2] = {
 #elif MELODEE_SID
     {ENGI_SID, 26},                                 /* (without it: SID BELL RING) */
 #else
-    {ENGI_FM6, 16},                                 /* FM6 GLASS PAD (FM back, PHYS and SID out: 2026-10-21) */
+    {ENGI_FM6, 10},                                 /* FM6 SOLID BASS (FM back, PHYS and SID out: 2026-10-21) */
 #endif
 #if MELODEE_FM6
-    {ENGI_FM6, 4},                                  /* FM6 PAD (was DIGITAL PAD) */
+    {ENGI_FM6, 16},                                 /* FM6 GLASS PAD (was PAD, then DIGITAL PAD) */
 #else
     {ENGI_SID, 19},                                 /* (without it: SID 8580 PAD) */
 #endif
 #if MELODEE_SID
     {3, 0},                                         /* SID INIT SID */
 #else
-    {ENGI_FM6, 19},                                 /* FM6 KALIMBA (without SID) */
+    {ENGI_FM6, 8},                                  /* FM6 DX TINE (without SID; was KALIMBA) */
 #endif
     {ENGI_DRUM, 0}};                                /* DRUM KIT */
 /* the power-on presets when project format 1 was written (project.c PROJ_DEF_SOUND): fixed, whatever TRK_DEF becomes */
