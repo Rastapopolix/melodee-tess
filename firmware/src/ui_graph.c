@@ -682,7 +682,7 @@ static void graph_evolve(const track_t *t, uint16_t c)
 
 /* TWEAK page: one small picture under each card. SHIFT: the note moved off its written pitch (the dashed line);
  * DROP: 8 hits, the share it drops hollow; HUMAN: 5 notes' gates and loudness, uneven as it rises; FOLLOW: the
- * four tracks, the one followed filled, this one dashed. At their off positions: level, full, even, none lit */
+ * four tracks, the one followed filled in its colour, this one dashed. At their off positions: level, full, even, none lit */
 static void graph_tweak(const track_t *t, uint16_t c)
 {
     static const uint8_t DROP_ORDER[8] = {3, 6, 0, 5, 2, 7, 1, 4};   /* which hits go first as DROP rises */
@@ -717,9 +717,9 @@ static void graph_tweak(const track_t *t, uint16_t c)
     for (i = 0; i < TESSERA_TRACKS; i++) {
         int32_t cx = x + 4 + (int32_t)(i % 2u) * 25, cy = 40 + (int32_t)(i / 2u) * 25;
         char n[2] = {(char)('1' + i), 0};
-        if (ev->follow == i + 1u) {
-            cv_rrect(cx, cy, 21, 21, 3, c, T_SURF);
-            cv_text_c(cx + 11, cy + 5, &AF_X, n, T_BG, c);
+        if (ev->follow == i + 1u) {                     /* (the track followed: in its own colour) */
+            cv_rrect(cx, cy, 21, 21, 3, T_TRK(i), T_SURF);
+            cv_text_c(cx + 11, cy + 5, &AF_X, n, T_BG, T_TRK(i));
         } else {
             if (i == tr) cv_dashed(cx, cy, 21, 21, 3, ev->follow ? T_TEXT : T_MID);
             else cv_rrect(cx, cy, 21, 21, 3, T_RAISE, T_SURF);
@@ -762,9 +762,9 @@ static void graph_tweak2(const track_t *t, uint16_t c)
     for (i = 0; i < TESSERA_TRACKS; i++) {
         int32_t cx = x + 4 + (int32_t)(i % 2u) * 25, cy = 40 + (int32_t)(i / 2u) * 25;
         char n[2] = {(char)('1' + i), 0};
-        if (on && ev->br_to == i + 1u) {
-            cv_rrect(cx, cy, 21, 21, 3, c, T_SURF);
-            cv_text_c(cx + 11, cy + 5, &AF_X, n, T_BG, c);
+        if (on && ev->br_to == i + 1u) {               /* (as FOLLOW: in the track's colour) */
+            cv_rrect(cx, cy, 21, 21, 3, T_TRK(i), T_SURF);
+            cv_text_c(cx + 11, cy + 5, &AF_X, n, T_BG, T_TRK(i));
         } else {
             if (i == tr) cv_dashed(cx, cy, 21, 21, 3, on ? T_TEXT : T_MID);
             else cv_rrect(cx, cy, 21, 21, 3, T_RAISE, T_SURF);
