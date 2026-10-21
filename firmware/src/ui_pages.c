@@ -360,7 +360,7 @@ static void pv_sound(void)
     cv_begin(240, 240 - PV_SOUND_Y, T_BG);
     cv_icon_mid(6, 8, 16, trk_icon(song.sel, 1), T_THEME, T_BG);   /* (its ink at x 8, as the text was) */
     x = cv_text_on(26, 3, &AF_X, en, T_THEME, T_BG);
-    tx = pv_tabs_on() ? page_tabs(x + 6 + 64, 232, 3) : 232;   /* the page tabs at the right (the name keeps 64 px) */
+    tx = foot_tabs_on() ? page_tabs(x + 6 + 64, 232, 3) : 232;   /* the page tabs at the right (the name keeps 64 px) */
     cv_free_text(x + 6, 1, &AF_S, nm, T_SEC, T_BG, tx - 6 - x - 6);
     cv_blit(0, PV_SOUND_Y);
 }

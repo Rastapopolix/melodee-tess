@@ -206,14 +206,14 @@ static void page_place(uint32_t *pn, uint32_t *pk)
     *pn = n;
     *pk = k;
 }
-static int pv_tabs_on(void);                            /* (below) */
+static int foot_tabs_on(void);                          /* (below) */
 /* the page's place in the header: a dot a page, the page's a pill in the track's colour (no room: "3/12"); none
- * where the foot has the page tabs (pv_tabs_on) */
+ * where the foot has the page tabs (foot_tabs_on) */
 static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1: where the transport's marks, or the
                                                          * battery, start) */
 {
     uint32_t i, n, k;
-    if (pv_tabs_on())
+    if (foot_tabs_on())
         return;
     page_place(&n, &k);
     if (n < 2u)
@@ -611,7 +611,7 @@ static void draw_foot(void)
             ti[0] = 'O'; ti[1] = 'P'; ti[2] = (char)('1' + fm6_opsel % 6u); ti[3] = ' ';
             str_cpy(ti + 4, pg->title, 9);
         }
-        if (n > 1) {
+        if (n > 1 && !foot_tabs_on()) {              /* (the tabs: the page's place, the header its name) */
             str_cpy(ti + str_len(ti), " ", 4);
             fmt_int(ti + str_len(ti), (int32_t)k);
             str_cpy(ti + str_len(ti), "/", 4);
@@ -632,7 +632,7 @@ static void draw_foot(void)
         uint32_t ph = song.playing && t->seq_idx / 16u == ui.bank ? t->seq_idx : 0xFFu;
         sig = str_hash(0x9E3779B9u, s) + ph * 97u + (song.seq_mode ? ui.cursor : 0xFFu) * 3001u + steps_hash(t) +
               (ui.home ? 0u : page_icon(pg)) * 7121u +
-              ui.bank * 7u + (uint32_t)t->p[P_SLEN] * 13u;
+              ui.bank * 7u + (uint32_t)t->p[P_SLEN] * 13u + (ui.home ? 0u : ui.page * 2246822519u);
     }
     if (act_cols()) {                                  /* the hint, and whether OCT+ would act */
         char ha[16], hb[16];
@@ -713,9 +713,17 @@ static void draw_foot(void)
     if (MELODEE_ICONS)
         x += cv_icon_on(x, 20, 12, engine_icon(ename), T_MID, T_BG) + 5;
     x = cv_text_fit(x, 19, &AF_S, ename, T_THEME, T_BG, 80);
-    {   /* the page title at the right, its icon before it (MIXER, SONG, MOTION) */
-        uint32_t pi = ui.home ? ICON_NONE : page_icon(pg);
-        int32_t tx = 232 - text_w(&AF_S, ti) - (pi != ICON_NONE ? 16 : 0);
+    {   /* the page title at the right, its icon before it (MIXER, SONG, MOTION); the page tabs: they, the title in
+         * the header's chip */
+        uint32_t pi = ui.home ? ICON_NONE : page_icon(pg), pn1, pk1;
+        int32_t tx;
+        if (!ui.home && foot_tabs_on() && (page_place(&pn1, &pk1), pn1 > 1u)) {
+            tx = page_tabs(x + 10 + 64, 232, 20);
+            cv_free_text(x + 10, 19, &AF_S, pn, T_TEXT, T_BG, tx - 6 - (x + 10));
+            cv_blit(0, Y_FOOT);
+            return;
+        }
+        tx = 232 - text_w(&AF_S, ti) - (pi != ICON_NONE ? 16 : 0);
         cv_free_text(x + 10, 19, &AF_S, pn, T_TEXT, T_BG, tx - 12 - (x + 10));
         if (pi != ICON_NONE) cv_icon_on(tx, 20, 12, pi, T_MID, T_BG);
         cv_text_r(232, 19, &AF_S, ti, T_MID, T_BG);
@@ -1465,13 +1473,17 @@ static int own_screen(void)                             /* a page drawn whole by
     uint32_t g = cur_page()->graph;
     return !ui.home && (g == GR_BROWSE || g == GR_PATGRID || g == GR_SONG || g == GR_SCALE_PICKER);
 }
-/* the sound's strip at the foot (ui_pages.c pv_sound) has the page tabs, the header then no dots: the pages pv_draw
- * draws with it, not the designer's (its stages are its tabs) */
-static int pv_tabs_on(void)
+/* the foot has the page tabs, the header then no dots: the sound's strip (ui_pages.c pv_sound) on the pages pv_draw
+ * draws with it, draw_foot's second row on the rest (not the notes', which end before it); not the designer's (its
+ * stages are its tabs), MIXER's, MOD's or CORDS' (no foot) */
+static int foot_tabs_on(void)
 {
-    uint32_t k = pv_kind();
-    return !designer_on() && !own_screen() && !slot_kind() && !motion_page() && !list_on() &&
-           (k == PV_CURVE || k == PV_RINGS || k == PV_FADERS || k == PV_NOTES || k == PV_GRID);
+    uint32_t k = pv_kind(), g = cur_page()->graph;
+    if (ui.home || designer_on() || own_screen() || slot_kind() || motion_page() || list_on())
+        return 0;
+    if (k == PV_NONE)
+        return !(g == GR_ROLL && (!grid_on() || live_rec_sel()));
+    return k == PV_CURVE || k == PV_RINGS || k == PV_FADERS || k == PV_NOTES || k == PV_GRID;
 }
 /* the page (or Stage): its own screen, the redesign's, else its cards, panel and footer */
 static void draw_page(void)
