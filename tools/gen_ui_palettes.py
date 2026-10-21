@@ -5,8 +5,9 @@
 
   gen_ui_palettes.py OUT.h [--report]
 
-Melodee's palettes: NIGHT (warm ink), DAY (light) and CONTRAST (black and white); Tessera's: SMALTI (the default:
-lapis and gold mosaic glass), MARMO (marble) and VITRO (glass), added after them so saved ids keep their palette. A palette is BG
+Palettes: NIGHT (warm ink) and CONTRAST (black and white), Melodee's grounds; SMALTI (the default: lapis and gold
+mosaic glass), MARMO (marble) and VITRO (glass), Tessera's. Melodee's DAY is gone; its stored slot stays retired.
+Every track colour is Tessera's own: the tool fails on one near Melodee's (MELODEE_TRACKS). A palette is BG
 (background), SURF (surface: cards, dialogs, menu rows), TEXT, ACCENT (the one active thing: hot knob, cursor,
 playhead) and four track colours: the selected track's is THEME (values, curves, gauges, selection), so the screen
 takes the colour of the track ALGORITHM picks (src/gfx.c palette_track). The firmware derives the rest with fixed
@@ -22,7 +23,7 @@ blends (src/gfx.c, the same integer maths as mix() here):
 Outside the palette: REC, a fixed red; the QR code's fixed black and white; the crash screen's fixed red.
 GRAY (pure grayscale, R = G = B in every colour and tint) is compiled into the host tests only (UI_TEST_PALETTE):
 every screen drawn in it must stay gray, which proves the drawing takes every colour from the tokens.
-Saved settings name palettes by a tagged id (PAL_TAG + index); any other id reads as the default.
+Saved settings name palettes by a tagged id (PAL_TAG + slot, SLOTS); any other id reads as the default.
 --report prints the WCAG contrast of every pairing, with each track colour as THEME. The tool fails on any miss.
 """
 import argparse
@@ -32,22 +33,26 @@ from pathlib import Path
 # name, bg, surf, text, accent, (track 1, 2, 3, 4) (8-bit RGB; stored as RGB565)
 PALETTES = [
     ("NIGHT",    (23, 20, 31),    (36, 32, 46),    (243, 238, 248), (255, 255, 255),
-     ((255, 122, 92), (255, 193, 69), (70, 217, 176), (157, 140, 255))),
-    ("DAY",      (246, 242, 234), (231, 224, 212), (30, 26, 38),    (20, 16, 28),
-     ((160, 42, 22), (116, 68, 0), (0, 92, 72), (78, 56, 184))),
+     ((232, 216, 92), (60, 200, 232), (236, 104, 220), (170, 222, 92))),
     ("CONTRAST", (0, 0, 0),       (34, 34, 34),    (255, 255, 255), (255, 255, 255),
-     ((255, 128, 96), (255, 214, 0), (0, 236, 188), (176, 160, 255))),
+     ((255, 250, 120), (0, 214, 255), (255, 90, 255), (140, 255, 90))),
     ("SMALTI",   (13, 19, 38),    (24, 33, 60),    (246, 240, 224), (255, 226, 150),     # Tessera's: lapis and gold
-     ((236, 184, 72), (236, 120, 86), (86, 206, 140), (120, 176, 255))),
+     ((222, 202, 96), (64, 200, 214), (110, 214, 104), (214, 124, 236))),
     ("MARMO",    (21, 19, 17),    (36, 33, 30),    (240, 233, 218), (255, 250, 240),     # marble
-     ((84, 204, 170), (226, 170, 76), (234, 116, 112), (138, 164, 236))),
+     ((132, 204, 112), (214, 194, 104), (204, 132, 208), (130, 178, 226))),
     ("VITRO",    (8, 25, 30),     (17, 41, 47),    (232, 244, 242), (255, 255, 255),     # glass
-     ((62, 210, 222), (238, 190, 64), (244, 134, 168), (170, 222, 92))),
+     ((62, 210, 222), (250, 232, 100), (236, 120, 236), (170, 222, 92))),
 ]
+SLOTS = [0, 2, 3, 4, 5]            # each palette's stored slot; 1 was DAY (retired: its stored id reads as the default)
+# Melodee's own track colours (NIGHT, DAY, CONTRAST as upstream had them): no track colour may come near one
+MELODEE_TRACKS = [(255, 122, 92), (255, 193, 69), (70, 217, 176), (157, 140, 255),
+                  (160, 42, 22), (116, 68, 0), (0, 92, 72), (78, 56, 184),
+                  (255, 128, 96), (255, 214, 0), (0, 236, 188), (176, 160, 255)]
+MELODEE_DE = 20                    # the least CIELAB distance (dE76) from each of them
 DEFAULT = "SMALTI"                 # a fresh install's (and an unknown stored id's); NIGHT stays index 0 for saved ids
 TEST_GRAY = ("GRAY", (14, 14, 14), (36, 36, 36), (204, 204, 204), (255, 255, 255),
              ((232, 232, 232), (220, 220, 220), (208, 208, 208), (244, 244, 244)))
-PAL_TAG = 96                       # stored id = PAL_TAG + index (ids below: earlier firmware, read as the default)
+PAL_TAG = 96                       # stored id = PAL_TAG + slot (ids below: earlier firmware, read as the default)
 REC_DARK, REC_LIGHT = (255, 72, 72), (190, 24, 40)
 QR_LIGHT, QR_DARK, CRASH_BG, CRASH_INK = (255, 255, 255), (0, 0, 0), (160, 0, 0), (255, 255, 255)
 PCT = {"MID": 70, "DIM": 42, "LINE": 18, "SEL": 80, "TINT": 12, "KEY": 78}
@@ -104,6 +109,22 @@ def contrast(a, b):
     return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 
 
+def lab(c):
+    """8-bit RGB -> CIELAB (D65)"""
+    def lin(v):
+        v /= 255.0
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (lin(v) for v in c)
+    x, y, z = ((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047, 0.2126 * r + 0.7152 * g + 0.0722 * b,
+               (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883)
+    f = [t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116 for t in (x, y, z)]
+    return 116 * f[1] - 16, 500 * (f[0] - f[1]), 200 * (f[1] - f[2])
+
+
+def delta_e(a, b):
+    return sum((p - q) ** 2 for p, q in zip(lab(a), lab(b))) ** 0.5
+
+
 def derive(p, t):
     """the derived colours of palette p with track t's colour as THEME"""
     name, bg, surf, text, accent, trk = p
@@ -141,6 +162,12 @@ def main():
     a = ap.parse_args()
     fails = []
     assert PALETTES[0][0] == "NIGHT" and len(PALETTES) <= 31
+    assert len(SLOTS) == len(PALETTES) and SLOTS == sorted(set(SLOTS)) and SLOTS[0] == 0 and SLOTS[-1] < 31
+    for p in PALETTES:
+        for t, c in enumerate(p[5]):
+            m = min(MELODEE_TRACKS, key=lambda q: delta_e(c, q))
+            if delta_e(c, m) < MELODEE_DE:
+                fails.append(f"{p[0]}/T{t + 1}: {c} is Melodee's {m} (dE {delta_e(c, m):.1f} < {MELODEE_DE})")
     rows = [derive(p, t) for p in PALETTES + [TEST_GRAY] for t in range(4)]
     for name, d in rows:
         if name.startswith("GRAY"):
@@ -174,7 +201,8 @@ def main():
         out += ["#ifdef UI_TEST_PALETTE", row(TEST_GRAY), "#endif", "};",
                 f"#define UI_NPALETTES {len(PALETTES)}u", f"#define UI_DEFAULT_INDEX {names.index(DEFAULT)}u      /* {DEFAULT} */",
                 f"#define UI_GRAY_INDEX {len(PALETTES)}u      /* (UI_TEST_PALETTE only) */",
-                f"#define UI_PAL_TAG {PAL_TAG}u          /* stored id = UI_PAL_TAG + index */"]
+                f"#define UI_PAL_TAG {PAL_TAG}u          /* stored id = UI_PAL_TAG + UI_PAL_SLOTS[index] */",
+                "static const uint8_t UI_PAL_SLOTS[] = {" + ", ".join(str(x) for x in SLOTS) + "};"]
         out += [f"#define UI_{k}_PCT {v}" for k, v in PCT.items()] + [f"#define UI_RAISE_PCT {RAISE_PCT}   /* SURF -> TEXT */"]
         out += ["/* each palette's LINE (BG -> TEXT %), in UI_PALETTES' order */",
                 "static const uint8_t UI_LINE_PCTS[] = {" +
