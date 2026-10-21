@@ -2998,6 +2998,22 @@ static int test_popups(void)
                      o && !smap.on && str_eq(sec.name[sec_of(ui.page)], "Amp"));
         press(B_EDIT); press(B_EDIT);
         bad += check("SECTIONS: EDIT again closes the map", !smap.on);
+        set_engine_of(TSEL, ENGI_FM6); TSEL->engine = ENGI_FM6; sec.ok = 0;
+        ui.home = 0; ui.page = (uint8_t)page_first(FAM_EDIT); page_entered(); frame();
+        press(B_EDIT);
+        o = smap.on && smap.row == 0u && smap.col == 0u;
+        turn(EN_K1, 1);
+        f = smap.col;
+        turn(EN_K1, -1);
+        bad += check("SECTIONS: FM6's map, KNOB 1 a click: OPS -> PATCH, a click back: OPS", o && f == 1u && smap.col == 0u);
+        turn(EN_K2, 1);
+        o = smap.row == 1u;
+        turn(EN_K2, 1);
+        f = smap.row;
+        turn(EN_K2, 3);                                 /* (three detents in one read: three rows) */
+        bad += check("..KNOB 2 a click a row: SOUND -> ALGO -> OP1, three at once: OP4", o && f == 2u && smap.row == 5u &&
+                     sec.op[smap.row] == 4u);
+        press(B_EDIT);
     }
     go_page(GR_SONG); frame();
     hold(B_OCTUP);

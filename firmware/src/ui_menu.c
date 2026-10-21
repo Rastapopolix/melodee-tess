@@ -394,6 +394,14 @@ static void enc_drop(void)                             /* knob turns nobody take
     for (k = 0; k < NE; k++)
         panel_enc(k);
 }
+/* .. but the knobs in keep (a bit a role): a detent of theirs the scan ISR publishes after their take waits for the
+ * next frame instead of being dropped (ui_input runs in a tight loop, so that window is most of a frame's time) */
+static void enc_drop_but(uint32_t keep)
+{
+    uint32_t k;
+    for (k = 0; k < NE; k++)
+        if (!((keep >> k) & 1u)) panel_enc(k);
+}
 
 static void menu_close(void)
 {

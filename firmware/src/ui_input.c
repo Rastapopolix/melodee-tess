@@ -2087,7 +2087,8 @@ static void ui_input(void)
         for (id = 0; b; id++, b >>= 1)
             if (b & 1u)
                 page_tap(panel_btn_of(id));
-        enc_drop();
+        if (smap.on) enc_drop_but(1u << EN_K1 | 1u << EN_K2);   /* (a click of theirs since: the next frame's) */
+        else enc_drop();
         return;
     }
     if (pop.on == POP_SHEET || pop.on == POP_LIST) {   /* an action sheet, a value's list: KNOB 1 / 2, OCT+ / OCT-
@@ -2096,7 +2097,8 @@ static void ui_input(void)
         if (pop.on == POP_LIST) vlist_input(k1, oct);
         else sheet_input(k1, k2, oct);
         ui.pg_down = 0;
-        enc_drop();
+        if (pop.on) enc_drop_but(1u << EN_K1 | 1u << EN_K2);   /* (still open: a click of theirs since, the next frame's) */
+        else enc_drop();
         step_history_end();                             /* (a note's sheet: its CHANCE, LENGTH, ... edits undo too) */
         return;
     }
