@@ -2890,7 +2890,8 @@ static int test_native_env_lfo(void)
     open_family(FAM_LFO);
     bad += check("LFO on CZ-1: its vibrato, LFO lit", str_eq(cur_page()->title, "CZ VIBRATO") && cur_fam() == FAM_LFO);
     open_family(FAM_LFO);
-    bad += check("..LFO again: the track LFO (it modulates the CZ-1 too)", str_eq(cur_page()->title, "LFO"));
+    bad += check("..LFO again: MODS, then the track LFO (it modulates the CZ-1 too)", str_eq(cur_page()->title, "MODS") &&
+                 (open_family(FAM_LFO), open_family(FAM_LFO), str_eq(cur_page()->title, "LFO")));
     go_home();
     set_engine_of(TSEL, ENGI_PROPHET);
     open_family(FAM_ENV);
@@ -2907,6 +2908,15 @@ static int test_native_env_lfo(void)
     set_engine_of(TSEL, 3);
     open_family(FAM_ENV);
     bad += check("ENV on SID: the track's ADSR", str_eq(cur_page()->title, "ENV"));
+    ui.fam_last[FAM_LFO] = 0;
+    open_family(FAM_LFO);
+    bad += check("LFO on SID: MODS first, then MATRIX, LFO, LFO 2, ORGANIC, LFO DEST", str_eq(cur_page()->title, "MODS") &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "MATRIX")) && (open_family(FAM_LFO), str_eq(cur_page()->title, "LFO")) &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "LFO 2")) &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "ORGANIC")) &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "LFO DEST")));
+    go_home();
+    open_family(FAM_ENV);
     o = song.octave;
     press(B_OCTDN);
     bad += check("OCT- on a sound page: Stage, no octave", ui.home && song.octave == o);
