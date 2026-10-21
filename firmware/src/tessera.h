@@ -86,6 +86,9 @@ enum { TESS_COND_OFF, TESS_COND_1_2, TESS_COND_2_2, TESS_COND_1_4, TESS_COND_2_4
        TESS_COND_1_8, TESS_COND_8_8, TESS_COND_FIRST, TESS_COND_NFIRST, TESS_COND_COUNT };
 
 /* One remembered section (A, B or C) of a track's form */
+#define TESS_SV_STEPS 64u                           /* STEP EVOLVE's changes: one a step (NSTEP) */
+#define TESS_SV_LOCK0 50u                           /* STEP EVOLVE's LOCK and EVERY (a bar) to start; AMOUNT 0: OFF */
+#define TESS_SV_EVERY0 1u
 typedef struct {
     uint16_t reg;         /* Turing: base register; Morph: snapshot A; Grids: x, y << 8 */
     uint8_t  p0, p1;      /* Euclid: pulses, rot; Markov: tension; Morph: morph_pos */
@@ -132,9 +135,22 @@ typedef struct {
     uint8_t          nl_mode[TESSERA_TRACKS]; /* NOTE LENGTH (note_len.c): 0 STEP (the GATE), 1 FIXED, 2 HIT */
     uint8_t          nl_len[TESSERA_TRACKS];  /* FIXED's length: 0..5 = 1/32 1/16 1/8 1/4 1/2 1 bar */
     uint8_t          nl_keys[TESSERA_TRACKS]; /* FIXED: 1..4 notes held at once */
+    /* STEP EVOLVE (a STEP track's EVOLVE page; vary.c): its steps played with changes that come and go */
+    uint8_t          sv_lock[TESSERA_TRACKS];   /* 0..100: the chance a change is a step put back as written */
+    uint8_t          sv_every[TESSERA_TRACKS];  /* 0 OFF, 1..5: 1 2 4 8 16 bars between rounds of changes */
+    uint8_t          sv_amount[TESSERA_TRACKS]; /* 0..100: changes a round, 1 a quarter; 0 none (as written) */
 } tessera_state_t;
 
 extern tessera_state_t tessera;
+/* STEP EVOLVE's changes as they play (not saved; cleared with `tessera` by tessera_init). In .pool: static RAM is
+ * nearly full */
+typedef struct {
+    uint8_t  flash[TESSERA_TRACKS];             /* steps left to show a round just made */
+    uint16_t steps[TESSERA_TRACKS];             /* steps since the last round */
+    uint32_t rnd[TESSERA_TRACKS];               /* its random stream */
+    uint8_t  mut[TESSERA_TRACKS][TESS_SV_STEPS];   /* each step's change (vary.c), 0 as written */
+} tessera_sv_t;
+extern tessera_sv_t tess_sv;
 
 void tessera_init(void);
 void tessera_clock_step(track_t *t);
@@ -163,7 +179,8 @@ void organic_play(void);                            /* seq.c, PLAY: SLOTH and OC
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 572u                       /* the saved state, version 13 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES 584u                       /* the saved state, version 14 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V13 572u                   /* version 13 (before STEP EVOLVE) */
 #define TESSERA_PK_BYTES_V12 540u                   /* version 12 (before Grids' KICK, SNR, HAT, TOMS, Chord's USER) */
 #define TESSERA_PK_BYTES_V11 520u                   /* version 11 (before CHORD) */
 #define TESSERA_PK_BYTES_V10 516u                   /* version 10 (before CONSTELLATION's LEN and FILL) */
@@ -178,9 +195,9 @@ const char *tessera_form_name(uint32_t form);
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..13) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..14) */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
-void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 13 */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 14 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
@@ -210,6 +227,7 @@ enum {
     TX_CH_OCT,
     TX_GRD_KICK, TX_GRD_SNR, TX_GRD_HAT, TX_GRD_TOMS,
     TX_CH_ULEN,
+    TX_SV_LOCK, TX_SV_EVERY, TX_SV_AMOUNT,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -236,6 +254,12 @@ uint32_t tessera_cs_speed(uint32_t tr);                 /* Constellation's SPEED
 void tessera_constel_layer_knob(uint32_t k, int32_t s);   /* OCT+ held on GEN in CONSTELLATION: LOCK, LEN, FILL, SIZE */
 void tessera_grids_layer_knob(uint32_t k, int32_t s);      /* OCT+ held on GEN in GRIDS: KICK, SNR, HAT, TOMS */
 uint32_t tessera_chord_user_key(uint32_t tr, uint32_t note, int first);   /* CHORD USER: a key's chord (0 full) */
+/* STEP EVOLVE (step_evolve.c): a STEP track's EVOLVE page evolves its written steps; they stay as written until kept */
+int tessera_step_on(uint32_t tr);                        /* a STEP track (no generator, no ARP): its EVOLVE page */
+const step_t *tessera_step_vary(track_t *t, const step_t *s, step_t *out);   /* seq.c: the step as it plays */
+uint32_t tessera_step_varied(uint32_t tr);               /* steps playing a change now */
+void tessera_step_clear(uint32_t tr);                    /* the steps as written again (KNOB 4 CLEAR) */
+uint32_t tessera_step_keep(uint32_t tr);                 /* REC held: the changes become the steps; returns how many */
 void tessera_chord_ulen_knob(int32_t s);                   /* OCT+ held on GEN in CHORD USER, KNOB 4: LEN */
 void tessera_chord_oct_knob(int32_t s);                    /* OCT+ held on GEN in CHORD, KNOB 1: OCT */
 const gen_series_t *tessera_series(uint32_t tr);

@@ -200,3 +200,6 @@
 0x24f GRIDS HAT                track 0..100 def 100
 0x250 GRIDS TOMS               track 0..100 def 0
 0x251 CHORD USER LEN           track 1..8 def 4
+0x252 STEP EVOLVE LOCK         track 0..100 def 50
+0x253 STEP EVOLVE EVERY        track 0..5 def 1
+0x254 STEP EVOLVE AMOUNT       track 0..100 def 0

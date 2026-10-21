@@ -404,7 +404,8 @@ static void qsave_poll(void)
  * On a generator track it prints: what the generator played (tessera.c tess_cap) into its STEP pattern as into an
  * empty one, then the track plays that pattern (SEQ MODE STEP) from where it is; EDIT held puts the generator back.
  * Steps there already: REPLACE STEPS? first (over: 1, its OCT+), they go in the same undo; recorded notes there: not
- * (their pool is not in an undo level), CLEAR PATTERN TO PRINT */
+ * (their pool is not in an undo level), CLEAR PATTERN TO PRINT. On a STEP track playing STEP EVOLVE's changes it keeps
+ * them: they become the steps (KEPT n STEPS), EDIT held undoes it */
 static void capture_take(int over)
 {
     track_t *t = TSEL;
@@ -416,6 +417,23 @@ static void capture_take(int over)
     uint32_t until;
     if (chain_busy()) { ui_message("STOP SONG TO CAPTURE"); return; }
     if ((song.rec >> k) & 1u) { ui_message("RECORDING"); return; }
+    if (gen == TESS_ENG_OFF && tessera_step_varied(k)) {   /* STEP EVOLVE: the changes playing become the steps */
+        char b[16];
+        load_begin(t, UNDO_PAT);
+        fm1_irq_off();
+        n = tessera_step_keep(k);
+        fm1_irq_on();
+        for (i = 0; i < NSTEP; i++) {
+            fm1_irq_off();
+            notes_rebuild(t, i);
+            fm1_irq_on();
+        }
+        load_end(t);
+        fmt_int(b, (int32_t)n);
+        str_cpy(b + str_len(b), n == 1u ? " STEP" : " STEPS", 8);
+        ui_say("KEPT ", b);
+        return;
+    }
     fm1_irq_off();                                      /* the selected track's events of this run: the newest, the oldest */
     now = cap_now(t);
     from = cap_w - cap_from > CAP_N ? cap_w - CAP_N : cap_from;

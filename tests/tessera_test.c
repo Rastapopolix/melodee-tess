@@ -1288,6 +1288,159 @@ static void org_run(char *res, size_t cap)
     snprintf(res, cap, "%u", fail);
 }
 
+/* ------------------------------------------------------------ STEP EVOLVE --- */
+/* A STEP track's EVOLVE page (step_evolve.c, vary.c): the step player called as seq.c calls it, step by step, then once
+ * through the sequencer. Each check a bit of "fail" */
+static const char *const SV_CHECK[] = {
+    "STEP EVOLVE: AMOUNT 0, or EVERY OFF: every step plays as written",
+    "STEP EVOLVE: a round at the pattern's start once EVERY's bars are done; AMOUNT 100 LOCK 0: half the steps, afresh",
+    "STEP EVOLVE: a recorded or tied step never changes",
+    "STEP EVOLVE: every note played in the track's scale (C major)",
+    "STEP EVOLVE: a SWAP's halves come in pairs; a GHOST is softer than the note it copies",
+    "STEP EVOLVE: the steps as written never change while it plays",
+    "STEP EVOLVE: LOCK 100: the variation held, round after round",
+    "STEP EVOLVE: REC held keeps: the steps become what played, none left changed, they play the same",
+    "STEP EVOLVE: through the sequencer: changes after the first bar, the steps untouched; a pattern switch clears them",
+    "STEP EVOLVE: LOCK, EVERY, AMOUNT round trip; version 13 loads as LOCK 50, EVERY 1 BAR, AMOUNT 0; over range refused",
+};
+#define SV_N (sizeof SV_CHECK / sizeof SV_CHECK[0])
+static void sv_setup(void)
+{
+    host_tracks_init();
+    tessera_reset();
+    for (uint32_t i = 0; i < 8u; i++) {
+        step_t *st = &trk[0].step[i];
+        st->n = FOLLOW_MELODY[i] ? 1u : 0u;
+        st->note[0] = FOLLOW_MELODY[i];
+        st->time = FOLLOW_MELODY[i] ? ST_NOTE : ST_REST;
+        st->vel = 100;
+    }
+    trk[0].p[P_SLEN] = 8;
+    trk[0].p[P_SCALE] = 1;                            /* major */
+    sel(0);
+}
+/* n steps of track 0 from its first, as seq.c plays them: into out (the last loop's), "steps changed" counted */
+static uint32_t sv_play(uint32_t n, step_t *out, uint32_t *fail)
+{
+    track_t *t = &trk[0];
+    uint32_t len = (uint32_t)t->p[P_SLEN], changed = 0, i;
+    for (i = 0; i < n; i++) {
+        step_t o;
+        const step_t *s = &t->step[i % len], *r;
+        t->seq_idx = (uint16_t)(i % len);
+        r = tessera_step_vary(t, s, &o);
+        if (r != s) changed++;
+        if (r->n && ((0xab5u >> (r->note[0] % 12u)) & 1u) == 0u) *fail |= 1u << 3;
+        if (!s->n && r->n && r->vel >= 100u) *fail |= 1u << 4;
+        if (out) out[i % len] = *r;
+    }
+    return changed;
+}
+static void sv_run(char *res, size_t cap)
+{
+    uint32_t fail = 0, i, k, n, most = 0;
+    step_t as[NSTEP], played[8], kept[8];
+    const uint32_t BAR = 16u;                         /* (1/16: 16 steps a bar, 2 loops of 8) */
+    sv_setup();
+    memcpy(as, trk[0].step, sizeof as);
+    if (sv_play(8u * BAR, 0, &fail)) fail |= 1u << 0;    /* AMOUNT 0 */
+    knob(tessera_evolve_knob, 2, 50);                 /* AMOUNT 100 */
+    turns(tessera_evolve_knob, 1, -1);                /* EVERY OFF */
+    if (sv_play(8u * BAR, 0, &fail) || tessera_param_get(0, TX_SV_AMOUNT) != 100) fail |= 1u << 0;
+    turns(tessera_evolve_knob, 1, 1);                 /* EVERY 1 BAR */
+    knob(tessera_evolve_knob, 0, -25);                /* LOCK 0 */
+    trk[0].step[5].flags |= SF_RECORDED;              /* (a recorded step: kept) */
+    trk[0].step[2].time = ST_TIE;                     /* (a tie: kept) */
+    if (tessera_lock_get(0) != 0 || tessera_step_varied(0)) fail |= 1u << 1;
+    sv_play(BAR, 0, &fail);                           /* (the first bar: no round yet) */
+    if (tessera_step_varied(0)) fail |= 1u << 1;
+    for (k = 0; k < 8u; k++) {                         /* a round a bar: 3 of the 6 steps free (a SWAP: 4) */
+        uint8_t was[8];
+        memcpy(was, tess_sv.mut[0], 8);
+        sv_play(BAR, 0, &fail);
+        n = tessera_step_varied(0);
+        if (n < 3u || n > 4u) fail |= 1u << 1;
+        most += memcmp(was, tess_sv.mut[0], 8) != 0;
+        if (tess_sv.mut[0][5] || tess_sv.mut[0][2]) fail |= 1u << 2;
+    }
+    if (most < 6u) fail |= 1u << 1;                   /* (afresh: another variation most rounds) */
+    for (i = 0; i < 8u; i++) {                        /* SWAP halves paired */
+        uint32_t m = tess_sv.mut[0][i];
+        uint8_t kind[8];
+        for (k = 0; k < 8u; k++) kind[k] = (uint8_t)sv_kind(&trk[0].step[k]);
+        if (vary_src(m) == VARY_NEXT && vary_src(tess_sv.mut[0][vary_find(kind, 8, i, 1)]) != VARY_PREV) fail |= 1u << 4;
+    }
+    trk[0].step[5].flags &= (uint8_t)~SF_RECORDED;
+    trk[0].step[2].time = ST_NOTE;
+    if (memcmp(as, trk[0].step, sizeof as)) fail |= 1u << 5;
+    knob(tessera_evolve_knob, 0, 50);                 /* LOCK 100 */
+    {
+        uint8_t held[8];
+        sv_play(BAR, 0, &fail);                       /* (the tie and the recorded step free again: one more) */
+        memcpy(held, tess_sv.mut[0], 8);
+        for (k = 0; k < 8u; k++) {
+            sv_play(BAR, 0, &fail);
+            if (memcmp(held, tess_sv.mut[0], 8) || tessera_step_varied(0) < 3u) fail |= 1u << 6;
+        }
+    }
+    knob(tessera_evolve_knob, 0, -25);                /* LOCK 50 */
+    sv_play(BAR, 0, &fail);
+    sv_play(8, played, &fail);                        /* (the loop playing: the bar's second, no round) */
+    n = tessera_step_varied(0);
+    k = tessera_step_keep(0);
+    if (!n || k != n || tessera_step_varied(0)) fail |= 1u << 7;
+    for (i = 0; i < 8u; i++) {
+        kept[i] = trk[0].step[i];
+        if (kept[i].n != played[i].n || kept[i].time != played[i].time || (kept[i].n && kept[i].note[0] != played[i].note[0]))
+            fail |= 1u << 7;
+    }
+    {   /* through the sequencer: 2 bars at 120 BPM */
+        int32_t o[2 * CTL];
+        uint32_t f, bar_len = 4u * seq_beat_samples(), changed_bar0 = 0;
+        sv_setup();
+        knob(tessera_evolve_knob, 2, 50);
+        memcpy(as, trk[0].step, sizeof as);
+        song.g[G_BPM] = 120;
+        transport_req = 1;
+        for (f = 0; f < 3u * bar_len; f += CTL) {
+            mix_block(o, CTL);
+            if (f < bar_len - 2u * CTL) changed_bar0 |= tessera_step_varied(0);
+        }
+        transport_req = 2;
+        mix_block(o, CTL);
+        if (changed_bar0 || !tessera_step_varied(0) || memcmp(as, trk[0].step, sizeof as)) fail |= 1u << 8;
+        pattern_apply(&trk[0], 1);
+        if (tessera_step_varied(0) || tess_sv.mut[0][0] || tess_sv.mut[0][1]) fail |= 1u << 8;
+    }
+    {   /* saved */
+        static uint8_t a[TESSERA_PK_BYTES], c[TESSERA_PK_BYTES], v13[TESSERA_PK_BYTES_V13];
+        const uint32_t n14 = TESSERA_PK_BYTES / TESSERA_TRACKS, n13 = TESSERA_PK_BYTES_V13 / TESSERA_TRACKS;
+        tessera_reset();
+        tessera_param_set(1, TX_SV_LOCK, 20);
+        tessera_param_set(1, TX_SV_EVERY, 4);
+        tessera_param_set(1, TX_SV_AMOUNT, 140);       /* (kept to 100) */
+        tessera_param_set(2, TX_SV_EVERY, 0);
+        tessera_pack(a);
+        tessera_reset();
+        if (tessera_unpack(a) != 1 || tessera_param_get(1, TX_SV_LOCK) != 20 || tessera_param_get(1, TX_SV_EVERY) != 4 ||
+            tessera_param_get(1, TX_SV_AMOUNT) != 100 || tessera_param_get(2, TX_SV_EVERY) != 0 ||
+            tessera_param_get(0, TX_SV_LOCK) != 50)
+            fail |= 1u << 9;
+        for (i = 0; i < TESSERA_TRACKS; i++) memcpy(v13 + i * n13, a + i * n14, n13);
+        tessera_reset();
+        tessera_param_set(1, TX_SV_LOCK, 90);
+        if (tessera_unpack_ver(13u, v13) != 1 || tessera_param_get(1, TX_SV_LOCK) != 50 ||
+            tessera_param_get(1, TX_SV_EVERY) != 1 || tessera_param_get(1, TX_SV_AMOUNT) != 0)
+            fail |= 1u << 9;
+        for (k = 0; k < 3u; k++) {
+            memcpy(c, a, sizeof c);
+            c[3u * n14 + n13 + k] = k == 1u ? 6u : 101u;   /* (track 4's) */
+            if (tessera_unpack(c) != 0) fail |= 1u << 9;
+        }
+    }
+    snprintf(res, cap, "%u", fail);
+}
+
 /* --------------------------------------------------------- saved block --- */
 static uint32_t pack_hash(const uint8_t *p)
 {
@@ -2019,6 +2172,24 @@ int main(int argc, char **argv)
             waitpid(pid, 0, 0);
         }
         for (i = 0; i < ORG_N; i++) bad += check(ORG_CHECK[i], !((fail >> i) & 1u));
+    }
+    {   /* STEP EVOLVE */
+        unsigned fail = ~0u;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                sv_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &fail);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        for (i = 0; i < SV_N; i++) bad += check(SV_CHECK[i], !((fail >> i) & 1u));
     }
     {   /* ROLL mid-bar: the line playing until the bar line */
         unsigned same = 0, n = 0;
