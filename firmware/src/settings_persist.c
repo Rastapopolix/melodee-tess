@@ -102,6 +102,8 @@ static int settings_import(persist_t *p, int n)
     memcpy(&favorites, &p->favorites, sizeof favorites);
     favorites_user_hi = p->ext.spare[0];
     favorites.filter = favorites.filter == 1u;
+    favorites.factory[15][29] = 0;               /* LIST's category (browse.c list_lcat): a power-on starts on ALL, so
+                                                  * a category picked in the browser does not hide sounds for good */
 #endif
     panel = p->panel.magic == PANEL_MAGIC ? p->panel : PANEL_DEFAULT;
     return 1;
