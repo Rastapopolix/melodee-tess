@@ -976,8 +976,8 @@ static int project_restore_runtime(const project_t *input)
         track_t *t = &trk[k];
         const proj_trk_t *s = &p->t[k];
         uint32_t e = s->engine % NENGINES, gone = !ENG_BUILT(e);   /* (gone: an engine left out of the build, */
-        if (gone)                                                     /* Tessera: the fallback's INIT (FM's, or SID's */
-            e = ENGI_FALLBACK;                                        /* without FM), the common settings kept, core.h) */
+        if (gone)                                                     /* Tessera: the fallback's first voice (FM's, or */
+            e = ENGI_FALLBACK;                                        /* SID's INIT), the common settings kept, core.h) */
         t->eng_req = (uint8_t)e;
         t->user = 0; t->user_native=0;                                    /* (no user preset slot is saved) */
         for (i = 0; i < P_COUNT; i++) {                 /* every value back inside its range */
