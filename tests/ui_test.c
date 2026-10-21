@@ -86,7 +86,10 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
     for (j = 0; j < h && y + j < 240u; j++)
         for (i = 0; i < w && x + i < 240u; i++) host_screen[(y + j) * 240u + x + i] = p[j * w + i];
 }
-static struct { uint32_t stage; } melodee_dbg;
+static struct { uint32_t stage, crash_magic, crash_audio, crash_stage, crash_page; } melodee_dbg;
+#define DBG_CRASH_MAGIC 0x43524831u               /* (audio.c) */
+#define FM1_CRASH_MAGIC 0x43525348u               /* hal/fm1_irq.h's record, for ABOUT's LAST CRASH (ui_menu.c) */
+static struct { uint32_t magic, count, vec, pc, rets, emu, dbg, sp, psr, icfg, uptime_ms, etm[4], early; } fm1_crash;
 #define MELODEE_FLASH 0
 #ifndef MELODEE_VERSION
 #define MELODEE_VERSION "TEST"
@@ -793,6 +796,88 @@ static int test_cords_page(void)
     turn(EN_K1 + 1u, -5);
     bad += check("KNOB 2 stops at cord 1", cord_ui_sel == 0u);
     cord_clear();
+    return bad;
+}
+
+/* MODS while playing (Theo's crash, 2026-10-21): four tracks generating, mods live on them (SLOTH, OCHD, the LFO), a
+ * new mod from SLOTH, its destination scrolled with KNOB 3 through every track's list and back (slow detents and fast
+ * spins) with the audio running between the turns: the destination's picker drawn, every one of them played */
+static void cords_blocks(uint32_t n)
+{
+    int32_t o[2 * CTL];
+    while (n--)
+        mix_block(o, CTL);
+}
+static int test_cords_scroll_playing(void)
+{
+    int bad = 0;
+    uint32_t i, tr, seen = 0;
+    cord_t c = {0};
+    const cord_t *k;
+    ui_power_on();
+    cord_clear();
+    tessera_param_set(0, TX_MODE, TESS_ENG_TURING);
+    tessera_param_set(1, TX_MODE, TESS_ENG_EUCLID);
+    tessera_param_set(2, TX_MODE, TESS_ENG_MARKOV);
+    tessera_param_set(3, TX_MODE, TESS_ENG_GRIDS);
+    c.src = CS_TORPOR; c.src_trk = 0; c.dst = CD_CUTOFF; c.dst_trk = 1; c.amount = 60;
+    (void)cord_set(0, &c);
+    c.src = CS_APATHY; c.src_trk = 1; c.dst = CD_E1; c.dst_trk = 2; c.amount = -40;
+    (void)cord_set(1, &c);
+    c.src = CS_OCHD3; c.src_trk = 2; c.dst = CD_GRD_X; c.dst_trk = 3; c.amount = 80;
+    (void)cord_set(2, &c);
+    c.src = CS_LFO; c.src_trk = 3; c.dst = CD_TUR_PROB; c.dst_trk = 0; c.amount = 100;
+    (void)cord_set(3, &c);
+    transport_req = 1;
+    cords_blocks(400);
+    go_title("MODS");
+    for (i = 0; i < 4u; i++)
+        turn(EN_K1 + 1u, 1);                            /* (a detent a cord) */
+    c.src = CS_TORPOR; c.src_trk = 0; c.dst = CD_OFF; c.dst_trk = 0; c.amount = 0; c.offset = 0;
+    bad += check("MODS while playing: mod 5 from track 1's SLOTH (TORPOR), no destination",
+                 cord_ui_sel == 4u && cord_set(4, &c));
+    {                                                   /* KNOB 2 to the next cord: no whole frame (it flickered) */
+        uint64_t sent;
+        static uint16_t was[240 * 240];
+        fm1_ms += 3000u; host_ticks += 3000000u; frame();
+        sent = host_sent;
+        turn(EN_K1 + 1u, 1);
+        sent = host_sent - sent;
+        memcpy(was, host_screen, sizeof was);
+        ui.force = 1;
+        frame();
+        bad += check("..KNOB 2 to the next mod while playing: the rows and chips redrawn, not the whole screen",
+                     cord_ui_sel == 5u && sent < 240u * 240u * 3u / 4u && !memcmp(was, host_screen, sizeof was));
+        turn(EN_K1 + 1u, -1);
+    }
+    k = cord_get(4);
+    for (i = 0; i < CU_NDST + 4u; i++) {                /* (past the end: it stops at the last) */
+        turn(EN_K1 + 2u, 1);
+        seen |= (k->dst == CD_GRD_Y && k->dst_trk == 3u) << 0;
+        cords_blocks(24);
+    }
+    bad += check("..KNOB 3 a detent at a time through every track's destinations, playing between: the last reached",
+                 k->dst == cu_dst_code(CU_DPT - 1u) && k->dst_trk == NTRK - 1u && (seen & 1u) && pop.on == POP_PICK);
+    for (i = 0; i < CU_NDST + 4u; i++) {
+        turn(EN_K1 + 2u, -1);
+        cords_blocks(24);
+    }
+    bad += check("..and back to --", k->dst == CD_OFF && cord_count() == 4u);
+    for (tr = 0; tr < 3u; tr++) {                       /* fast spins both ways, the audio between the frames */
+        for (i = 0; i < 120u; i++) {
+            host_enc[panel.enc[EN_K1 + 2u]] += (tr & 1u ? -1 : 1) * panel.dir[EN_K1 + 2u];
+            frame();
+            cords_blocks(6);
+        }
+    }
+    bad += check("..fast spins of KNOB 3 while playing: the mod still valid, the others kept",
+                 k->dst < CD_N && (k->dst == CD_OFF || cord_dest(k->dst)) && k->dst_trk < NTRK && cord_get(2)->dst == CD_GRD_X);
+    stop_transport();
+    cords_blocks(50);
+    cord_clear();
+    for (tr = 0; tr < 4u; tr++)
+        tessera_param_set(tr, TX_MODE, TESS_ENG_OFF);
+    fm1_ms += 3000u; host_ticks += 3000000u; frame();
     return bad;
 }
 
@@ -2038,6 +2123,30 @@ static int test_information(void)
                  ui.menu == 1 && !memcmp(sounds, trk, sizeof sounds));
     press(B_OCTUP);
     bad += check("reopening ABOUT starts the continuous document at the top", ui.menu == 2 && !ui.menu_scroll);
+    {                                                   /* a crash's record (the crash screen's, kept over its restart) */
+        char b[48];
+        int32_t plain = menu_scroll_max();
+        uint32_t p;
+        for (p = 0; p < NPAGES && strcmp(PAGES[p].title, "MODS"); p++)
+            ;
+        crash_where(b, 0, 7, p, 812345);
+        bad += check("a crash's where: the page and the main loop's breadcrumb, the seconds since the start",
+                     !strcmp(b, "UI MODS 7, 812 S IN"));
+        crash_where(b, 1, 3, p, 59000);
+        bad += check("..or the audio interrupt", !strcmp(b, "IN AUDIO, 59 S IN"));
+        fm1_crash.magic = FM1_CRASH_MAGIC;
+        fm1_crash.vec = 3; fm1_crash.pc = 0x0201A2B4u; fm1_crash.rets = 0x02003C10u;
+        fm1_crash.emu = 0x10u; fm1_crash.dbg = 0x200u; fm1_crash.uptime_ms = 812345;
+        melodee_dbg.crash_magic = DBG_CRASH_MAGIC;
+        melodee_dbg.crash_audio = 0; melodee_dbg.crash_stage = 7; melodee_dbg.crash_page = p;
+        ui.force = 1;
+        ui_draw();
+        bad += check("ABOUT after a crash: LAST CRASH with its numbers and where, before the credits",
+                     ui.menu == 2 && menu_scroll_max() >= plain + 4 * 18);
+        fm1_crash.magic = 0;
+        melodee_dbg.crash_magic = 0;
+        bad += check("..none recorded: not there", menu_scroll_max() == plain);
+    }
     menu_close();
     ui.msg_t = 0;
     usb.config = 1; usb.suspended = 0;
@@ -5249,6 +5358,7 @@ int main(void)
     bad += test_gen_family();
     bad += test_phys_chrd_click();
     bad += test_cords_page();
+    bad += test_cords_scroll_playing();
     bad += test_mod_shortcut();
     bad += test_tweak2();
     bad += test_organic();

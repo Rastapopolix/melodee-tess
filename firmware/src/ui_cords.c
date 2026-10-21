@@ -237,9 +237,9 @@ static void cu_knob(uint32_t slot, int32_t steps)
 {
     cord_t c = *cord_get(cord_ui_sel);
     int32_t v;
-    if (slot == 1u) {
+    if (slot == 1u) {                                   /* (no ui.force: the rows, their lights and the chips redraw
+                                                         * by their own signatures; a whole frame flickered) */
         cord_ui_sel = (uint8_t)clamp((int32_t)cord_ui_sel + (steps > 0 ? 1 : -1), 0, CORD_LIVE - 1);
-        ui.force = 1;
         return;
     }
     if (slot == 0u) {

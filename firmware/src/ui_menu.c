@@ -27,6 +27,33 @@ static const char *const MI_NAME[MI_COUNT] = {"COLOR", "HOLD", "LIGHTS",
 static const char *const MI_USB_NAME[4] = {"IN+OUT", "IN", "OUT", "OFF"};
 #endif
 
+static void hexs(char *b, uint32_t v)                /* v as 8 hex digits (the crash screen, ABOUT) */
+{
+    uint32_t i;
+    for (i = 0; i < 8u; i++)
+        b[i] = "0123456789ABCDEF"[(v >> (28u - 4u * i)) & 15u];
+    b[8] = 0;
+}
+/* where a crash was, as the crash screen and ABOUT say it: "IN AUDIO, 812 S IN" or "UI MODS 7, 812 S IN" (the page
+ * and the main loop's breadcrumb, main.c / ui_draw.c melodee_dbg.stage: 1 input, 2..6 drawing, 7 a popup, 9 done) */
+static void crash_where(char *b, uint32_t audio, uint32_t stage, uint32_t page, uint32_t ms)
+{
+    char n[12];
+    if (audio)
+        str_cpy(b, "IN AUDIO", 9);
+    else {
+        str_cpy(b, "UI ", 4);
+        str_cpy(b + 3, page < NPAGES ? PAGES[page].title : "?", 12);
+        str_cpy(b + str_len(b), " ", 2);
+        fmt_int(n, (int32_t)(stage & 15u));
+        str_cpy(b + str_len(b), n, 3);
+    }
+    str_cpy(b + str_len(b), ", ", 3);
+    fmt_int(n, (int32_t)(ms / 1000u > 99999u ? 99999u : ms / 1000u));
+    str_cpy(b + str_len(b), n, 6);
+    str_cpy(b + str_len(b), " S IN", 6);
+}
+
 /* https://github.com/Rastapopolix/melodee-tess, QR version 3, correction L (segno; 44 bytes, over M's 42).
  * One row per word, leftmost module in bit 0; the constant matrix needs no encoder or RAM. */
 static const uint32_t ABOUT_QR[29] = {
@@ -165,7 +192,38 @@ static int32_t menu_document(int32_t y, int draw)
         cv_text(6, y + 202, &AF_S, "GPL-3.0-only", T_TEXT);
         cv_text(6, y + 220, &AF_S, "github.com/Rastapopolix/melodee-tess", T_MID);
     }
-    y = menu_text("CREDITS", y + 246, T_THEME, draw) + 8;
+    y += 246;
+#ifdef FM1_CRASH_MAGIC
+    if (fm1_crash.magic == FM1_CRASH_MAGIC) {         /* the last crash's record (kept over the restart, gone at a
+                                                       * power-off): what its screen said, for a report */
+        char b[48], h[12];
+        y = menu_text("LAST CRASH", y, T_THEME, draw);
+        str_cpy(b, "VEC ", 5);
+        hexs(h, fm1_crash.vec);
+        str_cpy(b + 4, h + 6, 3);
+        str_cpy(b + str_len(b), "  PC ", 6);
+        hexs(h, fm1_crash.pc);
+        str_cpy(b + str_len(b), h, 9);
+        str_cpy(b + str_len(b), "  RETS ", 8);
+        hexs(h, fm1_crash.rets);
+        str_cpy(b + str_len(b), h, 9);
+        y = menu_text(b, y, T_TEXT, draw);
+        str_cpy(b, "EMU ", 5);
+        hexs(h, fm1_crash.emu);
+        str_cpy(b + 4, h, 9);
+        str_cpy(b + str_len(b), "  DBG ", 7);
+        hexs(h, fm1_crash.dbg);
+        str_cpy(b + str_len(b), h, 9);
+        y = menu_text(b, y, T_TEXT, draw);
+        if (melodee_dbg.crash_magic == DBG_CRASH_MAGIC) {
+            crash_where(b, melodee_dbg.crash_audio, melodee_dbg.crash_stage, melodee_dbg.crash_page,
+                        fm1_crash.uptime_ms);
+            y = menu_text(b, y, T_SEC, draw);
+        }
+        y += 12;
+    }
+#endif
+    y = menu_text("CREDITS", y, T_THEME, draw) + 8;
     for (i = 0; i < NELEM(MENU_CREDITS); i++) {
         const menu_credit_t *c = &MENU_CREDITS[i];
         const char *text = c->text;
