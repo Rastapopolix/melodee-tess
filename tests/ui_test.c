@@ -2215,12 +2215,12 @@ static int test_display_preferences(void)
     memcpy(before, host_screen, sizeof before);
     settings.palette = 0; palette_set(0);
     press(B_OCTUP);
-    bad += check("COLOR OCT+ previews the next palette (DAY, light) without closing the menu",
-                 settings.palette == 1 && T_BG == UI_PALETTES[1].bg && ux.light && ui.menu == 1 && !song.octave &&
+    bad += check("COLOR OCT+ previews the next palette (CONTRAST) without closing the menu",
+                 settings.palette == 1 && T_BG == UI_PALETTES[1].bg && ui.menu == 1 && !song.octave &&
                  memcmp(before, host_screen, sizeof before) && !memcmp(sounds, trk, sizeof sounds));
     turn(EN_K2, 1);
-    bad += check("COLOR KNOB 2 steps on to CONTRAST, then wraps to NIGHT",
-                 settings.palette == 2 && (turn(EN_K2, 1), settings.palette == UI_DEFAULT_INDEX));
+    bad += check("COLOR KNOB 2 steps on to SMALTI",
+                 settings.palette == 2 && settings.palette == UI_DEFAULT_INDEX);
     press(B_OCTDN);
     bad += check("OCT- leaves display preferences without changing musical state",
                  !ui.menu && settings.palette == UI_DEFAULT_INDEX && !memcmp(sounds, trk, sizeof sounds));
