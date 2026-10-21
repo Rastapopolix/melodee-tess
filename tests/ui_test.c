@@ -5123,6 +5123,59 @@ static int test_capture(void)
     bad += check("Capture while the track records: refused", msg_is("RECORDING"));
     song.rec = 0;
     stop_transport();
+    {   /* print: REC held on a generator track (EUCLID) takes its last whole bars into STEP and plays them on */
+        uint32_t ok = 1, played = 0;
+        ui_power_on();
+        recording_reset();
+        track_defaults_steps(TSEL);
+        TSEL->p[P_SLEN] = 16;
+        cap_w = cap_from = 0;
+        memset(cap_ev, 0, sizeof cap_ev);
+        tessera_knob(0, TESS_ENG_EUCLID);
+        transport_req = 1;
+        events_block(1);
+        while (cap_step[0] != 37u) events_block(1);     /* two bars and five steps */
+        for (i = 0; i < CAP_N; i++)
+            if (cap_ev[i].vel && (cap_ev[i].tr & 127u) == 0u && cap_ev[i].step < 32u) {
+                played++;
+                ok &= !(cap_ev[i].tr & 128u) && cap_ev[i].dur > 0u;
+            }
+        hold(B_REC);
+        for (i = 0; i < CAP_N; i++)
+            if (cap_ev[i].vel && (cap_ev[i].tr & 127u) == 0u && cap_ev[i].step < 32u)
+                ok &= TSEL->step[cap_ev[i].step].n >= 1u && TSEL->step[cap_ev[i].step].note[0] == cap_ev[i].note;
+        bad += check("print: EUCLID's notes go to Capture closed, with a length", played >= 4u);
+        bad += check("  REC held: its two whole bars (not the one playing) on their steps, LEN 32, then STEP",
+                     ok && msg_is("PRINTED 2 BARS") && TSEL->p[P_SLEN] == 32 && tessera.mode[0] == TESS_ENG_OFF);
+        bad += check("  .. playing on from where it was (step 5 of 32)", TSEL->seq_idx == 5u || TSEL->seq_idx == 6u);
+        hold(B_EDIT);
+        bad += check("  EDIT held: the generator back, steps and LEN too", tessera.mode[0] == TESS_ENG_EUCLID &&
+                     TSEL->p[P_SLEN] == 16 && seq_is_empty(TSEL));
+        TSEL->step[3].n = 1; TSEL->step[3].note[0] = 30; TSEL->step[3].time = ST_NOTE;
+        hold(B_REC);
+        bad += check("  steps written by hand: REPLACE STEPS? first, nothing changed yet", ui.confirm == CF_PRINT &&
+                     tessera.mode[0] == TESS_ENG_EUCLID && TSEL->step[3].note[0] == 30);
+        press(B_OCTDN);
+        bad += check("  .. OCT- keeps them", !ui.confirm && tessera.mode[0] == TESS_ENG_EUCLID && TSEL->step[3].note[0] == 30);
+        hold(B_REC);
+        press(B_OCTUP);
+        bad += check("  .. OCT+ prints over them", !ui.confirm && msg_is("PRINTED 2 BARS") && tessera.mode[0] == TESS_ENG_OFF &&
+                     TSEL->step[3].note[0] != 30);
+        hold(B_EDIT);
+        bad += check("  .. one EDIT held: the hand-written steps and the generator back", tessera.mode[0] == TESS_ENG_EUCLID &&
+                     TSEL->step[3].note[0] == 30 && TSEL->p[P_SLEN] == 16);
+        track_defaults_steps(TSEL);
+        hold(B_REC);
+        tessera_knob(0, TESS_ENG_EUCLID);
+        hold(B_REC);
+        bad += check("  printed (recorded) notes there: CLEAR PATTERN TO PRINT", msg_is("CLEAR PATTERN TO PRINT") &&
+                     tessera.mode[0] == TESS_ENG_EUCLID && !ui.confirm);
+        stop_transport();
+        track_defaults_steps(TSEL);
+        tessera_knob(0, -TESS_ENG_EUCLID);
+        cap_w = cap_from = 0;
+        memset(cap_ev, 0, sizeof cap_ev);
+    }
     {   /* the jam log: track 1's loop with pattern 1, then 2 twice, then 1 */
         ui_power_on();
         stop_transport();

@@ -822,13 +822,21 @@ static void tess_branch_on(track_t *v, uint32_t note, uint32_t vel, uint32_t off
     tessera.br_in[trk_index(v)] = 1;
 }
 
+/* Capture (seq.c cap_gen): a note this track's step played on its own voice, off samples long, so REC held can
+ * print the generator's last bars into its STEP pattern (ui_input.c capture_take) */
+static void tess_cap(const track_t *t, uint32_t note, uint32_t vel, uint32_t off)
+{
+    uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]);
+    cap_gen(t, note, vel, period ? (uint32_t)((uint64_t)off * 256u / period) : 256u);
+}
+
 /* Grids: every part that hits plays its GM drum note (kick 36, snare 38, closed hat 42; a DRUM track's kit), each
  * thinned by DROP and its velocity varied by HUMAN; no scale, SHIFT, FOLLOW or FLOURISH: they are drums. LOCK's
  * replay is CHAOS turned round (gen_grids_tick). The first part sounding is the track's note (FOLLOW, GATE, NOTE) */
 static void tess_grids_play(track_t *t, uint32_t tr, const gen_out_t *out)
 {
     const tessera_evolve_t *tw = &tessera.evolve[tr];
-    uint32_t p, n = 0;
+    uint32_t p, n = 0, off = seq_div_samples((uint32_t)t->p[P_SDIV]) * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
     for (p = 0; p < 3u; p++) {
         uint32_t vel = (out->accent >> p) & 1u ? 127u : 96u;
         if (!((out->parts >> p) & 1u)) continue;
@@ -838,6 +846,7 @@ static void tess_grids_play(track_t *t, uint32_t tr, const gen_out_t *out)
             vel = (uint32_t)(v < 1 ? 1 : v > 127 ? 127 : v);
         }
         trk_note_on(t, GEN_GRIDS_NOTE[p], vel);
+        tess_cap(t, GEN_GRIDS_NOTE[p], vel, off);
         t->seq_notes[n++] = GEN_GRIDS_NOTE[p];
     }
     if (!n) return;
@@ -845,7 +854,7 @@ static void tess_grids_play(track_t *t, uint32_t tr, const gen_out_t *out)
     tessera.last_note[tr] = t->seq_notes[0];
     tessera.active_gate[tr] = 1;
     t->seq_n = (uint8_t)n;
-    t->seq_off = seq_div_samples((uint32_t)t->p[P_SDIV]) * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u;
+    t->seq_off = off;
 }
 
 /* a note's length in samples: the step's GATE, or len quarters of it (gen_out_t len; Constellation's star sizes), never
@@ -919,6 +928,8 @@ static void tess_chord_play(track_t *t, uint32_t tr, uint32_t gate)
     tessera.last_note[tr] = t->seq_notes[0];             /* (FOLLOW of it: the chord's lowest note) */
     period = seq_div_samples((uint32_t)t->p[P_SDIV]);
     t->seq_off = g->hold ? period * g->hold - period / 16u : tess_gate_len(t, period, 0);
+    for (i = 0; i < t->seq_n; i++)
+        tess_cap(t, t->seq_notes[i], vel, t->seq_off);
 }
 
 static void tess_clock_step_body(track_t *t, uint32_t tr)
@@ -1057,12 +1068,14 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         }
         tessera.hit[tr] = 1;
         if (tessera.nl_mode[tr] != NL_STEP) {             /* NOTE LENGTH: held by note_len.c, not the step's GATE */
+            uint32_t step = seq_div_samples((uint32_t)t->p[P_SDIV]);   /* (Capture: a step each, as it goes) */
             nl_on(t, tr, (uint32_t)final_note, vel, 0);
+            tess_cap(t, (uint32_t)final_note, vel, step);
             tessera.last_note[tr] = (uint8_t)final_note;
             for (uint32_t i = 0; i < out.more_n && i < 2u; i++) {
                 int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
                 m = m < 0 ? 0 : m > 127 ? 127 : m;
-                if (m != final_note) nl_on(t, tr, (uint32_t)m, vel, 1);
+                if (m != final_note) { nl_on(t, tr, (uint32_t)m, vel, 1); tess_cap(t, (uint32_t)m, vel, step); }
             }
             return;
         }
@@ -1083,6 +1096,8 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         t->seq_off = tess_gate_len(t, period, out.len);
         if (tw2->human)                                    /* shorten by up to HUMAN/2 percent */
             t->seq_off = t->seq_off * (100u - gen_rnd(&tessera.rnd[tr], tw2->human / 2u + 1u)) / 100u;
+        for (uint32_t i = 0; i < t->seq_n; i++)
+            tess_cap(t, t->seq_notes[i], vel, t->seq_off);
     }
 }
 
@@ -1115,6 +1130,23 @@ static uint32_t tess_link_idx(uint32_t tr, uint32_t mask)
     return 0;
 }
 
+/* track tr's SEQ MODE: m a generator, or TESS_ENG_OFF its STEP pattern (GEN's KNOB 1; a print: ui_input.c capture_take,
+ * its undo: ui.c undo_step); with the IRQs off */
+void tessera_mode_set(uint32_t tr, uint32_t m)
+{
+    if (tr >= TESSERA_TRACKS || m >= TESS_ENG_COUNT) return;
+    if ((uint8_t)m != tessera.mode[tr]) {
+        nl_stop(&trk[tr]);
+        seq_release(&trk[tr]);
+        tessera.active_gate[tr] = 0;
+    }
+    tessera.mode[tr] = (uint8_t)m;
+    tessera.awake[tr].edit = 0;                             /* (no step picked under another generator) */
+    if (m != TESS_ENG_OFF) tess_seed_fresh(tr);             /* (its picture shows the material at once) */
+    if (tessera.evolve[tr].form) tess_form_restart(tr);     /* the sections were another engine's */
+    tess_rearm(tr);
+}
+
 static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v);
 static void tess_knob_body(uint32_t k, int32_t s)
 {
@@ -1137,16 +1169,7 @@ static void tess_knob_body(uint32_t k, int32_t s)
         int32_t m = (int32_t)mode + s;
         if (m < 0) m = 0;
         if (m >= TESS_ENG_COUNT) m = TESS_ENG_COUNT - 1;
-        if ((uint8_t)m != tessera.mode[tr]) {
-            nl_stop(&trk[tr]);
-            seq_release(&trk[tr]);
-            tessera.active_gate[tr] = 0;
-        }
-        tessera.mode[tr] = (uint8_t)m;
-        tessera.awake[tr].edit = 0;                         /* (no step picked under another generator) */
-        if (m != TESS_ENG_OFF) tess_seed_fresh(tr);             /* (its picture shows the material at once) */
-        if (tessera.evolve[tr].form) tess_form_restart(tr);   /* the sections were another engine's */
-        tess_rearm(tr);
+        tessera_mode_set(tr, (uint32_t)m);
         return;
     }
 

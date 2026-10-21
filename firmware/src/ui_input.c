@@ -400,11 +400,16 @@ static void qsave_poll(void)
 /* REC held: Capture. What the selected track played in its last bars while it was not recording (seq.c cap_ev) into
  * its pattern, as recorded notes (timing, velocity and length as played): an empty pattern takes 1, 2 or 4 bars (16, 32
  * or 64 steps), as many as the notes span, its LEN set to it; a pattern with notes the last LEN steps, over them. The
- * bars end at the bar playing when a note in it was played, else at its start. EDIT held undoes it */
-static void capture_take(void)
+ * bars end at the bar playing when a note in it was played, else at its start. EDIT held undoes it.
+ * On a generator track it prints: what the generator played (tessera.c tess_cap) into its STEP pattern as into an
+ * empty one, then the track plays that pattern (SEQ MODE STEP) from where it is; EDIT held puts the generator back.
+ * Steps there already: REPLACE STEPS? first (over: 1, its OCT+), they go in the same undo; recorded notes there: not
+ * (their pool is not in an undo level), CLEAR PATTERN TO PRINT */
+static void capture_take(int over)
 {
     track_t *t = TSEL;
     uint32_t k = song.sel, n = 0, i, now, first = 0xFFFFu, last = 0, end, w, start, put = 0, full = 0, j = 0, from;
+    uint32_t gen = k < TESSERA_TRACKS ? tessera.mode[k] : TESS_ENG_OFF;
     uint64_t touched = 0;
     int empty;
     cap_ev_t captured[CAP_N];
@@ -427,15 +432,29 @@ static void capture_take(void)
         if (back < first) first = back;
     }
     if (!n) { ui_message("NOTHING TO CAPTURE"); return; }
+    if (gen != TESS_ENG_OFF && notes_have_recording(t)) {
+        ui_message("CLEAR PATTERN TO PRINT");
+        return;
+    }
+    if (gen != TESS_ENG_OFF && !seq_is_empty(t) && !over) {
+        confirm_open(CF_PRINT, k);                      /* (a print never mixes into steps written by hand) */
+        return;
+    }
     {   /* (16-bit step counts: they wrap) */
         uint32_t cur = (now >> 8) & 0xFFFFu, pos = cur & 15u, span;
-        end = (uint16_t)(cur - pos + (first <= pos ? 16u : 0u));     /* a bar's start */
+        end = (uint16_t)(cur - pos + (first <= pos && gen == TESS_ENG_OFF ? 16u : 0u));   /* a bar's start (a print:
+                                                                         * whole bars, the one playing is not done) */
         span = (uint16_t)(end - (uint16_t)(cur - last));
-        empty = seq_is_empty(t) && !notes_have_recording(t);
+        empty = gen != TESS_ENG_OFF || (seq_is_empty(t) && !notes_have_recording(t));
         w = empty ? (span <= 16u ? 16u : span <= 32u ? 32u : 64u) : (uint32_t)clamp(t->p[P_SLEN], 1, NSTEP);
         start = (uint16_t)(end - w);
     }
     load_begin(t, UNDO_PAT);
+    if (gen != TESS_ENG_OFF && !seq_is_empty(t)) {      /* REPLACE STEPS? accepted: in this undo level */
+        fm1_irq_off();
+        track_defaults_steps(t);
+        fm1_irq_on();
+    }
     if (empty)
         t->p[P_SLEN] = (int16_t)w;
     for (i = from; i != until; i++) {
@@ -485,13 +504,20 @@ static void capture_take(void)
         }
     if (put)
         t->seq_active = 1;
+    if (put && gen != TESS_ENG_OFF) {                   /* print: the steps play on from the place they were taken */
+        fm1_irq_off();
+        undo.gmode = (uint8_t)(gen + 1u);
+        tessera_mode_set(k, TESS_ENG_OFF);
+        t->seq_idx = (uint16_t)((uint16_t)(cap_step[k] - start) % w);
+        fm1_irq_on();
+    }
     load_end(t);
     if (!put) { ui_message("NOTHING TO CAPTURE"); return; }
     {
         char b[16];
         fmt_int(b, (int32_t)(w % 16u ? w : w / 16u));
         str_cpy(b + str_len(b), w % 16u ? " STEPS" : w > 16u ? " BARS" : " BAR", 8);
-        ui_say(full ? "FULL: " : "CAPTURED ", b);
+        ui_say(full ? "FULL: " : gen != TESS_ENG_OFF ? "PRINTED " : "CAPTURED ", b);
     }
     ui.force = 1;
 }
@@ -1730,6 +1756,8 @@ static void ui_confirm_accept(void)
         }
     } else if (kind == CF_TAKE_JAM) {
         jam_take();
+    } else if (kind == CF_PRINT) {
+        if (ui.confirm_trk == song.sel) capture_take(1);
     } else if (kind == CF_NEW_SONG) {
         new_open();
     } else if (kind == CF_CLEAR_SONG) {
@@ -1914,7 +1942,7 @@ static void ui_input(void)
         if (!ui.home && cur_page()->graph == GR_SONG)    /* SONG: TAKE JAM (the jam's rows as the song) */
             ps_jam();
         else
-            capture_take();
+            capture_take(0);
     }
     if (ui.menu) {
         momentary_restore();                                      /* HOME / SAVE / REC taps do nothing here */
