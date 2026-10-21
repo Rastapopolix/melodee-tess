@@ -2,7 +2,7 @@
 /* The sound designer's input (ui_designer.c), ahead of the rest of ui_input: all of it but NAME and the question.
  * START: KNOB 1..3 ENGINE START PAGES, OCT+ designs, OCT- / HOME closes. The stages: OCT+ / OCT- the next /
  * previous stage (past either end, and HOME: the designer's sheet), PRESETS a stage, SELECT the pages, the knobs the
- * page's (FEATURES: KNOB 2 the row, KNOB 1 its value; a dim control: what it needs switched on), SAVE the original
+ * page's (FEATURES: KNOB 1 the row, KNOB 2 its value; a dim control: what it needs switched on), SAVE the original
  * and back */
 static void page_knob(uint32_t k, int32_t s);          /* ui_input.c */
 static void designer_leave_feats(void)                  /* FEATURES left: the pages of what it switched on */
@@ -36,7 +36,7 @@ static int designer_input(uint32_t pressed,uint32_t notes)
     panel_enc(EN_ALGO);                                 /* (the track stays the designer's) */
     if(pop.on==POP_SHEET || pop.on==POP_LIST){          /* its sheet (ui_popup.c) */
         int32_t k1=panel_enc(EN_K1),k2=panel_enc(EN_K2);
-        if(pop.on==POP_LIST)vlist_input(k2,oct);
+        if(pop.on==POP_LIST)vlist_input(k1,oct);
         else sheet_input(k1,k2,oct);
         enc_drop();
         return 1;

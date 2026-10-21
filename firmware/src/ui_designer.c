@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The sound designer (docs/SOUND_DESIGNER.md): a sound-only transaction over the native editors, which stay the
  * authority for every control. START is NEW SONG's key screen (rings over a large panel, the keys under it), FEATURES
- * a list page (KNOB 2 the row, KNOB 1 its value), the shaping stages the sound pages themselves: the stages as the
+ * a list page (KNOB 1 the row, KNOB 2 its value), the shaping stages the sound pages themselves: the stages as the
  * tabs under the header, a stage's pages as its dots. OCT+ / OCT- the next / previous stage, PRESETS a stage, SELECT
  * the pages, SAVE the original and back, HOME (or OCT past either end) its sheet: Keep, Save as user.., Discard.
  * No serialized IDs, project formats or DSP defaults change. Included by ui_draw.c */
@@ -269,13 +269,13 @@ static void designer_feat_set(uint32_t f,uint32_t s)
 }
 /* A build that cannot sound: said when it is made (a header notice) */
 static const char *designer_silent(void);
-/* FEATURES: KNOB 2 the row, KNOB 1 its value */
+/* FEATURES: KNOB 1 the row, KNOB 2 its value */
 static void designer_feat_knob(uint32_t k,int32_t s)
 {
     uint32_t n,f,st;const uint8_t *fs=designer_feats(&n);
     if(!n)return;
-    if(k==1u){ds.row=(uint8_t)clamp((int32_t)ds.row+s,0,(int32_t)n-1);return;}
-    if(k)return;
+    if(k==0u){ds.row=(uint8_t)clamp((int32_t)ds.row+s,0,(int32_t)n-1);return;}
+    if(k!=1u)return;
     f=fs[ds.row%n];st=designer_feat_get(f);
     st=designer_feat_states(f)>2u?(uint32_t)clamp((int32_t)st+(s>0?1:-1),0,(int32_t)designer_feat_states(f)-1):s>0;
     fm1_irq_off();designer_feat_set(f,st);fm1_irq_on();
@@ -451,7 +451,7 @@ static uint32_t designer_need(void)
     const list_t *l=list_on();
     if(l){
         const lrow_t *rw=list_at(l,lst.row);uint32_t pg=page_titled(rw->page);
-        if(ds.focus || pg>=NPAGES)return DF_NONE;     /* (KNOB 2: the row) */
+        if(ds.focus!=1u || pg>=NPAGES)return DF_NONE; /* (KNOB 1: the row) */
         p=&PAGES[pg];id=p->id[rw->slot&3u];
     }
     if(p->scope==SC_P5 && !p5_ed_active(TSEL,id))switch(id){

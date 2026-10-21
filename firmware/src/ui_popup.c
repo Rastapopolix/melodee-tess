@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Popups (docs/design: mock/r6_popups, README "Popups"), over the page dimmed (ui_draw.c: drawn under cv_dim).
  * An action sheet: what can be done with the page (OCT+ held; a "..." in the header says there is one) or with the
- * thing its cursor is on: a card from the bottom, its rows; KNOB 2 the row, KNOB 1 a row's value, OCT+ does it (a
+ * thing its cursor is on: a card from the bottom, its rows; KNOB 1 the row, KNOB 2 a row's value, OCT+ does it (a
  * destructive one asks its question first), OCT- closes.
  * A picker: a knob whose value is a name from a list (a wave, a source, a division; not a list of numbers) turning
  * on a page: the names
@@ -10,7 +10,7 @@
 typedef struct {
     const char *label;
     void (*value)(char *b);                             /* its value at the right (0: none) */
-    void (*turn)(int32_t s);                            /* KNOB 1 changes it (0: none) */
+    void (*turn)(int32_t s);                            /* KNOB 2 changes it (0: none) */
     void (*act)(void);                                  /* OCT+ does it (0: OCT+ steps the value) */
     uint8_t cf;                                         /* the question it asks first (CF_*), 0 none; with act: act
                                                          * asks it itself (after its checks), the row drawn red;
@@ -137,7 +137,7 @@ static const sheet_row_t SHEET_PATTERN[] = {{"Quantize",nt_quantize_v,nt_quantiz
 /* PATTERNS' (OCT+): the selected track's pattern; Copy to: its place picked on the grid (ui_patterns.c) */
 static const sheet_row_t SHEET_PATTERNS[] = {{"Copy to\x85", 0, 0, ptc_start, 0}, {"Delete pattern", 0, 0, 0, CF_DEL_PAT}};
 
-/* the step's: NOTES' note at the cursor (KNOB 1 its length, velocity, chance), the drum grid's hit of the lane there */
+/* the step's: NOTES' note at the cursor (KNOB 2 its length, velocity, chance), the drum grid's hit of the lane there */
 static void st_cap(uint32_t c, char *b)                 /* NOTES' column c as its chip shows it (draw_columns) */
 {
     lrow_t rw;
@@ -309,15 +309,15 @@ static int cf_refused(uint32_t cf)
     return 1;
 }
 
-/* KNOB 2 the row, KNOB 1 its value; OCT+ does it (its question first), OCT- closes (oct: bit 0 OCT-, bit 1 OCT+) */
+/* KNOB 1 the row, KNOB 2 its value; OCT+ does it (its question first), OCT- closes (oct: bit 0 OCT-, bit 1 OCT+) */
 static void sheet_input(int32_t k1, int32_t k2, uint32_t oct)
 {
     const sheet_row_t *r;
-    if (k2)
-        pop.sel = (uint8_t)clamp((int32_t)pop.sel + (k2 > 0 ? 1 : -1), 0, (int32_t)pop.n - 1);
+    if (k1)
+        pop.sel = (uint8_t)clamp((int32_t)pop.sel + (k1 > 0 ? 1 : -1), 0, (int32_t)pop.n - 1);
     r = &pop.rows[pop.sel % pop.n];
-    if (k1 && r->turn)
-        r->turn(k1);
+    if (k2 && r->turn)
+        r->turn(k2);
     if (oct & 1u) {
         pop_close();
     } else if (oct & 2u) {
@@ -411,7 +411,7 @@ static void vlist_open(uint8_t page, uint8_t slot)
     pop.on = POP_LIST;
     ui.force = 1;
 }
-static void vlist_input(int32_t k2, uint32_t oct)
+static void vlist_input(int32_t k1, uint32_t oct)   /* KNOB 1 the row, as the lists */
 {
     int16_t *vp;
     const param_desc_t *d = vlist_desc(&vp);
@@ -419,8 +419,8 @@ static void vlist_input(int32_t k2, uint32_t oct)
         pop_close();
         return;
     }
-    if (k2)
-        vl.sel = (int16_t)enum_turn(d, vl.sel, k2 > 0 ? 1 : -1);
+    if (k1)
+        vl.sel = (int16_t)enum_turn(d, vl.sel, k1 > 0 ? 1 : -1);
     if (oct & 1u) {
         pop_close();
     } else if (oct & 2u) {                              /* (its page edits it, as if it were shown) */

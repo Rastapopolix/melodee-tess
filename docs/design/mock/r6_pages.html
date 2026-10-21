@@ -21,7 +21,7 @@ h3{font:500 15px system-ui;color:#ccc;margin:18px 0 0}
 <h3>Rings over a picture</h3>
 <div class="mg">
 <div class="mc"><svg viewBox="0 0 240 240" id="q_arp"></svg><div class="cap">ARP: the notes it plays, climbing</div></div>
-<div class="mc"><svg viewBox="0 0 240 240" id="q_scl"></svg><div class="cap">SCL: its settings as a list (KNOB 2 the row, KNOB 1 the value, OCT+ the scales list); the octave under it</div></div>
+<div class="mc"><svg viewBox="0 0 240 240" id="q_scl"></svg><div class="cap">SCL: its settings as a list (KNOB 1 the row, KNOB 2 the value, OCT+ the scales list); the octave under it</div></div>
 <div class="mc"><svg viewBox="0 0 240 240" id="q_chord"></svg><div class="cap">CHORD: its name, its notes on two octaves</div></div>
 <div class="mc"><svg viewBox="0 0 240 240" id="q_pattern"></svg><div class="cap">PATTERN: the 64 steps as four bars of dots</div></div>
 <div class="mc"><svg viewBox="0 0 240 240" id="q_slicer"></svg><div class="cap">SLICER: the gate it cuts, at its depth</div></div>
@@ -83,7 +83,7 @@ const put=(id,s)=>document.getElementById(id).innerHTML=r(0,0,240,240,BG,0)+s;
 {let s=head('ARP',c,1,2,0)+rings([['MODE','Up','',.25],['RATE','1/16','',.4],['OCTAVES','2','',.33],['GATE','50','%',.5]],c,0)+panel(108,112);
  const N=[0,1,2,3,4,5,6,7];N.forEach((k)=>{const x=14+k*27,row=k%4+(k>=4?4:0);s+=r(x,198-row*8-8,13,7,k<4?c:mix(c,PN,.6),3)});
  s+=t(14,126,'C3 E3 G3 · 2 oct',9,MD)+path('M12 204 L228 204',LN,1)+sound('PROPHET','Pickle Pincher',c);put('q_arp',s)}
-/* SCL: a list of its settings (KNOB 2 the row, KNOB 1 its value, OCT+ its list), the octave under it */
+/* SCL: a list of its settings (KNOB 1 the row, KNOB 2 its value, OCT+ its list), the octave under it */
 {let s=head('SCALE',c,1,3,1);const L=[['Root','D#',0],['Scale','Minor',1],['Quantise','On',0],['Transpose','0 st',0],['Favourite','★',0]];
  L.forEach((q,i)=>{const y=26+i*22,on=i==1;if(on)s+=r(0,y,240,20,RS,0)+r(0,y,3,20,c,0);s+=t(12,y+14,q[0],11,on?TX:SC,0,on)+t(on?216:228,y+14,q[1],11,on?c:MD,'end',on)+(q[2]?t(228,y+14,'›',12,on?c:MD,'end',1):'')});
  s+=r(4,142,232,78,PN,6);const W=[0,2,4,5,7,9,11],inS=[3,5,6,8,10,11,1],root=3;

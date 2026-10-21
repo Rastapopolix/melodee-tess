@@ -76,7 +76,7 @@ int main(void)
     select_range(1,2);hold(B_OCTUP);
     bad+=check("holding OCT+ with a range opens selected-note tools",pop.on==POP_SHEET&&!strcmp(pop.title,"Selected notes"));
     for(pop.sel=0;pop.sel<pop.n&&!str_eq(pop.rows[pop.sel].label,"Quantize");pop.sel++);
-    turn(EN_K1,2);press(B_OCTUP);
+    turn(EN_K2,2);press(B_OCTUP);
     bad+=check("selected quantize snaps each onset to the chosen quarter grid only",!strcmp(ui.msg,"NOTES QUANTIZED")&&recording[0].on==RECORD_UNIT/4u&&!memcmp(&recording[1],&b,sizeof b)&&TSEL->step[10].note[0]==72&&recording[0].vel==83&&duration(0)==5u*RECORD_UNIT/2u&&bulk.on==2&&bulk_note_has(0)&&!bulk_note_has(1));
     hold(B_EDIT);
     bad+=check("quantize undo restores mixed precise events and manual tie data",!memcmp(&recording[0],&a,sizeof a)&&!memcmp(&recording[1],&b,sizeof b)&&TSEL->step[1].note[0]==67&&!(TSEL->step[1].flags&SF_RECORDED)&&TSEL->step[2].time==ST_TIE&&TSEL->step[4].time==ST_TIE&&!recording[2].vel);
