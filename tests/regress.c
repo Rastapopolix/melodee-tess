@@ -249,7 +249,7 @@ static void job_drums(const job_t *j)           /* every GM note through 808 DRU
 
 
 /* the 4-track mix: T1 the power-on bass (PROPHET FUNK BASS II; ANALOG ACID until 2.0), T2 the power-on pad
- * (TRK_DEF: FM6 GLASS PAD; FM6 PAD, DIGITAL PAD before) (tied chords), T3 SID lead (12 steps against 16),
+ * (TRK_DEF: FM6 STRINGS; GLASS PAD, PAD, DIGITAL PAD before) (tied chords), T3 SID lead (12 steps against 16),
  * T4 808 DRUM drums; 120 BPM, 4 bars (the hostsim TRACKS demo without the recording), stop, the tail.
  * arg 1: with the SLICER (GATE on the pad, STUT on the bass line and the drums, SWING 20 %) */
 static void job_song(const job_t *j)
