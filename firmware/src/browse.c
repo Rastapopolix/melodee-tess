@@ -213,7 +213,8 @@ static void recent_push(uint32_t src, uint32_t k)
 
 /* LIST: 0 ALL, 1 FAV, 2 RECENT, then a category (CAT_ORDER). The category is kept with the settings in a byte no
  * engine uses (lcat: CAT_*, 0 none; earlier firmware ignores it and keeps showing ALL / FAV as favorites.filter says,
- * as do the editor and backups); RECENT is not kept */
+ * as do the editor and backups; settings_persist.c puts it back to ALL at a load: Tessera, 2026-10-21); RECENT is not
+ * kept */
 #define list_lcat (favorites.factory[15][29])
 enum { LM_ALL, LM_FAV, LM_RECENT, LM_CAT };
 #define LM_N (LM_CAT + NELEM(CAT_ORDER))

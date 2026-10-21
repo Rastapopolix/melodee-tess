@@ -301,6 +301,12 @@ static void drum_note_on(track_t *t, voice_t *v)
     int16_t local[P_COUNT];drum808_values(t,L->sound,local);
     L->r.decay=drum_patch[t-trk].c[L->sound][1];
     L->r.pitch=(drum_patch[t-trk].c[L->sound][0]+drum_event_pitch)*16;
+    if (ins >= DR_LT && ins <= DR_HT) {                  /* the toms: two keys each (41 / 43, 45 / 47, 48 / 50), */
+        static const uint8_t TOM_KEY[3] = {41, 45, 48};  /* the upper one the GM steps higher: six pitches, rising */
+        int32_t s0;
+        drum_gm(t->p, TOM_KEY[ins - DR_LT], &s0);
+        L->r.pitch += (st - s0) * 16;
+    }
     dr8_hit(&L->r, ins, v->vel, local);
     v->env_out = mulq15(127 * 258, dr8_level(v->vel, t->p[P_E5]));
     if (lane == DV_HATC && ins == DR_CH)
