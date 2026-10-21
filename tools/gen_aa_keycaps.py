@@ -7,7 +7,7 @@ tools/build.py generate()).
   gen_aa_keycaps.py OUT.h
 
 Keycaps: a fixed set of labels (the hardware controls the hints name, the state badges), each a pill
-KC_H px tall with corners of radius KC_R (about a third of the height), the label in Rubik
+KC_H px tall with corners of radius KC_R (Tessera's 2 px tile corner), the label in Rubik
 KC_PX px / KC_WGHT centred in it. One 4-bit map per pill, two levels in one nibble, tinted at draw time
 with theme tokens (src/gfx.c cv_keycap; MONO stays gray, the dim state is just a tint):
   0        outside the pill (left as it is)
@@ -34,7 +34,7 @@ import aa_raster as ar  # noqa: E402
 
 FONT = str(Path(__file__).resolve().parents[1] / "assets" / "fonts" / "Rubik[wght].ttf")
 KC_PX, KC_WGHT = 9, 600          # the label: Rubik 9 px / 600 (as the UI's face)
-KC_H, KC_R, KC_PAD = 13, 4, 3    # the pill: 13 px tall, radius 4, 3 px each side of the label
+KC_H, KC_R, KC_PAD = 13, 2, 3    # the pill: 13 px tall, radius 2 (Tessera's tile corner), 3 px each side of the label
 KC_BASE = 10                     # baseline row: the caps on rows 3 .. 9
 
 # (C name, label): the controls the hints name (panel.c B_NAME / E_NAME, short), then the state badges
