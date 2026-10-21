@@ -2082,11 +2082,25 @@ static void ui_input(void)
         smap_input(k1, k2, oct);
         if (lytap)
             layer_tap(lytap);
+        for (id = 0; id < 14u; id++) {                  /* FX ENV LFO ARP pressed: their page when let go, below */
+            uint32_t pb = panel_btn_of(id);
+            if (((pressed >> id) & 1u) && !lay && (pb == B_FX || pb == B_ENV || pb == B_LFO || pb == B_ARP))
+                ui.pg_down |= (uint16_t)(1u << id);
+        }
+        if (seq == BT_TAP || home == BT_TAP) {          /* SEQ, HOME: as from any page */
+            smap_close();
+            if (seq == BT_TAP) open_family(FAM_SEQ);
+            else go_home();
+        }
         b = ui.pg_down & ~fm1_in.buttons;
         ui.pg_down &= (uint16_t)~b;
         for (id = 0; b; id++, b >>= 1)
-            if (b & 1u)
-                page_tap(panel_btn_of(id));
+            if (b & 1u) {
+                uint32_t pb = panel_btn_of(id);
+                if (pb != B_EDIT) smap_close();         /* another page's button: the map closes, its page opens (as
+                                                         * from any page; FM6's ENV and LFO pages are EDIT's too) */
+                page_tap(pb);
+            }
         if (smap.on) enc_drop_but(1u << EN_K1 | 1u << EN_K2);   /* (a click of theirs since: the next frame's) */
         else enc_drop();
         return;
