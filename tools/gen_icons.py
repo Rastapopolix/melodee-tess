@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import aa_raster as ar  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-RUBIK = ROOT / "assets" / "fonts" / "Rubik[wght].ttf"
+FACE = ROOT / "assets" / "fonts" / "ChakraPetch-SemiBold.ttf"   # the UI's face (tools/gen_aa_font.py --preset chakra)
 SS = 8                                   # supersampling
 
 # the UI's own icons, after the legacy names (their order is the enum's: keep it, append new ones at the end)
@@ -98,8 +98,7 @@ class Pen:
                                  radius=max(0.0, r * self.k - sw / 2), fill=0)
 
     def digit(self, ch, ink):
-        font = ImageFont.truetype(str(RUBIK), int(self.n * 0.62))
-        font.set_variation_by_axes([600])
+        font = ImageFont.truetype(str(FACE), int(self.n * 0.62))
         self.d.text((self.n / 2, self.n / 2 + self.n * 0.02), ch, font=font, fill=ink, anchor="mm")
 
 
@@ -134,10 +133,10 @@ def battery(pn, level, charging=False):
 
 def trk(pn, n, filled):
     if filled:
-        pn.box(3, 3, 21, 21, r=5)
+        pn.box(3, 3, 21, 21, r=1.5)                     # (a tile: Tessera's square corners)
         pn.digit(str(n), 0)
     else:
-        pn.frame(4, 4, 20, 20, r=4.5, w=0.9)
+        pn.frame(4, 4, 20, 20, r=1.5, w=0.9)
         pn.digit(str(n), 255)
 
 
