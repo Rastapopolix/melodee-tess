@@ -220,7 +220,16 @@ static void pv_ring(uint32_t c, const char *label0, const char *val0, const char
         cv_rrect(1, 1, 56, h - 4, 7, bg, T_THEME);
     }
     if (label[0] || val[0]) {
-        cv_text_c(29, 2, &AF_X, label, lc, bg);
+        if (gen_layer_on() && label[0]) {              /* OCT+'s layer: the labels on tiles, a set laid over the
+                                                         * page's (ui_graph.c gen_layer_on) */
+            int32_t w = text_w(&AF_X, label) + 8;
+            if (w < 30) w = 30;
+            if (w > 58) w = 58;
+            cv_rrect(29 - w / 2, 1, w, 12, 2, lc, bg);
+            cv_text_c(29, 2, &AF_X, label, T_INK, lc);
+        } else {
+            cv_text_c(29, 2, &AF_X, label, lc, bg);
+        }
         if (ratio >= 0) {
             int32_t r = ratio > 1000 ? 1000 : ratio, a1 = -KA_END + r * 2 * KA_END / 1000;
             knob_arc(29 - KNOB_RING_R, cy - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE,

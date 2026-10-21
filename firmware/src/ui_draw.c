@@ -270,7 +270,7 @@ static void draw_head(void)
     sig = (uint32_t)seq_erase_active(TSEL) * 8191u + (uint32_t)song.playing * 3u + song.rec * 5u + song.rec_wait * 65537u + (uint32_t)(song.octave + 8) * 11u +
           song.sel * 13131u + (msg ? str_hash(7u, ui.msg_t ? ui.msg : layer_head()) : str_hash(5u, chip)) +
           (ui.bpm_t != 0) * 31u + low * 7777u + (chain.running ? (chain.row + 1u) * 104729u : 0u) + ux.gen * 977u +
-          (ui.home ? 0u : ui.page * 2654435761u) + page_sheet() * 524287u;
+          (ui.home ? 0u : ui.page * 2654435761u) + page_sheet() * 524287u + (uint32_t)gen_layer_on() * 40503u;
     if (bpm != ui.roll_bpm) {
         char a[8];
         fmt_int(a, ui.roll_bpm);
@@ -335,7 +335,10 @@ static void draw_head(void)
             cv_text_c(8 + cw / 2, 3, &AF_X, chip, T_INK, T_THEME);
             l = 8 + cw;
         }
-        if (page_sheet()) {                             /* the page has a sheet (OCT+ held) */
+        if (gen_layer_on()) {                           /* OCT+ held, a generator's layer: its key */
+            cv_keycap(l + 6, 3, KC_OCTUP, T_THEME, T_INK, T_BG);
+            l += 6 + kc_w(KC_OCTUP);
+        } else if (page_sheet()) {                      /* the page has a sheet (OCT+ held) */
             cv_text_on(l + 4, 2, &AF_S, "\x85", T_MID, T_BG);
             l += 14;
         }
