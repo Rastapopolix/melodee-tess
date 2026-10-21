@@ -282,7 +282,8 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         const gen_grids_t *g = tessera_grids(tr);
         uint32_t steps = gen_grids_steps(tess_steps_per_bar(&trk[tr]));
         uint32_t cur = (g->step_idx + steps - 1u) % steps, four = g->toms != 0u, np = four ? GEN_GRIDS_PARTS : 3u;
-        int h = is_panel ? 14 : 18;
+        int h = is_panel ? 84 : 18, gap = is_panel ? 4 : 1;   /* (the panel: tall lanes, filling it as the others do) */
+        int32_t gy = is_panel ? 10 : y_base;
         int lane = h / (int)np;
         int step_w = steps > 16u ? (is_panel ? 4 : 5) : (is_panel ? 10 : 11);
 
@@ -293,13 +294,13 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             int is_head = song.playing && i == cur;
             for (uint32_t p = 0; p < np; p++) {
                 int acc;
-                int32_t ly = y_base + (int32_t)ROW[four][p] * lane;
+                int32_t ly = gy + (int32_t)ROW[four][p] * lane;
                 if (gen_grids_hit(g, i, steps, p, 0, &acc))
-                    cv_rrect(sx, ly, step_w, lane - 1, 1, is_head ? T_TEXT : acc ? T_ACCENT : c, bg);
+                    cv_rrect(sx, ly, step_w, lane - gap, 1, is_head ? T_TEXT : acc ? T_ACCENT : c, bg);
                 else
-                    cv_rect(sx, ly + lane - 2, step_w, 1, dim);
+                    cv_rect(sx, ly + lane - gap - 1, step_w, 1, dim);
             }
-            cv_rect(sx, y_base + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
+            cv_rect(sx, gy + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
         }
     } else if (mode == TESS_ENG_BOUNCE) {
         /* the box (its 256 x 256 the panel's; on the older page squeezed into a strip), the balls (all alike), the walls

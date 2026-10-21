@@ -2,10 +2,13 @@
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* Help (Theo 2026-10-16; tessera-notes/docs/design/phase2/help.png): ARP held, a knob turned shows what it does, its value left as it
  * is: a card over the page, dimmed, with the parameter's name, its value and its text (pid.c). Letting ARP go closes it
- * (and opens no page: ui_input.c). The FM-1's knobs cannot sense a touch, so a turn it is. Included by ui_pages.c. */
+ * (and opens no page: ui_input.c). The FM-1's knobs cannot sense a touch, so a turn it is; turning the same knob on
+ * makes the text larger, as far as it all still fits (a text longer than the card scrolls), back smaller again.
+ * Included by ui_pages.c. */
 
 static struct {
     uint8_t on, knob;
+    uint8_t zoom, top;                                  /* the text's size (HELP_FONT) and its first line shown */
     uint16_t pid;                                       /* PID_NONE: name and text below (CORDS, FORM's CLEAR) */
     const char *name, *text;
 } help;
@@ -143,58 +146,128 @@ static void help_find(uint32_t k)
     }
 }
 
-/* ui_input.c: a knob turned with ARP held; 1 = its help shown (the turn does nothing else) */
-static int help_knob(uint32_t k)
-{
-    if (!(fm1_in.buttons & (1u << panel.btn[B_ARP])) || ui.menu || ui.confirm || ui.layer)   /* (a popup: ui_input.c) */
-        return 0;
-    help_find(k);
-    help.knob = (uint8_t)k;
-    help.on = 1;
-    ui.force = 1;
-    return 1;
-}
+/* The card: 228 x 214 under the header, over the page. Its text in one of three sizes, the largest it was turned to
+ * that shows all of it; a text longer than the card at the smallest scrolls instead */
+#define HELP_X 6
+#define HELP_Y 22
+#define HELP_W 228
+#define HELP_H 214
+#define HELP_TW 204                                     /* (the text's width) */
+#define HELP_T0 34                                      /* (the text's first line, its last above HELP_T1) */
+#define HELP_T1 188
+#define HELP_LINES 16                                   /* (the most a card holds: the smallest's) */
+static const aafont_t *const HELP_FONT[3] = {&AF_X, &AF_S, &AF_M};
+static uint32_t help_lh(uint32_t z) { return HELP_FONT[z]->h + 2u; }
+static uint32_t help_rows(uint32_t z) { return (HELP_T1 - HELP_T0) / help_lh(z); }
 
-/* the card: the name in the track's colour, the value right, the text wrapped to its width. 220 x 168 at (10, 40): two
- * strips (a canvas holds 240 x 124 at most), each drawing the whole card at cv_oy = -its top */
-static void help_strip(int32_t top, int32_t h, const char *name, const char *val, const char *text)
+/* text's words wrapped to lines of HELP_TW px in font f: each line's start and length (at most max of them); returns
+ * how many lines it takes (all of them, also past max) */
+static uint32_t help_wrap(const aafont_t *f, const char *text, uint16_t *at, uint8_t *len, uint32_t max)
 {
     char line[64];
-    int32_t y = 34, w = 196;
-    uint32_t i, n, start;
-    cv_begin(220, (uint32_t)h, T_BG);
-    cv_oy = -top;                                       /* (as ui_motion.c: the card drawn whole, this strip of it) */
-    cv_rrect(0, 0, 220, 168, 8, T_THEME, T_BG);
-    cv_rrect(1, 1, 218, 166, 7, T_SURF, T_THEME);
-    cv_free_text(12, 10, &AF_S, name ? name : "", T_THEME, T_SURF, 140);
-    if (val[0]) cv_text_r(208, 12, &AF_X, val, T_TEXT, T_SURF);
-    for (i = 0, start = 0, n = 0; text && y < 140; ) {   /* words to lines of w px */
+    uint32_t i = 0, start = 0, n = 0, lines = 0;
+    while (text && text[start]) {
         uint32_t end = i;
         while (text[end] && text[end] != ' ') end++;
         if (end - start < sizeof line) {
             memcpy(line, text + start, end - start);
             line[end - start] = 0;
         }
-        if ((end - start >= sizeof line || text_w(&AF_X, line) > w) && n) {
-            memcpy(line, text + start, n - start);
-            line[n - start] = 0;
-            cv_text_on(12, y, &AF_X, line, T_TEXT, T_SURF);
-            y += 14;
+        if ((end - start >= sizeof line || text_w(f, line) > HELP_TW) && n) {   /* (the line up to the last word) */
+            if (lines < max) at[lines] = (uint16_t)start, len[lines] = (uint8_t)(n - start);
+            lines++;
             start = i = n + 1u;
             n = 0;
             continue;
         }
         if (!text[end]) {
-            cv_text_on(12, y, &AF_X, line, T_TEXT, T_SURF);
-            break;
+            if (lines < max) at[lines] = (uint16_t)start, len[lines] = (uint8_t)(end - start < 63u ? end - start : 63u);
+            return lines + 1u;
         }
         n = end;
         i = end + 1u;
     }
-    cv_rect(12, 144, 196, 1, T_LINE);
-    cv_free_text(12, 149, &AF_X, "ARP held: turn a knob for its help", T_DIM, T_SURF, 196);
+    return lines;
+}
+static const char *help_text(void)
+{
+    const pid_entry_t *e = help.pid != PID_NONE ? pid_find(help.pid) : 0;
+    return e ? e->help : help.text;
+}
+static uint32_t help_count(uint32_t z)
+{
+    uint16_t at[1];
+    uint8_t len[1];
+    return help_wrap(HELP_FONT[z], help_text(), at, len, 0);
+}
+
+/* ui_input.c: knob k turned s with ARP held; 1 = its help shown (the turn does nothing else). The first turn shows it;
+ * turning on the same knob makes the text larger while it all still fits (or scrolls a text longer than the card),
+ * back smaller again. The card is drawn again only when what it shows changes */
+static int help_knob(uint32_t k, int32_t s)
+{
+    if (!(fm1_in.buttons & (1u << panel.btn[B_ARP])) || ui.menu || ui.confirm || ui.layer)   /* (a popup: ui_input.c) */
+        return 0;
+    if (!help.on || help.knob != k) {
+        help_find(k);
+        help.knob = (uint8_t)k;
+        help.zoom = help.top = 0;
+        help.on = 1;
+        ui.force = 1;
+        return 1;
+    }
+    if (s > 0) {
+        uint32_t n = help_count(help.zoom);
+        if (help.zoom < 2u && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u)) help.zoom++;
+        else if (help.top + help_rows(help.zoom) < n) help.top++;
+        else return 1;
+    } else if (s < 0) {
+        if (help.top) help.top--;
+        else if (help.zoom) help.zoom--;
+        else return 1;
+    } else {
+        return 1;
+    }
+    ui.force = 1;
+    return 1;
+}
+
+/* a strip of the card (a canvas holds 240 x 124 at most), each drawing the whole card at cv_oy = -its top: the name in
+ * the theme's colour, the value right, the text in its size, what the knob does next under a line */
+static void help_strip(int32_t top, int32_t h, const char *name, const char *val, const char *text)
+{
+    const aafont_t *f = HELP_FONT[help.zoom];
+    uint16_t at[64];
+    uint8_t len[64];
+    char line[64];
+    uint32_t n = help_wrap(f, text, at, len, 64), rows = help_rows(help.zoom), i;
+    int32_t y = HELP_T0;
+    const char *hint;
+    cv_begin(HELP_W, (uint32_t)h, T_BG);
+    cv_oy = -top;                                       /* (as ui_motion.c: the card drawn whole, this strip of it) */
+    cv_rrect(0, 0, HELP_W, HELP_H, 8, T_THEME, T_BG);
+    cv_rrect(1, 1, HELP_W - 2, HELP_H - 2, 7, T_SURF, T_THEME);
+    cv_free_text(12, 10, &AF_S, name ? name : "", T_THEME, T_SURF, 140);
+    if (val[0]) cv_text_r(HELP_W - 12, 12, &AF_X, val, T_TEXT, T_SURF);
+    for (i = help.top; i < n && i < 64u && i < help.top + rows; i++, y += (int32_t)help_lh(help.zoom)) {
+        memcpy(line, text + at[i], len[i]);
+        line[len[i]] = 0;
+        cv_text_on(12, y, f, line, T_TEXT, T_SURF);
+    }
+    if (n > rows) {                                     /* (a scroll bar: the lines shown of all of them) */
+        int32_t th = HELP_T1 - HELP_T0 - 4, bh = th * (int32_t)rows / (int32_t)n;
+        cv_rect(HELP_W - 7, HELP_T0, 2, th, T_LINE);
+        cv_rect(HELP_W - 7, HELP_T0 + th * (int32_t)help.top / (int32_t)n, 2, bh > 6 ? bh : 6, T_THEME);
+    }
+    if (n > rows && help.top + rows < n) hint = "Clockwise: more.  Back: up.";
+    else if (help.top) hint = "Back: up.";
+    else if (help.zoom < 2u && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u))
+        hint = help.zoom ? "Clockwise: larger.  Back: smaller." : "Clockwise: larger.";
+    else hint = help.zoom ? "Back: smaller." : "ARP held: turn a knob for its help";
+    cv_rect(12, HELP_H - 24, HELP_W - 24, 1, T_LINE);
+    cv_free_text(12, HELP_H - 19, &AF_X, hint, T_DIM, T_SURF, HELP_W - 24);
     cv_oy = 0;
-    cv_blit(10, (uint32_t)(40 + top));
+    cv_blit(HELP_X, (uint32_t)(HELP_Y + top));
 }
 /* the card's value: as the knobs' columns show it, a name whole ("TURING": the columns cut one to 5) */
 static void help_value(const pid_entry_t *e, char *val, uint32_t size)
@@ -221,6 +294,6 @@ static void help_draw(void)
     if (!ui.force)
         return;
     help_value(e, val, sizeof val);
-    help_strip(0, 112, e ? e->name : help.name, val, e ? e->help : help.text);
-    help_strip(112, 56, e ? e->name : help.name, val, e ? e->help : help.text);
+    help_strip(0, 124, e ? e->name : help.name, val, e ? e->help : help.text);
+    help_strip(124, HELP_H - 124, e ? e->name : help.name, val, e ? e->help : help.text);
 }

@@ -149,7 +149,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x207 | MARKOV LEAP | 0 to 100 % | 25 | How far each note jumps from the last: 0 moves to its neighbours, 100 leaps widely. |
 | 0x208 | MARKOV DENSITY | 5 to 100 % | 70 | The chance a step plays a note; the others rest. |
 | 0x209 | MARKOV SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
-| 0x20A | MORPH POSITION | 0 to 127 | 0 | Blends rhythm A (0) into rhythm B (full). |
+| 0x20A | MORPH POSITION | 0 to 127 | 64 | Blends rhythm A (0) into rhythm B (full). |
 | 0x20B | MORPH RHYTHM A | 0 to 7 | 0 | Rhythm A: one of eight preset patterns. |
 | 0x20C | MORPH RHYTHM B | 0 to 7 | 2 | Rhythm B: one of eight preset patterns. |
 | 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a step plays its loop instead of the sky; Euclid, Bounce, Awake, Poly and Quad have none. |
