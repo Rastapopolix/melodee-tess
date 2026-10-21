@@ -759,6 +759,26 @@ static void chord_tests(void)
         sec &= h.prog == GEN_CH_WALK && h.bars == 3u && h.hit == GEN_CH_BEAT && h.rot == 5u &&
                !memcmp(h.walk, g.walk, GEN_CH_WALK_N);
     }
+    {   /* USER: the keys' degrees in order, its own length (0: one, the tonic), eight at most, a new one from the first */
+        gen_chord_t g;
+        const gen_clock_t clk = {0, 16, 0};
+        int ok = 1;
+        memset(&g, 0, sizeof g);
+        g.prog = GEN_CH_USER, g.bars = 1, g.rot = 3;
+        ok &= gen_chord_len(&g) == 1u && gen_chord_degree(&g, 0) == 0u;
+        ok &= gen_chord_user_add(&g, 2, 1) && gen_chord_user_add(&g, 9, 0) && gen_chord_user_add(&g, 4, 0);
+        ok &= g.ulen == 3u && g.rot == 0u && gen_chord_len(&g) == 3u && gen_chord_degree(&g, 1) == 2u &&
+              gen_chord_degree(&g, 5) == 4u;          /* (9: 2; and round again) */
+        for (uint32_t i = 0; i < 64u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            if (!(i % 16u)) ok &= o.gate && o.note == g.user[i / 16u % 3u];   /* (a chord a bar: 2 2 4) */
+        }
+        for (uint32_t i = 0; i < 5u; i++) ok &= gen_chord_user_add(&g, 1, 0);
+        ok &= !gen_chord_user_add(&g, 1, 0) && g.ulen == GEN_CH_USER_N;
+        ok &= gen_chord_user_add(&g, 6, 1) && g.ulen == 1u && gen_chord_degree(&g, 5) == 6u;
+        check("chord: USER plays the keys' chords in order, up to eight, a new progression from the first key", ok);
+    }
     check("chord: POP plays I V vi IV, a chord a bar, its degree as the note, the first strike louder", prog);
     check("chord: HIT HOLD strikes once a chord, BEAT every beat, STEP every step, each held as long", hits);
     check("chord: BARS 1/2, 1, 2 and 4 bars a chord", bars);

@@ -163,8 +163,8 @@ void organic_play(void);                            /* seq.c, PLAY: SLOTH and OC
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 556u                       /* the saved state, version 13 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
-#define TESSERA_PK_BYTES_V12 540u                   /* version 12 (before Grids' KICK, SNR, HAT, TOMS) */
+#define TESSERA_PK_BYTES 572u                       /* the saved state, version 13 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V12 540u                   /* version 12 (before Grids' KICK, SNR, HAT, TOMS, Chord's USER) */
 #define TESSERA_PK_BYTES_V11 520u                   /* version 11 (before CHORD) */
 #define TESSERA_PK_BYTES_V10 516u                   /* version 10 (before CONSTELLATION's LEN and FILL) */
 #define TESSERA_PK_BYTES_V9 508u                    /* version 9 (before QUAD's columns, RANGE and LINK to several) */
@@ -209,6 +209,7 @@ enum {
     TX_CH_PROG, TX_CH_BARS, TX_CH_HIT,
     TX_CH_OCT,
     TX_GRD_KICK, TX_GRD_SNR, TX_GRD_HAT, TX_GRD_TOMS,
+    TX_CH_ULEN,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -234,6 +235,8 @@ uint32_t tessera_cs_speed(uint32_t tr);                 /* Constellation's SPEED
 #define TESS_CS_SPEEDS 8u                               /* (4BAR .. 1/32, the straight DIVs) */
 void tessera_constel_layer_knob(uint32_t k, int32_t s);   /* OCT+ held on GEN in CONSTELLATION: LOCK, LEN, FILL, SIZE */
 void tessera_grids_layer_knob(uint32_t k, int32_t s);      /* OCT+ held on GEN in GRIDS: KICK, SNR, HAT, TOMS */
+uint32_t tessera_chord_user_key(uint32_t tr, uint32_t note, int first);   /* CHORD USER: a key's chord (0 full) */
+void tessera_chord_ulen_knob(int32_t s);                   /* OCT+ held on GEN in CHORD USER, KNOB 4: LEN */
 void tessera_chord_oct_knob(int32_t s);                    /* OCT+ held on GEN in CHORD, KNOB 1: OCT */
 const gen_series_t *tessera_series(uint32_t tr);
 const gen_chord_t *tessera_chord(uint32_t tr);

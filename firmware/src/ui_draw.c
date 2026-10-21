@@ -1022,6 +1022,10 @@ static void draw_columns(void)
                     col_mods(PID_TRACK(P_VOIC));
                     draw_column(2, "VOIC", vv <= (uint32_t)dv->max ? dv->names[vv] : "?", "", VAL(2u),
                                 (int32_t)vv * 1000 / (dv->max ? dv->max : 1), ICON_AUTO);
+                    if (g->prog == GEN_CH_USER) {             /* USER: its LEN (the keys play its chords in) */
+                        fmt_int(v3, (int32_t)gen_chord_ulen(g));
+                        draw_column(3, "LEN", v3, "", VAL(3u), ((int32_t)gen_chord_ulen(g) - 1) * 1000 / 7, ICON_AUTO);
+                    }
                     return;
                 }
                 draw_column(0, "MODE", "CHORD", "", VAL(0u), TESS_ENG_CHORD * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);

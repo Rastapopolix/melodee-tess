@@ -862,17 +862,33 @@ static void gen_series_load(gen_series_t *g, const gen_sec_t *s)
 }
 
 /* Chord pad: the progressions as degrees of the scale (0 = the tonic): POP I V vi IV, 50S I vi IV V, 251 ii V I I,
- * CIRCLE the scale's fifths down (I IV vii iii vi ii V), TWO I IV, DRONE I alone; WALK the seed's (gen_chord_fill) */
-static const uint8_t GEN_CH_PROG[GEN_CH_PROGS - 1u][8] = {
+ * CIRCLE the scale's fifths down (I IV vii iii vi ii V), TWO I IV, DRONE I alone; WALK the seed's (gen_chord_fill),
+ * USER the keys' (its own length) */
+static const uint8_t GEN_CH_PROG[GEN_CH_WALK][8] = {
     {0, 4, 5, 3}, {0, 5, 3, 4}, {1, 4, 0, 0}, {0, 3, 6, 2, 5, 1, 4}, {0, 3}, {0},
 };
-static const uint8_t GEN_CH_PROG_N[GEN_CH_PROGS] = {4, 4, 4, 7, 2, 1, GEN_CH_WALK_N};
-static uint32_t gen_chord_len(const gen_chord_t *g) { return GEN_CH_PROG_N[g->prog < GEN_CH_PROGS ? g->prog : 0u]; }
+static const uint8_t GEN_CH_PROG_N[GEN_CH_PROGS] = {4, 4, 4, 7, 2, 1, GEN_CH_WALK_N, 0};
+static uint32_t gen_chord_ulen(const gen_chord_t *g) { return g->ulen >= 1u && g->ulen <= GEN_CH_USER_N ? g->ulen : 1u; }
+static uint32_t gen_chord_len(const gen_chord_t *g)
+{
+    if (g->prog == GEN_CH_USER) return gen_chord_ulen(g);
+    return GEN_CH_PROG_N[g->prog < GEN_CH_PROGS ? g->prog : 0u];
+}
 /* the degree of chord i of the progression (from ROT on) */
 static uint32_t gen_chord_degree(const gen_chord_t *g, uint32_t i)
 {
-    uint32_t p = g->prog < GEN_CH_PROGS ? g->prog : 0u, k = (i + g->rot) % GEN_CH_PROG_N[p];
-    return (p == GEN_CH_WALK ? g->walk[k] : GEN_CH_PROG[p][k]) % 7u;
+    uint32_t p = g->prog < GEN_CH_PROGS ? g->prog : 0u, k = (i + g->rot) % gen_chord_len(g);
+    return (p == GEN_CH_WALK ? g->walk[k] : p == GEN_CH_USER ? g->user[k] : GEN_CH_PROG[p][k]) % 7u;
+}
+/* USER's progression, a key at a time (first: a new one): degree deg (0..6) the next chord, up to eight; 1 taken, 0
+ * full (the eighth already in) */
+static int gen_chord_user_add(gen_chord_t *g, uint32_t deg, int first)
+{
+    if (first) g->ulen = 0;
+    if (g->ulen >= GEN_CH_USER_N) return 0;
+    g->user[g->ulen++] = (uint8_t)(deg % 7u);
+    g->rot = 0;                                         /* (the progression from its first chord, as played in) */
+    return 1;
 }
 /* a chord's length in steps: BARS of the clock's bars (1/2 bar: at least a step) */
 static uint32_t gen_chord_steps(const gen_chord_t *g, uint32_t steps_per_bar)

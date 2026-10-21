@@ -758,6 +758,60 @@ static int test_constel_layer(void)
     return bad;
 }
 
+/* CHORD USER on GEN with OCT+ held: the keys play its chords in, silent (a key's note rounded down to the scale, the
+ * first key of a hold a new progression, up to eight), KNOB 4 its LEN; no octave, no sheet */
+static int test_chord_user(void)
+{
+    int bad = 0;
+    uint32_t i, tr;
+    int32_t oct;
+    const gen_chord_t *g;
+    static const uint8_t K1[5] = {7, 16, 12, 14, 13};   /* C, A, F, G, F# (C major: I vi IV V, F# rounded down: IV) */
+    ui_power_on();
+    go_title("GEN");
+    tr = song.sel;
+    trk[tr].p[P_ROOT] = 0;
+    trk[tr].p[P_SCALE] = 1;                             /* (C major) */
+    tessera_param_set(tr, TX_MODE, TESS_ENG_CHORD);
+    tessera_param_set(tr, TX_CH_PROG, GEN_CH_USER);
+    g = tessera_chord(tr);
+    frame();
+    oct = song.octave;
+    fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+    host_pressed |= 1u << panel.btn[B_OCTUP];
+    frame();
+    bad += check("CHORD USER, OCT+ held: the keys are its chords, silent (keys mode 2)", ch_user_entry_on() && song.grid == 2u);
+    for (i = 0; i < 5u; i++) {
+        fm1_in.notes |= 1u << K1[i]; host_notes |= 1u << K1[i]; frame();
+        fm1_in.notes &= ~(1u << K1[i]); frame();
+    }
+    bad += check("..C A F G F#: I vi IV V IV, five chords", g->ulen == 5u && g->user[0] == 0u && g->user[1] == 5u &&
+                 g->user[2] == 3u && g->user[3] == 4u && g->user[4] == 3u && tessera_param_get(tr, TX_CH_ULEN) == 5);
+    turn(EN_K1 + 3u, -1);
+    help_find(3);
+    bad += check("..KNOB 4 LEN 4; its help", g->ulen == 4u && help.pid == PID_TESS(TX_CH_ULEN) && pid_find(help.pid));
+    bad += check("..the octave as it was, no sheet open", song.octave == oct && pop.on != POP_SHEET);
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
+    frame();
+    bad += check("OCT+ let go: the keys play again", !ch_user_entry_on() && song.grid != 2u && g->ulen == 4u);
+    fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+    host_pressed |= 1u << panel.btn[B_OCTUP];
+    frame();
+    fm1_in.notes |= 1u << 9; host_notes |= 1u << 9; frame();   /* D */
+    fm1_in.notes = 0; frame();
+    bad += check("..held again, the first key a new progression: D alone, ii", g->ulen == 1u && g->user[0] == 1u);
+    for (i = 0; i < 9u; i++) {
+        fm1_in.notes |= 1u << 7; host_notes |= 1u << 7; frame();
+        fm1_in.notes = 0; frame();
+    }
+    bad += check("..eight at most", g->ulen == GEN_CH_USER_N && g->user[7] == 0u);
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
+    frame();
+    bad += check("..OCT+'s release changed no octave", song.octave == oct);
+    tessera_param_set(tr, TX_CH_PROG, GEN_CH_POP);
+    return bad;
+}
+
 /* GRIDS on GEN with OCT+ held: KNOB 1..4 KICK, SNR, HAT, TOMS (2 % a click), their help; no octave, no sheet; let go,
  * the knobs are MODE, X, Y, DENS again */
 static int test_grids_layer(void)
@@ -5465,6 +5519,7 @@ int main(void)
     bad += test_constel_speed();
     bad += test_constel_layer();
     bad += test_grids_layer();
+    bad += test_chord_user();
     bad += test_div_order();
     bad += test_quad_cols();
     bad += test_screen();

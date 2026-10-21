@@ -68,6 +68,8 @@ static int ch_layer_on(void)
            cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_CHORD &&
            ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
 }
+/* CHORD on GEN, PROG USER, OCT+ held: the keys are USER's chords, silent (ui_input.c chord_user_keys) */
+static int ch_user_entry_on(void) { return ch_layer_on() && tessera_chord(song.sel)->prog == GEN_CH_USER; }
 /* GRIDS on GEN with OCT+ held: the knobs are KICK, SNR, HAT and TOMS (tessera.c tessera_grids_layer_knob) */
 static int gr_layer_on(void)
 {

@@ -176,11 +176,13 @@ typedef struct {
 
 /* 12. Chord pad: one chord at a time on a degree of the track's scale, from a progression, BARS long (tessera.c builds
  * its tones with the track's SCL CHORD: CHRD, VOIC). HIT: held for the chord, struck every beat, or every step. WALK is
- * the seed's own four chords (ROLL a new walk, EVOLVE changes one); the others are fixed progressions */
-enum { GEN_CH_POP, GEN_CH_50S, GEN_CH_251, GEN_CH_CIRCLE, GEN_CH_TWO, GEN_CH_DRONE, GEN_CH_WALK, GEN_CH_PROGS };
+ * the seed's own four chords (ROLL a new walk, EVOLVE changes one); USER up to eight played in on the keys (OCT+ held
+ * on GEN: tessera_chord_user_key); the others are fixed progressions */
+enum { GEN_CH_POP, GEN_CH_50S, GEN_CH_251, GEN_CH_CIRCLE, GEN_CH_TWO, GEN_CH_DRONE, GEN_CH_WALK, GEN_CH_USER, GEN_CH_PROGS };
 enum { GEN_CH_HOLD, GEN_CH_BEAT, GEN_CH_STEP, GEN_CH_HITS };
 #define GEN_CH_BARS 4u     /* BARS 0..3: 1/2, 1, 2, 4 bars a chord */
 #define GEN_CH_WALK_N 4u
+#define GEN_CH_USER_N 8u   /* USER's chords at most */
 typedef struct {
     uint8_t  prog;        /* GEN_CH_*: the progression */
     uint8_t  bars;        /* 0..3: 1/2, 1, 2, 4 bars a chord */
@@ -192,6 +194,8 @@ typedef struct {
     uint8_t  idx;         /* its place in the progression (the picture's) */
     uint16_t hold;        /* the last strike's length in steps, 0: the step's GATE (tessera.c) */
     uint16_t n;           /* the steps played since PLAY or the section's start */
+    uint8_t  user[GEN_CH_USER_N];   /* USER's degrees, 0..6 */
+    uint8_t  ulen;        /* USER's chords, 1..8 (0: one, the tonic) */
 } gen_chord_t;
 
 /* A FORM section's settings for the generator that made it (tessera.h tessera_sec_t keeps them and the phrase).

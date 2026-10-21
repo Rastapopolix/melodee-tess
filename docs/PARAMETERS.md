@@ -209,7 +209,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x246 | QUAD EVERY 4 | /1, /2, /3, /4, /6, /8, /16 | /4 | How often a column moves: every 1 to 16 steps of the first QUAD track. OCT+ held on GEN: KNOB 1 the column, KNOB 3 its EVERY. |
 | 0x247 | CONSTELLATION LEN | 1 to 16 | 16 | How many steps the loop of stars is, 1 to 16: with LOCK up a short phrase repeats. OCT+ held on GEN, KNOB 2. |
 | 0x248 | CONSTELLATION FILL | OFF, ARP | OFF | What the steps between stars play: OFF a rest, ARP the last four stars again, low to high and softer. OCT+ held on GEN, KNOB 3. |
-| 0x249 | CHORD PROG | POP, 50S, 2-5-1, CIRCLE, TWO, DRONE, WALK | POP | The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, 2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four chords of the track's SEED (ROLL another, EVOLVE changes one). SCL CHORD's CHRD and VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC. |
+| 0x249 | CHORD PROG | POP, 50S, 2-5-1, CIRCLE, TWO, DRONE, WALK, USER | POP | The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, 2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four chords of the track's SEED (ROLL another, EVOLVE changes one); USER up to eight of your own: hold OCT+ on GEN and play their roots on the keys, one key a chord (rounded down to the scale; letting OCT+ go ends it). SCL CHORD's CHRD and VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC. |
 | 0x24A | CHORD BARS | 1/2, 1, 2, 4 | 1 | How long each chord lasts: half a bar, 1, 2 or 4 bars. |
 | 0x24B | CHORD HIT | HOLD, BEAT, STEP | HOLD | How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; STEP every step, for the step's GATE. |
 | 0x24C | CHORD OCT | -2 to 2 | 0 | The chords' register, -2 to +2 octaves from their home around C3. OCT+ held on GEN, KNOB 1; KNOB 2 and 3 there are SCL CHORD's CHRD and VOIC. |
@@ -217,6 +217,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x24E | GRIDS SNARE | 0 to 100 % | 100 | How much of DENSITY the snare gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 2. |
 | 0x24F | GRIDS HAT | 0 to 100 % | 100 | How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 3. |
 | 0x250 | GRIDS TOMS | 0 to 100 % | 0 | A fourth part, on the kit's tom (GM 45): the hits the kick and snare only just miss, so fills follow the groove. 0 none; up, misses further under the line play too (DENSITY scales it). OCT+ held on GEN, KNOB 4. |
+| 0x251 | CHORD USER LEN | 1 to 8 | 4 | How many of USER's chords play, 1 to 8: playing them in on the keys (OCT+ held on GEN) sets it; shorten it to leave the last ones out. OCT+ held on GEN, KNOB 4. |
 
 ## Mods
 

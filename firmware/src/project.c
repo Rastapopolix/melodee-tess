@@ -498,7 +498,7 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
  * (no room in it). A slot's block is valid only while its tag equals the project record's hash (proj_saved_hash):
  * any other write to the slot (an archive, a failed or interrupted save) loads the project with Tessera OFF. */
 #if MELODEE_FLASH
-#define TESS_OBJ_MAGIC 0x33315354u                    /* "TS13": blocks of version 13 (Grids' KICK, SNR, HAT, TOMS) */
+#define TESS_OBJ_MAGIC 0x33315354u                    /* "TS13": blocks of version 13 (Grids' KICK .. TOMS, Chord's USER) */
 #define TESS_SLOT_BYTES (4u + TESSERA_PK_BYTES)
 #define TESS_OBJ_BYTES (4u + 4u * TESS_SLOT_BYTES)
 #define TESS_OBJ_MAGIC_V12 0x32315354u                /* "TS12": version 12 (CHORD), read and converted */

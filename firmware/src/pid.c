@@ -27,7 +27,7 @@ static const char *const TX_N_QLINK[] = {"OFF", "T1", "T2", "T12", "T3", "T13", 
 static const char *const TX_N_QRANGE[] = {"3 OCT", "1 OCT", "2 OCT", "+-1"};
 static const char *const TX_N_QMOVE[] = {"STOP", "DOWN", "UP", "RAND"};
 static const char *const TX_N_CSFILL[] = {"OFF", "ARP"};
-static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO", "DRONE", "WALK"};   /* (GEN_CH_*) */
+static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO", "DRONE", "WALK", "USER"};   /* (GEN_CH_*) */
 static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
 static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
@@ -112,6 +112,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_SNR] = PD("SNR", F_PCT, 0, 100, 100),
     [TX_GRD_HAT] = PD("HAT", F_PCT, 0, 100, 100),
     [TX_GRD_TOMS] = PD("TOMS", F_PCT, 0, 100, 0),
+    [TX_CH_ULEN] = PD("LEN", F_INT, 1, 8, 4),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -400,8 +401,10 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                          "again, low to high and softer. OCT+ held on GEN, KNOB 3."),
     X_(TX_CH_PROG, "CHORD PROG", "The progression, on the degrees of the track's scale: POP I V vi IV, 50S I vi IV V, "
                                  "2-5-1 ii V I I, CIRCLE the scale's fifths down, TWO I IV, DRONE I alone; WALK four "
-                                 "chords of the track's SEED (ROLL another, EVOLVE changes one). SCL CHORD's CHRD and "
-                                 "VOIC shape the chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC."),
+                                 "chords of the track's SEED (ROLL another, EVOLVE changes one); USER up to eight of "
+                                 "your own: hold OCT+ on GEN and play their roots on the keys, one key a chord (rounded "
+                                 "down to the scale; letting OCT+ go ends it). SCL CHORD's CHRD and VOIC shape the "
+                                 "chords (CHRD OFF: triads); hold OCT+ on GEN for OCT, CHRD and VOIC."),
     X_(TX_CH_BARS, "CHORD BARS", "How long each chord lasts: half a bar, 1, 2 or 4 bars."),
     X_(TX_CH_HIT, "CHORD HIT", "How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; "
                                "STEP every step, for the step's GATE."),
@@ -416,6 +419,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_GRD_TOMS, "GRIDS TOMS", "A fourth part, on the kit's tom (GM 45): the hits the kick and snare only just "
                                   "miss, so fills follow the groove. 0 none; up, misses further under the line play too "
                                   "(DENSITY scales it). OCT+ held on GEN, KNOB 4."),
+    X_(TX_CH_ULEN, "CHORD USER LEN", "How many of USER's chords play, 1 to 8: playing them in on the keys (OCT+ held "
+                                     "on GEN) sets it; shorten it to leave the last ones out. OCT+ held on GEN, KNOB 4."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
