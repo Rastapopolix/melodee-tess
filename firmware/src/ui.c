@@ -642,6 +642,7 @@ typedef struct {
     uint8_t keep;                /* the track is as the last load left it (after): a next load keeps the copy */
     uint8_t what;                /* UNDO_SOUND | UNDO_PAT: what the loads since the copy changed (undo_step) */
     uint8_t eng, preset, user, user_native, patn;
+    uint8_t gmode;               /* a print (capture_take on a generator track): its SEQ MODE + 1; 0 = not one */
     uint8_t fm6[FP_SIZE + 1u];   /* the track's complete patch */
     cz_patch_t cz;
     p5_patch_t p5;
@@ -770,6 +771,7 @@ static void load_begin(track_t *t, uint32_t what)
     u->keep = 0;
     u->pattern_gen = t->pattern_gen;
     u->what = (uint8_t)what;
+    u->gmode = 0;
     u->eng = t->eng_req;
     u->preset = t->preset;
     u->user = t->user;
@@ -869,6 +871,11 @@ static void undo_step(int redo)
             step_t s = t->step[i];
             t->step[i] = step_snapshot_get(&u->step[i]);
             step_snapshot_put(&u->step[i], &s);
+        }
+        if (u->gmode && trk_index(t) < TESSERA_TRACKS) {   /* a print: the generator back (its redo: STEP again) */
+            uint8_t m = tessera.mode[trk_index(t)];
+            tessera_mode_set(trk_index(t), u->gmode - 1u);
+            u->gmode = (uint8_t)(m + 1u);
         }
     }
     fm1_irq_on();

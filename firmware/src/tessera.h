@@ -140,6 +140,7 @@ void tessera_init(void);
 void tessera_clock_step(track_t *t);
 void tessera_markov_recalc(uint32_t tr);
 void tessera_knob(uint32_t k, int32_t s);
+void tessera_mode_set(uint32_t tr, uint32_t m);   /* SEQ MODE (IRQs off) */
 void tessera_ensure_init(void);
 int32_t tessera_snap_note(const track_t *t, int32_t n);
 uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step);

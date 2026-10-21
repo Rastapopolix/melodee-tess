@@ -389,6 +389,17 @@ static void cap_off(const track_t *t, uint32_t note)
     }
 }
 
+/* a generator's note (tessera.c tess_cap) for Capture: closed at once, dur its length in 1/256 of a step */
+static void cap_gen(const track_t *t, uint32_t note, uint32_t vel, uint32_t dur)
+{
+    uint32_t w = cap_w;
+    cap_on(t, note, vel);
+    if (cap_w == w)
+        return;
+    cap_ev[w % CAP_N].dur = (uint16_t)(dur < 1u ? 1u : dur > 65535u ? 65535u : dur);
+    cap_ev[w % CAP_N].tr = (uint8_t)trk_index(t);
+}
+
 /* Jam -> song: while the transport runs (no song), each time track 1 starts its loop the four tracks' patterns are
  * a row: the same as the last row: its repeats + 1 (up to 16), else a new row (up to CHAIN_ROWS). From PLAY on;
  * SEQ > SONG TAKE JAM makes them the song (ui_input.c jam_take) */
