@@ -113,6 +113,9 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_HAT] = PD("HAT", F_PCT, 0, 100, 100),
     [TX_GRD_TOMS] = PD("TOMS", F_PCT, 0, 100, 0),
     [TX_CH_ULEN] = PD("LEN", F_INT, 1, 8, 4),
+    [TX_SV_LOCK] = PD("LOCK", F_PCT, 0, 100, 50),
+    [TX_SV_EVERY] = {"EVERY", F_ENUM, 0, 5, 1, TX_N_EVERY, "bar"},
+    [TX_SV_AMOUNT] = PD("AMOUNT", F_PCT, 0, 100, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -421,6 +424,14 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                   "(DENSITY scales it). OCT+ held on GEN, KNOB 4."),
     X_(TX_CH_ULEN, "CHORD USER LEN", "How many of USER's chords play, 1 to 8: playing them in on the keys (OCT+ held "
                                      "on GEN) sets it; shorten it to leave the last ones out. OCT+ held on GEN, KNOB 4."),
+    X_(TX_SV_LOCK, "STEP EVOLVE LOCK", "A STEP track's EVOLVE page: how much of the variation stays from round to "
+                                       "round. 100 holds it, 0 makes a fresh one each time."),
+    X_(TX_SV_EVERY, "STEP EVOLVE EVERY", "A STEP track's EVOLVE page: bars between rounds of changes; OFF plays the "
+                                         "steps as written."),
+    X_(TX_SV_AMOUNT, "STEP EVOLVE AMOUNT", "A STEP track's EVOLVE page: how many steps play a change, 100 half of them: "
+                                           "a note moved by a degree or two or an octave, a step dropped, two notes "
+                                           "swapped, a ghost note in a rest. 0 plays the steps as written; the steps "
+                                           "themselves never change until REC held keeps the changes."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
