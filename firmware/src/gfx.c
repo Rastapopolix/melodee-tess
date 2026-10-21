@@ -639,8 +639,8 @@ static uint32_t rr_cov(int32_t r, int32_t i, int32_t j)
 }
 /* a filled rectangle with rounded corners (r <= 8), the corners anti-aliased against `under` (what lies
  * behind it): the flat look's cards, panels, rows, bars and buttons. Tessera's tiles: every corner at most
- * UI_TILE_R, whatever r the caller asks */
-#define UI_TILE_R 2
+ * UI_TILE_R, whatever r the caller asks (0: square, Tessera's look) */
+#define UI_TILE_R 0
 static void cv_rrect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c, uint16_t under)
 {
     int32_t i, j;
@@ -709,10 +709,15 @@ static void cv_vspan_aa(int32_t x, int32_t a, int32_t b, uint16_t c)
         *p = swap16(mix565(swap16(*p), c, (uint32_t)cov * 2u));
     }
 }
-/* a 1 px dashed outline, 3 on, 2 off (a pattern waiting: the design's dashed chip), its corners rounded (r) and solid */
+/* a 1 px dashed outline, 3 on, 2 off (a pattern waiting: the design's dashed chip), its corners rounded (r, at most
+ * UI_TILE_R) and solid */
 static void cv_dashed(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c)
 {
     int32_t i;
+    if (r > UI_TILE_R) r = UI_TILE_R;
+    if (r < 1) {                                    /* square: its four corner pixels solid */
+        cv_pset(x, y, c); cv_pset(x + w - 1, y, c); cv_pset(x, y + h - 1, c); cv_pset(x + w - 1, y + h - 1, c);
+    }
     for (i = r; i < w - r; i++)
         if ((i - r) % 5 < 3) { cv_pset(x + i, y, c); cv_pset(x + i, y + h - 1, c); }
     for (i = r; i < h - r; i++)
