@@ -124,7 +124,7 @@ void tessera_init(void)
         tessera_markov_recalc(i);
 
         /* 4. Morph */
-        tessera.morph[i].morph_pos = 0;
+        tessera.morph[i].morph_pos = 64;                     /* (halfway between A and B) */
         tessera.morph[i].snap_a = 0x8888u;
         tessera.morph[i].snap_b = 0xA5A5u;
         tessera.morph[i].step_idx = 0;

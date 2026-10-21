@@ -1690,7 +1690,7 @@ static void page_knob(uint32_t k, int32_t s)
 {
     const page_t *pg = cur_page();
     int16_t *hv;
-    if (!pop.on && help_knob(k))                       /* ARP held: the knob's help, the value left (ui_help.c) */
+    if (!pop.on && help_knob(k, s))                    /* ARP held: the knob's help, the value left (ui_help.c) */
         return;
     if (!pop.on && msc_knob(k, s))                     /* FX held: the knob's mod amount, the value left (ui_modsc.c) */
         return;

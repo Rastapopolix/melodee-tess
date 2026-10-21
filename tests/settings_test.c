@@ -63,6 +63,8 @@ int main(void)
         for (uint32_t i = 0; i < NPALETTES; i++) assert(palette_from_stored(palette_to_stored(i)) == i);
         for (uint32_t i = 0; i < 72u; i++) assert(palette_from_stored(i) == UI_DEFAULT_INDEX && !palette_stored_ok(i));
         assert(palette_stored_ok(palette_to_stored(3)));
+        assert(palette_stored_ok(UI_PAL_TAG + 1u) && palette_from_stored(UI_PAL_TAG + 1u) == UI_DEFAULT_INDEX);  /* DAY */
+        assert(palette_to_stored(UI_DEFAULT_INDEX) == UI_PAL_TAG + 3u);       /* SMALTI keeps its stored id */
         q.palette = palette_to_stored(2);
         assert(settings_import(&q, sizeof q) == 1 && settings.palette == 2u);
         p = original; assert(settings_import(&p, sizeof p) == 1); settings_init();
