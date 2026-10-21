@@ -305,6 +305,12 @@ static int gen_grids_hit(const gen_grids_t *g, uint32_t step, uint32_t steps, ui
  * at the bar's start (none drawn at 0: the pattern alone); the note is the first part's (GM 36 kick, 38 snare, 42
  * closed hat, 45 tom), the adapter plays every part (tessera.c) */
 static const uint8_t GEN_GRIDS_NOTE[GEN_GRIDS_PARTS] = {36, 38, 42, 45};
+/* the fourth part's sounds: the DRUM lanes besides the kick, snare and closed hat (eng_drum.c DRUM_LANE_NOTE) */
+static const uint8_t GEN_GRIDS_P4_NOTE[GEN_GRIDS_P4_N] = {45, 39, 46, 37, 56};
+static uint32_t gen_grids_note(const gen_grids_t *g, uint32_t p)
+{
+    return p == GEN_GRIDS_TOM ? GEN_GRIDS_P4_NOTE[g->part4 % GEN_GRIDS_P4_N] : GEN_GRIDS_NOTE[p % GEN_GRIDS_PARTS];
+}
 static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
     uint32_t steps = gen_grids_steps(clk->steps_per_bar), cur = g->step_idx % steps, p;
@@ -317,7 +323,7 @@ static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd
         int acc;
         if (!gen_grids_hit(g, cur, steps, p, g->perturb, &acc)) continue;
         if (!out->parts) {
-            out->note = GEN_GRIDS_NOTE[p];
+            out->note = (uint8_t)gen_grids_note(g, p);
             out->vel = acc ? 127 : 96;
         }
         out->parts |= (uint8_t)(1u << p);

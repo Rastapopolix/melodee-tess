@@ -894,6 +894,21 @@ static int test_grids_layer(void)
                  tessera_param_get(tr, TX_GRD_HAT) == 100 && tessera_grids(tr)->toms == 10u &&
                  help.pid == PID_TESS(TX_GRD_TOMS) && pid_find(help.pid));
     bad += check("..the octave as it was, no sheet open", song.octave == oct && pop.on != POP_SHEET);
+    {   /* black keys 1 3 5 8 10 13 15 17: the drum grid's lanes BD SD CP CH OH TM RS CB */
+        static const uint8_t K[4] = {5, 1, 17, 0};
+        static const int8_t P4[4] = {1, 1, 4, 4};       /* (CP CLAP; BD, a white key refused) */
+        bad += check("..the keys silent (keys mode 2), KNOB 4's column TOM", song.grid == 2u &&
+                     !strcmp(tessera_grids_part4_name(tr), "TOM"));
+        for (i = 0; i < 4u; i++) {
+            fm1_in.notes |= 1u << K[i]; host_notes |= 1u << K[i]; frame();
+            fm1_in.notes = 0; frame();
+            if (tessera_param_get(tr, TX_GRD_PART4) != P4[i] ||
+                strcmp(ui.msg, i == 1u || i == 3u ? "PART4: CP OH TM RS CB" : i ? "PART4: BELL" : "PART4: CLAP"))
+                break;
+        }
+        bad += check("..a black key picks the fourth part's sound (CP CLAP, CB BELL); BD, a white key refused", i == 4u);
+    }
+    bad += check("..the octave still as it was", song.octave == oct);
     fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
     frame();
     turn(EN_K1 + 3u, 1);
@@ -902,6 +917,7 @@ static int test_grids_layer(void)
     tessera_param_set(tr, TX_GRD_DENS, 50);
     for (i = 0; i < 3u; i++) tessera_param_set(tr, TX_GRD_KICK + i, 100);
     tessera_param_set(tr, TX_GRD_TOMS, 0);
+    tessera_param_set(tr, TX_GRD_PART4, 0);
     return bad;
 }
 
