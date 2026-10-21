@@ -2956,6 +2956,37 @@ static int test_panel(void)
     return bad;
 }
 
+/* MENU > TRACK KNOB: LEFT swaps the ALGORITHM and PRESETS knobs' roles; saved with the settings */
+static int test_track_knob(void)
+{
+    int bad = 0;
+    persist_t p;
+    ui_power_on();
+    settings_knob_swap = 0;
+    song.sel = 0;
+    turn(EN_ALGO, 1);
+    bad += check("TRACK KNOB RIGHT (default): ALGORITHM picks the track", song.sel == 1u);
+    hold(B_HOME);
+    ui.menu_sel = MI_TRACK_KNOB;
+    turn(EN_K2, -1);
+    bad += check("  the menu's KNOB 2 left: LEFT", ui.menu == 1 && settings_knob_swap == 1u);
+    press(B_OCTDN);
+    song.sel = 0;
+    turn(EN_PRESET, 1);
+    bad += check("  LEFT: PRESETS picks the track", !ui.menu && song.sel == 1u);
+    turn(EN_ALGO, 1);
+    bad += check("  .. and ALGORITHM no longer does", song.sel == 1u);
+    memset(&p, 0, sizeof p);
+    settings_export(&p);
+    settings_knob_swap = 0;
+    bad += check("  saved with the settings", settings_import(&p, sizeof p) && settings_knob_swap == 1u);
+    p.favorites.factory[15][25] = 0x01u;
+    settings_import(&p, sizeof p);
+    bad += check("  an older record (no tag): RIGHT", settings_knob_swap == 0u);
+    song.sel = 0;
+    return bad;
+}
+
 /* ------------------------------------------------- the FX hold layer --- */
 static void btn_down(uint32_t label) { fm1_in.buttons |= 1u << panel.btn[label]; host_pressed |= 1u << panel.btn[label]; }
 static void btn_up(uint32_t label) { fm1_in.buttons &= ~(1u << panel.btn[label]); }
@@ -5244,6 +5275,7 @@ int main(void)
     bad += test_mono_screens();
     bad += test_roll();
     bad += test_panel();
+    bad += test_track_knob();
     bad += test_layer();
     bad += test_name();
     bad += test_edit_cycle();
