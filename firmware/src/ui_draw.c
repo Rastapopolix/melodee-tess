@@ -1555,6 +1555,7 @@ static void ui_draw_frame(void)
             ui.force = 1;
         } else if (pop.on == POP_PICK)
             pv_mod_chips();                             /* (the values under it, the page left as it is: no flash) */
+        melodee_dbg.stage = 7;
         pop_draw();
         ui.force = 0;
         return;

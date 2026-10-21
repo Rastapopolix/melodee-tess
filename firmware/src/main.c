@@ -103,36 +103,40 @@ static void clock_boot(void)
     vbudget_cpu1 = VBUDGET * (m ? fm1_clock_mhz_of(m) : 360u) / 360u;
 }
 
-static void hexs(char *b, uint32_t v)
-{
-    uint32_t i;
-    for (i = 0; i < 8u; i++)
-        b[i] = "0123456789ABCDEF"[(v >> (28u - 4u * i)) & 15u];
-    b[8] = 0;
-}
-
-static void fm1_fault(const fm1_crash_t *c)
+/* the crash screen: the fault's registers, each named, then where it was (the audio interrupt, or the main loop's
+ * breadcrumb: its drawing stage and page) and how long after the start. A photo of it finds the line in the build
+ * (VEC and PC first). The where is kept with the record (melodee_dbg, .noinit) for ABOUT after the restart */
+static void crash_line(uint32_t y, const char *label, uint32_t v)
 {
     char b[12];
+    hexs(b, v);
+    draw_text_line(16, y, 60, &AF_M, label, UI_CRASH_INK, UI_CRASH_BG, 0);
+    draw_text_line(80, y, 150, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
+}
+static void fm1_fault(const fm1_crash_t *c)
+{
+    char b[32];
     uint32_t t0;
 #if MELODEE_DUAL_CORE
     if (audio_worker_online)
         fm1_core1_bar_set();                          /* one core on every boot until power-off */
 #endif
     fm1_audio_stop();
+    melodee_dbg.crash_audio = melodee_dbg.in_audio;   /* (before anything else can change them) */
+    melodee_dbg.crash_stage = melodee_dbg.stage;
+    melodee_dbg.crash_page = melodee_dbg.page;
+    melodee_dbg.crash_magic = DBG_CRASH_MAGIC;
     scr_wake_now();
     lcd_fill(0, 0, 240, 240, UI_CRASH_BG);            /* fixed, outside the palettes */
-    draw_text_line(0, 8, 240, &AF_M, "MELODEE CRASH", UI_CRASH_INK, UI_CRASH_BG, 1);
-    hexs(b, c->vec);
-    draw_text_line(10, 40, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->pc);
-    draw_text_line(10, 60, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->emu);
-    draw_text_line(10, 84, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->dbg);
-    draw_text_line(10, 102, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->rets);
-    draw_text_line(10, 120, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
+    draw_text_line(0, 8, 240, &AF_M, "TESSERA CRASH", UI_CRASH_INK, UI_CRASH_BG, 1);
+    crash_line(40, "VEC", c->vec);
+    crash_line(60, "PC", c->pc);
+    crash_line(80, "RETS", c->rets);
+    crash_line(100, "EMU", c->emu);
+    crash_line(120, "DBG", c->dbg);
+    crash_where(b, melodee_dbg.crash_audio, melodee_dbg.crash_stage, melodee_dbg.crash_page, c->uptime_ms);
+    draw_text_line(0, 152, 240, &AF_S, b, UI_CRASH_INK, UI_CRASH_BG, 1);
+    draw_text_line(0, 200, 240, &AF_S, "PHOTO THIS SCREEN: IT RESTARTS", UI_CRASH_INK, UI_CRASH_BG, 1);
     t0 = fm1_ticks();
     while ((uint32_t)(fm1_ticks() - t0) < 4000u * 1000u * FM1_TICKS_PER_US)
         ;

@@ -18,7 +18,9 @@ struct melodee_dbg {
     uint32_t last_us, cpu_q8, boots;
     uint32_t stage, page, home;           /* where the main loop is (breadcrumbs) */
     uint32_t prev_stage, prev_page, prev_home, prev_rst, prev_frames;   /* as found at boot */
+    uint32_t crash_magic, crash_audio, crash_stage, crash_page;   /* where the last crash was (main.c fm1_fault) */
 } melodee_dbg __attribute__((section(".noinit")));
+#define DBG_CRASH_MAGIC 0x43524831u                 /* "CRH1": crash_audio .. crash_page are a crash's */
 static volatile uint32_t audio_halves,audio_max_us;
 static uint32_t audio_full_last_us,audio_full_max_us,audio_deadline_misses,audio_target_exceeded;
 /* Written by the assembly wrapper, observed at the following interrupt. */
