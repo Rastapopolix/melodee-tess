@@ -177,10 +177,18 @@ static int palette_track(uint32_t t)
     return 1;
 }
 
-/* settings store a tagged id (UI_PAL_TAG + index); any other id reads as the default */
-static int palette_stored_ok(uint32_t v) { return v >= UI_PAL_TAG && v - UI_PAL_TAG < NPALETTES; }
-static uint32_t palette_from_stored(uint32_t v) { return palette_stored_ok(v) ? v - UI_PAL_TAG : UI_DEFAULT_INDEX; }
-static uint32_t palette_to_stored(uint32_t i) { return UI_PAL_TAG + i % NPALETTES; }
+/* settings store a tagged id (UI_PAL_TAG + the palette's slot, UI_PAL_SLOTS); a retired slot's (DAY's) is still a
+ * valid id and reads as the default, as does any other id */
+static uint32_t palette_slot_index(uint32_t v)       /* the index of stored id v, NPALETTES: none */
+{
+    uint32_t i;
+    for (i = 0; i < NPALETTES; i++)
+        if (v == UI_PAL_TAG + UI_PAL_SLOTS[i]) break;
+    return i;
+}
+static int palette_stored_ok(uint32_t v) { return v >= UI_PAL_TAG && v - UI_PAL_TAG <= UI_PAL_SLOTS[NPALETTES - 1u]; }
+static uint32_t palette_from_stored(uint32_t v) { return palette_slot_index(v) < NPALETTES ? palette_slot_index(v) : UI_DEFAULT_INDEX; }
+static uint32_t palette_to_stored(uint32_t i) { return UI_PAL_TAG + UI_PAL_SLOTS[i % NPALETTES]; }
 
 static inline uint16_t swap16(uint32_t c) { return (uint16_t)(((c >> 8) & 0xFFu) | ((c & 0xFFu) << 8)); }
 
