@@ -377,7 +377,7 @@ def fm6_tables():
     N = 64
     L = [f"#define FM6_N {N}", "#define FM6_LG_N 6"]
     # sine, Q24 out of a Q24 phase: 1024 points by rotation (sin.cc), the next point for interpolation
-    # The RAM tables (FM6_SIN, the MARK I and OPL logs and exponents) are filled at boot by dsp_tables_init (below)
+    # The RAM tables (FM6_SIN, the MARK I log and exponents) are filled at boot by dsp_tables_init (below)
     # from the rotation's two constants, half of each log and the exponents' steps: 8.6 KB less flash, bit for bit
     c = math.floor(math.cos(2 * math.pi / 1024) * (1 << 30) + 0.5)
     s = math.floor(math.sin(2 * math.pi / 1024) * (1 << 30) + 0.5)
@@ -421,8 +421,8 @@ def fm6_tables():
         16, 15, 15, 14, 13, 13, 12, 12, 11, 10, 10, 9, 9, 8, 8, 7,
         7, 7, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2,
         2, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
-    L += arr("FM6_OPL_LOG_H", "uint16_t", opl_log, 16)      # FM6_OPL_LOG: half a cycle
-    L += ["static uint16_t FM6_OPL_LOG[512];"]
+    # (melodee-tess, 2026-10-21: the OPL tables in flash, 1.5 KB of static RAM for FM back; only OPL voices read them)
+    L += arr("FM6_OPL_LOG", "uint16_t", opl_log + opl_log[::-1], 16)   # half a cycle
     opl_exp = [
         0, 3, 6, 8, 11, 14, 17, 20, 22, 25, 28, 31, 34, 37, 40, 42,
         45, 48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84, 87, 90,
@@ -440,8 +440,7 @@ def fm6_tables():
         774, 779, 784, 789, 794, 799, 804, 809, 814, 819, 824, 829, 834, 839, 844, 849,
         854, 859, 864, 869, 874, 880, 885, 890, 895, 900, 906, 911, 916, 921, 927, 932,
         937, 942, 948, 953, 959, 964, 969, 975, 980, 986, 991, 996, 1002, 1007, 1013, 1018]
-    L += arr("FM6_OPL_EXP_D", "uint8_t", nibbles([opl_exp[i] - opl_exp[i - 1] - 2 for i in range(1, 256)], opl_exp[0]), 16)
-    L += ["static uint16_t FM6_OPL_EXP[256];              /* (0x400 + exp) << 1, reversed */"]
+    L += arr("FM6_OPL_EXP", "uint16_t", [(0x400 + opl_exp[i ^ 255]) << 1 for i in range(256)], 16)   # (0x400 + exp) << 1, reversed
     L += ["/* the RAM tables above, bit for bit as this script made them before (checked by tests/fm6_parity.sh and the",
           " * goldens); fm1_main calls it before anything renders, host builds before main */",
           "static void dsp_tables_init(void)",
@@ -461,14 +460,9 @@ def fm6_tables():
           "    }",
           "    FM6_SIN[1024] = 0.0f;",
           "    for (i = 0; i < 1024u; i++) FM6_MKI_LOG[i] = FM6_MKI_LOG[2047u - i] = FM6_MKI_LOG_H[i];",
-          "    for (i = 0; i < 256u; i++) FM6_OPL_LOG[i] = FM6_OPL_LOG[511u - i] = FM6_OPL_LOG_H[i];",
           f"    for (i = 0, e = {ex[0]}u; i < 1024u; i++) {{",
           "        if (i) e += 2u + ((FM6_MKI_EXP_D[(i - 1u) >> 1] >> (((i - 1u) & 1u) * 4u)) & 15u);",
           "        FM6_MKI_EXP[i ^ 1023u] = (uint16_t)(4096u + e);",
-          "    }",
-          f"    for (i = 0, e = {opl_exp[0]}u; i < 256u; i++) {{",
-          "        if (i) e += 2u + ((FM6_OPL_EXP_D[(i - 1u) >> 1] >> (((i - 1u) & 1u) * 4u)) & 15u);",
-          "        FM6_OPL_EXP[i ^ 255u] = (uint16_t)((0x400u + e) << 1);",
           "    }",
           "}",
           "#if defined(__APPLE__)",
