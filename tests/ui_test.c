@@ -3023,7 +3023,20 @@ static int test_popups(void)
         turn(EN_K2, 3);                                 /* (three detents in one read: three rows) */
         bad += check("..KNOB 2 a click a row: SOUND -> ALGO -> OP1, three at once: OP4", o && f == 2u && smap.row == 5u &&
                      sec.op[smap.row] == 4u);
+        press(B_ENV);
+        bad += check("..another page's button from the map: ENV, FM6's EG, the map closed", !smap.on &&
+                     str_eq(cur_page()->title, "EG RATE"));
         press(B_EDIT);
+        press(B_SEQ);
+        bad += check("..SEQ from the map: SEQ's page (the track's GEN or steps), the map closed", !smap.on && !ui.home &&
+                     cur_page()->fam != FAM_EDIT);
+        press(B_EDIT); press(B_EDIT);
+        press(B_LFO);
+        bad += check("..LFO from the map: FM6's LFO, the map closed", !smap.on && str_eq(cur_page()->title, "FM LFO"));
+        press(B_EDIT);
+        o = smap.on;
+        press(B_HOME);
+        bad += check("..HOME from the map: HOME, the map closed", o && !smap.on && ui.home);
     }
     go_page(GR_SONG); frame();
     hold(B_OCTUP);
