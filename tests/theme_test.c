@@ -130,7 +130,7 @@ int main(int argc, char **argv)
     assert(palette_track(1) && !palette_track(1));             /* (and so does the track: once) */
     cv_begin(3, 1, T_BG); cv_text(0, 0, &probe, "A", T_THEME);
     assert(swap16(cv_px[1]) != night);
-    /* fonts (docs/design): Rubik X 10 px, S 12 px (on the line metrics of 9 / 11 px), M 15 px, L 30 px; tabular
+    /* fonts (docs/design): Chakra Petch X 10 px, S 12 px, M 15 px, L 30 px in Rubik's line boxes; tabular
      * digits; the ellipsis; L capitals only */
     assert(AF_X.h == 12 && AF_X.asc == 9 && AF_S.h == 14 && AF_S.asc == 11 && AF_M.h == 19 && AF_M.asc == 15 &&
            AF_L.h == 37 && AF_L.asc == 29);

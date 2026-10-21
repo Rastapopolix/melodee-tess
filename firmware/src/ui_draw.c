@@ -4,7 +4,7 @@
 /* Melodee UI drawing: the header, the four knob cards, the footer (steps + engine / preset / page)
  * and the frame; the panel between the cards and the footer is ui_graph.c. The layout: SURF cards and panels on
  * BG, rounded corners, no rules, colours from the theme tokens only (gfx.c T_*); THEME is the selected track's
- * colour (labels, gauges, curves), values in TEXT. Type: Rubik, S (12 px) labels, M (15 px) values and the header,
+ * colour (labels, gauges, curves), values in TEXT. Type: Chakra Petch, S (12 px) labels, M (15 px) values and the header,
  * L (26 px) big numerals. A card value too wide for M is set in S; free text (names, messages) is ellipsised. */
 static void draw_menu(void);
 static int name_on(void);                              /* NAME (ui_name.c) */
@@ -188,21 +188,34 @@ static void head_chip_text(char *b)
         str_cpy(b, t, 16);
     }
 }
-/* the page's place in its family: a dot a page, the page's a pill in the track's colour (no room: "3/12") */
-static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1: where the transport's marks, or the
-                                                         * battery, start) */
+/* the page's place in its family: n pages, the page the k-th (an engine in sections: the section's pages; the
+ * designer: its stage's) */
+static void page_place(uint32_t *pn, uint32_t *pk)
 {
     const page_t *pg = cur_page();
     uint32_t i, n = 0, k = 0, sc = sec_on() ? sec_of(ui.page) + 1u : 0u;
-    if (designer_on() && !name_on())                    /* the designer: its stage's pages */
+    if (designer_on() && !name_on())
         designer_pages(&n, &k);
-    else for (i = 0; i < NPAGES; i++)                   /* (an engine in sections: the section's pages) */
+    else for (i = 0; i < NPAGES; i++)
         if (PAGES[i].fam == pg->fam && page_visible(i) &&
             (!sc || (PAGES[i].scope == SC_FMOP ? PAGES[ui.page].scope == SC_FMOP : sec_of(i) + 1u == sc))) {
             if (i == ui.page)
                 k = n;
             n++;
         }
+    *pn = n;
+    *pk = k;
+}
+static int foot_tabs_on(void);                          /* (below) */
+/* the page's place in the header: a dot a page, the page's a pill in the track's colour (no room: "3/12"); none
+ * where the foot has the page tabs (foot_tabs_on) */
+static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1: where the transport's marks, or the
+                                                         * battery, start) */
+{
+    uint32_t i, n, k;
+    if (foot_tabs_on())
+        return;
+    page_place(&n, &k);
     if (n < 2u)
         return;
     if (x + (int32_t)n * 9 + 8 > x1 - 6) {              /* (no room for the dots; none for that either: nothing) */
@@ -220,6 +233,32 @@ static void head_pages(int32_t x, int32_t x1)          /* (x: after the chip; x1
         x += w + 5;
     }
 }
+/* Tessera's page tabs, right-aligned to x1 at row y: a numbered tile a page, the page's in the track's colour
+ * (no room right of x0: "3/12"); returns their left edge (one page: x1, nothing drawn) */
+static int32_t page_tabs(int32_t x0, int32_t x1, int32_t y)
+{
+    uint32_t i, n, k;
+    int32_t w, x;
+    char d[8];
+    page_place(&n, &k);
+    if (n < 2u)
+        return x1;
+    w = n > 9u ? 14 : 10;                               /* (a tile: 12 rows, its numeral's width and a margin) */
+    if (x1 - (int32_t)n * (w + 2) + 2 < x0) {
+        fmt_int(d, (int32_t)k + 1);
+        str_cpy(d + str_len(d), "/", 2);
+        fmt_int(d + str_len(d), (int32_t)n);
+        return cv_text_r(x1, y, &AF_X, d, T_MID, T_BG);
+    }
+    x = x1 - (int32_t)n * (w + 2) + 2;
+    for (i = 0; i < n; i++, x += w + 2) {
+        uint16_t c = i == k ? T_THEME : T_SURF;
+        fmt_int(d, (int32_t)i + 1);
+        cv_rrect(x, y, w, 12, 2, c, T_BG);
+        cv_text_c(x + w / 2, y, &AF_X, d, i == k ? T_INK : T_MID, c);
+    }
+    return x1 - (int32_t)n * (w + 2) + 2;
+}
 static void draw_head(void)
 {
     char b[16], chip[16];
@@ -231,7 +270,7 @@ static void draw_head(void)
     sig = (uint32_t)seq_erase_active(TSEL) * 8191u + (uint32_t)song.playing * 3u + song.rec * 5u + song.rec_wait * 65537u + (uint32_t)(song.octave + 8) * 11u +
           song.sel * 13131u + (msg ? str_hash(7u, ui.msg_t ? ui.msg : layer_head()) : str_hash(5u, chip)) +
           (ui.bpm_t != 0) * 31u + low * 7777u + (chain.running ? (chain.row + 1u) * 104729u : 0u) + ux.gen * 977u +
-          (ui.home ? 0u : ui.page * 2654435761u) + page_sheet() * 524287u;
+          (ui.home ? 0u : ui.page * 2654435761u) + page_sheet() * 524287u + (uint32_t)gen_layer_on() * 40503u;
     if (bpm != ui.roll_bpm) {
         char a[8];
         fmt_int(a, ui.roll_bpm);
@@ -296,7 +335,10 @@ static void draw_head(void)
             cv_text_c(8 + cw / 2, 3, &AF_X, chip, T_INK, T_THEME);
             l = 8 + cw;
         }
-        if (page_sheet()) {                             /* the page has a sheet (OCT+ held) */
+        if (gen_layer_on()) {                           /* OCT+ held, a generator's layer: its key */
+            cv_keycap(l + 6, 3, KC_OCTUP, T_THEME, T_INK, T_BG);
+            l += 6 + kc_w(KC_OCTUP);
+        } else if (page_sheet()) {                      /* the page has a sheet (OCT+ held) */
             cv_text_on(l + 4, 2, &AF_S, "\x85", T_MID, T_BG);
             l += 14;
         }
@@ -569,7 +611,7 @@ static void draw_foot(void)
             ti[0] = 'O'; ti[1] = 'P'; ti[2] = (char)('1' + fm6_opsel % 6u); ti[3] = ' ';
             str_cpy(ti + 4, pg->title, 9);
         }
-        if (n > 1) {
+        if (n > 1 && !foot_tabs_on()) {              /* (the tabs: the page's place, the header its name) */
             str_cpy(ti + str_len(ti), " ", 4);
             fmt_int(ti + str_len(ti), (int32_t)k);
             str_cpy(ti + str_len(ti), "/", 4);
@@ -590,7 +632,7 @@ static void draw_foot(void)
         uint32_t ph = song.playing && t->seq_idx / 16u == ui.bank ? t->seq_idx : 0xFFu;
         sig = str_hash(0x9E3779B9u, s) + ph * 97u + (song.seq_mode ? ui.cursor : 0xFFu) * 3001u + steps_hash(t) +
               (ui.home ? 0u : page_icon(pg)) * 7121u +
-              ui.bank * 7u + (uint32_t)t->p[P_SLEN] * 13u;
+              ui.bank * 7u + (uint32_t)t->p[P_SLEN] * 13u + (ui.home ? 0u : ui.page * 2246822519u);
     }
     if (act_cols()) {                                  /* the hint, and whether OCT+ would act */
         char ha[16], hb[16];
@@ -671,9 +713,17 @@ static void draw_foot(void)
     if (MELODEE_ICONS)
         x += cv_icon_on(x, 20, 12, engine_icon(ename), T_MID, T_BG) + 5;
     x = cv_text_fit(x, 19, &AF_S, ename, T_THEME, T_BG, 80);
-    {   /* the page title at the right, its icon before it (MIXER, SONG, MOTION) */
-        uint32_t pi = ui.home ? ICON_NONE : page_icon(pg);
-        int32_t tx = 232 - text_w(&AF_S, ti) - (pi != ICON_NONE ? 16 : 0);
+    {   /* the page title at the right, its icon before it (MIXER, SONG, MOTION); the page tabs: they, the title in
+         * the header's chip */
+        uint32_t pi = ui.home ? ICON_NONE : page_icon(pg), pn1, pk1;
+        int32_t tx;
+        if (!ui.home && foot_tabs_on() && (page_place(&pn1, &pk1), pn1 > 1u)) {
+            tx = page_tabs(x + 10 + 64, 232, 20);
+            cv_free_text(x + 10, 19, &AF_S, pn, T_TEXT, T_BG, tx - 6 - (x + 10));
+            cv_blit(0, Y_FOOT);
+            return;
+        }
+        tx = 232 - text_w(&AF_S, ti) - (pi != ICON_NONE ? 16 : 0);
         cv_free_text(x + 10, 19, &AF_S, pn, T_TEXT, T_BG, tx - 12 - (x + 10));
         if (pi != ICON_NONE) cv_icon_on(tx, 20, 12, pi, T_MID, T_BG);
         cv_text_r(232, 19, &AF_S, ti, T_MID, T_BG);
@@ -1441,6 +1491,18 @@ static int own_screen(void)                             /* a page drawn whole by
 {
     uint32_t g = cur_page()->graph;
     return !ui.home && (g == GR_BROWSE || g == GR_PATGRID || g == GR_SONG || g == GR_SCALE_PICKER);
+}
+/* the foot has the page tabs, the header then no dots: the sound's strip (ui_pages.c pv_sound) on the pages pv_draw
+ * draws with it, draw_foot's second row on the rest (not the notes', which end before it); not the designer's (its
+ * stages are its tabs), MIXER's, MOD's or CORDS' (no foot) */
+static int foot_tabs_on(void)
+{
+    uint32_t k = pv_kind(), g = cur_page()->graph;
+    if (ui.home || designer_on() || own_screen() || slot_kind() || motion_page() || list_on())
+        return 0;
+    if (k == PV_NONE)
+        return !(g == GR_ROLL && (!grid_on() || live_rec_sel()));
+    return k == PV_CURVE || k == PV_RINGS || k == PV_FADERS || k == PV_NOTES || k == PV_GRID;
 }
 /* the page (or Stage): its own screen, the redesign's, else its cards, panel and footer */
 static void draw_page(void)

@@ -3,7 +3,7 @@
 /* Small-canvas renderer (no full framebuffer). Draw text/lines into
  * an off-screen strip, then blit it in one DMA transfer. Pixels are stored
  * byte-swapped (the panel takes RGB565 big-endian).
- * Text and icons are 4-bit alpha bitmaps made at build time (tools/gen_aa_font.py: Rubik;
+ * Text and icons are 4-bit alpha bitmaps made at build time (tools/gen_aa_font.py: Chakra Petch;
  * tools/gen_icons.py: Melodee's own drawings). A glyph is trimmed to its ink box, advances are in 1/16 px, and
  * each glyph is rasterised at 1 << psh horizontal phases (2: drawn at a pen of +0, +1/2 px);
  * cv_text takes the phase that puts it within a phase step of its true place. Blending uses a 16-entry
@@ -630,11 +630,14 @@ static uint32_t rr_cov(int32_t r, int32_t i, int32_t j)
     return (uint32_t)n;
 }
 /* a filled rectangle with rounded corners (r <= 8), the corners anti-aliased against `under` (what lies
- * behind it): the flat look's cards, panels, rows, bars and buttons */
+ * behind it): the flat look's cards, panels, rows, bars and buttons. Tessera's tiles: every corner at most
+ * UI_TILE_R, whatever r the caller asks */
+#define UI_TILE_R 2
 static void cv_rrect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c, uint16_t under)
 {
     int32_t i, j;
     GFX_HOOK_CELL(x, y + cv_oy, x + w, y + h + cv_oy);   /* (the lint: what is drawn on it stays inside it) */
+    if (r > UI_TILE_R) r = UI_TILE_R;
     if (r > w / 2) r = w / 2;
     if (r > h / 2) r = h / 2;
     if (r < 1) {
@@ -661,6 +664,11 @@ static uint16_t mix565(uint16_t bg, uint16_t fg, uint32_t a);
 static void cv_disc(int32_t cx, int32_t cy, int32_t d, uint16_t c, int ring)
 {
     int32_t qx = cx * 8 + ((d & 1) ? 4 : 0), qy = (cy + cv_oy) * 8 + ((d & 1) ? 4 : 0), r = d * 4, ri = r - 8, x, y;
+    if (!ring) {                                        /* Tessera: a dot is a square tile, a pixel inside the disc's box */
+        int32_t e = d > 3 ? d - 1 : d;
+        cv_rect(cx - e / 2, cy - e / 2, e, e, c);
+        return;
+    }
     for (y = cy + cv_oy - d / 2 - 1; y <= cy + cv_oy + d / 2 + 1; y++)
         for (x = cx - d / 2 - 1; x <= cx + d / 2 + 1; x++) {
             int32_t n = 0, i, j;

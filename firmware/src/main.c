@@ -174,14 +174,6 @@ static void melodee_init(void)
     ui.force = 1;
 }
 
-static void splash(const char *line)          /* the boot screen: MELODEE, the fork's name, then a line */
-{
-    lcd_fill(0, 0, 240, 240, T_BG);
-    draw_text_box(0, 84, 240, &AF_L, "MELODEE", T_THEME, 1);
-    draw_text_box(0, 122, 240, &AF_M, "TESS", T_TEXT, 1);
-    draw_text_box(0, 146, 240, &AF_S, line, T_MID, 1);
-}
-
 static void fm1_main(void)
 {
     int32_t knob = 512 * 16;
@@ -199,7 +191,7 @@ static void fm1_main(void)
     settings_init();
     clock_boot();                             /* the voice budget at the clock found (never changed) */
     if (boot_work.state != 2u)
-        splash("MULTI-ENGINE SYNTH");
+        splash("FM-1 FIRMWARE");
     if (melodee_dbg.magic != DBG_MAGIC) {
         memset(&melodee_dbg, 0, sizeof melodee_dbg);
         melodee_dbg.magic = DBG_MAGIC;
@@ -240,10 +232,11 @@ static void fm1_main(void)
     if ((fm1_in.buttons & 3u) == 3u) {
         panel_setup();                        /* OCT- + OCT+ held at power-on */
         settings_save();
+        splash("FM-1 FIRMWARE");              /* (the bed back for the tiles) */
     }
     glo_restore();                            /* CLK TUNE MIDI ROUT as last used, */
     project_boot();                           /* then the BOOT project or the template (they keep them) */
-    fm1_delay_ms(400);
+    splash_lay(400, boot_work.state != 2u);   /* the mosaic set in the boot's wait (src/splash.c) */
     if (boot_work.state != 2u)
         lcd_fill(0, 0, 240, 240, T_BG);
 

@@ -180,7 +180,8 @@ static const int8_t PV_DOT[33][2] = {
 /* CS_RING: a 58 x 80 cell: the label (9 px, the track's colour), the ring (5 px, KNOB_RING: the newer Elektron dial,
  * filled to its value, no pointer), the value under it; the knob just turned: lifted, outlined */
 /* a ring's words as the mockups write them: its label in full ("OCT" -> "OCTAVES", when it fits), a name value in
- * sentence case ("SAW" -> "Saw"; numbers and notes as they are), a unit in lower case ("STEP" -> "steps") */
+ * sentence case ("SAW" -> "Saw"; numbers and notes as they are), a unit in lower case ("STEP" -> "steps"; dB and
+ * BPM as they are) */
 static const struct { const char *k, *w; } PV_LABEL[] = {
     {"OCT", "OCTAVES"}, {"LEN", "LENGTH"}, {"DIV", "DIVISION"}, {"SWG", "SWING"}, {"PAT", "PATTERN"},
     {"DTN", "DETUNE"}, {"NOIS", "NOISE"}, {"CUT", "CUTOFF"}, {"DRV", "DRIVE"}, {"ATK", "ATTACK"}, {"DEC", "DECAY"},
@@ -201,7 +202,7 @@ static void pv_words(const char *label, const char *val, const char *unit, char 
     str_cpy(u, unit, 8);
     if (str_eq(unit, "STEP")) {
         str_cpy(u, str_eq(val, "1") ? "step" : "steps", 8);
-    } else if (unit[0] && unit[1] && !str_eq(unit, "dB")) {
+    } else if (unit[0] && unit[1] && !str_eq(unit, "dB") && !str_eq(unit, "BPM")) {
         for (i = 0; u[i]; i++)
             if (u[i] >= 'A' && u[i] <= 'Z') u[i] = (char)(u[i] + 32);
     }
@@ -219,7 +220,16 @@ static void pv_ring(uint32_t c, const char *label0, const char *val0, const char
         cv_rrect(1, 1, 56, h - 4, 7, bg, T_THEME);
     }
     if (label[0] || val[0]) {
-        cv_text_c(29, 2, &AF_X, label, lc, bg);
+        if (gen_layer_on() && label[0]) {              /* OCT+'s layer: the labels on tiles, a set laid over the
+                                                         * page's (ui_graph.c gen_layer_on) */
+            int32_t w = text_w(&AF_X, label) + 8;
+            if (w < 30) w = 30;
+            if (w > 58) w = 58;
+            cv_rrect(29 - w / 2, 1, w, 12, 2, lc, bg);
+            cv_text_c(29, 2, &AF_X, label, T_INK, lc);
+        } else {
+            cv_text_c(29, 2, &AF_X, label, lc, bg);
+        }
         if (ratio >= 0) {
             int32_t r = ratio > 1000 ? 1000 : ratio, a1 = -KA_END + r * 2 * KA_END / 1000;
             knob_arc(29 - KNOB_RING_R, cy - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE,
@@ -338,19 +348,20 @@ static void pv_sound(void)
     char nm[20];
     const char *en = ENGINES[eng_idx(TSEL->eng_req)]->name;
     uint32_t sig;
-    int32_t x;
+    int32_t x, tx;
     if (designer_on() && designer_foot())                /* the sound designer: its keys (ui_designer.c) */
         return;
     if(cur_page()->fam==FAM_FX && cur_page()->scope==SC_GLOBAL && cur_page()->id[0]!=G_TRK_SEND){en="SEND / RETURN";memcpy(nm,"ALL TRACKS",11);}
     else sound_name(TSEL, nm);
-    sig = str_hash(str_hash(song.sel * 7u + ux.gen * 977u + ux.pal * 31u, en), nm);
+    sig = str_hash(str_hash(song.sel * 7u + ux.gen * 977u + ux.pal * 31u + ui.page * 2654435761u, en), nm);
     if (!ui.force && sig == pv.sound)
         return;
     pv.sound = sig;
     cv_begin(240, 240 - PV_SOUND_Y, T_BG);
     cv_icon_mid(6, 8, 16, trk_icon(song.sel, 1), T_THEME, T_BG);   /* (its ink at x 8, as the text was) */
     x = cv_text_on(26, 3, &AF_X, en, T_THEME, T_BG);
-    cv_free_text(x + 6, 1, &AF_S, nm, T_SEC, T_BG, 232 - x - 6);
+    tx = foot_tabs_on() ? page_tabs(x + 6 + 64, 232, 3) : 232;   /* the page tabs at the right (the name keeps 64 px) */
+    cv_free_text(x + 6, 1, &AF_S, nm, T_SEC, T_BG, tx - 6 - x - 6);
     cv_blit(0, PV_SOUND_Y);
 }
 /* a panel h rows tall at y, drawn by fn in slices (fn draws in panel coordinates; pv.slice0: the slice's first row) */
