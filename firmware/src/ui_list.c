@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* List pages (docs/design README "Pages: lists or knobs", mock/r6_pages SCL): the pages one sets and leaves as a list,
- * a row a setting: KNOB 2 the row, KNOB 1 its value, OCT+ a list value's whole list (SCL's Scale: the SCALES page),
+ * a row a setting: KNOB 1 the row, KNOB 2 its value, OCT+ a list value's whole list (SCL's Scale: the SCALES page),
  * OCT- Stage. Only what has more than four settings (Kerem, 2026-10-11: four or fewer are a page's own four knobs;
  * TEMPO, GLOBAL, SYSTEM stay knobs too: BPM and TUNE are turned while playing). A list may gather a few
  * pages (VOICE 1-3, FM6's LFO and controller pages): the
@@ -135,7 +135,7 @@ static void list_capture(uint32_t c, const char *label, const char *val, const c
     lcap[c].on = label[0] || val[0];
 }
 
-/* KNOB 2 the row, KNOB 1 its value (the row's page edits it, as if it were shown) */
+/* KNOB 1 the row, KNOB 2 its value (the row's page edits it, as if it were shown) */
 static void list_knob(uint32_t k, int32_t s)
 {
     const list_t *l = list_on();
@@ -143,11 +143,11 @@ static void list_knob(uint32_t k, int32_t s)
     uint32_t p;
     if (!l)
         return;
-    if (k == 1u) {
+    if (k == 0u) {
         lst.row = (uint8_t)clamp((int32_t)lst.row + s, 0, (int32_t)list_n(l) - 1);
         return;
     }
-    if (k != 0u || (p = page_titled(list_at(l, lst.row)->page)) >= NPAGES)
+    if (k != 1u || (p = page_titled(list_at(l, lst.row)->page)) >= NPAGES)
         return;
     pg = ui.page;
     ui.page = (uint8_t)p;

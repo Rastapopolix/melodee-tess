@@ -355,14 +355,14 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
             menu_close();
         return;
     }
-    if ((s = panel_enc(EN_K2)) != 0 && ui.menu == 1)  /* KNOB 2 the row (the standard; PRESETS too) */
+    if ((s = panel_enc(EN_K1)) != 0 && ui.menu == 1)  /* KNOB 1 the row, KNOB 2 its value (Tessera's lists) */
         ui.menu_sel = (uint8_t)clamp((int32_t)ui.menu_sel + s, 0, (int32_t)MI_COUNT - 1);
     if ((s = panel_enc(EN_PRESET)) != 0 && ui.menu == 1)
         ui.menu_sel = (uint8_t)((ui.menu_sel + (s > 0 ? 1u : MI_COUNT - 1u)) % MI_COUNT);
     else if (s != 0 && ui.menu >= 2) {             /* bounded document scrolling */
         ui.menu_scroll = (uint16_t)clamp((int32_t)ui.menu_scroll + clamp(s, -128, 128) * 18, 0, menu_scroll_max());
     }
-    s = panel_enc(EN_K1);
+    s = panel_enc(EN_K2);
     if (s != 0 && ui.menu == 1 && ui.menu_sel == MI_COLOR) {
         settings.palette = (settings.palette + (s > 0 ? 1u : NPALETTES - 1u)) % NPALETTES;   /* (wraps) */
         palette_set(settings.palette);              /* (the menu signature redraws) */
@@ -375,7 +375,7 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         ok = 0;
     }
     if ((s != 0 || ok) && ui.menu == 1 && ui.menu_sel == MI_USB) {
-        /* KNOB 1 steps IN+OUT IN OUT OFF, OCT+ steps and wraps; the host gets it once it rests (main.c) */
+        /* KNOB 2 steps IN+OUT IN OUT OFF, OCT+ steps and wraps; the host gets it once it rests (main.c) */
         uint32_t v = ua_off_want & 3u;
         v = s > 0 ? (v < 3u ? v + 1u : 3u) : s < 0 ? (v ? v - 1u : 0u) : (v + 1u) % 4u;
         ua_off_set(UA_OFF_OUT, !(v & UA_OFF_OUT), fm1_ms);
@@ -384,13 +384,13 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
     }
 #endif
     if ((s != 0 || ok) && ui.menu == 1 && ui.menu_sel == MI_LIGHTS) {
-        /* KNOB 1 steps OFF .. FULL, OCT+ steps and wraps (saved when the menu closes) */
+        /* KNOB 2 steps OFF .. FULL, OCT+ steps and wraps (saved when the menu closes) */
         uint32_t v = settings_lights % LIGHTS_N;
         settings_lights = (uint8_t)(s > 0 ? (v + 1u < LIGHTS_N ? v + 1u : v) : s < 0 ? (v ? v - 1u : 0u) : (v + 1u) % LIGHTS_N);
         ok = 0;
     }
     if ((s != 0 || ok) && ui.menu == 1 && ui.menu_sel == MI_HOLD) {
-        /* KNOB 1 steps 0.3 .. 0.6 s, OCT+ steps and wraps */
+        /* KNOB 2 steps 0.3 .. 0.6 s, OCT+ steps and wraps */
         uint32_t v = settings_hold % 4u;
         settings_hold = (uint8_t)(s > 0 ? (v < 3u ? v + 1u : 3u) : s < 0 ? (v ? v - 1u : 0u) : (v + 1u) % 4u);
         ok = 0;
@@ -406,17 +406,17 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         settings_autosave = (uint8_t)(s > 0 ? 1u : s < 0 ? 0u : !settings_autosave);
         ui.force = 1; ok = 0;
     }
-    if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_ACCEL) {   /* KNOB 1 right ON, left OFF; OCT+ toggles */
+    if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_ACCEL) {   /* KNOB 2 right ON, left OFF; OCT+ toggles */
         uint32_t on = s > 0 ? 1u : s < 0 ? 0u : !!(PREF_BITS & PREF_ACCEL_OFF);
         PREF_BITS = (uint8_t)(on ? PREF_BITS & ~PREF_ACCEL_OFF : PREF_BITS | PREF_ACCEL_OFF);
         ui.force=1; ok=0;
     }
-    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_MIDI_OUT) {   /* KNOB 1 steps KEYS ALL OFF, OCT+ wraps */
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_MIDI_OUT) {   /* KNOB 2 steps KEYS ALL OFF, OCT+ wraps */
         uint32_t v = settings_midi_out % MIDI_OUT_N;
         settings_midi_out = (uint8_t)(s > 0 ? (v + 1u < MIDI_OUT_N ? v + 1u : v) : s < 0 ? (v ? v - 1u : 0u) : (v + 1u) % MIDI_OUT_N);
         ui.force = 1; ok = 0;                          /* (notes already sent still send their note-offs) */
     }
-    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_CLOCK_OUT) {  /* KNOB 1 right ON, left OFF; OCT+ toggles */
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_CLOCK_OUT) {  /* KNOB 2 right ON, left OFF; OCT+ toggles */
         settings_clock_out = (uint8_t)(s > 0 ? 1u : s < 0 ? 0u : !settings_clock_out);
         ui.force = 1; ok = 0;                          /* (on: from the next PLAY; off: STOP goes out now) */
     }

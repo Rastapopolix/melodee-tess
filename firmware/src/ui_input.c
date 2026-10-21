@@ -1647,7 +1647,7 @@ static void page_knob(uint32_t k, int32_t s)
         ui.hot_col = (uint8_t)k;
         ui.hot_t = 40;
     }
-    if (list_on()) {                                    /* a list page: KNOB 2 the row, KNOB 1 its value (ui_list.c) */
+    if (list_on()) {                                    /* a list page: KNOB 1 the row, KNOB 2 its value (ui_list.c) */
         list_knob(k, s);
         return;
     }
@@ -1989,7 +1989,7 @@ static void ui_input(void)
     if (pop.on == POP_SHEET || pop.on == POP_LIST) {   /* an action sheet, a value's list: KNOB 1 / 2, OCT+ / OCT-
                                                          * (ui_popup.c) */
         int32_t k1 = panel_enc(EN_K1), k2 = panel_enc(EN_K2);
-        if (pop.on == POP_LIST) vlist_input(k2, oct);
+        if (pop.on == POP_LIST) vlist_input(k1, oct);
         else sheet_input(k1, k2, oct);
         ui.pg_down = 0;
         enc_drop();

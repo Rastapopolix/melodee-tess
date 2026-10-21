@@ -29,7 +29,7 @@ INIT. The recipes are suggestions for exploration, not claims of reproducing an 
 | OCT+ / OCT- | The next / previous stage; past the last or the first: the designer's sheet |
 | PRESETS | The next / previous stage |
 | SELECT | The pages, across the stages |
-| KNOB 1–4 | The page's own controls (a list page: KNOB 2 the row, KNOB 1 its value) |
+| KNOB 1–4 | The page's own controls (a list page: KNOB 1 the row, KNOB 2 its value) |
 | SAVE | The original sound (header chip ORIGINAL); SAVE again: back to the design |
 | HOME | The designer's sheet |
 
@@ -54,7 +54,7 @@ designer do not record motion. Other tracks' motion continues normally.
 ## Features
 
 The first stage builds the signal path before any shaping: a list page, a row for each feature
-of the instrument, its state at the right (Off is dim). KNOB 2 moves through the rows; KNOB 1
+of the instrument, its state at the right (Off is dim). KNOB 1 moves through the rows; KNOB 2
 switches the row on (right) or off (left), or steps Voice and Lines.
 
 | Engine | Features |
@@ -108,7 +108,7 @@ them reachable. This does not change the synthesis model or claim calibrated har
 
 ## Finish
 
-HOME, or OCT past either end of the stages, opens the designer's sheet (KNOB 2 the row, OCT+
+HOME, or OCT past either end of the stages, opens the designer's sheet (KNOB 1 the row, OCT+
 does it, OCT- goes back to designing):
 
 - **Keep the sound**: the designer closes, the designed sound stays on the track.

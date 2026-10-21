@@ -14,7 +14,7 @@ static void designer_at(const char *title,uint32_t op)
 static void designer_finish_row(uint32_t r)
 {
     press(B_HOME);
-    for(uint32_t i=0;i<r;i++)turn(EN_K2,1);
+    for(uint32_t i=0;i<r;i++)turn(EN_K1,1);
     press(B_OCTUP);
     if(ui.confirm)press(B_OCTUP);
 }
@@ -82,13 +82,13 @@ static void dependency_tests(void)
     failures+=check("turning a line-2 DETUNE selects 1+2'",designer_feat_get(DF_LINES)==2u && designer_need()==DF_NONE);
     designer_close(0);
 }
-/* FEATURES' row of path f (KNOB 1 turns it: the knob returned) */
+/* FEATURES' row of path f (KNOB 2 turns it: the knob returned) */
 static uint32_t designer_feature(uint32_t f)
 {
     uint32_t n;const uint8_t *fs=designer_feats(&n);
     for(uint32_t i=0;i<ds.n;i++)if(ds.route[i].page==DS_FEAT){
         ds.at=(uint8_t)i;designer_page();
-        for(uint32_t r=0;r<n;r++)if(fs[r]==f){ds.row=(uint8_t)r;return 0;}
+        for(uint32_t r=0;r<n;r++)if(fs[r]==f){ds.row=(uint8_t)r;return 1;}
     }
     failures+=check("requested feature is reachable",0);return 0;
 }

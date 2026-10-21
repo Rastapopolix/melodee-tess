@@ -110,7 +110,7 @@ TAKE JAM: REC held on SONG (elsewhere REC held captures).
 
 ## Popups (R6)
 
-- **Action sheet**: OCT+ on an item opens what can be done with it (KNOB 2 the row, KNOB 1 a row's value, OCT+ does
+- **Action sheet**: OCT+ on an item opens what can be done with it (KNOB 1 the row, KNOB 2 a row's value, OCT+ does
   it, OCT- closes); OCT+ held opens the page's own (a ⋯ in the header says there are some). A destructive row asks the
   question first. TOOLS is gone, its actions in these (Clear pattern: NOTES / PATTERN; Init sound: the sound pages;
   Delete section, Clear song: SONG); PROJECT / USER / FM6 STORE / P5 STORE are slot lists (no chips), a slot's sheet:
@@ -135,7 +135,7 @@ TAKE JAM: REC held on SONG (elsewhere REC held captures).
 ## Pages: lists or knobs (R6)
 
 - **List pages** (set and leave): only where there are more than four settings (Kerem, 2026-10-11: four or fewer are
-  the page's own four knobs). A row a setting (KNOB 2 the row, KNOB 1 its value, OCT+ a list value's full list, OCT-
+  the page's own four knobs). A row a setting (KNOB 1 the row, KNOB 2 its value, OCT+ a list value's full list, OCT-
   back), the page's picture under the rows where it has one: SCL (OCT+ on Scale: the SCALES list; with Quantise MPC
   a row for MPC degree, which had a page of its own), VOICE
   1-3 (one list), FM6's LFO and controller pages (a list each).
