@@ -1,0 +1,88 @@
+name: Test page
+
+# A push to testpage/X.Y.Z builds both release variants of X.Y.Z, the web simulator and the installer site, and
+# pushes them as docs/test/X.Y.Z/ on a branch test-X.Y.Z from main (a PR to main publishes the page). Test only:
+# no tag, no release.
+on:
+  push:
+    branches: ['testpage/**']
+
+permissions:
+  contents: write
+
+jobs:
+  page:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      JIELI_TOOLCHAIN: ${{ github.workspace }}/.nightly-deps/jieli/toolchain
+      AC79_SDK: ${{ github.workspace }}/.nightly-deps/sdk
+      PARALLEL: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libharfbuzz-dev libfribidi-dev libraqm-dev
+          python -m pip install Pillow fonttools
+      - uses: actions/cache@v4
+        with:
+          path: .nightly-deps
+          key: jieli-linux-sdk-d179b448-v1
+      - name: Fetch pinned SDK and toolchain
+        run: |
+          if [ ! -x "$JIELI_TOOLCHAIN/pi32v2/bin/clang" ]; then
+            tools/get_toolchain.sh "$GITHUB_WORKSPACE/.nightly-deps/jieli"
+          fi
+          if [ ! -d "$AC79_SDK/.git" ]; then
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git "$AC79_SDK"
+          fi
+      - name: Build both release variants
+        run: |
+          ver="${GITHUB_REF_NAME#testpage/}"
+          echo "VER=$ver" >> "$GITHUB_ENV"
+          MELODEE_RAM_AUDIO=1 ./build.sh --release "$ver" 2>&1 | tee dual.log
+          cp "build/melodee-tess-$ver.fwsc" build/melodee-tess.fwsc
+          MELODEE_RAM_AUDIO=1 MELODEE_DUAL_CORE=0 ./build.sh --release "$ver" 2>&1 | tee single.log
+          for f in dual single; do
+            echo "### $f core" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            grep -E "image [0-9]+ B|working arena|package " $f.log >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Host tests (reported, not blocking)
+        run: |
+          if tests/run_tests.sh > tests.log 2>&1; then r=passed; else r=FAILED; fi
+          echo "### host tests: $r" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          sed -n '/^HOST TESTS/,$p' tests.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Web simulator
+        run: web/sim/build.sh
+      - name: The page, on a branch from main
+        run: |
+          git fetch --no-tags --depth 1 origin main
+          git worktree add -B "test-$VER" ../site FETCH_HEAD
+          out="../site/docs/test/$VER"
+          rm -rf "$out"
+          python web/make_site.py "build/melodee-tess-$VER.fwsc" "build/melodee-tess-$VER-1core.fwsc" "$VER" "$out"
+          mkdir -p "$out/webapp/sim"
+          cp build/sim/melodee.wasm build/sim/worklet.js build/sim/index.html "$out/webapp/sim/"
+          cd ../site
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "docs/test/$VER"
+          git commit -m "Test page $VER (develop at ${GITHUB_SHA:0:7})"
+          git push -f origin "HEAD:test-$VER"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-page-logs
+          path: |
+            dual.log
+            single.log
+            tests.log
