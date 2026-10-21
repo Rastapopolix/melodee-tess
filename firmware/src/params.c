@@ -532,14 +532,15 @@ static const page_t PAGES[] = {
     {"SEND FX 3", FAM_FX, SC_GLOBAL, GR_NONE, {G_MFX3TYPE, G_MFX3MIX, G_MFX3RATE, G_MFX3CHAR}},
     {"ENV", FAM_ENV, SC_TRACK, GR_ADSR, {P_ATK, P_DEC, P_SUS, P_REL}},
     {"ENV DEST", FAM_ENV, SC_TRACK, GR_NONE, {P_ED_FLT, P_ED_PIT, P_ED_SHP, 0xFF}},   /* the former fourth slot: SEQ > TEMPO's QNT */
-    {"LFO", FAM_LFO, SC_TRACK, GR_LFO, {P_LRATE, P_LWAVE, P_LPHASE, P_LFADE}},
-    {"LFO 2", FAM_LFO, SC_TRACK, GR_LFO, {P_LSYNC, P_LTRIG, P_LPOL, 0xFF}},
-    {"LFO DEST", FAM_LFO, SC_TRACK, GR_NONE, {P_LD_PIT, P_LD_FLT, P_LD_SHP, P_LD_AMP}},
-    {"MOD", FAM_LFO, SC_TRACK, GR_MOD, {P_M1SRC, 0xFF, P_M1DST, P_M1AMT}},   /* KNOB 2: the route (mod_ui_slot) */
-    {"ORGANIC", FAM_LFO, SC_TRACK, GR_ORGANIC, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: SLOTH SPEED, OCHD RATE (organic.c) */
+    /* Tessera: MODS first (where everything is routed), then the sources; LFO DEST, the fixed routes, last */
     {"MODS", FAM_LFO, SC_GLOBAL, GR_CORDS, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: the cords (cord.c, ui_cords.c), MOD's
                                                                      * place (MOD hidden: ui.c page_visible) */
     {"MATRIX", FAM_LFO, SC_GLOBAL, GR_MATRIX, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: the mods track by track (ui_matrix.c) */
+    {"LFO", FAM_LFO, SC_TRACK, GR_LFO, {P_LRATE, P_LWAVE, P_LPHASE, P_LFADE}},
+    {"LFO 2", FAM_LFO, SC_TRACK, GR_LFO, {P_LSYNC, P_LTRIG, P_LPOL, 0xFF}},
+    {"MOD", FAM_LFO, SC_TRACK, GR_MOD, {P_M1SRC, 0xFF, P_M1DST, P_M1AMT}},   /* KNOB 2: the route (mod_ui_slot) */
+    {"ORGANIC", FAM_LFO, SC_TRACK, GR_ORGANIC, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: SLOTH SPEED, OCHD RATE (organic.c) */
+    {"LFO DEST", FAM_LFO, SC_TRACK, GR_NONE, {P_LD_PIT, P_LD_FLT, P_LD_SHP, P_LD_AMP}},
     {"SCALES", FAM_SCL, SC_TRACK, GR_SCALE_PICKER, {0xFF, P_SCALE, P_ROOT, P_QUANT}},
     {"SCL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, 0xFF, P_QUANT, P_TRANS}}, /* K2: scale favorite */
     {"CHORD", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHRD, P_VOIC, 0xFF, 0xFF}},   /* SCL again: the chord keys (chord.c) */

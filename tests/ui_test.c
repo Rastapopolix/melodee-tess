@@ -2890,7 +2890,8 @@ static int test_native_env_lfo(void)
     open_family(FAM_LFO);
     bad += check("LFO on CZ-1: its vibrato, LFO lit", str_eq(cur_page()->title, "CZ VIBRATO") && cur_fam() == FAM_LFO);
     open_family(FAM_LFO);
-    bad += check("..LFO again: the track LFO (it modulates the CZ-1 too)", str_eq(cur_page()->title, "LFO"));
+    bad += check("..LFO again: MODS, then the track LFO (it modulates the CZ-1 too)", str_eq(cur_page()->title, "MODS") &&
+                 (open_family(FAM_LFO), open_family(FAM_LFO), str_eq(cur_page()->title, "LFO")));
     go_home();
     set_engine_of(TSEL, ENGI_PROPHET);
     open_family(FAM_ENV);
@@ -2907,6 +2908,15 @@ static int test_native_env_lfo(void)
     set_engine_of(TSEL, 3);
     open_family(FAM_ENV);
     bad += check("ENV on SID: the track's ADSR", str_eq(cur_page()->title, "ENV"));
+    ui.fam_last[FAM_LFO] = 0;
+    open_family(FAM_LFO);
+    bad += check("LFO on SID: MODS first, then MATRIX, LFO, LFO 2, ORGANIC, LFO DEST", str_eq(cur_page()->title, "MODS") &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "MATRIX")) && (open_family(FAM_LFO), str_eq(cur_page()->title, "LFO")) &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "LFO 2")) &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "ORGANIC")) &&
+                 (open_family(FAM_LFO), str_eq(cur_page()->title, "LFO DEST")));
+    go_home();
+    open_family(FAM_ENV);
     o = song.octave;
     press(B_OCTDN);
     bad += check("OCT- on a sound page: Stage, no octave", ui.home && song.octave == o);
@@ -2998,6 +3008,22 @@ static int test_popups(void)
                      o && !smap.on && str_eq(sec.name[sec_of(ui.page)], "Amp"));
         press(B_EDIT); press(B_EDIT);
         bad += check("SECTIONS: EDIT again closes the map", !smap.on);
+        set_engine_of(TSEL, ENGI_FM6); TSEL->engine = ENGI_FM6; sec.ok = 0;
+        ui.home = 0; ui.page = (uint8_t)page_first(FAM_EDIT); page_entered(); frame();
+        press(B_EDIT);
+        o = smap.on && smap.row == 0u && smap.col == 0u;
+        turn(EN_K1, 1);
+        f = smap.col;
+        turn(EN_K1, -1);
+        bad += check("SECTIONS: FM6's map, KNOB 1 a click: OPS -> PATCH, a click back: OPS", o && f == 1u && smap.col == 0u);
+        turn(EN_K2, 1);
+        o = smap.row == 1u;
+        turn(EN_K2, 1);
+        f = smap.row;
+        turn(EN_K2, 3);                                 /* (three detents in one read: three rows) */
+        bad += check("..KNOB 2 a click a row: SOUND -> ALGO -> OP1, three at once: OP4", o && f == 2u && smap.row == 5u &&
+                     sec.op[smap.row] == 4u);
+        press(B_EDIT);
     }
     go_page(GR_SONG); frame();
     hold(B_OCTUP);

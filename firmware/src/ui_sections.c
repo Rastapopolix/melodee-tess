@@ -230,10 +230,10 @@ static void smap_input(int32_t k1, int32_t k2, uint32_t oct)
     uint8_t pg[8];
     uint32_t n;
     if (k2)
-        smap.row = (uint8_t)clamp((int32_t)smap.row + (k2 > 0 ? 1 : -1), 0, (int32_t)sec.n - 1);
+        smap.row = (uint8_t)clamp((int32_t)smap.row + k2, 0, (int32_t)sec.n - 1);   /* (a detent a row: none lost) */
     n = smap_pages(smap.row, pg);
     if (k1)
-        smap.col = (uint8_t)clamp((int32_t)smap.col + (k1 > 0 ? 1 : -1), 0, (int32_t)n - 1);
+        smap.col = (uint8_t)clamp((int32_t)smap.col + k1, 0, (int32_t)n - 1);
     if (smap.col >= n)
         smap.col = (uint8_t)(n ? n - 1u : 0u);
     if (oct & 1u) {
