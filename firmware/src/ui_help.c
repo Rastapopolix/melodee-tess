@@ -98,6 +98,10 @@ static void help_find(uint32_t k)
             if (k < 3u) help.pid = (uint16_t)(k == 0u ? PID_TESS(TX_CH_OCT) : k == 1u ? PID_TRACK(P_CHRD) : PID_TRACK(P_VOIC));
             return;
         }
+        if (gr_layer_on()) {                            /* (GRIDS, OCT+ held: KICK, SNR, HAT, TOMS) */
+            help.pid = (uint16_t)PID_TESS(TX_GRD_KICK + (k & 3u));
+            return;
+        }
         if (cs_layer_on()) {                            /* (CONSTELLATION, OCT+ held: LOCK, LEN, FILL, SIZE) */
             static const uint8_t CSL[4] = {TX_EV_LOCK, TX_CS_LEN, TX_CS_FILL, TX_CS_SIZE};
             help.pid = (uint16_t)PID_TESS(CSL[k & 3u]);

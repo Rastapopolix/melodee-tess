@@ -758,6 +758,44 @@ static int test_constel_layer(void)
     return bad;
 }
 
+/* GRIDS on GEN with OCT+ held: KNOB 1..4 KICK, SNR, HAT, TOMS (2 % a click), their help; no octave, no sheet; let go,
+ * the knobs are MODE, X, Y, DENS again */
+static int test_grids_layer(void)
+{
+    int bad = 0;
+    uint32_t i, tr;
+    int32_t oct;
+    ui_power_on();
+    go_title("GEN");
+    tr = song.sel;
+    tessera_param_set(tr, TX_MODE, TESS_ENG_GRIDS);
+    frame();
+    oct = song.octave;
+    fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+    host_pressed |= 1u << panel.btn[B_OCTUP];
+    frame();
+    for (i = 0; i < 10u; i++) turn(EN_K1, -1);         /* KICK 80 */
+    turn(EN_K1 + 1u, -1);                               /* SNR 98 */
+    turn(EN_K1 + 2u, 1);                                /* HAT 100 (its top) */
+    for (i = 0; i < 5u; i++) turn(EN_K1 + 3u, 1);       /* TOMS 10 */
+    for (i = 0; i < 6u; i++) { frame(); fm1_ms += 200u; host_ticks += 200000u; }   /* (held 1.2 s) */
+    help_find(3);
+    bad += check("GRIDS, OCT+ held: KNOB 1 KICK 80, KNOB 2 SNR 98, KNOB 3 HAT 100, KNOB 4 TOMS 10; its help",
+                 tessera_param_get(tr, TX_GRD_KICK) == 80 && tessera_param_get(tr, TX_GRD_SNR) == 98 &&
+                 tessera_param_get(tr, TX_GRD_HAT) == 100 && tessera_grids(tr)->toms == 10u &&
+                 help.pid == PID_TESS(TX_GRD_TOMS) && pid_find(help.pid));
+    bad += check("..the octave as it was, no sheet open", song.octave == oct && pop.on != POP_SHEET);
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
+    frame();
+    turn(EN_K1 + 3u, 1);
+    bad += check("OCT+ let go: KNOB 4 is DENS again, the shares kept", tessera_grids(tr)->dens == 52u &&
+                 tessera_param_get(tr, TX_GRD_KICK) == 80 && tessera_grids(tr)->toms == 10u && song.octave == oct);
+    tessera_param_set(tr, TX_GRD_DENS, 50);
+    for (i = 0; i < 3u; i++) tessera_param_set(tr, TX_GRD_KICK + i, 100);
+    tessera_param_set(tr, TX_GRD_TOMS, 0);
+    return bad;
+}
+
 /* CORDS (ui_cords.c): KNOB 2 the cord, 1 its source, 3 its destination, 4 the move (a fixed cord's: its OFFSET) */
 static int test_cords_page(void)
 {
@@ -5426,6 +5464,7 @@ int main(void)
     bad += test_awake_entry();
     bad += test_constel_speed();
     bad += test_constel_layer();
+    bad += test_grids_layer();
     bad += test_div_order();
     bad += test_quad_cols();
     bad += test_screen();

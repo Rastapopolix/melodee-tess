@@ -1059,6 +1059,21 @@ static void draw_columns(void)
                 draw_column(3, "SPEED", v3, "", VAL(3u), (int32_t)tessera_cs_speed(tr) * 1000 / (TESS_CS_SPEEDS - 1u), ICON_AUTO);
             } else if (m == TESS_ENG_GRIDS) {
                 const gen_grids_t *g = tessera_grids(tr);
+                if (gr_layer_on()) {                            /* OCT+ held: KICK, SNR, HAT, TOMS */
+                    static const char *const GRL[3] = {"KICK", "SNR", "HAT"};
+                    for (uint32_t k = 0; k < 3u; k++) {
+                        char v[6];
+                        int32_t sh = 100 - (int32_t)g->thin[k];
+                        fmt_int(v, sh);
+                        col_mods(PID_TESS(TX_GRD_KICK + k));
+                        draw_column(k, GRL[k], v, "%", VAL(k), sh * 10, ICON_AUTO);
+                    }
+                    fmt_int(v3, g->toms);
+                    col_mods(PID_TESS(TX_GRD_TOMS));
+                    if (g->toms) draw_column(3, "TOMS", v3, "%", VAL(3u), (int32_t)g->toms * 10, ICON_AUTO);
+                    else draw_column(3, "TOMS", "OFF", "", VAL(3u), 0, ICON_AUTO);
+                    return;
+                }
                 draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, g->x);
                 col_mods(PID_TESS(TX_GRD_X));
