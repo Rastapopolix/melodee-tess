@@ -5011,10 +5011,25 @@ static int test_capture(void)
         hold(B_EDIT);
         bad += check("  EDIT held: the generator back, steps and LEN too", tessera.mode[0] == TESS_ENG_EUCLID &&
                      TSEL->p[P_SLEN] == 16 && seq_is_empty(TSEL));
-        TSEL->step[3].n = 1; TSEL->step[3].note[0] = 60; TSEL->step[3].time = ST_NOTE;
+        TSEL->step[3].n = 1; TSEL->step[3].note[0] = 30; TSEL->step[3].time = ST_NOTE;
         hold(B_REC);
-        bad += check("  steps written by hand: refused, nothing changed", msg_is("CLEAR STEPS TO PRINT") &&
-                     tessera.mode[0] == TESS_ENG_EUCLID && TSEL->step[3].note[0] == 60);
+        bad += check("  steps written by hand: REPLACE STEPS? first, nothing changed yet", ui.confirm == CF_PRINT &&
+                     tessera.mode[0] == TESS_ENG_EUCLID && TSEL->step[3].note[0] == 30);
+        press(B_OCTDN);
+        bad += check("  .. OCT- keeps them", !ui.confirm && tessera.mode[0] == TESS_ENG_EUCLID && TSEL->step[3].note[0] == 30);
+        hold(B_REC);
+        press(B_OCTUP);
+        bad += check("  .. OCT+ prints over them", !ui.confirm && msg_is("PRINTED 2 BARS") && tessera.mode[0] == TESS_ENG_OFF &&
+                     TSEL->step[3].note[0] != 30);
+        hold(B_EDIT);
+        bad += check("  .. one EDIT held: the hand-written steps and the generator back", tessera.mode[0] == TESS_ENG_EUCLID &&
+                     TSEL->step[3].note[0] == 30 && TSEL->p[P_SLEN] == 16);
+        track_defaults_steps(TSEL);
+        hold(B_REC);
+        tessera_knob(0, TESS_ENG_EUCLID);
+        hold(B_REC);
+        bad += check("  printed (recorded) notes there: CLEAR PATTERN TO PRINT", msg_is("CLEAR PATTERN TO PRINT") &&
+                     tessera.mode[0] == TESS_ENG_EUCLID && !ui.confirm);
         stop_transport();
         track_defaults_steps(TSEL);
         tessera_knob(0, -TESS_ENG_EUCLID);

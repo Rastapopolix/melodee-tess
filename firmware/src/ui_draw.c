@@ -1297,6 +1297,10 @@ static void confirm_text(char *a, char *b)
         str_cpy(a, "START A NEW SONG?", 24);
         str_cpy(b, "Unsaved changes", 24);
         break;
+    case CF_PRINT:                                      /* REC held on a generator track with steps (capture_take) */
+        str_cpy(a, "REPLACE STEPS?", 24);
+        str_cpy(b, "With the generator's bars", 32);
+        break;
     case CF_TAKE_JAM:                                   /* the rows it replaces */
         str_cpy(a, "SONG FROM JAM?", 24);
         fmt_int(b, (int32_t)chain_config.count);
