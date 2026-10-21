@@ -180,7 +180,8 @@ static const int8_t PV_DOT[33][2] = {
 /* CS_RING: a 58 x 80 cell: the label (9 px, the track's colour), the ring (5 px, KNOB_RING: the newer Elektron dial,
  * filled to its value, no pointer), the value under it; the knob just turned: lifted, outlined */
 /* a ring's words as the mockups write them: its label in full ("OCT" -> "OCTAVES", when it fits), a name value in
- * sentence case ("SAW" -> "Saw"; numbers and notes as they are), a unit in lower case ("STEP" -> "steps") */
+ * sentence case ("SAW" -> "Saw"; numbers and notes as they are), a unit in lower case ("STEP" -> "steps"; dB and
+ * BPM as they are) */
 static const struct { const char *k, *w; } PV_LABEL[] = {
     {"OCT", "OCTAVES"}, {"LEN", "LENGTH"}, {"DIV", "DIVISION"}, {"SWG", "SWING"}, {"PAT", "PATTERN"},
     {"DTN", "DETUNE"}, {"NOIS", "NOISE"}, {"CUT", "CUTOFF"}, {"DRV", "DRIVE"}, {"ATK", "ATTACK"}, {"DEC", "DECAY"},
@@ -201,7 +202,7 @@ static void pv_words(const char *label, const char *val, const char *unit, char 
     str_cpy(u, unit, 8);
     if (str_eq(unit, "STEP")) {
         str_cpy(u, str_eq(val, "1") ? "step" : "steps", 8);
-    } else if (unit[0] && unit[1] && !str_eq(unit, "dB")) {
+    } else if (unit[0] && unit[1] && !str_eq(unit, "dB") && !str_eq(unit, "BPM")) {
         for (i = 0; u[i]; i++)
             if (u[i] >= 'A' && u[i] <= 'Z') u[i] = (char)(u[i] + 32);
     }

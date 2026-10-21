@@ -4,10 +4,13 @@
 """Pre-rasterise TTF fonts into anti-aliased 4-bit alpha glyph tables for the UI (run by
 tools/build.py generate() with --preset rubik).
 
-  gen_aa_font.py OUT.h --preset rubik|standin|inter-tight [--tracking EM] [--gamma G] [--kern-min N]
+  gen_aa_font.py OUT.h --preset chakra|rubik|standin|inter-tight [--tracking EM] [--gamma G] [--kern-min N]
   gen_aa_font.py OUT.h --face NAME=FONT[#index]:PX:FIRST-LAST[+0xNN,...] ...   (explicit faces)
 
 Faces of the presets (S labels, M values/headers, L big numerals / titles):
+  chakra      assets/fonts/ChakraPetch-{Regular,Medium,SemiBold}.ttf (SIL OFL 1.1, Google Fonts): Tessera's face, its
+              squared corners the tiles', at Rubik's 10 / 12 / 15 / 30 px (X Medium, S Regular, M Medium, L SemiBold),
+              each set in Rubik's line box (height and baseline), so every layout stays as it was.
   rubik       assets/fonts/Rubik[wght].ttf (SIL OFL 1.1, Google Fonts): Melodee's face, at 10 / 12 / 15 / 30 px and weights
               400 / 500 / 600 (its tall x-height reads as Inter Tight's 12 / 15 / 28 at about the same width); X and S
               on the line metrics of 9 / 11 px (lifted a row).
@@ -53,6 +56,13 @@ L_CHARS = " #+./-_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 
 
 def preset(name):
+    if name == "chakra":
+        f = FONTS.parent / "assets" / "fonts"                                 # SIL OFL 1.1, Google Fonts
+        r, m, b = (str(f / f"ChakraPetch-{w}.ttf") for w in ("Regular", "Medium", "SemiBold"))
+        return [("X", m, 10, (32, 126), EXTRAS, 0.0, PHASES, (12, 9)),        # (Rubik's line boxes: the layout's)
+                ("S", r, 12, (32, 126), EXTRAS, 0.0, PHASES, (14, 11)),
+                ("M", m, 15, (32, 126), EXTRAS, 0.0, PHASES, (19, 15)),
+                ("L", b, 30, (32, 32), [ord(c) for c in L_CHARS[1:]], 0.0, PHASES_L, (37, 29))]
     if name == "rubik":
         v = str(FONTS.parent / "assets" / "fonts" / "Rubik[wght].ttf")       # SIL OFL 1.1, Google Fonts
         # X and S: a pixel larger than the layout's 9 / 11 px, lifted a row so their baselines and line heights stay
@@ -177,12 +187,19 @@ def emit(face, tracking, gamma, kern_min):
     lift = lift[0] if lift else 0              # rows the glyphs move up in the line box (and off its baseline, height)
     chars = [chr(c) for c in range(first, last + 1)] + [chr(c) for c in extras]
     r = ar.raster_font(font, px, chars, tracking if ftrack is None else ftrack, gamma, True, kern_min, phases)
+    fit = None
+    if isinstance(lift, tuple):                # (h, baseline): the line box the layout was drawn for (another face's)
+        fit, lift = lift, r["asc"] - lift[1]
     if lift:
         for ch, (adv16, ph) in r["glyphs"].items():
             assert all(by >= lift for bx, by, bw, bh, b in ph if bh), f"{name} {ch!r}: no room above to lift it"
             r["glyphs"][ch] = (adv16, [(bx, by - lift if bh else by, bw, bh, b) for bx, by, bw, bh, b in ph])
         r["asc"] -= lift
         r["h"] -= lift
+    if fit:                                    # the ink inside the box, which takes the layout's height
+        low = max(by + bh for adv16, ph in r["glyphs"].values() for bx, by, bw, bh, b in ph if bh)
+        assert low <= fit[0], f"{name}: ink to row {low}, below the {fit[0]} px line box"
+        r["h"] = fit[0]
     data, table, lines = bytearray(), [], []
     for ch in chars:
         adv16, ph = r["glyphs"][ch]
@@ -264,7 +281,7 @@ def emit(face, tracking, gamma, kern_min):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out")
-    ap.add_argument("--preset", choices=["rubik", "standin", "inter-tight"])
+    ap.add_argument("--preset", choices=["chakra", "rubik", "standin", "inter-tight"])
     ap.add_argument("--face", action="append", default=[])
     ap.add_argument("--tracking", type=float, default=0.0, help="extra advance per glyph in em")
     ap.add_argument("--gamma", type=float, default=1.0, help="coverage curve; <1 thickens light-on-dark text")
