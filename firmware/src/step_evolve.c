@@ -77,18 +77,18 @@ const step_t *tessera_step_vary(track_t *t, const step_t *s, step_t *out)
     uint32_t tr = trk_index(t), i = t->seq_idx, len, k, m;
     if (!sv_on(t, tr)) return s;
     len = t->p[P_SLEN] ? (uint32_t)t->p[P_SLEN] : 1u;
-    if (tessera.sv_flash[tr]) tessera.sv_flash[tr]--;
-    if (!i && tessera.sv_steps[tr] >= tessera_every_bars(tessera.sv_every[tr]) * tess_steps_per_bar(t)) {
+    if (tess_sv.flash[tr]) tess_sv.flash[tr]--;
+    if (!i && tess_sv.steps[tr] >= tessera_every_bars(tessera.sv_every[tr]) * tess_steps_per_bar(t)) {
         uint8_t kind[NSTEP];
         const step_t *st = seq_steps(t);
         for (k = 0; k < len && k < NSTEP; k++) kind[k] = (uint8_t)sv_kind(&st[k]);
-        if (!tessera.sv_rnd[tr]) tessera.sv_rnd[tr] = gen_stream(0x5EEDu + tr);
-        vary_round(tessera.sv_mut[tr], kind, len, tessera.sv_amount[tr], tessera.sv_lock[tr], &tessera.sv_rnd[tr]);
-        tessera.sv_steps[tr] = 0;
-        tessera.sv_flash[tr] = 4;
+        if (!tess_sv.rnd[tr]) tess_sv.rnd[tr] = gen_stream(0x5EEDu + tr);
+        vary_round(tess_sv.mut[tr], kind, len, tessera.sv_amount[tr], tessera.sv_lock[tr], &tess_sv.rnd[tr]);
+        tess_sv.steps[tr] = 0;
+        tess_sv.flash[tr] = 4;
     }
-    tessera.sv_steps[tr]++;
-    m = i < NSTEP ? tessera.sv_mut[tr][i] : 0u;
+    tess_sv.steps[tr]++;
+    m = i < NSTEP ? tess_sv.mut[tr][i] : 0u;
     if (!m || i >= len || sv_kind(s) == VK_KEEP) return s;
     sv_apply(t, i, m, out);
     return out;
@@ -100,15 +100,15 @@ uint32_t tessera_step_varied(uint32_t tr)
     uint32_t n = 0, len;
     if (tr >= TESSERA_TRACKS || !sv_on(&trk[tr], tr)) return 0;
     len = trk[tr].p[P_SLEN] ? (uint32_t)trk[tr].p[P_SLEN] : 1u;
-    for (uint32_t i = 0; i < len && i < NSTEP; i++) n += tessera.sv_mut[tr][i] != 0u;
+    for (uint32_t i = 0; i < len && i < NSTEP; i++) n += tess_sv.mut[tr][i] != 0u;
     return n;
 }
 /* the changes back to as written, from the next round on afresh (CLEAR; a pattern load) */
 void tessera_step_clear(uint32_t tr)
 {
     if (tr >= TESSERA_TRACKS) return;
-    memset(tessera.sv_mut[tr], 0, sizeof tessera.sv_mut[tr]);
-    tessera.sv_steps[tr] = 0;
+    memset(tess_sv.mut[tr], 0, sizeof tess_sv.mut[tr]);
+    tess_sv.steps[tr] = 0;
 }
 /* REC held on a STEP track with changes: they become its steps (the caller: an undo level, the interrupt off, the
  * NOTES view rebuilt); the steps written that way played as before. Returns the steps changed */
@@ -121,9 +121,9 @@ uint32_t tessera_step_keep(uint32_t tr)
     t = &trk[tr];
     len = t->p[P_SLEN] ? (uint32_t)t->p[P_SLEN] : 1u;
     for (i = 0; i < len && i < NSTEP; i++)              /* (each from the steps as written: then written over) */
-        if (tessera.sv_mut[tr][i] && sv_kind(&t->step[i]) != VK_KEEP) sv_apply(t, i, tessera.sv_mut[tr][i], &v[i]);
+        if (tess_sv.mut[tr][i] && sv_kind(&t->step[i]) != VK_KEEP) sv_apply(t, i, tess_sv.mut[tr][i], &v[i]);
     for (i = 0; i < len && i < NSTEP; i++)
-        if (tessera.sv_mut[tr][i] && sv_kind(&t->step[i]) != VK_KEEP) {
+        if (tess_sv.mut[tr][i] && sv_kind(&t->step[i]) != VK_KEEP) {
             t->step[i] = v[i];
             n++;
         }

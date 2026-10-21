@@ -1196,9 +1196,9 @@ static void setup(int s)
         }
         tessera_param_set(0, TX_SV_LOCK, 60);
         tessera_param_set(0, TX_SV_AMOUNT, 80);
-        tessera.sv_mut[0][1] = 2u;                   /* (MOVE +2, an OCT up, a GHOST) */
-        tessera.sv_mut[0][4] = 1u << 3;
-        tessera.sv_mut[0][6] = VARY_PREV << 5;
+        tess_sv.mut[0][1] = 2u;                   /* (MOVE +2, an OCT up, a GHOST) */
+        tess_sv.mut[0][4] = 1u << 3;
+        tess_sv.mut[0][6] = VARY_PREV << 5;
         go_title("EVOLVE");
         break;
     case S_GEN_CHORD_USER:                           /* CHORD USER, eight chords played in, OCT+ held: LEN 8 */

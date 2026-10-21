@@ -6,6 +6,7 @@
 #include "tessera.h"
 
 tessera_state_t tessera;
+tessera_sv_t tess_sv __attribute__((section(".pool")));
 
 #include "organic.c"                                 /* SLOTH and OCHD: each track's drifting sources (cords) */
 
@@ -99,6 +100,7 @@ void tessera_init(void)
 {
     uint8_t *p = (uint8_t *)&tessera;
     for (uint32_t b = 0; b < sizeof(tessera); b++) p[b] = 0;
+    memset(&tess_sv, 0, sizeof tess_sv);
 
     for (uint32_t i = 0; i < TESSERA_TRACKS; i++) {
         tessera.mode[i] = TESS_ENG_OFF;
@@ -591,9 +593,9 @@ void tessera_phrase(uint32_t tr, uint32_t *bar, uint32_t *of, int *flash)
     const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
     if (tr < TESSERA_TRACKS && tessera_step_on(tr)) {   /* (STEP EVOLVE: bars since its last round) */
         *of = tessera_every_bars(tessera.sv_every[tr]);
-        *bar = tessera.sv_steps[tr] / tess_steps_per_bar(&trk[tr]);
+        *bar = tess_sv.steps[tr] / tess_steps_per_bar(&trk[tr]);
         if (*of && *bar >= *of) *bar = *of - 1u;
-        *flash = tessera.sv_flash[tr] != 0;
+        *flash = tess_sv.flash[tr] != 0;
         return;
     }
     *of = tessera_every_bars(ev->every);
@@ -1499,7 +1501,7 @@ uint32_t tessera_sig(uint32_t tr)
 {
     if (tr < TESSERA_TRACKS && tessera_step_on(tr))    /* (STEP EVOLVE: its EVOLVE page and the changes) */
         return tessera.sv_lock[tr] * 13u + tessera.sv_every[tr] * 61u + tessera.sv_amount[tr] * 29u +
-               tessera.sv_flash[tr] * 4093u + tessera.sv_steps[tr] * 977u + tessera_step_varied(tr) * 131u;
+               tess_sv.flash[tr] * 4093u + tess_sv.steps[tr] * 977u + tessera_step_varied(tr) * 131u;
     if (tr >= TESSERA_TRACKS || tessera.mode[tr] == TESS_ENG_OFF) return 0;
     uint32_t h = tessera.mode[tr] * 1009u + tessera.last_note[tr] * 53u + tessera.active_gate[tr];
     h ^= tessera.evolve[tr].bar_cnt * 977u + tessera.evolve[tr].flash * 4093u + tessera.evolve[tr].every * 61u + tessera.evolve[tr].amount * 29u + tessera.evolve[tr].lock * 13u + tessera.evolve[tr].form * 7u + tessera.evolve[tr].form_pos * 131u + tessera.evolve[tr].sec * 17u;
@@ -2309,7 +2311,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_GRD_TOMS: tessera.grids[tr].toms = (uint8_t)tess_clampi(v, 0, 100); eng = TESS_ENG_GRIDS; break;
     case TX_CH_ULEN: tessera.chord[tr].ulen = (uint8_t)tess_clampi(v, 1, GEN_CH_USER_N); return;
     case TX_SV_LOCK: tessera.sv_lock[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
-    case TX_SV_EVERY: tessera.sv_every[tr] = (uint8_t)tess_clampi(v, 0, 5); tessera.sv_steps[tr] = 0; return;
+    case TX_SV_EVERY: tessera.sv_every[tr] = (uint8_t)tess_clampi(v, 0, 5); tess_sv.steps[tr] = 0; return;
     case TX_SV_AMOUNT: tessera.sv_amount[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); eng = TESS_ENG_BOUNCE; break;
     case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); eng = TESS_ENG_BOUNCE; break;
