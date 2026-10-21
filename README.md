@@ -81,26 +81,40 @@ Tessera state is saved with the project into its own dedicated flash object (`OB
 
 ## Visual Reference Gallery
 
-### 1. Turing Engine
-![Turing Engine](assets/02_Pattern_Turing.jpg)
+The screens as the firmware draws them, in Tessera's default SMALTI palette: rendered on the PC by the firmware's own drawing code (`tests/gallery_render.c`, shown at 2x).
 
-### 2. Euclidean Engine
-![Euclid Engine](assets/03_Pattern_Euclid.jpg)
+### 1. Stage (home)
+![Stage (home)](assets/gallery/home.png)
 
-### 3. Markov Engine
-![Markov Engine](assets/04_Pattern_Markov.jpg)
+### 2. Turing Engine
+![Turing Engine](assets/gallery/gen_turing.png)
 
-### 4. Morph Engine
-![Morph Engine](assets/05_Pattern_Morph.jpg)
+### 3. Euclidean Engine
+![Euclidean Engine](assets/gallery/gen_euclid.png)
 
-### 5. Evolve Page
-![Evolve Page](assets/06_Evolve.jpg)
+### 4. Markov Engine
+![Markov Engine](assets/gallery/gen_markov.png)
 
-### 6. Form Page
-![Form Page](assets/07_Form.jpg)
+### 5. Morph Engine
+![Morph Engine](assets/gallery/gen_morph.png)
 
-### 7. Tweak Page
-![Tweak Page](assets/08_Tweak.jpg)
+### 6. Grids Engine
+![Grids Engine](assets/gallery/gen_grids.png)
+
+### 7. Evolve Page
+![Evolve Page](assets/gallery/gen_evolve.png)
+
+### 8. Form Page
+![Form Page](assets/gallery/form.png)
+
+### 9. Tweak Page
+![Tweak Page](assets/gallery/gen_tweak.png)
+
+### 10. Mod Cords
+![Mod Cords](assets/gallery/cords.png)
+
+### 11. Sound Editing (SID)
+![Sound Editing (SID)](assets/gallery/edit_sid.png)
 
 ---
 
