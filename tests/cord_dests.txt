@@ -57,3 +57,7 @@
 54 ?        ?     -
 55 C AUTO   step  CONSTELLATION AUTO
 56 CH PROG  step  CHORD PROG
+57 G KICK   step  GRIDS KICK
+58 G SNR    step  GRIDS SNARE
+59 G HAT    step  GRIDS HAT
+60 G TOMS   step  GRIDS TOMS

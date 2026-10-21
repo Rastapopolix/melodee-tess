@@ -41,6 +41,7 @@ enum {
     CD_SR_START, CD_RETIRED_CL_RULE,                                /* (CELLS' RULE, cut: a gap, no destination) */
     CD_CS_AUTO,
     CD_CH_PROG,
+    CD_GRD_KICK, CD_GRD_SNR, CD_GRD_HAT, CD_GRD_TOMS,
     CD_N
 };
 

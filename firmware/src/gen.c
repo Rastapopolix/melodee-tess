@@ -264,21 +264,47 @@ static uint32_t gen_grids_level(uint32_t step, uint32_t part, uint32_t x, uint32
 /* Grids: steps in its bar: 32 (Grids' own 32nds) when the track's division makes 32 a bar, else 16 (its 16ths) */
 static uint32_t gen_grids_steps(uint32_t steps_per_bar) { return steps_per_bar >= 32u ? 32u : 16u; }
 
-/* 1 = part `part` hits on step `step` of its bar (steps of them): the map's chance plus the bar's push over the
- * threshold DENSITY sets (Grids' EvaluateDrums); *acc: 1 when it is an accent */
-static int gen_grids_hit(const gen_grids_t *g, uint32_t step, uint32_t steps, uint32_t part, uint32_t push, int *acc)
+/* Grids: part `part`'s line (0..255) its chance has to pass: DENS times the part's KICK, SNR or HAT (Grids'
+ * EvaluateDrums' threshold, one a part) */
+static uint32_t gen_grids_thr(const gen_grids_t *g, uint32_t part)
 {
-    uint32_t lv = gen_grids_level(step * (32u / steps), part, g->x, g->y);
-    uint32_t thr = 255u - (uint32_t)(g->dens > 100u ? 100u : g->dens) * 255u / 100u;
-    lv = lv < 255u - push ? lv + push : 255u;
-    if (acc) *acc = lv > 192u;
-    return lv > thr;
+    uint32_t d = g->dens > 100u ? 100u : g->dens, s = g->thin[part] > 100u ? 0u : 100u - g->thin[part];
+    return 255u - d * s * 255u / 10000u;
+}
+/* Grids: part `part`'s chance on step `step` of its bar (steps of them) plus the bar's push (none: push 0) */
+static uint32_t gen_grids_lv(const gen_grids_t *g, uint32_t step, uint32_t steps, uint32_t part, const uint8_t *push)
+{
+    uint32_t lv = gen_grids_level(step * (32u / steps), part, g->x, g->y), u = push ? push[part] : 0u;
+    return lv < 255u - u ? lv + u : 255u;
+}
+/* 1 = part `part` hits on step `step` of its bar (steps of them): the map's chance plus the bar's push (push 0: none)
+ * over the part's line; *acc: 1 when it is an accent. The tom (GEN_GRIDS_TOM): neither the kick nor the snare hits,
+ * but one of them is offered a hit and misses its line by less than TOMS' window (TOMS x DENS: half the scale at most),
+ * never an accent */
+static int gen_grids_hit(const gen_grids_t *g, uint32_t step, uint32_t steps, uint32_t part, const uint8_t *push, int *acc)
+{
+    uint32_t p, lv[2], win;
+    if (acc) *acc = 0;
+    if (part < 3u) {
+        lv[0] = gen_grids_lv(g, step, steps, part, push);
+        if (acc) *acc = lv[0] > 192u;
+        return lv[0] > gen_grids_thr(g, part);
+    }
+    win = (uint32_t)(g->toms > 100u ? 100u : g->toms) * (g->dens > 100u ? 100u : g->dens) * 128u / 10000u;
+    if (!win) return 0;
+    for (p = 0; p < 2u; p++) {
+        lv[p] = gen_grids_lv(g, step, steps, p, push);
+        if (lv[p] > gen_grids_thr(g, p)) return 0;            /* (the kick or the snare plays) */
+    }
+    for (p = 0; p < 2u; p++)                                  /* (a step the map offers nothing: no near miss) */
+        if (gen_grids_level(step * (32u / steps), p, g->x, g->y) && lv[p] + win > gen_grids_thr(g, p)) return 1;
+    return 0;
 }
 
-/* Grids: kick, snare and hat of this step, from the map at x, y. CHAOS draws each part's push at the bar's start (none
- * drawn at 0: the pattern alone); the note is the first part's (GM 36 kick, 38 snare, 42 closed hat), the adapter
- * plays every part (tessera.c) */
-static const uint8_t GEN_GRIDS_NOTE[3] = {36, 38, 42};
+/* Grids: kick, snare, hat and tom of this step, from the map at x, y. CHAOS draws the kick's, snare's and hat's push
+ * at the bar's start (none drawn at 0: the pattern alone); the note is the first part's (GM 36 kick, 38 snare, 42
+ * closed hat, 45 tom), the adapter plays every part (tessera.c) */
+static const uint8_t GEN_GRIDS_NOTE[GEN_GRIDS_PARTS] = {36, 38, 42, 45};
 static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd, gen_out_t *out)
 {
     uint32_t steps = gen_grids_steps(clk->steps_per_bar), cur = g->step_idx % steps, p;
@@ -287,9 +313,9 @@ static void gen_grids_tick(gen_grids_t *g, const gen_clock_t *clk, uint32_t *rnd
         for (p = 0; p < 3u; p++)
             g->perturb[p] = (uint8_t)(g->chaos ? (gen_rnd(rnd, 256u) * ((uint32_t)g->chaos * 255u / 100u >> 2)) >> 8 : 0u);
     out->cv = (int16_t)(gen_grids_level(cur * (32u / steps), 0u, g->x, g->y) * 32767u / 255u);   /* the kick's chance */
-    for (p = 0; p < 3u; p++) {
+    for (p = 0; p < GEN_GRIDS_PARTS; p++) {
         int acc;
-        if (!gen_grids_hit(g, cur, steps, p, g->perturb[p], &acc)) continue;
+        if (!gen_grids_hit(g, cur, steps, p, g->perturb, &acc)) continue;
         if (!out->parts) {
             out->note = GEN_GRIDS_NOTE[p];
             out->vel = acc ? 127 : 96;

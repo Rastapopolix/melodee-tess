@@ -163,7 +163,8 @@ void organic_play(void);                            /* seq.c, PLAY: SLOTH and OC
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 540u                       /* the saved state, version 12 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES 556u                       /* the saved state, version 13 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES_V12 540u                   /* version 12 (before Grids' KICK, SNR, HAT, TOMS) */
 #define TESSERA_PK_BYTES_V11 520u                   /* version 11 (before CHORD) */
 #define TESSERA_PK_BYTES_V10 516u                   /* version 10 (before CONSTELLATION's LEN and FILL) */
 #define TESSERA_PK_BYTES_V9 508u                    /* version 9 (before QUAD's columns, RANGE and LINK to several) */
@@ -177,9 +178,9 @@ const char *tessera_form_name(uint32_t form);
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..12) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..13) */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
-void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 12 */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 13 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
@@ -207,6 +208,7 @@ enum {
     TX_CS_LEN, TX_CS_FILL,
     TX_CH_PROG, TX_CH_BARS, TX_CH_HIT,
     TX_CH_OCT,
+    TX_GRD_KICK, TX_GRD_SNR, TX_GRD_HAT, TX_GRD_TOMS,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -231,6 +233,7 @@ const gen_constel_t *tessera_constel(uint32_t tr);
 uint32_t tessera_cs_speed(uint32_t tr);                 /* Constellation's SPEED: the track's DIV, 0 the slowest .. 7 */
 #define TESS_CS_SPEEDS 8u                               /* (4BAR .. 1/32, the straight DIVs) */
 void tessera_constel_layer_knob(uint32_t k, int32_t s);   /* OCT+ held on GEN in CONSTELLATION: LOCK, LEN, FILL, SIZE */
+void tessera_grids_layer_knob(uint32_t k, int32_t s);      /* OCT+ held on GEN in GRIDS: KICK, SNR, HAT, TOMS */
 void tessera_chord_oct_knob(int32_t s);                    /* OCT+ held on GEN in CHORD, KNOB 1: OCT */
 const gen_series_t *tessera_series(uint32_t tr);
 const gen_chord_t *tessera_chord(uint32_t tr);

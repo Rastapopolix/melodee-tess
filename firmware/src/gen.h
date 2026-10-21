@@ -49,13 +49,19 @@ typedef struct {
 } gen_morph_t;
 
 /* 5. Grids (Mutable Instruments Grids' drum map, gen_grids.h): kick, snare and hat from a point on a 5 x 5 map of
- * patterns, blended between the four nearest */
+ * patterns, blended between the four nearest; TOMS a fourth part, the kick's and the snare's near misses (OCT+ held on
+ * GEN: KICK, SNR, HAT, TOMS) */
+#define GEN_GRIDS_PARTS 4u   /* kick, snare, hat, tom */
+#define GEN_GRIDS_TOM 3u     /* (the part TOMS plays: no pattern of its own on the map) */
 typedef struct {
     uint8_t  x, y;        /* 0..255: the point on the map */
-    uint8_t  dens;        /* 0..100: how full the three parts are (Grids' FILL, one for all three) */
+    uint8_t  dens;        /* 0..100: how full the parts are (Grids' FILL, one for all) */
     uint8_t  chaos;       /* 0..100: random hits added each bar (Grids' CHAOS; LOCK turned round) */
     uint8_t  step_idx;    /* the next step, 0..31 */
     uint8_t  perturb[3];  /* this bar's random push per part, 0..63 (drawn on the bar's first step) */
+    uint8_t  thin[3];     /* 0..100: KICK, SNR, HAT turned round: how much of DENS the part loses (0: all of it, as
+                           * before; the knobs show 100 - thin) */
+    uint8_t  toms;        /* 0..100: how far under the line a kick or snare may miss and still play the tom; 0 none */
 } gen_grids_t;
 
 /* 6. Bounce (Theo's): balls crossing a 256 x 256 box a fixed distance a step, no gravity; a wall a ball hits plays a
@@ -215,7 +221,7 @@ typedef struct {
     uint8_t gate;           /* 1 = a note starts on this step */
     uint8_t note, vel;      /* the raw note (before LOCK, the scale snap, transpose, SHIFT) */
     int16_t cv;             /* the generator's CV for the signal bus (phase 2; 0 until then) */
-    uint8_t parts;          /* Grids: the drum parts that hit, bit 0 kick, 1 snare, 2 hat (gate: any); else 0 */
+    uint8_t parts;          /* Grids: the drum parts that hit, bit 0 kick, 1 snare, 2 hat, 3 tom (gate: any); else 0 */
     uint8_t accent;         /* Grids: the parts among them accented */
     uint8_t more[2];        /* Bounce: notes after `note` on the same step (raw, as note), more_n of them */
     uint8_t more_n;

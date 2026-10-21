@@ -195,3 +195,7 @@
 0x24a CHORD BARS               track 0..3 def 1
 0x24b CHORD HIT                track 0..2 def 0
 0x24c CHORD OCT                track -2..2 def 0
+0x24d GRIDS KICK               track 0..100 def 100
+0x24e GRIDS SNARE              track 0..100 def 100
+0x24f GRIDS HAT                track 0..100 def 100
+0x250 GRIDS TOMS               track 0..100 def 0

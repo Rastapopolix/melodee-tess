@@ -1709,6 +1709,40 @@ static void pack_run(char *res, size_t cap)
               tessera.chord[1].oct == -2 && tessera_param_get(3, TX_CH_OCT) == 2;
         tessera_unpack(a);
     }
+    {   /* a version 12 block (before Grids' KICK, SNR, HAT, TOMS: each track 4 bytes shorter) loads every setting, the
+         * parts all of DENS and no TOMS, as it played; a share or TOMS over 100 is refused; they round trip */
+        static uint8_t v12[TESSERA_PK_BYTES_V12], v12b[TESSERA_PK_BYTES_V12];
+        const uint32_t n13 = TESSERA_PK_BYTES / TESSERA_TRACKS, n12 = TESSERA_PK_BYTES_V12 / TESSERA_TRACKS;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v12 + tr * n12, a + tr * n13, n12);
+        tessera_reset();
+        tessera_param_set(2, TX_GRD_SNR, 10);
+        tessera_param_set(2, TX_GRD_TOMS, 60);
+        ok &= tessera_unpack_ver(12u, v12) == 1;
+        tessera_pack(b);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) {
+            memcpy(v12b + tr * n12, b + tr * n13, n12);
+            for (uint32_t k = 0; k < 3u; k++) ok &= tessera_param_get(tr, TX_GRD_KICK + k) == 100;
+            ok &= tessera_param_get(tr, TX_GRD_TOMS) == 0;
+        }
+        ok &= !memcmp(v12, v12b, sizeof v12);         /* every other version 12 setting as it was */
+        for (uint32_t k = 0; k < 4u; k++) {
+            memcpy(c, a, sizeof c);
+            c[1u * n13 + n12 + k] = 101;                /* (track 2's) */
+            ok &= tessera_unpack(c) == 0;
+        }
+        tessera_unpack(a);
+        tessera_param_set(1, TX_GRD_KICK, 30);
+        tessera_param_set(1, TX_GRD_SNR, 0);
+        tessera_param_set(1, TX_GRD_HAT, 140);         /* (kept to 100) */
+        tessera_param_set(1, TX_GRD_TOMS, 70);
+        tessera_param_set(3, TX_GRD_TOMS, -5);         /* (kept to 0) */
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera_param_get(1, TX_GRD_KICK) == 30 && tessera_param_get(1, TX_GRD_SNR) == 0 &&
+              tessera_param_get(1, TX_GRD_HAT) == 100 && tessera_param_get(1, TX_GRD_TOMS) == 70 &&
+              tessera_param_get(3, TX_GRD_TOMS) == 0 && tessera.grids[1].thin[0] == 70u;
+        tessera_unpack(a);
+    }
     {   /* POLY over 3 octaves: pitches above 15 survive the round trip (their fifth bits in SPAN's byte) */
         static const uint8_t P[4] = {20, 16, 5, 15};
         tessera.poly[3].span = 3;
