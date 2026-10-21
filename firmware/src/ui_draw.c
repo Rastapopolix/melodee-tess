@@ -847,6 +847,21 @@ static void draw_columns(void)
         const tessera_evolve_t *ev = &tessera.evolve[tr < TESSERA_TRACKS ? tr : 0u];
         char e0[16], e1[16], e2[16], e3[16], e0u[8] = "", e1u[8] = "", e2u[8] = "%";
         int lk = tessera_lock_get(tr);
+        if (tessera_step_on(tr)) {                      /* STEP EVOLVE: LOCK, EVERY, AMOUNT, CLEAR (the steps changed) */
+            uint32_t every = tessera.sv_every[tr], amount = tessera.sv_amount[tr], n = tessera_step_varied(tr);
+            fmt_int(e0, (uint32_t)lk);
+            if (!every) str_cpy(e1, "OFF", sizeof e1);
+            else { fmt_int(e1, tessera_every_bars(every)); str_cpy(e1u, "BAR", sizeof e1u); }
+            if (!amount) { str_cpy(e2, "OFF", sizeof e2); e2u[0] = 0; }
+            else fmt_int(e2, amount);
+            if (n) fmt_int(e3, n);
+            else str_cpy(e3, "--", sizeof e3);
+            draw_column(0, "LOCK", e0, "%", VAL(0u), lk * 10, ICON_AUTO);
+            draw_column(1, "EVERY", e1, e1u, VAL(1u), (int32_t)every * 1000 / 5, ICON_AUTO);
+            draw_column(2, "AMOUNT", e2, e2u, VAL(2u), (int32_t)amount * 10, ICON_AUTO);
+            draw_column(3, "CLEAR", e3, n ? (n == 1u ? "STEP" : "STEPS") : "", n ? VAL(3u) : T_DIM, -1, ICON_AUTO);
+            return;
+        }
         if (lk < 0) str_cpy(e0, "--", sizeof e0);
         else { fmt_int(e0, (uint32_t)lk); str_cpy(e0u, "%", sizeof e0u); }
         if (!ev->every) str_cpy(e1, "OFF", sizeof e1);

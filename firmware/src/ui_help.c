@@ -56,7 +56,16 @@ static void help_find(uint32_t k)
         help.text = MX_TEXT[k];
         return;
     }
-    if (pg->graph == GR_EVOLVE) x = EV[k];
+    if (pg->graph == GR_EVOLVE && tessera_step_on(tr)) {   /* STEP EVOLVE */
+        static const uint8_t SV[3] = {TX_SV_LOCK, TX_SV_EVERY, TX_SV_AMOUNT};
+        if (k == 3u) {
+            help.name = "STEP EVOLVE CLEAR";
+            help.text = "Turn: the steps play as written again; the next round starts afresh. REC held instead keeps "
+                        "the changes playing: they become the steps (EDIT held undoes it).";
+            return;
+        }
+        x = SV[k];
+    } else if (pg->graph == GR_EVOLVE) x = EV[k];
     else if (pg->graph == GR_TWEAK) x = TW[k];
     else if (pg->graph == GR_TWEAK2) x = TW2[k];
     else if (pg->graph == GR_NOTELEN) x = NL[k];
