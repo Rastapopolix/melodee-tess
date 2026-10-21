@@ -36,6 +36,7 @@ static void pattern_apply(track_t *t, uint32_t bank)
     t->pattern_next = 0xff;
     t->rh_n = t->rskip_n = 0;
     t->pattern_gen++;
+    tessera_step_clear((uint32_t)(t - trk));        /* (STEP EVOLVE: the new steps as written) */
 }
 static void pattern_init(void)
 {

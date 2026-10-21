@@ -1100,6 +1100,8 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             if (tr_idx < TESSERA_TRACKS && tessera.mode[tr_idx] != TESS_ENG_OFF) {
                 tessera_clock_step(t);
             } else {
+                step_t sv;                          /* (STEP EVOLVE: the step with its change, tessera.c) */
+                s = tessera_step_vary(t, s, &sv);
                 seq_step(t, s, step_gate(s) ? step_samples(t, period, t->seq_idx) : period, skip);
                 if (tr_idx < TESSERA_TRACKS)
                     tessera.hit[tr_idx] = t->seq_n != 0;   /* (TWEAK 2's LOGIC on another track reads it) */
