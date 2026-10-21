@@ -139,13 +139,18 @@ typedef struct {
     uint8_t          sv_lock[TESSERA_TRACKS];   /* 0..100: the chance a change is a step put back as written */
     uint8_t          sv_every[TESSERA_TRACKS];  /* 0 OFF, 1..5: 1 2 4 8 16 bars between rounds of changes */
     uint8_t          sv_amount[TESSERA_TRACKS]; /* 0..100: changes a round, 1 a quarter; 0 none (as written) */
-    uint8_t          sv_flash[TESSERA_TRACKS];  /* steps left to show a round just made (not saved) */
-    uint16_t         sv_steps[TESSERA_TRACKS];  /* steps since the last round (not saved) */
-    uint32_t         sv_rnd[TESSERA_TRACKS];    /* its random stream (not saved) */
-    uint8_t          sv_mut[TESSERA_TRACKS][TESS_SV_STEPS];   /* each step's change (vary.c), 0 as written (not saved) */
 } tessera_state_t;
 
 extern tessera_state_t tessera;
+/* STEP EVOLVE's changes as they play (not saved; cleared with `tessera` by tessera_init). In .pool: static RAM is
+ * nearly full */
+typedef struct {
+    uint8_t  flash[TESSERA_TRACKS];             /* steps left to show a round just made */
+    uint16_t steps[TESSERA_TRACKS];             /* steps since the last round */
+    uint32_t rnd[TESSERA_TRACKS];               /* its random stream */
+    uint8_t  mut[TESSERA_TRACKS][TESS_SV_STEPS];   /* each step's change (vary.c), 0 as written */
+} tessera_sv_t;
+extern tessera_sv_t tess_sv;
 
 void tessera_init(void);
 void tessera_clock_step(track_t *t);

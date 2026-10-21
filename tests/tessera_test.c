@@ -1356,19 +1356,19 @@ static void sv_run(char *res, size_t cap)
     if (tessera_step_varied(0)) fail |= 1u << 1;
     for (k = 0; k < 8u; k++) {                         /* a round a bar: 3 of the 6 steps free (a SWAP: 4) */
         uint8_t was[8];
-        memcpy(was, tessera.sv_mut[0], 8);
+        memcpy(was, tess_sv.mut[0], 8);
         sv_play(BAR, 0, &fail);
         n = tessera_step_varied(0);
         if (n < 3u || n > 4u) fail |= 1u << 1;
-        most += memcmp(was, tessera.sv_mut[0], 8) != 0;
-        if (tessera.sv_mut[0][5] || tessera.sv_mut[0][2]) fail |= 1u << 2;
+        most += memcmp(was, tess_sv.mut[0], 8) != 0;
+        if (tess_sv.mut[0][5] || tess_sv.mut[0][2]) fail |= 1u << 2;
     }
     if (most < 6u) fail |= 1u << 1;                   /* (afresh: another variation most rounds) */
     for (i = 0; i < 8u; i++) {                        /* SWAP halves paired */
-        uint32_t m = tessera.sv_mut[0][i];
+        uint32_t m = tess_sv.mut[0][i];
         uint8_t kind[8];
         for (k = 0; k < 8u; k++) kind[k] = (uint8_t)sv_kind(&trk[0].step[k]);
-        if (vary_src(m) == VARY_NEXT && vary_src(tessera.sv_mut[0][vary_find(kind, 8, i, 1)]) != VARY_PREV) fail |= 1u << 4;
+        if (vary_src(m) == VARY_NEXT && vary_src(tess_sv.mut[0][vary_find(kind, 8, i, 1)]) != VARY_PREV) fail |= 1u << 4;
     }
     trk[0].step[5].flags &= (uint8_t)~SF_RECORDED;
     trk[0].step[2].time = ST_NOTE;
@@ -1377,10 +1377,10 @@ static void sv_run(char *res, size_t cap)
     {
         uint8_t held[8];
         sv_play(BAR, 0, &fail);                       /* (the tie and the recorded step free again: one more) */
-        memcpy(held, tessera.sv_mut[0], 8);
+        memcpy(held, tess_sv.mut[0], 8);
         for (k = 0; k < 8u; k++) {
             sv_play(BAR, 0, &fail);
-            if (memcmp(held, tessera.sv_mut[0], 8) || tessera_step_varied(0) < 3u) fail |= 1u << 6;
+            if (memcmp(held, tess_sv.mut[0], 8) || tessera_step_varied(0) < 3u) fail |= 1u << 6;
         }
     }
     knob(tessera_evolve_knob, 0, -25);                /* LOCK 50 */
@@ -1410,7 +1410,7 @@ static void sv_run(char *res, size_t cap)
         mix_block(o, CTL);
         if (changed_bar0 || !tessera_step_varied(0) || memcmp(as, trk[0].step, sizeof as)) fail |= 1u << 8;
         pattern_apply(&trk[0], 1);
-        if (tessera_step_varied(0) || tessera.sv_mut[0][0] || tessera.sv_mut[0][1]) fail |= 1u << 8;
+        if (tessera_step_varied(0) || tess_sv.mut[0][0] || tess_sv.mut[0][1]) fail |= 1u << 8;
     }
     {   /* saved */
         static uint8_t a[TESSERA_PK_BYTES], c[TESSERA_PK_BYTES], v13[TESSERA_PK_BYTES_V13];
