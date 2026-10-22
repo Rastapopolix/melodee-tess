@@ -122,7 +122,7 @@ static int preferences(void)
         host_wire[n - 27] == 0x42 && host_wire[n - 26] == 1 && host_wire[n - 25] == 3 &&
         host_wire[n - 24] == 0x50 && host_wire[n - 23] == 1 && host_wire[n - 22] == NPAT && host_wire[n - 21] == CHAIN_ROWS &&
         host_wire[n - 20] == 0x46 && host_wire[n - 19] == 1 && host_wire[n - 18] == FM6_NFAC &&
-        host_wire[n - 17] == 0 && host_wire[n-16]==0x35 && host_wire[n-15]==1 && host_wire[n-14]==0 && host_wire[n-13]==16 && host_wire[n-12]==17 && host_wire[n-11]==18 && host_wire[n-10]==20 && host_wire[n-9]==0 && host_wire[n-8]==1 && host_wire[n-7]==0x4e && host_wire[n-6]==1 && host_wire[n-5]==64 && host_wire[n-4]==0 && host_wire[n-3]==0 && host_wire[n-2]==1);
+        host_wire[n - 17] == 0 && host_wire[n-16]==0x35 && host_wire[n-15]==1 && host_wire[n-14]==0 && host_wire[n-13]==16 && host_wire[n-12]==17 && host_wire[n-11]==18 && host_wire[n-10]==20 && host_wire[n-9]==0 && host_wire[n-8]==1 && host_wire[n-7]==0x4e && host_wire[n-6]==1 && host_wire[n-5]==64 && host_wire[n-4]==0 && host_wire[n-3]==0 && host_wire[n-2]==0);   /* (no CZ-1 pool) */
     request(ED_UI_SET, a, 2);
     bad += check("UI_SET updates the actual palette and reports RAM-only saving",
         host_wire[5] == 3 && settings.palette == 2 && T_BG == UI_PALETTES[2].bg);
@@ -423,13 +423,11 @@ static int native_protocol(void)
     a[0]=ENGI_CZ;a[1]=2;a[2]=127;
     for(uint32_t j=0;j<CZ_BYTES;j++){a[3+2*j]=cz[j]&15;a[4+2*j]=cz[j]>>4;}
     request(ED_NATIVE,a,sizeof a);
-    bad+=check("NATIVE saves Z128 without using general or FM6 slots",!host_wire[8] && native_used(ENGI_CZ,127) && !memcmp(native_raw(ENGI_CZ,127),cz,sizeof cz));
-    a[3]=16;request(ED_NATIVE,a,sizeof a);
-    bad+=check("malformed native nibbles cannot replace a committed tone",host_wire[8]==1 && !memcmp(native_raw(ENGI_CZ,127),cz,sizeof cz));
-    a[1]=0;a[2]=120;a[3]=16;request(ED_NATIVE,a,4);
-    bad+=check("last native page clamps to Z128 and reports 128 slots",!host_wire[8] && host_wire[9]==8 && host_wire[10]==0 && host_wire[11]==1);
-    a[1]=5;a[2]=127;request(ED_NATIVE,a,3);   /* (the CZ-1's bank: kept, not played: load and STORE are FM6's below) */
-    bad+=check("native erase of a kept CZ tone",!host_wire[8] && !native_used(ENGI_CZ,127));
+    bad+=check("NATIVE refuses a CZ-1 tone (its pool retired)",host_wire[8]==1 && !native_used(ENGI_CZ,127));
+    a[1]=0;a[2]=0;a[3]=16;request(ED_NATIVE,a,4);
+    bad+=check("NATIVE lists no CZ-1 page",host_wire[8]==1);
+    a[0]=ENGI_FM6;a[1]=0;a[2]=56;a[3]=16;request(ED_NATIVE,a,4);
+    bad+=check("last native page clamps to F064 and reports 64 slots",!host_wire[8] && host_wire[9]==8 && host_wire[10]==64 && host_wire[11]==0);
     a[0]=ENGI_CZ;a[1]=4;a[2]=126;a[3]=2;request(ED_NATIVE,a,4);
     bad+=check("a retired engine's native tone does not load",host_wire[8]!=0 && trk[2].eng_req!=ENGI_CZ);
     a[0]=ENGI_FM6;a[1]=4;a[2]=63;a[3]=2;trk[2].p[P_PAN]=37;trk[2].p[P_LEVEL]=61;trk[2].step[0].note[0]=67;request(ED_NATIVE,a,4);
@@ -437,7 +435,7 @@ static int native_protocol(void)
     bad+=check("native load targets track 3 and preserves pan, level and pattern",!host_wire[8] && trk[2].user==64 && trk[2].user_native && trk[2].p[P_PAN]==37 && trk[2].p[P_LEVEL]==61 && trk[2].step[0].note[0]==67 && !memcmp(packed,fm,sizeof fm));
     trk[2].p[P_E2]=23;request(ED_NATIVE,a,4);
     bad+=check("same-engine native load also keeps track macros",trk[2].p[P_E2]==23);
-    a[0]=ENGI_CZ;a[1]=7;a[2]=2;request(ED_NATIVE,a,3);
+    a[0]=ENGI_FM6;a[1]=7;a[2]=1;request(ED_NATIVE,a,3);
     bad+=check("native status encodes the slot without a 7-bit overflow",!host_wire[8] && host_wire[9]==0 && host_wire[10]==0);
     uint8_t fav_fm[4]={USER_NATIVE_FM,63,64,1};request(ED_FAV_SET,fav_fm,4);
     bad+=check("the highest FM6 native preset can be favorited through editor",host_wire[5]==3 && favorite_has(USER_NATIVE_FM,63));

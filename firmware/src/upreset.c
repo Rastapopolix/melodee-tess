@@ -10,9 +10,10 @@
  *
  * Versions: a bank whose magic, record size or slot count differ reads as
  * empty; so does a record with another layout version. Read: UP_VER (4, values as biased bytes), UP_VER_GRID (5,
- * its pattern a drum grid: note[i] step i's lane hits, flags[i] their accents), UP_VER_CZ (8, native CZ-1 bytes),
- * UP_VER_DRUM / UP_VER_DRUM_GRID (9 / 10, the DRUM patch beside the values). Older versions (1..3, the CZ records
- * of before the native CZ-1, the 192-byte banks) remain protected and unreadable. A record keeps np = the
+ * its pattern a drum grid: note[i] step i's lane hits, flags[i] their accents),
+ * UP_VER_DRUM / UP_VER_DRUM_GRID (9 / 10, the DRUM patch beside the values). Other versions (1..3, the CZ records
+ * of before the native CZ-1, the 192-byte banks; 8, a native CZ-1 tone: retired with its engine) remain protected
+ * and unreadable. A record keeps np = the
  * P_COUNT it was stored with; when that differs from today's it is mapped by count: its last 8 values are
  * P_E0..P_E7, the first np - 8 are P_LEVEL.. in order, and parameters it does not have take their defaults.
  * That holds as long as common parameters are only ever added just before P_E0 (else bump UP_VER and translate).
@@ -21,8 +22,6 @@
  * With -DUP_HOST (host test) only the part above #ifndef UP_HOST is built;
  * it needs nothing but core.h. */
 #define UP_PER_BANK 16u
-#include "cz_patch.h"
-#define UP_VER_CZ 8u                            /* native CZ-1 bytes in the 144-byte payload */
 #define UP_PMAX 72u                              /* room for P_COUNT to grow */
 #define UP_USED 0xA5u
 #define UP_VER 4u                                /* the values as biased bytes */
@@ -33,7 +32,7 @@
 typedef struct {
     uint8_t used, ver, engine, np;               /* UP_USED, UP_VER, engine, P_COUNT when stored */
     char name[12];                               /* ASCII 32..126, 0-padded (no 0 when 12 long) */
-    uint8_t packed[UP_PMAX * 2u];                /* the values + 64 (UP_VER_CZ: the native tone) */
+    uint8_t packed[UP_PMAX * 2u];                /* the values + 64 */
     uint8_t note[16], flags[16];                 /* note 0 = rest; flags 1 accent, 2 slide, 4 tie (UP_VER_GRID:
                                                   * lane hits, their accents) */
     uint8_t cz_extra[46];                        /* UP_VER_DRUM*: the DRUM patch's first bytes (up_drum_raw) */
@@ -46,12 +45,12 @@ typedef struct {
 _Static_assert(sizeof(up_rec_t) == 238, "user preset record layout");
 _Static_assert(P_COUNT <= UP_PMAX * 2u && P_COUNT < 128, "user preset record: P_COUNT");
 #if MELODEE_FLASH && !defined(UP_HOST)
-/* One main-loop bank cache holds whichever bank was asked for last: a user preset bank, a native FM6 or CZ-1 bank
- * (or the CZ-1 bank's older view, cz_bank_load) or a Prophet user bank (bank_buf, after native_presets.c). Each owner
+/* One main-loop bank cache holds whichever bank was asked for last: a user preset bank or a native FM6 bank
+ * (bank_buf, after native_presets.c). Each owner
  * keeps its own cached-bank byte; bank_claim(kind) before a load forgets the others' (a user bank is indexed first,
  * up_meta). Names, used masks and favourites stay in the owners' indexes, so browsing never reloads. A pointer into a
  * bank is good until the next call that may load another kind: copy what outlives it. */
-enum { BK_UP, BK_FM, BK_CZ, BK_CZOLD, BK_P5 };
+enum { BK_UP, BK_FM };
 static void bank_claim(uint32_t kind);
 static up_bank_t *bank_up(void);
 #define up_cache (*bank_up())
@@ -89,12 +88,6 @@ static int up_save_bank(uint32_t b) {
 
 static up_rec_t *up_rec(uint32_t k) { return &up_cache_bank(k / UP_PER_BANK)->r[k % UP_PER_BANK]; }
 
-static int up_native_cz(const up_rec_t *r){return r->engine==ENGI_CZ && r->ver==UP_VER_CZ;}
-static int up_cz_raw(const up_rec_t *r,uint8_t *raw)
-{
-    if(!up_native_cz(r))return 0;
-    memcpy(raw,r->packed,CZ_BYTES);return cz_patch_valid(raw);
-}
 static int up_bank_shape(uint32_t len,uint32_t rsize){return len==sizeof(up_bank_t) && rsize==sizeof(up_rec_t);}
 static int up_drum_raw(const up_rec_t *r,drum_patch_t *p)
 {
@@ -104,7 +97,6 @@ static int up_drum_raw(const up_rec_t *r,drum_patch_t *p)
 
 static int up_valid(const up_rec_t *r)
 {
-    if (r->used == UP_USED && up_native_cz(r)) { uint8_t raw[CZ_BYTES];return (r->np==92u || r->np==100u || r->np==104u || r->np==108u || r->np==P_COUNT) && r->name[0] && up_cz_raw(r,raw); }
     if (!(r->used == UP_USED && (r->ver == UP_VER || r->ver == UP_VER_GRID || (r->engine==ENGI_DRUM && (r->ver==UP_VER_DRUM || r->ver==UP_VER_DRUM_GRID))) && r->engine < USER_GENERAL &&
           r->np >= 8u && r->np <= UP_PMAX * 2u && r->name[0])) return 0;
     for (uint32_t i = 0; i < r->np; i++) if (r->packed[i] > 191u) return 0;
@@ -163,7 +155,7 @@ static void up_cache_index(uint32_t b)
         uint32_t k=b*UP_PER_BANK+j; const up_rec_t *r=&up_cache.r[j];
         up_meta[k].ready=1;up_meta[k].used=(uint8_t)up_valid(r);
         up_meta[k].old=(uint8_t)(((up_bank_old >> b) & 1u) || (r->used != 0 && !up_valid(r)));
-        up_meta[k].engine=up_native_cz(r)?ENGI_CZ:eng_sound_idx(r->engine);
+        up_meta[k].engine=eng_sound_idx(r->engine);
         uint32_t n=0;
         for(;n<12u && r->name[n];n++)up_meta[k].name[n]=r->name[n]>='a' && r->name[n]<='z'?(char)(r->name[n]-32):r->name[n];
         up_meta[k].name[n]=0;
@@ -191,7 +183,6 @@ static up_bank_t *up_cache_bank(uint32_t b)
 /* the record's values in today's P_* order (mapped by count, see above); def = the defaults */
 static void up_params(const up_rec_t *r, int16_t *out, const int16_t *def)
 {
-    if (up_native_cz(r)) { memcpy(out, def, P_COUNT * sizeof *out); out[P_E7] = CZ_NATIVE; return; }
     int16_t values[UP_PMAX * 2u];
     for (uint32_t i = 0; i < r->np && i < NELEM(values); i++) values[i] = up_value(r, i);
     params_by_count(out, values, r->np, def);
@@ -299,15 +290,14 @@ static void up_values(const up_rec_t *r, int16_t *v)   /* mapped and clamped for
     int16_t def[P_COUNT];
     uint32_t i;
     for (i = 0; i < P_COUNT; i++)
-        def[i] = param_desc_of(up_native_cz(r)?ENGI_CZ:r->engine, i)->def;
+        def[i] = param_desc_of(r->engine, i)->def;
     up_params(r, v, def);
     for (i = 0; i < P_COUNT; i++) if (param_reserved(i)) v[i] = 0;
     for (i = 0; i < P_COUNT; i++)
         if (!(eng_extra_retired(r->engine) && i >= P_E0))
-        v[i] = (int16_t)clamp(v[i], param_desc_of(up_native_cz(r)?ENGI_CZ:r->engine, i)->min, param_desc_of(up_native_cz(r)?ENGI_CZ:r->engine, i)->max);
+        v[i] = (int16_t)clamp(v[i], param_desc_of(r->engine, i)->min, param_desc_of(r->engine, i)->max);
 }
 
-#include "cz_bank.c"
 static void native_boot(void);
 static void native_cache_reset(void);
 
@@ -345,7 +335,6 @@ static void up_boot(void)                      /* persist_boot: the banks from f
     }
 #endif
     native_cache_reset();
-    cz_bank_boot();
     native_boot();
 #ifdef MELODEE_FAVORITES
     for (uint32_t k = 0; k < UP_SLOTS; k++)
@@ -467,10 +456,6 @@ static int up_store(uint32_t k, const char *name)
     up_set_name(&r, k, name);
     for (i = 0; i < P_COUNT; i++)
         up_set_value(&r, i, (param_fx(i) || param_fx_send(i))?TP[i].def:motion_base_value(TSEL, i));
-    if (r.engine == ENGI_CZ && TSEL->p[P_E7] == CZ_NATIVE) {
-        r.ver = UP_VER_CZ;
-        memcpy(r.packed, cz_patch[song.sel % NTRK].raw, CZ_BYTES);
-    }
     up_pat_from(&r, TSEL->step);
     if (drum_track(TSEL)) {                             /* a DRUM track that strikes a lane: its grid */
         uint32_t any = 0;
@@ -524,14 +509,12 @@ static int up_load(uint32_t k)
     panic_req |= (uint8_t)(1u << song.sel);
     {
         fm1_irq_off();                                  /* the audio ISR must not see half a sound */
-        t->eng_req = up_native_cz(r)?ENGI_CZ:r->engine;
+        t->eng_req = r->engine;
         for (i = 0; i < P_COUNT; i++)
             if (!param_kept(i))
                 t->p[i] = param_reserved(i) ? 0 : v[i];
         t->preset = 0;
-        if (up_native_cz(r))up_cz_raw(r,cz_patch[song.sel % NTRK].raw);
         if(r->engine==ENGI_DRUM){memset(&drum_patch[song.sel],0,sizeof(drum_patch_t));if(r->ver==UP_VER_DRUM || r->ver==UP_VER_DRUM_GRID)up_drum_raw(r,&drum_patch[song.sel]);}
-        cz_track_accept(t);
         fm1_irq_on();
         if (t->eng_req == ENGI_FM6) {                   /* FM6: its voice, native slot k (else INIT) */
             uint8_t v[FP_SIZE + 1u];
@@ -552,7 +535,7 @@ static uint32_t up_engine(uint32_t k) {
 #if MELODEE_FLASH && !defined(UP_HOST)
     if(up_cached != k/UP_PER_BANK && up_meta[k].ready)return up_meta[k].engine;
 #endif
- if(up_native_cz(up_rec(k)))return ENGI_CZ; return eng_sound_idx(up_rec(k)->engine); }
+ return eng_sound_idx(up_rec(k)->engine); }
 
 static uint32_t up_count(void)                 /* used slots */
 {
@@ -610,23 +593,17 @@ static void up_ui_named(uint32_t op, uint32_t k, const char *name)   /* 0 load, 
     ui.force = 1;
 }
 static void up_ui(uint32_t op, uint32_t k) { up_ui_named(op, k, 0); }
-#include "prophet_user.c"
 #include "native_presets.c"
 #if MELODEE_FLASH
-static union { up_bank_t up; native_fm_t fm; cz_bank_t cz; p5_bank_t p5; } bank_buf __attribute__((section(".pool")));
+static union { up_bank_t up; native_fm_t fm; } bank_buf __attribute__((section(".pool")));
 static up_bank_t *bank_up(void) { return &bank_buf.up; }
 static native_fm_t *bank_fm(void) { return &bank_buf.fm; }
-static cz_bank_t *bank_cz(void) { return &bank_buf.cz; }
-static p5_bank_t *bank_p5(void) { return &bank_buf.p5; }
 static void bank_claim(uint32_t kind)
 {
     if (kind != BK_UP && up_cached < UP_SLOTS / UP_PER_BANK)
         up_cache_index(up_cached);
     if (kind != BK_UP) up_cached = 255;
     if (kind != BK_FM) native_fm_cached = 255;
-    if (kind != BK_CZ) native_cz_cached = 255;
-    if (kind != BK_CZOLD) cz_bank_cached = 255;
-    if (kind != BK_P5) p5_cached = 255;
 }
 #endif
 #endif

@@ -67,11 +67,12 @@ static int all_banks_persist(void)
         motion_begin(); motion_step(t,0,&motion); ok &= t->p[P_LEVEL] == (int16_t)(k*8+b); motion_end();
     }
     bad += check("every bank round-trips chord, ties, timing, chance, hits and bank-specific automation", ok);
-    uint8_t raw[BANK_STORE_SIZE]; project_capture(&proj_scratch); bank_pack(raw,&proj_scratch,1);
-    raw[BANK_ACTIVE_OFF] = 8; bank_checksum(raw);
-    bad += check("invalid bank IDs are rejected even with a valid checksum", !bank_valid(raw,sizeof raw));
-    bank_pack(raw,&proj_scratch,1); raw[BANK_EXTRA_OFF+3] |= 0xF0; bank_checksum(raw);
-    bad += check("malformed inactive-bank chord is rejected before publication", !bank_valid(raw,sizeof raw) && trk[0].step[0].n == 4);
+    static uint8_t raw[TSP_MAX]; project_capture(&proj_scratch); uint32_t len = tsp_pack(raw,&proj_scratch,1);
+    tsp_valid(raw,len); raw[tsp_seen.at[TSP_STEPS]] = 8; tsp_resum(raw);
+    bad += check("invalid bank IDs are rejected even with a valid checksum", !tsp_valid(raw,len));
+    len = tsp_pack(raw,&proj_scratch,1); tsp_valid(raw,len);
+    raw[tsp_seen.at[TSP_STEPS] + NTRK + NSTEP * TSP_STEP_BYTES + 3u] |= 0xF0; tsp_resum(raw);
+    bad += check("malformed inactive-bank chord is rejected before publication", !tsp_valid(raw,len) && trk[0].step[0].n == 4);
     return bad;
 }
 static int panel_banks(void)

@@ -42,16 +42,10 @@
 #endif
 /* Tessera (phase 4, tessera-notes/docs/design/phase4/PLAN.md): an engine left out of the build (0) is never offered; its stored ID
  * stays reserved and a project's track of it loads SID's INIT (project.c). Its code goes where nothing reaches it */
-/* CZ-1 and PROPHET: retired as engines 2026-10-22 (their IDs stay reserved); MELODEE_CZ / MELODEE_PROPHET keep their
- * stored tones, factory sounds and banks (cz_p5_store.c, cz_bank.c, prophet_user.c) until the own project format */
-#ifndef MELODEE_PROPHET
-#define MELODEE_PROPHET 1
-#endif
+/* CZ-1 and PROPHET: retired as engines 2026-10-22 (their IDs stay reserved), their user stores and factory sounds
+ * with the own project format (cz_p5_store.c: what FUN20 still carries) */
 #ifndef MELODEE_FM6
 #define MELODEE_FM6 1
-#endif
-#ifndef MELODEE_CZ
-#define MELODEE_CZ 1
 #endif
 #ifndef MELODEE_SID
 #define MELODEE_SID 1            /* SID as a melodic engine (eng_sid.c); DRUM's SID KIT and SID DIGI keep the chip core either
@@ -361,7 +355,20 @@ typedef struct {                 /* acid-style step: up to 4 notes (POLY), time,
     uint8_t hit;                 /* bit l: lane l hits (its GM note, on any engine): the DRUM grid */
     uint8_t acc;                 /* hit != 0: lane accents; hit == 0: recorded gate, 1..255 of a step (0 legacy) */
     uint8_t probability;         /* 0 = legacy 100%; 1..100 = percent, 101 = silent */
+    uint8_t sub;                 /* SUB (Tessera): bits 0..1 RATCH - 1 (x1..x4), 2..5 NUDGE in 16ths of the step,
+                                  * -8..+7 (two's complement); 6..7 spare. 0: once, on the step (every older step) */
 } step_t;
+_Static_assert(sizeof(step_t) == 12u, "step v2 (docs/design/PROJECT_FORMAT.md in tessera-notes)");
+static uint32_t step_ratch(const step_t *s) { return (s->sub & 3u) + 1u; }   /* the hits, 1..4 */
+static int32_t step_nudge(const step_t *s) { return (int32_t)((s->sub >> 2) & 15u ^ 8u) - 8; }
+static void step_set_ratch(step_t *s, uint32_t hits)
+{
+    s->sub = (uint8_t)((s->sub & ~3u) | (hits < 1u ? 0u : hits > 4u ? 3u : hits - 1u));
+}
+static void step_set_nudge(step_t *s, int32_t v)
+{
+    s->sub = (uint8_t)((s->sub & ~0x3Cu) | (((uint32_t)(v < -8 ? -8 : v > 7 ? 7 : v) & 15u) << 2));
+}
 typedef struct {                 /* a step as formats 1..4 (projects to FUN4) stored it: no hits */
     uint8_t note[4];
     uint8_t n, time, flags, vel;

@@ -39,7 +39,6 @@ static void ed_ui_state(void)
 #else
     ed_b(127);
 #endif
-    for(uint32_t bank=0;bank<5u;bank++){if(!p5_meta_ready[bank])p5_user_bank(bank);sig=(sig^p5_meta[bank].favorites)*16777619u;}
     ed_u28(sig);
     ed_u28(up_gen);
     ed_b(settings_click);ed_b(settings_click_level);ed_b(settings_countin);ed_b(settings_preview);ed_b(settings_chord_add);
@@ -115,7 +114,7 @@ static int ed_ui_handle(uint32_t cmd, const uint8_t *a, uint32_t n)
 #ifdef MELODEE_FAVORITES
         if (n == 4u && a[0] <= USER_NATIVE_P5) {
             int32_t start = ed_rv(a + 1);
-            uint32_t limit = (a[0]==USER_NATIVE_FM || a[0]==USER_NATIVE_CZ || a[0]==USER_NATIVE_P5) ? native_limit(a[0]==USER_NATIVE_P5?ENGI_PROPHET:a[0]==USER_NATIVE_FM?ENGI_FM6:ENGI_CZ) : a[0] == USER_GENERAL ? UP_SLOTS : ENGINES[a[0]]->npresets;
+            uint32_t limit = a[0]==USER_NATIVE_FM ? NATIVE_FM_SLOTS : (a[0]==USER_NATIVE_CZ || a[0]==USER_NATIVE_P5) ? 0u : a[0] == USER_GENERAL ? UP_SLOTS : ENGINES[a[0]]->npresets;
             if (start >= 0 && a[3] && a[3] <= 32u && (uint32_t)start + a[3] <= limit) {
                 ed_b(0); ed_b(a[0]); ed_v(start); ed_b(a[3]);
                 for (uint32_t i = 0; i < a[3]; i++) ed_b(favorite_has(a[0], (uint32_t)start + i));
@@ -131,16 +130,13 @@ static int ed_ui_handle(uint32_t cmd, const uint8_t *a, uint32_t n)
 #ifdef MELODEE_FAVORITES
         if (n == 4u && a[0] <= USER_NATIVE_P5 && a[3] <= 1u) {
             int32_t preset = ed_rv(a + 1);
-            uint32_t limit = (a[0]==USER_NATIVE_FM || a[0]==USER_NATIVE_CZ || a[0]==USER_NATIVE_P5) ? native_limit(a[0]==USER_NATIVE_P5?ENGI_PROPHET:a[0]==USER_NATIVE_FM?ENGI_FM6:ENGI_CZ) : a[0] == USER_GENERAL ? UP_SLOTS : ENGINES[a[0]]->npresets;
+            uint32_t limit = a[0]==USER_NATIVE_FM ? NATIVE_FM_SLOTS : (a[0]==USER_NATIVE_CZ || a[0]==USER_NATIVE_P5) ? 0u : a[0] == USER_GENERAL ? UP_SLOTS : ENGINES[a[0]]->npresets;
             if (preset >= 0 && (uint32_t)preset < limit &&
                 (a[0] != USER_GENERAL || !a[3] || up_used((uint32_t)preset)) &&
-                ((a[0]!=USER_NATIVE_FM && a[0]!=USER_NATIVE_CZ && a[0]!=USER_NATIVE_P5) || !a[3] || native_used(a[0]==USER_NATIVE_P5?ENGI_PROPHET:a[0]==USER_NATIVE_FM?ENGI_FM6:ENGI_CZ,(uint32_t)preset))) {
-                int p5=a[0]==ENGI_PROPHET || a[0]==USER_NATIVE_P5;
-                int before=favorite_has(a[0],(uint32_t)preset);
-                int changed=favorite_set(a[0], (uint32_t)preset, a[3]);
-                if(p5 && !changed && before!=a[3]){ed_b(transport_busy()?4u:3u);ed_b(a[0]);ed_v(preset);ed_b(before);return 1;}
+                (a[0]!=USER_NATIVE_FM || !a[3] || native_used(ENGI_FM6,(uint32_t)preset))) {
+                favorite_set(a[0], (uint32_t)preset, a[3]);
                 ui.force = 1;
-                ed_b(p5 && a[0]==USER_NATIVE_P5 ? 0u : ed_ui_save()); ed_b(a[0]); ed_v(preset); ed_b(a[3]);
+                ed_b(ed_ui_save()); ed_b(a[0]); ed_v(preset); ed_b(a[3]);
                 return 1;
             }
         }

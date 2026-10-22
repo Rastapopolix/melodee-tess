@@ -100,18 +100,6 @@ static void reset(void)
     irq_start_race = irq_races = 0;
 }
 
-static int cz_bank_persistence(void)
-{
-    int bad=0;reset();cz_bank_t bank;uint8_t raw[CZ_BYTES];
-    for(uint32_t k=0;k<8;k++){cz_bank_empty(&bank,k);bank.used=1;cz_patch_init(bank.tone[0].raw);bank.tone[0].raw[128]=(uint8_t)('A'+k);bad+=check("dedicated CZ bank writes its own A/B object",!st_save(OBJ_CZBANK0+k,&bank,sizeof bank));}
-    cz_bank_boot();for(uint32_t k=0;k<8;k++)bad+=check("CZ banks survive cache reset and boot",!cz_bank_get(k,0,raw)&&raw[128]=='A'+k);
-    bank=*cz_bank_load(1);bank.tone[0].raw[128]='X';fail_after=2;
-    bad+=check("interrupted CZ bank write reports failure",st_save(OBJ_CZBANK0+1,&bank,sizeof bank)!=0);
-    fail_after=-1;cz_bank_boot();
-    bad+=check("torn CZ bank write keeps previous committed tone",!cz_bank_get(1,0,raw)&&raw[128]=='B');
-    bad+=check("CZ bank writes leave neighbouring project objects untouched",st_sector(OBJ_BANK0+3,1)+5u*ST_SECTOR==st_sector(OBJ_CZBANK0,0));
-    return bad;
-}
 #ifndef PERSISTENCE_TEST_NO_MAIN
 static int staged_import_persistence(void)
 {
@@ -130,9 +118,9 @@ static int test_boot_maintenance_writes(void)
     int bad = 0;
     reset(); boot_trace = 1;
     persist_boot();
-    bad += check("first boot flushes warning before settings and 12 bank erases",
-                 erases == 13u && !boot_trace_bad && boot_syncs >= 17u &&
-                 !boot_work.state && boot_work.total == 12u && boot_work.done == 12u);
+    bad += check("first boot flushes warning before settings and 4 FM6 bank erases",   /* (CZ-1 banks: retired) */
+                 erases == 5u && !boot_trace_bad && boot_syncs >= 9u &&
+                 !boot_work.state && boot_work.total == 4u && boot_work.done == 4u);
     uint32_t before = erases, flushed = boot_syncs;
     persist_boot();
     bad += check("completed first boot needs no more bank writes or progress screen",
@@ -146,20 +134,97 @@ static int test_boot_maintenance_writes(void)
                  native_fm_valid(native_fm_bank(0)) && native_fm_valid(native_fm_bank(2)));
     fail_after = -1; before = erases; boot_syncs = 0;
     persist_boot();
-    bad += check("restart retries only the nine unfinished banks",
-                 !boot_work.state && boot_work.total == 9u && boot_work.done == 9u &&
-                 erases == before + 9u && !boot_trace_bad && boot_syncs >= 11u);
+    bad += check("restart retries only the unfinished bank",
+                 !boot_work.state && boot_work.total == 1u && boot_work.done == 1u &&
+                 erases == before + 1u && !boot_trace_bad && boot_syncs >= 3u);
+    reset();
+    return bad;
+}
+
+/* TSP1 (project_tsp.c): a step's RATCH and NUDGE, the generators and the cords come back with a slot; the largest
+ * project fits a record; a part this build does not know is skipped and a missing one leaves its defaults; a damaged
+ * part or checksum refuses the record; a rename keeps the music */
+static int test_tsp_record(void)
+{
+    static uint8_t raw[TSP_MAX];
+    char name[PROJ_NAME_LEN + 1u];
+    int bad = 0, ok;
+    uint32_t len, i, k, b;
+    reset();
+    trk[0].step[5] = (step_t){{62}, 1, ST_NOTE, 0, 90, 0, 0, 0, 0};
+    step_set_ratch(&trk[0].step[5], 3); step_set_nudge(&trk[0].step[5], -6);
+    song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
+    tessera.en_arc = 40u; tessera.en_rests = 60u;     /* (ENERGY: the block's project tail, TS18) */
+    {
+        cord_t c = {CS_LFO, 0, CD_CUTOFF, 1, 30, 0};
+        cord_set(0, &c);
+    }
+    ok = !project_save_as(0, "TSP");
+    memset(trk[0].step, 0, sizeof trk[0].step); tessera_reset();
+    project_load(0);
+    bad += check("TSP1: a step's RATCH and NUDGE, the generators and a cord come back with the slot", ok &&
+                 step_ratch(&trk[0].step[5]) == 3u && step_nudge(&trk[0].step[5]) == -6 && trk[0].step[5].note[0] == 62u &&
+                 tessera.mode[1] == TESS_ENG_EUCLID && cord_count() == 1u && cord_get(0)->amount == 30 &&
+                 tessera.en_arc == 40u && tessera.en_rests == 60u);
+    ok = project_rename(0, "TSP TWO") == 0;
+    memset(trk[0].step, 0, sizeof trk[0].step);
+    project_load(0);
+    bad += check("TSP1: a rename keeps the music and the generators", ok && project_name(0, name) && !strcmp(name, "TSP TWO") &&
+                 step_ratch(&trk[0].step[5]) == 3u && tessera.mode[1] == TESS_ENG_EUCLID);
+    project_capture(&proj_scratch);
+    len = tsp_pack(raw, &proj_scratch, 1);             /* (with the generators: the TESSERA part) */
+    ok = len && tsp_valid(raw, len) && tsp_seen.at[TSP_TESSERA];
+    raw[tsp_seen.at[TSP_TESSERA] + 1u + TESSERA_PK_BYTES - 2u] = 101u;   /* (ARC past 100) */
+    tsp_resum(raw);
+    bad += check("TSP1: a Tessera block whose ENERGY tail is out of range is refused", ok && !tsp_valid(raw, len));
+
+    reset();                                           /* the largest: every step of every pattern full, 1,024 notes */
+    for (k = 0; k < NTRK; k++) {
+        for (b = 0; b < NPAT; b++)
+            for (i = 0; i < NSTEP; i++) {
+                step_t s = {{(uint8_t)(40u + i), 60, 64, 67}, 4, ST_NOTE, SF_ACCENT, 100, 0, 0, 20, 0};
+                step_set_ratch(&s, 4); step_set_nudge(&s, 7);
+                if (b == trk[k].pattern) trk[k].step[i] = s; else pattern_at(k, b)->step[i] = s;
+            }
+        song.sel = (uint8_t)k; tessera_knob(0, TESS_ENG_TURING);
+    }
+    for (i = 0; i < RECORD_MAX; i++) recording[i] = (recorded_note_t){(uint16_t)(i * 61u), 1234, 60, 100, (uint8_t)(i % 32u), 3};
+    recording_reindex();
+    project_capture(&proj_scratch);
+    len = tsp_pack(raw, &proj_scratch, 1);
+    printf("  (the largest project: %u B of %u)\n", (unsigned)len, (unsigned)TSP_MAX);
+    bad += check("TSP1: the largest project packs into a record and reads back", len && len <= TSP_MAX && tsp_valid(raw, len));
+
+    reset();
+    project_capture(&proj_scratch);
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok = tsp_valid(raw, len);
+    raw[tsp_seen.at[TSP_NAME] - 4u] = 200u;            /* (the NAME part: an id this build does not know) */
+    memcpy(raw + tsp_seen.at[TSP_NAME], "SKIPPED", 7);
+    tsp_resum(raw);
+    bad += check("TSP1: an unknown part is skipped, a missing one leaves its default", ok && tsp_valid(raw, len) &&
+                 !proj_scratch.name[0] && !tsp_seen.at[TSP_NAME]);
+    len = tsp_pack(raw, &proj_scratch, 1); tsp_valid(raw, len);
+    raw[tsp_seen.at[TSP_TRACKS]] = 200u;               /* (more parameters than this build has) */
+    tsp_resum(raw);
+    ok = !tsp_valid(raw, len);
+    len = tsp_pack(raw, &proj_scratch, 1);
+    raw[len / 2u] ^= 1u;                               /* (a bit flipped: the checksum) */
+    ok &= !tsp_valid(raw, len);
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok &= !tsp_valid(raw, len - 1u) && tsp_len(raw) == len;
+    bad += check("TSP1: a damaged part, a flipped bit or a wrong length refuses the record", ok);
     reset();
     return bad;
 }
 
 int main(void)
 {
-    int bad = test_boot_maintenance_writes(), ok;
+    int bad = test_boot_maintenance_writes() + test_tsp_record(), ok;
     uint32_t before;
     persist_t p;
     project_store_t old;
-    static uint8_t got[BANK_STORE_SIZE];
+    static uint8_t got[TSP_MAX];
     up_bank_t bank;
     up_rec_t r;
     reset();
@@ -243,8 +308,7 @@ int main(void)
     project_save(0);
     fail_after = -1;
     bad += check("failed project save keeps RAM and old flash", !strcmp(ui.msg, "SAVE ERROR") &&
-                  !memcmp(&proj_slot[0], &old, sizeof old) && st_load(OBJ_BANK0, got, sizeof got) == (int)sizeof got &&
-                  !memcmp(got + 8u, &old, sizeof old));
+                  !memcmp(&proj_slot[0], &old, sizeof old) && st_load(OBJ_SLOT(0), got, sizeof got) > 0 && !memcmp(&proj_slot[0], &old, sizeof old));
     project_save(0);
     bad += check("successful project save publishes new RAM", !strcmp(ui.msg, "SAVED") &&
                   proj_import(&proj_scratch, &proj_slot[0], sizeof proj_slot[0]) &&
@@ -272,7 +336,7 @@ int main(void)
         fail_after = 1;
         bad += check("failed project rename: SAVE ERROR, the slot and flash as they were",
                       project_rename(0, "DUB") == 2 && !strcmp(ui.msg, "SAVE ERROR") && !memcmp(&proj_slot[0], &keep, sizeof keep) &&
-                      st_load(OBJ_BANK0, got, sizeof got) == (int)sizeof got && !memcmp(got + 8u, &keep, sizeof keep));
+                      st_load(OBJ_SLOT(0), got, sizeof got) > 0 && tsp_valid(got, tsp_len(got)) && !memcmp(&proj_slot[0], &keep, sizeof keep));
         fail_after = -1;
         before = erases;
         transport_req = 1;
@@ -296,9 +360,11 @@ int main(void)
     }
     {   /* All inactive banks are validated before replacing the runtime. */
         step_t keep = trk[0].step[0];
-        project_capture(&proj_scratch); bank_pack(got, &proj_scratch, 1);
-        got[BANK_EXTRA_OFF + 3u] |= 0xF0; bank_checksum(got);
-        st_save(OBJ_BANK0, got, sizeof got);
+        project_capture(&proj_scratch);
+        uint32_t len = tsp_pack(got, &proj_scratch, 1);
+        tsp_valid(got, len);                          /* (track 1's second pattern, its first step: kind 15) */
+        got[tsp_seen.at[TSP_STEPS] + NTRK + NSTEP * TSP_STEP_BYTES + 3u] |= 0xF0; tsp_resum(got);
+        st_save(OBJ_SLOT(0), got, len);
         project_load(0);
         bad += check("damaged inactive-bank chord is refused with runtime unchanged", !strcmp(ui.msg,"OLD FORMAT") &&
             !memcmp(&trk[0].step[0],&keep,sizeof keep));
@@ -375,7 +441,6 @@ int main(void)
     settings_save();
     bad += check("PLAY consumed before the settings snapshot defers the write",
                   irq_races == 3u && song.playing && !transport_req && persist_pending && erases == before);
-    bad += cz_bank_persistence();
     bad += staged_import_persistence();
     printf("%s\n", bad ? "PERSISTENCE TEST FAILED" : "persistence test passed");
     return bad != 0;

@@ -9,8 +9,6 @@
 #define USER_GENERAL 16u
 #define USER_NATIVE_P5 20u
 #define ENGI_PROPHET 19u
-static int p5_favorite_has(uint32_t slot,int factory){(void)slot;(void)factory;return 0;}
-static int p5_favorite_set(uint32_t slot,int on,int factory){(void)slot;(void)on;(void)factory;return 0;}
 #define UP_SLOTS 64u
 #define USER_NATIVE_FM 17u
 #define USER_NATIVE_CZ 18u
@@ -75,7 +73,7 @@ int main(void)
 #endif
     favorite_set(USER_NATIVE_FM,63,1);favorite_set(USER_NATIVE_CZ,127,1);favorite_set(USER_GENERAL,63,1);
     settings_export(&p);memset(&favorites,0,sizeof favorites);favorites_user_hi=0;settings_import(&p,sizeof p);
-    assert(favorite_has(USER_NATIVE_FM,63) && favorite_has(USER_NATIVE_CZ,127) && favorite_has(USER_GENERAL,63));
+    assert(favorite_has(USER_NATIVE_FM,63) && !favorite_has(USER_NATIVE_CZ,127) && favorite_has(USER_GENERAL,63));   /* (no CZ-1 pool) */
     assert(!favorite_has(USER_NATIVE_FM,64) && !favorite_has(USER_NATIVE_CZ,128));
     p=original;settings_import(&p,sizeof p);
     {

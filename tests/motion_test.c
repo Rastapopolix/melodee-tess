@@ -82,9 +82,9 @@ static int compact_project(void)
     fm6_fn[0][FN_PTIME] = 33;                            /* (FM6 functions: in the FBKK around FUN16, not in FUN16) */
     project_capture(&before);
     {
-        static uint8_t fbk[BANK_STORE_SIZE];
-        bad += check("FBKK keeps the tracks' FM6 function settings", bank_pack(fbk, &before, 1) &&
-                     bank_valid(fbk, sizeof fbk) && proj_scratch.fm6_fn_ok && proj_scratch.fm6_fn[0][FN_PTIME] == 33u);
+        static uint8_t fbk[TSP_MAX];
+        bad += check("TSP1 keeps the tracks' FM6 function settings", tsp_pack(fbk, &before, 1) &&
+                     tsp_valid(fbk, tsp_len(fbk)) && proj_scratch.fm6_fn_ok && proj_scratch.fm6_fn[0][FN_PTIME] == 33u);
     }
     proj_fn_none(&before); proj_pack(&packed,&before);
     bad += check("FUN16 round trip preserves signed values/FM params/probability/motion", proj_import(&after, &packed, sizeof packed) &&

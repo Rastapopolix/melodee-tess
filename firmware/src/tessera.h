@@ -212,6 +212,7 @@ const char *tessera_form_name(uint32_t form);
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
 int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..18) */
+int tessera_check(uint32_t ver, const uint8_t *in);        /* the same checks, nothing loaded: 1 it would load */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
 void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 17 */
 void tessera_reset(void);                           /* every track OFF, defaults */

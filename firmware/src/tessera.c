@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* Tessera: the note generators of tracks 1-4 (Turing, Euclid, Markov, Morph, Grids, Bounce, Awake,
  * Poly, Quad, Constellation, Series), EVOLVE, FORM and TWEAK, clocked by the
- * sequencer (seq.c) in place of a track's steps; their state is saved with the project (project.c, OBJ_TESSERA). */
+ * sequencer (seq.c) in place of a track's steps; their state is saved with the project (the TESSERA part of its record, project_tsp.c). */
 #include "tessera.h"
 
 tessera_state_t tessera;
@@ -1756,7 +1756,7 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
 }
 
 /* ------------------------------------------------------------ persistence --- */
-/* The project's Tessera block (project.c tessera_store_*): per track the engine, each engine's settings, the
+/* The project's Tessera block (project_tsp.c, the record's TESSERA part): per track the engine, each engine's settings, the
  * EVOLVE / FORM / TWEAK settings and the settings of the remembered sections (A, B, C). Not stored: the recorded
  * Markov / Morph phrases (a loaded project records them again on its first pass: RAM is the limit, see
  * project.c), the playheads and the counters. A block that fails any range check is refused whole. */
@@ -2306,6 +2306,21 @@ int tessera_unpack_ver(uint32_t ver, const uint8_t *in)
         tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
     b[TESSERA_TRACKS * TESS_PK_TRACK] = b[TESSERA_TRACKS * TESS_PK_TRACK + 1u] = 0;   /* (before 18: no ENERGY) */
     return tessera_unpack(b);
+}
+/* the same checks as tessera_unpack_ver, nothing loaded (project.c reads a record before it replaces anything): 1 a
+ * block it would load */
+int tessera_check(uint32_t ver, const uint8_t *in)
+{
+    uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
+    uint32_t n = tessera_pk_bytes(ver) / TESSERA_TRACKS, tr;   /* (18: its 2-byte tail rounds away) */
+    if (!n) return 0;
+    if (ver == 18u && (in[TESSERA_TRACKS * TESS_PK_TRACK] > 100u || in[TESSERA_TRACKS * TESS_PK_TRACK + 1u] > 100u)) return 0;
+    for (tr = 0; tr < TESSERA_TRACKS; tr++)
+        tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
+    tessera_ensure_init();
+    for (tr = 0; tr < TESSERA_TRACKS; tr++)
+        if (!tess_pk_track(b + tr * TESS_PK_TRACK, tr, 0)) return 0;
+    return 1;
 }
 
 /* every track back to OFF and its settings to their defaults (a project load starts from this) */

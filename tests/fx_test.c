@@ -36,7 +36,7 @@ static uint64_t fx_signal(uint32_t type,int rate,int character,int mix,const cha
 }
 static void legacy(void)
 {
-    static uint8_t b[BANK_STORE_SIZE];
+    static uint8_t b[27904];                     /* (the fixtures: FUN records, and FBKK ones holding one at 8) */
     const char *names[]={"fun16.bin","fbkk.bin","tplf.bin","fun17.bin","fbkk17.bin","tplg.bin"};
     for(uint32_t k=0;k<6u;k++){
         char path[96];snprintf(path,sizeof path,"tests/fixtures/fx/%s",names[k]);
@@ -44,27 +44,26 @@ static void legacy(void)
         ui_power_on();
         if(k%3u==2u){assert(tmpl_take(b,n));template_load();}
         else{
-            assert(k%3u?bank_valid(b,n):proj_import(&proj_scratch,b,(int)n));
+            assert(k%3u?proj_import(&proj_scratch,b+8u,(int)PROJ_STORE_SIZE):proj_import(&proj_scratch,b,(int)n));
             assert(proj_scratch.t[0].p[P_E0]==17 && proj_scratch.motion.event[0].param==P_E0);
             assert(proj_scratch.recording[0].on==55 && proj_scratch.recording[0].duration==217 && proj_scratch.recording[0].owner==11);
-            assert(!project_restore_runtime(&proj_scratch));if(k%3u)bank_restore(b);
+            assert(!project_restore_runtime(&proj_scratch));
             assert(TSEL->step[0].n==3 && TSEL->step[0].note[2]==67);
-            if(k%3u)assert(pattern_at(1,3)->step[7].note[0]==72);
         }
         assert(TSEL->p[P_E0]==17);
         assert(TSEL->p[P_FXTYPE]==(k<3u?FX_OFF:FX_ECHO) && TSEL->p[P_FXMIX]==(k<3u?0:91));
         assert(TSEL->p[P_FXRATE]==(k<3u?60:83) && TSEL->p[P_FXCHAR]==(k<3u?64:77));
         for(uint32_t slot=1;slot<FX_SLOTS;slot++)assert(!TSEL->p[P_FXTYPE+slot*FX_PARAMS]);
     }
-    puts("Frozen FUN16/FUN17, FBKK, TPLF/TPLG: notes, banks, timing, motion, engine IDs and original insert preserved: OK");
+    puts("Frozen FUN16/FUN17, FBKK (its FUN part: FBKK is no longer read whole), TPLF/TPLG: notes, timing, motion, engine IDs and original insert preserved: OK");
 }
 static void frozen_three_slots(void)
 {
-    static uint8_t b[BANK_STORE_SIZE];const char *names[]={"fun18.bin","fbkk18.bin","tplh.bin"};
+    static uint8_t b[27904];const char *names[]={"fun18.bin","fbkk18.bin","tplh.bin"};
     const int16_t chain[12]={1,80,30,71,6,95,55,65,8,105,88,99};
     for(uint32_t k=0;k<3;k++){
         char path[96];snprintf(path,sizeof path,"tests/fixtures/fx/%s",names[k]);FILE *f=fopen(path,"rb");assert(f);uint32_t n=fread(b,1,sizeof b,f);fclose(f);ui_power_on();
-        if(k==2){assert(tmpl_take(b,n));template_load();}else {assert(k?bank_valid(b,n):proj_import(&proj_scratch,b,n));assert(!project_restore_runtime(&proj_scratch));}
+        if(k==2){assert(tmpl_take(b,n));template_load();}else {assert(k?proj_import(&proj_scratch,b+8u,(int)PROJ_STORE_SIZE):proj_import(&proj_scratch,b,n));assert(!project_restore_runtime(&proj_scratch));}
         if(k==0){ /* Old engine ID 112 shifts, a tagged native 112 must not. */
             motion_store_t m={.count=2,.on=1,.event={{0,112,10},{0,112,(MO_TAG_FM6<<8)|80}}};
             uint32_t off=68u+NTRK*(116u+2u+NSTEP*8u)+sizeof(chain_config_t);memcpy(b+off,&m,sizeof m);uint32_t h=proj_hash(b,n-4u);memcpy(b+n-4u,&h,4);

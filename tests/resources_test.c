@@ -6,39 +6,31 @@
 static void audio_resources_reset(void) { memset(resource,0,sizeof resource); }
 static int cache_tests(void)
 {
-    int bad=0;uint8_t fm[FM6_PACKED],cz[CZ_BYTES];char name[13];
-    reset();audio_resources_reset();up_boot();fm6_factory(3,fm);cz_patch_init(cz);
+    int bad=0;uint8_t fm[FM6_PACKED];char name[13];
+    reset();audio_resources_reset();up_boot();fm6_factory(3,fm);
     for(uint32_t b=0;b<4u;b++){fm[118]=(uint8_t)('A'+b);bad+=check("native FM cache writes across bank evictions",!native_put(ENGI_FM6,b*16u,fm));}
-    for(uint32_t b=0;b<8u;b++){cz[128]=(uint8_t)('A'+b);bad+=check("native CZ cache writes across bank evictions",!native_put(ENGI_CZ,b*16u,cz));}
     for(uint32_t b=0;b<4u;b++){set_engine_of(TSEL,3);TSEL->p[P_E1]=(int16_t)b;   /* (SID's WAVE) */bad+=check("general cache writes across bank evictions",!up_store(b*16u,"BANK SOUND"));}
     up_boot();uint32_t reads=preset_reads;
     for(uint32_t k=0;k<64u;k++){up_used(k);up_engine(k);up_name(k,name);native_used(ENGI_FM6,k);native_name(ENGI_FM6,k,name);}
-    for(uint32_t k=0;k<128u;k++){native_used(ENGI_CZ,k);native_name(ENGI_CZ,k,name);}
     bad+=check("browsing every preset name/slot does no flash reads",preset_reads==reads);
     for(uint32_t b=0;b<4u;b++)bad+=check("FM cache reload preserves each independent patch",native_raw(ENGI_FM6,b*16u)[118]=='A'+b);
-    for(uint32_t b=0;b<8u;b++)bad+=check("CZ cache reload preserves each independent patch",native_raw(ENGI_CZ,b*16u)[128]=='A'+b);
     for(uint32_t b=0;b<4u;b++)bad+=check("general cache reload preserves parameters",up_value(up_rec(b*16u),P_E1)==(int16_t)b);
     {   /* one bank cache for every kind (upreset.c bank_buf): interleaved reads load the bank asked for and find each
          * kind's contents intact; an edit made while a user bank was the cached one reaches its index on eviction */
-        p5_patch_t p5,got;p5_patch_init(&p5);memcpy(p5.raw+P5_NAME,"SHARED BANK P5      ",20);
-        uint8_t old[CZ_BYTES];int ok=!native_put(ENGI_PROPHET,30,(const uint8_t *)&p5);
-        for(uint32_t r=0;r<3u;r++)for(uint32_t b=0;b<4u;b++){
-            ok&=up_value(up_rec(b*16u),P_E1)==(int16_t)b && native_raw(ENGI_FM6,b*16u)[118]=='A'+b &&
-                native_raw(ENGI_CZ,(b+4u)*16u)[128]=='A'+b+4u && !cz_bank_get(b,0,old) && old[128]=='A'+b &&
-                !p5_user_get(30,&got) && !memcmp(got.raw+P5_NAME,"SHARED BANK P5",14);
-        }
-        bad+=check("one bank cache: user, FM6, CZ-1 (both views) and Prophet banks interleaved read back intact",ok);
+        int ok=1;
+        for(uint32_t r=0;r<3u;r++)for(uint32_t b=0;b<4u;b++)
+            ok&=up_value(up_rec(b*16u),P_E1)==(int16_t)b && native_raw(ENGI_FM6,b*16u)[118]=='A'+b;
+        bad+=check("one bank cache: user and FM6 banks interleaved read back intact",ok);
         set_engine_of(TSEL,3);up_store(5,"AFTER EDIT");native_raw(ENGI_FM6,16u);up_name(5,name);
         bad+=check("one bank cache: a user bank evicted after an edit keeps its index (the new name, no reload)",
                    up_cached==255u && !strcmp(name,"AFTER EDIT"));
-        bad+=check("one bank cache: the largest bank's size, not the sum (8208 + 3600 B before)",
-                   sizeof bank_buf==sizeof(up_bank_t) && sizeof(up_bank_t)>=sizeof(p5_bank_t) &&
-                   sizeof(up_bank_t)>=sizeof(cz_bank_t) && sizeof(up_bank_t)>=sizeof(native_fm_t));
+        bad+=check("one bank cache: the largest bank's size, not the sum",
+                   sizeof bank_buf==sizeof(up_bank_t) && sizeof(up_bank_t)>=sizeof(native_fm_t));
     }
     flash_ok=0;
-    bad+=check("missing flash refuses mutations without evicting committed indexes",native_put(ENGI_FM6,0,fm)==2 && native_put(ENGI_CZ,0,cz)==2 && up_store(0,"NO FLASH")==2 && native_used(ENGI_FM6,0) && native_used(ENGI_CZ,0) && up_used(0));
+    bad+=check("missing flash refuses mutations without evicting committed indexes",native_put(ENGI_FM6,0,fm)==2 && up_store(0,"NO FLASH")==2 && native_used(ENGI_FM6,0) && up_used(0));
     flash_ok=1;
-    bad+=check("failed missing-flash writes preserve stored patches",native_raw(ENGI_FM6,0)[118]=='A' && native_raw(ENGI_CZ,0)[128]=='A' && up_value(up_rec(0),P_E0)==0);
+    bad+=check("failed missing-flash writes preserve stored patches",native_raw(ENGI_FM6,0)[118]=='A' && up_value(up_rec(0),P_E0)==0);
     resource_get(RES_NOTE_HISTORY,RESOURCE_MAIN_CAPACITY);
     for(uint32_t b=0;b<RESOURCE_BANKS-1u;b++)if(b!=RESOURCE_CACHE_BANK || RESOURCE_CACHE_AVAILABLE)
         resource_get(RES_ENGINE0+b,(uint32_t)((uintptr_t)resource_banks[b].end-(uintptr_t)resource_banks[b].start));
