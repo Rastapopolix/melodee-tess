@@ -35,7 +35,7 @@ tweak_shift_drop_human_follow.state 0xbdeaed15
 scale_root_transpose 0x94df196d 94
 scale_root_transpose.state 0x511cad6c
 division_gate_length 0xd0fd4cc4 139
-division_gate_length.state 0xb4d66083
+division_gate_length.state 0xafb324cf
 all_four_tracks 0x3d8c80b3 888
 all_four_tracks.state 0x6ec41c25
 transport_stop_start 0x06ee1ac1 239
@@ -53,7 +53,7 @@ track_len_shorter_than_loop.state 0xa6dd65b5
 pattern_switch_while_playing 0xbd00dbb1 94
 pattern_switch_while_playing.state 0xdd6162b5
 song_chain_two_banks 0x6ed08b6d 49
-song_chain_two_banks.state 0xf3120524
+song_chain_two_banks.state 0xf5c945ac
 glo_mute_and_unmute 0x669b647d 48
 glo_mute_and_unmute.state 0x0c8b1c94
 follow_step_melody_third 0xe0f34729 65
