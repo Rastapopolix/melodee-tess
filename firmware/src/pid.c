@@ -7,7 +7,7 @@
 #include "pid.h"
 
 static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "ATLAS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL", "SERIES",
-                                        "CHORD"};
+                                        "CHORD", "ANSWER"};
 static const char *const TX_N_QDIR[] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
 static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10", "/11", "/12",
                                          "/13", "/14", "/15", "/16"};   /* (every n steps: no unit, "st" read as semitones) */
@@ -32,6 +32,8 @@ static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
 static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_GRP4[] = {"TOM", "CLAP", "HATOP", "RIM", "BELL"};
 static const char *const TX_N_RATCH[] = {"x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"};
+static const char *const TX_N_ANORDER[] = {"PLAYED", "REVERSE", "SHUFFLE"};   /* (TESS_AN_*) */
+static const char *const TX_N_ANLEN[] = {"SHORT", "MID", "LONG"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
@@ -124,6 +126,13 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_CH_BREATH] = PD("BREATH", F_PCT, 0, 100, 0),
     [TX_EN_ARC] = PD("ARC", F_PCT, 0, 100, 0),
     [TX_EN_RESTS] = PD("RESTS", F_PCT, 0, 100, 0),
+    [TX_AN_VARY] = PD("VARY", F_PCT, 0, 100, 30),
+    [TX_AN_ECHO] = PD("ECHO", F_PCT, 0, 100, 20),
+    [TX_AN_FADE] = PD("FADE", F_PCT, 0, 100, 33),
+    [TX_AN_ORDER] = PE("ORDER", TX_N_ANORDER, 0),
+    [TX_AN_SHIFT] = PD("SHIFT", F_INT, 0, 7, 2),
+    [TX_AN_SPACE] = PD("SPACE", F_PCT, 0, 100, 25),
+    [TX_AN_LEN] = PE("LEN", TX_N_ANLEN, 1),
 };
 
 #if MELODEE_HELP_PACKED                          /* the texts stay here, tools/gen_help.py packs them */
@@ -469,6 +478,22 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     XP_(TX_EN_RESTS, "ENERGY RESTS", "How often the music rests: 8 to 18 s with the generator tracks silent (a CHORD "
                                      "track's held chord and its BREATH go on), at 100 about every 4 minutes, near 0 "
                                      "about every 20, sooner while ARC's tide is sparse. 0 off."),
+    X_(TX_AN_VARY, "ANSWER VARY", "How much each answer changes the phrase you played: a note moved a degree or two, "
+                                  "an octave, left out or swapped with the next. Each answer changes it a little more. "
+                                  "0 answers it as played."),
+    X_(TX_AN_ECHO, "ANSWER ECHO", "The chance a note it plays comes back once more, at half its velocity, 3 to 8 "
+                                  "steps later, one in four an octave up. 0 off."),
+    X_(TX_AN_FADE, "ANSWER FADE", "How long it remembers: 1 answer at 0 to 16 at 99, each softer than the last, then "
+                                  "it rests until you play again. At 100 it never forgets: the notes play on as four "
+                                  "loops of different lengths (LEN), so it never quite repeats."),
+    X_(TX_AN_ORDER, "ANSWER ORDER", "The order of the notes in an answer, over the rhythm you played: PLAYED, REVERSE "
+                                    "or SHUFFLE (a new order each answer). OCT+ held on GEN, KNOB 1."),
+    X_(TX_AN_SHIFT, "ANSWER SHIFT", "Each answer is moved up or down by up to this many degrees of the scale, a new "
+                                    "amount each time. 0 keeps it where you played it. OCT+ held on GEN, KNOB 2."),
+    X_(TX_AN_SPACE, "ANSWER SPACE", "The rest before each answer: 0 answers straight away, 100 waits 4 bars. A bar "
+                                    "without a key ends the phrase you play. OCT+ held on GEN, KNOB 3."),
+    X_(TX_AN_LEN, "ANSWER LEN", "With FADE at 100, the lengths of the four loops the notes play on, in steps: SHORT "
+                                "5 7 11 13, MID 13 17 23 29, LONG 23 29 31 37. OCT+ held on GEN, KNOB 4."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

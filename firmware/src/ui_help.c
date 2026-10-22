@@ -27,7 +27,7 @@ static void help_find(uint32_t k)
         {TX_GRD_X, TX_GRD_Y, TX_GRD_DENS}, {TX_BNC_SPEED, TX_BNC_ANGLE, TX_BNC_BALLS},
         {TX_AWK_LENA, TX_AWK_LENB, TX_AWK_PROB}, {0xFF, TX_POL_DIV1, TX_POL_SPAN},
         {TX_QD_DIR, TX_QD_PROB, TX_QD_LINK}, {TX_CS_Y, TX_CS_DENS, TX_CS_AUTO},
-        {TX_SR_START, TX_SR_INTV, TX_SR_LOOP}, {TX_CH_PROG, TX_CH_BARS, TX_CH_HIT}};
+        {TX_SR_START, TX_SR_INTV, TX_SR_LOOP}, {TX_CH_PROG, TX_CH_BARS, TX_CH_HIT}, {TX_AN_VARY, TX_AN_ECHO, TX_AN_FADE}};
     static const char *const CORD_TEXT[4] = {
         "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
         "or CV, or DRIFT, a slow wander, or its TIDE 1-3 or SWARM 1-8 (LFO > ORGANIC). -- leaves "
@@ -115,6 +115,10 @@ static void help_find(uint32_t k)
         }
         if (gr_layer_on()) {                            /* (GRIDS, OCT+ held: KICK, SNR, HAT, TOMS) */
             help.pid = (uint16_t)PID_TESS(TX_GRD_KICK + (k & 3u));
+            return;
+        }
+        if (an_layer_on()) {                            /* (ANSWER, OCT+ held: ORDER, SHIFT, SPACE, LEN) */
+            help.pid = (uint16_t)PID_TESS(TX_AN_ORDER + (k & 3u));
             return;
         }
         if (cs_layer_on()) {                            /* (CONSTELLATION, OCT+ held: LOCK, LEN, FILL, SIZE) */

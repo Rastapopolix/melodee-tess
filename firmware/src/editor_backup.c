@@ -19,7 +19,7 @@ static uint8_t ed_bk_tess_live[TESSERA_PK_BYTES]; /* id 29, as LIST found it */
 static uint32_t ed_bk_tess_ver(uint32_t len)      /* id 29: the block's version by its length (older: converted), 0 none */
 {
     uint32_t v;
-    for (v = 18u; v && tessera_pk_bytes(v) != len; v--) ;
+    for (v = 19u; v && tessera_pk_bytes(v) != len; v--) ;
     return v;
 }
 static uint32_t ed_bk_run_len;                    /* id 0: the TSP1 record of the music playing, as LIST packed it */

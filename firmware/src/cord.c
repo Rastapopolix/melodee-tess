@@ -73,6 +73,7 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_GRD_SNR] = S_(CD_GRD_SNR, TX_GRD_SNR, "AT SNR", "Atlas' SNR: how much of its density the snare gets"),
     [CD_GRD_HAT] = S_(CD_GRD_HAT, TX_GRD_HAT, "AT HAT", "Atlas' HAT: how much of its density the hat gets"),
     [CD_GRD_TOMS] = S_(CD_GRD_TOMS, TX_GRD_TOMS, "AT TOMS", "Atlas' TOMS: how many of the near misses play the tom"),
+    [CD_AN_VARY] = S_(CD_AN_VARY, TX_AN_VARY, "AN VARY", "Answer's VARY: how much each answer changes the phrase"),
 };
 #undef V_
 #undef B_

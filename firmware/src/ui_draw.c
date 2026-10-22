@@ -1131,6 +1131,29 @@ static void draw_columns(void)
                             (int32_t)(g->bars % GEN_CH_BARS) * 1000 / (GEN_CH_BARS - 1), ICON_AUTO);
                 draw_column(3, "HIT", pid_desc(PID_TESS(TX_CH_HIT), tr)->names[g->hit % GEN_CH_HITS], "", VAL(3u),
                             (int32_t)(g->hit % GEN_CH_HITS) * 1000 / (GEN_CH_HITS - 1), ICON_AUTO);
+            } else if (m == TESS_ENG_ANSWER) {
+                const tessera_answer_t *a = tessera_answer(tr);
+                if (an_layer_on()) {                            /* OCT+ held: ORDER, SHIFT, SPACE, LEN */
+                    const param_desc_t *dor = pid_desc(PID_TESS(TX_AN_ORDER), tr), *dl = pid_desc(PID_TESS(TX_AN_LEN), tr);
+                    draw_column(0, "ORDER", dor->names[a->order % TESS_AN_ORDERS], "", VAL(0u),
+                                (int32_t)(a->order % TESS_AN_ORDERS) * 1000 / (TESS_AN_ORDERS - 1), ICON_AUTO);
+                    fmt_int(v1, a->shift);
+                    draw_column(1, "SHIFT", a->shift ? v1 : "OFF", "", VAL(1u), (int32_t)a->shift * 1000 / 7, ICON_AUTO);
+                    fmt_int(v2, a->space);
+                    draw_column(2, "SPACE", v2, "%", VAL(2u), (int32_t)a->space * 10, ICON_AUTO);
+                    draw_column(3, "LEN", dl->names[a->len % TESS_AN_LENS], "", VAL(3u),
+                                (int32_t)(a->len % TESS_AN_LENS) * 1000 / (TESS_AN_LENS - 1), ICON_AUTO);
+                    return;
+                }
+                draw_column(0, "MODE", "ANSWER", "", VAL(0u), TESS_ENG_ANSWER * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                fmt_int(v1, a->vary);
+                col_mods(PID_TESS(TX_AN_VARY));
+                draw_column(1, "VARY", a->vary ? v1 : "OFF", a->vary ? "%" : "", VAL(1u), (int32_t)a->vary * 10, ICON_AUTO);
+                fmt_int(v2, a->echo);
+                draw_column(2, "ECHO", a->echo ? v2 : "OFF", a->echo ? "%" : "", VAL(2u), (int32_t)a->echo * 10, ICON_AUTO);
+                if (tessera_answer_count(tr)) fmt_int(v3, (int32_t)tessera_answer_count(tr));
+                else str_cpy(v3, "LOOPS", sizeof v3);
+                draw_column(3, "FADE", v3, "", VAL(3u), (int32_t)a->fade * 10, ICON_AUTO);
             } else if (m == TESS_ENG_CONSTEL) {
                 const gen_constel_t *c = tessera_constel(tr);
                 if (cs_layer_on()) {                            /* OCT+ held: LOCK, LEN, FILL, SIZE */
