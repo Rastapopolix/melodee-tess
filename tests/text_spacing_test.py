@@ -43,8 +43,9 @@ def parse(path):
     faces = {}
     for m in re.finditer(r"static const aafont_t AF_(\w+) = \{([^}]*)\};", t):
         name, f = m.group(1), [x.strip() for x in m.group(2).split(",")]
-        arr = lambda n: [int(v, 0) for v in re.search(r"AF_%s_%s\[\d+\] = \{([^}]*)\}" % (name, n), t)
-                         .group(1).replace("\n", " ").split(",") if v.strip()]
+        own = {"G": f[6], "DATA": f[7], "KL": f[8], "KR": f[9], "KM": f[10], "EX": f[11]}   # (a later face may
+        arr = lambda n: [int(v, 0) for v in re.search(r"%s\[\d+\] = \{([^}]*)\}" % own.get(n, f"AF_{name}_{n}"), t)
+                         .group(1).replace("\n", " ").split(",") if v.strip()]    # name an earlier face's table)
         g = [tuple(int(v) for v in e.split(",")) for e in
              re.findall(r"\{(-?\d+, -?\d+, -?\d+, -?\d+, -?\d+, -?\d+)\}",
                         re.search(r"AF_%s_G\[\d+\] = \{(.*?)\n\};" % name, t, re.S).group(1))]
