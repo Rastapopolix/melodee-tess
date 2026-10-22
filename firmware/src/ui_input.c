@@ -909,7 +909,7 @@ static void edit_param(uint32_t slot, int32_t steps)
             ui.force = 1;
             return;
         }
-        if (ch_layer_on()) {                            /* CHORD, OCT+ held: OCT, the track's CHRD and VOIC */
+        if (ch_layer_on()) {                            /* CHORD, OCT+ held: OCT, the track's CHRD and VOIC, LEN / BREATH */
             if (slot == 0u) {
                 tessera_chord_oct_knob(steps);
             } else if (slot < 3u) {
@@ -918,6 +918,8 @@ static void edit_param(uint32_t slot, int32_t steps)
                 TSEL->p[p] = (int16_t)clamp(TSEL->p[p] + (steps > 0 ? 1 : -1), dp->min, dp->max);
             } else if (tessera_chord(sel_tr)->prog == GEN_CH_USER) {
                 tessera_chord_ulen_knob(steps);         /* (USER: its LEN) */
+            } else {
+                tessera_chord_breath_knob(steps);       /* (the others: BREATH) */
             }
             oct_eat |= 2u;
             ui.oct_t0 |= 2u;

@@ -224,6 +224,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x255 | ATLAS PART4 | TOM, CLAP, HATOP, RIM, BELL | TOM | The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black key (as on the drum grid: CP OH TM RS CB). |
 | 0x256 | TIMING RATCH | x1, x2, x3, x4 | x1 | Plays each step's notes 1 to 4 times in equal parts of the step, a ratchet; x1 plays them once, as written. Each hit gets its share of the step's GATE. Notes NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once. |
 | 0x257 | TIMING CHANCE | 0 to 100 % | 100 | How often a step ratchets: 100 every step, 0 none. The toss replays with the track's SEED. |
+| 0x258 | CHORD BREATH | 0 to 100 % | 0 | With HIT HOLD, the chord breathes: each voice is struck again, softer, on a slow cycle of its own (11 to 19 s), and the same chord again is tied over instead of struck (DRONE: one long chord). BREATH is the chance a voice above the lowest sits a cycle out, one at a time; 0 is off. OCT+ held on GEN, KNOB 4 (USER: its LEN there). |
 
 ## Mods
 

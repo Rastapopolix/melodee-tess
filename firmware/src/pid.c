@@ -121,6 +121,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_PART4] = PE("PART4", TX_N_GRP4, 0),
     [TX_SUB_RATCH] = PE("RATCH", TX_N_RATCH, 0),
     [TX_SUB_CHANCE] = PD("CHANCE", F_PCT, 0, 100, 100),
+    [TX_CH_BREATH] = PD("BREATH", F_PCT, 0, 100, 0),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -446,6 +447,11 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                      "NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once."),
     X_(TX_SUB_CHANCE, "TIMING CHANCE", "How often a step ratchets: 100 every step, 0 none. The toss replays with the "
                                        "track's SEED."),
+    X_(TX_CH_BREATH, "CHORD BREATH", "With HIT HOLD, the chord breathes: each voice is struck again, softer, on a "
+                                     "slow cycle of its own (11 to 19 s), and the same chord again is tied over "
+                                     "instead of struck (DRONE: one long chord). BREATH is the chance a voice above "
+                                     "the lowest sits a cycle out, one at a time; 0 is off. OCT+ held on GEN, KNOB 4 "
+                                     "(USER: its LEN there)."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
