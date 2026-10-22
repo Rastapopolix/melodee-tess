@@ -253,6 +253,7 @@ if core; then
     t "resource lifetimes, cache eviction, tails and capacity" resources_test -O2 $FW
     t "aligned libc: copy/clear bounds, ordering and float aliasing" libc_word_test -O2 -fstrict-aliasing
     t "audio worker: stalled jobs and wrapping deadlines" audio_worker_test
+    t "CPU1 stop: delayed bus errors, guard and lock restoration" core1_stop_test
     t "cache RAM startup, memory faults and safe fallback" cache_ram_test
     t "system clock: read only, never written" clock_test -O1
     t "stock V15 supply startup, timeouts and read-back faults" power_test -O1
