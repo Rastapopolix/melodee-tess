@@ -32,8 +32,8 @@ The four sounds a new project starts with are an ambient set: **GLASS PAD**, **S
 **808 KIT** on DRUM.
 
 ### 🎼 Scales
-Six Japanese and Okinawan scales after **SIKAH** in SCL: **IN**, **YO**, **HIRA** (Hirajoshi), **IWATO**, **KUMOI**
-and **RYUKYU**, as 12-tone pitches.
+Seven Japanese and Okinawan scales after **SIKAH** in SCL: **IN**, **YO**, **HIRA** (Hirajoshi), **IWATO**, **KUMOI**,
+**RYUKYU** and **MINYO** (Min'yo, the folk-song scale), as 12-tone pitches.
 
 ### ✨ Generators and pages
 * **CHORD** generator: a progression's chords in the track's scale (POP, 50S, 2-5-1, CIRCLE, TWO, DRONE, WALK, or
