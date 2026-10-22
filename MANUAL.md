@@ -30,7 +30,7 @@ page's four settings sit along the top of the screen in the same order.
 - [Harmony: CHORD and QNT CHRD](#harmony-chord-and-qnt-chrd)
 - [MODS: the modulation cords](#mods-the-modulation-cords)
 - [MATRIX](#matrix)
-- [ORGANIC: SLOTH and OCHD](#organic-sloth-and-ochd)
+- [ORGANIC: TIDE and SWARM](#organic-tide-and-swarm)
 - [Mod shortcut](#mod-shortcut)
 - [Help card](#help-card)
 - [Menu and settings](#menu-and-settings)
@@ -78,7 +78,7 @@ COLOR. Each track has its own colour, used for its tile, its cords and its row i
 |---|---|
 | Tap **SEQ** | **GEN** first: KNOB 1 (**MODE**) picks what the track plays. SEQ then shows only that mode's pages. |
 | Tap **ARP** | Switches a STEP track to ARP and opens **ARP**; tap again for **ARP 2**. On a generator track it opens GEN instead ("ARP: MODE ON GEN"), so a playing generator never goes quiet by accident. |
-| Hold **OCT+** on GEN | The generator's second layer, for QUAD, CHORD, GRIDS and CONSTELLATION (see [OCT+ layers](#oct-layers-on-gen)). |
+| Hold **OCT+** on GEN | The generator's second layer, for QUAD, CHORD, ATLAS and CONSTELLATION (see [OCT+ layers](#oct-layers-on-gen)). |
 | **GEN** on an AWAKE track, a white key | Picks that step: KNOB 1 sets its A, KNOB 2 its B. The same key lets it go. |
 | Hold **ARP**, turn a knob | The [help card](#help-card) for that knob. Turn the same knob further to make the text larger or scroll it. |
 | Hold **FX**, turn a knob | Sets how far a cord moves that knob's parameter (see [Mod shortcut](#mod-shortcut)). |
@@ -90,7 +90,7 @@ COLOR. Each track has its own colour, used for its tile, its cords and its row i
 | **MODS**, **OCT+** | Switches the picked mod between BI and UNI. |
 | **MATRIX**, **OCT+** | Opens the picked mod in MODS. |
 | **EDIT** on an EDIT page | The map of the sound's pages: KNOB 1 across a row, KNOB 2 between rows, OCT+ opens the page, OCT- or EDIT closes it. Any other page button leaves it for its page. |
-| **PLAY** | Every generator starts its random choices from the top of its seed, and SLOTH and OCHD restart: with EVOLVE's EVERY off, a project plays the same way each time. |
+| **PLAY** | Every generator starts its random choices from the top of its seed, and TIDE and SWARM restart: with EVOLVE's EVERY off, a project plays the same way each time. |
 
 ---
 
@@ -121,7 +121,7 @@ Tap **SEQ** for **GEN**, where **KNOB 1, MODE** picks what the selected track pl
 
 - **STEP**: the step sequencer.
 - **ARP**: the arpeggiator over the keys held (the ARP button gets here too).
-- One of twelve generators: **TURING**, **EUCLID**, **MARKOV**, **MORPH**, **GRIDS**, **BOUNCE**, **AWAKE**,
+- One of twelve generators: **TURING**, **EUCLID**, **MARKOV**, **MORPH**, **ATLAS**, **BOUNCE**, **AWAKE**,
   **POLY**, **QUAD**, **CONSTL** (Constellation), **SERIES** or **CHORD**.
 
 SEQ then shows only that mode's pages:
@@ -151,7 +151,7 @@ generator is also a mod source: its **GATE**, its **NOTE** and a **CV** (see [MO
 | **EUCLID** | STEPS (1–32) | PULSE | ROT | Hits spread as evenly as they go over STEPS, turned round by ROT, on pitches picked by the seed. |
 | **MARKOV** | LEAP (0–100 %) | DENS (5–100 %) | SPAN (1–3 oct) | A random walk over eight scale degrees. LEAP 0 moves to neighbours, 100 leaps widely. DENS is the chance a step plays. |
 | **MORPH** | POS (0–127) | SNP A (0–7) | SNP B (0–7) | A rhythm blended from preset A into preset B. POS starts halfway. |
-| **GRIDS** | X (0–255) | Y (0–255) | DENS (0–100 %) | Émilie Gillet's Grids (Mutable Instruments): its drum map, kick, snare, closed hat and a fourth part from the point X, Y. Best on a DRUM track. More on the [OCT+ layer](#grids-kick-snr-hat-toms). |
+| **ATLAS** | X (0–255) | Y (0–255) | DENS (0–100 %) | Inspired by Émilie Gillet's Grids (Mutable Instruments): its drum map, kick, snare, closed hat and a fourth part from the point X, Y. Best on a DRUM track. More on the [OCT+ layer](#atlas-kick-snr-hat-toms). |
 | **BOUNCE** | SPEED (1–64) | ANGLE (0–90°) | BALLS (1–4, Fall) | Balls in a box: a note where a ball hits a wall. Each extra ball starts from its own place and angle; balls that hit on the same step play together, three notes at most. Past 4, **FALL** (after ambalek's norns script Fall): eight leaves fall at their own speeds and play where they land (left low, right high), and ANGLE becomes **WIND**: calm in the middle, leaning the melody low or high either side, gusting further out. |
 | **AWAKE** | LEN A (1–16) | LEN B (1–16) | PROB (0–100 %) | Two loops, as norns' Awake. A is the melody (scale degrees or rests), B lifts it up the scale; different lengths shift B against A. Steps can be set from the keys (below). |
 | **POLY** | RHY (1–4) | DIVISION (OFF, /1–/16) | SPAN (1–3 oct) | Four notes stepped on by four rhythms. RHY picks which rhythm DIVISION edits. Rhythms that land together play once, louder: /4 against /3 is a polyrhythm. |
@@ -168,7 +168,7 @@ generator is also a mod source: its **GATE**, its **NOTE** and a **CV** (see [MO
 <td align="center" width="25%"><img src="assets/gallery/gen_morph.png" alt="MORPH" width="200"><br><b>MORPH</b></td>
 </tr>
 <tr>
-<td align="center"><img src="assets/gallery/gen_grids.png" alt="GRIDS" width="200"><br><b>GRIDS</b></td>
+<td align="center"><img src="assets/gallery/gen_grids.png" alt="ATLAS" width="200"><br><b>ATLAS</b></td>
 <td align="center"><img src="assets/gallery/gen_bounce.png" alt="BOUNCE" width="200"><br><b>BOUNCE</b></td>
 <td align="center"><img src="assets/gallery/gen_fall.png" alt="BOUNCE in FALL" width="200"><br><b>FALL</b></td>
 <td align="center"><img src="assets/gallery/gen_awake.png" alt="AWAKE" width="200"><br><b>AWAKE</b></td>
@@ -201,9 +201,9 @@ saved project keeps its seeds.
 Four generators have more settings than three knobs. Hold **OCT+** on GEN: the knobs' labels move onto tiles in the
 track's colour, an OCT+ key shows in the header, and the four knobs set the layer. Let go to return.
 
-<p align="center"><img src="assets/gallery/gen_grids_oct.png" alt="GRIDS with OCT+ held" width="240"> <img src="assets/gallery/gen_chord_oct.png" alt="CHORD with OCT+ held" width="240"> <img src="assets/gallery/gen_chord_user.png" alt="CHORD USER with OCT+ held" width="240"></p>
+<p align="center"><img src="assets/gallery/gen_grids_oct.png" alt="ATLAS with OCT+ held" width="240"> <img src="assets/gallery/gen_chord_oct.png" alt="CHORD with OCT+ held" width="240"> <img src="assets/gallery/gen_chord_user.png" alt="CHORD USER with OCT+ held" width="240"></p>
 
-### GRIDS: KICK, SNR, HAT, TOMS
+### ATLAS: KICK, SNR, HAT, TOMS
 
 | Knob | Setting | What it does |
 |---|---|---|
@@ -213,7 +213,7 @@ track's colour, an OCT+ key shows in the header, and the four knobs set the laye
 | 4 | **TOMS** (0–100 %) | A fourth part: the hits the kick and snare only just miss, so fills follow the groove. 0 none. |
 
 With OCT+ held, a **black key** picks the fourth part's sound, as on the drum grid: TOM, CLAP, OPEN HAT, RIM or
-BELL. The parts are also mod destinations: G KICK, G SNR, G HAT, G TOMS.
+BELL. The parts are also mod destinations: AT KICK, AT SNR, AT HAT, AT TOMS.
 
 ### CHORD: OCT, CHRD, VOIC (and LEN)
 
@@ -254,7 +254,7 @@ On a generator track, EVOLVE mutates the phrase every few bars.
 
 | Knob | Setting | What it does |
 |---|---|---|
-| 1 | **LOCK** (0–100 %) | How much of the phrase stays: 100 loops it, 0 is new every pass. Turing's LOCK is its PROB turned round, Grids' its CHAOS turned round, Constellation's the chance of its loop. Euclid, Bounce, Awake, Poly and Quad have none. |
+| 1 | **LOCK** (0–100 %) | How much of the phrase stays: 100 loops it, 0 is new every pass. Turing's LOCK is its PROB turned round, Atlas' its CHAOS turned round, Constellation's the chance of its loop. Euclid, Bounce, Awake, Poly and Quad have none. |
 | 2 | **EVERY** | Mutates every OFF, 1, 2, 4, 8 or 16 bars. OFF keeps the phrase. |
 | 3 | **AMOUNT** (0–100 %) | How much changes each time. |
 | 4 | **ROLL** (1–128) | The track's seed. While playing, a new seed starts on the track's next bar line (the number blinks until then). |
@@ -304,7 +304,7 @@ are reached. Changing MODE or ROLL starts the form again at A.
 | 3 | **HUMAN** (0–100 %) | Varies velocity and gate a little, as a player would. |
 | 4 | **FOLLOW** | OFF, or T1 to T4: plays that track's pitch, SHIFT away, in this track's scale. STEP tracks can be followed too. The followed track is drawn in its own colour. |
 
-On a GRIDS track only DROP and HUMAN apply: SHIFT, FOLLOW and FLRSH would change which drum plays.
+On an ATLAS track only DROP and HUMAN apply: SHIFT, FOLLOW and FLRSH would change which drum plays.
 
 ---
 
@@ -329,7 +329,7 @@ How long a generator holds its notes.
 
 | Knob | Setting | What it does |
 |---|---|---|
-| 1 | **LENGTH** | **STEP**: the step's GATE. **FIXED**: LEN, whatever the DIV. **HIT**: until the next hit, so rests let notes ring. GRIDS keeps STEP. |
+| 1 | **LENGTH** | **STEP**: the step's GATE. **FIXED**: LEN, whatever the DIV. **HIT**: until the next hit, so rests let notes ring. ATLAS keeps STEP. |
 | 2 | **LEN** | FIXED's length: 1/32 to 1/1 (a bar). |
 | 3 | **KEYS** (1–4) | FIXED: how many notes may hold at once. |
 | 4 | **GATE** | The track's step gate, as on PATTERN. |
@@ -370,12 +370,12 @@ at a time, each with an activity light and a moving mark.
 
 | Knob | What it sets |
 |---|---|
-| 1 | **Source**: `--`, then per track (T1 to T4) LFO, ENV, VEL, KEY, RAND, MODW, AT, EXPR, S&H, SLEW, the generator's GATE, NOTE and CV, DRIFT, SLOTH's TORPOR, APATHY and INERTIA, and OCHD 1 to 8. |
+| 1 | **Source**: `--`, then per track (T1 to T4) LFO, ENV, VEL, KEY, RAND, MODW, AT, EXPR, S&H, SLEW, the generator's GATE, NOTE and CV, DRIFT, TIDE 1 to 3, and SWARM 1 to 8. |
 | 2 | **Mod**: which of the 16 the other knobs edit. |
-| 3 | **Destination**, on a track: the voice (PITCH, CUTOFF, SHAPE, GAIN), the mix (LEVEL, PAN, SPREAD, FX SEND), the envelope and LFO settings, the engine's E1 to E8, and the generators' settings (T PROB, T LEN, E PULSE, E ROT, M LEAP, M DENS, MP POS, SHIFT, DROP, HUMAN, BRANCH, EV AMT, CONTR, G X, G Y, G DENS, G KICK, G SNR, G HAT, G TOMS, B SPEED, B ANGLE, A PROB, Q PROB, C Y, C SIZE, C DENS, C AUTO, S START, CH PROG). |
+| 3 | **Destination**, on a track: the voice (PITCH, CUTOFF, SHAPE, GAIN), the mix (LEVEL, PAN, SPREAD, FX SEND), the envelope and LFO settings, the engine's E1 to E8, and the generators' settings (T PROB, T LEN, E PULSE, E ROT, M LEAP, M DENS, MP POS, SHIFT, DROP, HUMAN, BRANCH, EV AMT, CONTR, AT X, AT Y, AT DENS, AT KICK, AT SNR, AT HAT, AT TOMS, B SPEED, B ANGLE, A PROB, Q PROB, C Y, C SIZE, C DENS, C AUTO, S START, CH PROG). |
 | 4 | **Amount**, −100 to +100 %. With no source (`--`) the cord is a fixed move and KNOB 4 sets its offset. |
 
-- **BI and UNI.** A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, SLOTH, OCHD) swings both
+- **BI and UNI.** A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, TIDE, SWARM) swings both
   ways from the knob. Press **OCT+** on MODS to make the picked mod **UNI**: the source folded to 0 to 1, so it moves
   one way only, as ENV does.
 - Choosing a destination on a new cord sets the amount to 50 % (or a fixed move of 25 % with no source), so you hear
@@ -405,14 +405,14 @@ top (TO). A cell is lit, in the source track's colour, when a cord goes that way
 
 ---
 
-## ORGANIC: SLOTH and OCHD
+## ORGANIC: TIDE and SWARM
 
-Each track has its own SLOTH and OCHD, slow sources in the style of Nonlinearcircuits' Sloth and Instruō's ochd.
+Each track has its own TIDE and SWARM, slow sources inspired by Nonlinear Circuits' Triple Sloth and Instruō's ochd.
 
 | Knob | Setting | What it does |
 |---|---|---|
-| 1 | **SPEED** (0–100) | SLOTH's speed. At 50 its three chaotic circuits take about 17 minutes (**TORPOR**), 1 minute (**APATHY**) and 3 minutes (**INERTIA**) a turn; each 12.5 more is twice as fast. |
-| 2 | **RATE** (0–100) | OCHD's speed. At 50, **OCHD 1** takes 64 s a turn and **OCHD 8** 2.4 s; each 12.5 more is twice as fast. |
+| 1 | **TIDE SPEED** (0–100) | TIDE's speed. At 50 its three chaotic circuits take about 17 minutes (**TIDE 1**), 3 minutes (**TIDE 2**) and 1 minute (**TIDE 3**) a turn; each 12.5 more is twice as fast. |
+| 2 | **SWARM RATE** (0–100) | SWARM's speed. At 50, **SWARM 1** takes 64 s a turn and **SWARM 8** 2.4 s; each 12.5 more is twice as fast. |
 
 PLAY restarts them from the track's seed, so a piece replays the same way. Pick them as sources on MODS.
 
@@ -483,12 +483,12 @@ before. Stock Melodee projects load with every track on STEP. Melodee's own pres
 Tessera stands on other people's ideas and work:
 
 - **Melodee** by keremimo, and **Felucca** by Leo Kuroshita / Hügelton Instruments: the firmware Tessera is built on.
-- **Grids** by Émilie Gillet / Mutable Instruments: the GRIDS generator's drum map and the way it is read.
+- **Grids** by Émilie Gillet / Mutable Instruments: the ATLAS generator's drum map and the way it is read.
 - **norns** scripts, as ideas restated in C (no code copied): **Awake** (tehn) for AWAKE, **Fall** (ambalek) for
   BOUNCE's FALL, **Constellation** (timothy-taylor) for CONSTELLATION, **initenere** for QUAD, and **nørgård** for
   SERIES.
 - **Turing Machine** (Music Thing Modular) for TURING.
-- **Triple Sloth** by Nonlinear Circuits (Andrew Fitch), with J. C. Sprott's jerk system, for SLOTH; **ochd** by
-  Instruō and DivKid for OCHD (ideas only, no code copied).
+- **Triple Sloth** by Nonlinear Circuits (Andrew Fitch), with J. C. Sprott's jerk system, for TIDE; **ochd** by
+  Instruō and DivKid for SWARM (ideas only, no code copied).
 
 Every third-party part and its licence is listed in [LICENSING.md](LICENSING.md).

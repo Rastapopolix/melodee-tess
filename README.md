@@ -39,7 +39,7 @@ page also has a way back to the official V15 firmware, with a backup first.
 
 ## What's inside
 
-* **Twelve generators** on SEQ > GEN: TURING, EUCLID, MARKOV, MORPH, GRIDS (with a fourth drum part), BOUNCE (and
+* **Twelve generators** on SEQ > GEN: TURING, EUCLID, MARKOV, MORPH, ATLAS (with a fourth drum part), BOUNCE (and
   FALL), AWAKE, POLY, QUAD, CONSTELLATION, SERIES and CHORD, besides the step sequencer and the arpeggiator.
 * **Shaping**: EVOLVE mutates a phrase every few bars, and **STEP EVOLVE** does the same to steps you wrote; FORM
   builds sections such as AABA; TWEAK shifts, drops, humanises or follows another track; TWEAK 2 branches hits
@@ -47,7 +47,7 @@ page also has a way back to the official V15 firmware, with a backup first.
   hold.
 * **Harmony**: a CHORD track plays a progression (or your own), and **QNT CHRD** makes the other tracks follow it.
 * **Modulation**: 16 cords from any source to any destination on any track, generators included; slow organic
-  sources (SLOTH, OCHD); live marks on every knob a cord moves, and **MATRIX** to see the whole patch.
+  sources (TIDE, SWARM); live marks on every knob a cord moves, and **MATRIX** to see the whole patch.
 * **Print**: hold REC to turn what a generator played into ordinary steps.
 * **Sounds**: FM6 (six-operator FM, three engine models), TRIO and DRUM (808, 909, SID KIT).
 * **MIDI OUT** of every track and the generators, and **CLOCK OUT**, over USB.
@@ -67,7 +67,7 @@ patches and tips.
 <tr>
 <td align="center" valign="top" width="33%"><img src="assets/gallery/home.png" alt="HOME" width="240"><br><b>HOME</b><br><sub>The four tracks, their sounds and knobs.</sub></td>
 <td align="center" valign="top" width="33%"><img src="assets/gallery/gen_constel.png" alt="CONSTELLATION" width="240"><br><b>CONSTELLATION</b><br><sub>Stars play as they cross the ship's crosshair (after the norns script Constellation).</sub></td>
-<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_grids.png" alt="GRIDS" width="240"><br><b>GRIDS</b><br><sub>Émilie Gillet's Grids drum map (Mutable Instruments): kick, snare, hat and a fourth part.</sub></td>
+<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_grids.png" alt="ATLAS" width="240"><br><b>ATLAS</b><br><sub>Inspired by Émilie Gillet's Grids (Mutable Instruments): kick, snare, hat and a fourth part.</sub></td>
 </tr>
 <tr>
 <td align="center" valign="top"><img src="assets/gallery/gen_quad.png" alt="QUAD" width="240"><br><b>QUAD</b><br><sub>A 4 x 4 grid of notes the tracks share, a row each (after the norns script initenere).</sub></td>
@@ -112,9 +112,9 @@ See [BUILDING.md](BUILDING.md). The host tests run with `tests/run_tests.sh`; th
 GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved. Melodee is by keremimo,
 Felucca by Leo Kuroshita / Hügelton Instruments.
 
-The GRIDS generator uses the drum map of **Grids** by Émilie Gillet / Mutable Instruments. Several generators are
+The ATLAS generator uses the drum map of **Grids** by Émilie Gillet / Mutable Instruments. Several generators are
 inspired by **norns** scripts (ideas only, no code copied): **QUAD** by initenere, **FALL** by ambalek's Fall,
 **CONSTELLATION** by timothy-taylor's Constellation, **AWAKE** by tehn's Awake and **SERIES** by nørgård. The
-SLOTH and OCHD mod sources are inspired by **Triple Sloth** by Nonlinear Circuits (Andrew Fitch) and **ochd** by
+The TIDE and SWARM mod sources are inspired by **Triple Sloth** by Nonlinear Circuits (Andrew Fitch) and **ochd** by
 Instruō and DivKid. See
 [LICENSING.md](LICENSING.md) for every third-party part and its licence.
