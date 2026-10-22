@@ -3,7 +3,8 @@
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 """Make the site (GitHub Pages):
 
-  index.html                        redirect to the installer (the old URL keeps working)
+  index.html                        the project page (web/home/index.html; the installer stays at webapp/installer/)
+  media/gallery/, media/brand/      its pictures: assets/gallery (tests/gallery_render.c), assets/brand (tools/gen_brand.py)
   firmware/melodee-tess-VER.fwsc    the package, both cores (+ LICENSE, LICENSING.md, LICENSES/: the
                                     packages hold JieLi SDK files under Apache-2.0, see LICENSING.md)
   firmware/melodee-tess-VER-1core.fwsc the same release built with MELODEE_DUAL_CORE=0, for FM-1s that crash
@@ -171,11 +172,14 @@ def main(pkg, single, version, out, nightly=None, installer_only=False, synth=No
     for f in ("fukiai.ttf", "FUKIAI-LICENSE.txt", "fm1backup.js"):
         if not installer_only and (HERE / f).exists():
             shutil.copy(HERE / f, ed / f)
-    if not installer_only:
-        (out / "index.html").write_text(
-            '<!doctype html><meta charset="utf-8"><title>Melodee</title>'
-            '<meta http-equiv="refresh" content="0; url=webapp/installer/">'
-            '<a href="webapp/installer/">Melodee installer</a>\n', encoding="utf-8")
+    if not installer_only:                          # the project page, its screens and the brand pictures
+        shutil.copy(HERE / "home" / "index.html", out / "index.html")
+        for src, dest in ((HERE.parent / "assets/gallery", out / "media/gallery"),
+                          (HERE.parent / "assets/brand", out / "media/brand")):
+            dest.mkdir(parents=True, exist_ok=True)
+            for f in src.iterdir():
+                if f.suffix in (".png", ".svg"):
+                    shutil.copy(f, dest / f.name)
     print(f"site: {out}: webapp/installer ({len(html)} B), webapp/editor, firmware/{name} ({len(raw)} B) and "
           f"{name1} ({len(raw1)} B), {product}" + (f"; synth {synth_meta['version']}" if synth_meta else ""))
 
