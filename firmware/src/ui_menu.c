@@ -81,13 +81,13 @@ static void draw_about_qr(int32_t x, int32_t y)
 enum { MC_TEXT, MC_TITLE, MC_URL };
 typedef struct { const char *text; uint8_t kind; } menu_credit_t;
 static const menu_credit_t MENU_CREDITS[] = {
-    {"MELODEE (TESS) / THIS FORK", MC_TITLE},
-    {"TESS fork by Rastapopolix (Theo Dainis): Tessera generators, engines and project save / GPL-3.0", MC_TEXT},
+    {"TESSERA / THIS FIRMWARE", MC_TITLE},
+    {"Tessera by Rastapopolix (Theo Dainis): the generators, engines and project format; a fork of Melodee / GPL-3.0", MC_TEXT},
     {"Thanks: Inputsignwave", MC_TEXT},
-    {"tess is short for tessera, the small tile of a mosaic: short phrases set side by side into a larger form", MC_TEXT},
+    {"A tessera is the small tile of a mosaic: short phrases set side by side into a larger form", MC_TEXT},
     {"https://github.com/Rastapopolix/melodee-tess", MC_URL},
     {"", MC_TEXT},
-    {"MELODEE / ORIGINAL", MC_TITLE},                  /* Tess is a modified Melodee */
+    {"MELODEE / ORIGINAL", MC_TITLE},                  /* Tessera is a modified Melodee */
     {"Kerem Kilic (keremimo), Ellic Studio / GPL-3.0", MC_TEXT},
     {"https://github.com/keremimo/melodee", MC_URL},
     {"", MC_TEXT},
@@ -179,16 +179,16 @@ static int32_t menu_document(int32_t y, int draw)
     uint32_t i;
     if (draw) {
         int32_t x;                                    /* (docs/design: mock/r6_pages About) */
-        cv_text(6, y + 4, &AF_L, "Melodee", T_THEME);
-        cv_text(6, y + 36, &AF_M, "(Tess)", T_THEME);
+        cv_text(6, y + 4, &AF_L, "Tessera", T_THEME);
+        cv_text(6, y + 36, &AF_M, "for the FM-1", T_THEME);
         x = cv_text(6, y + 62, &AF_M, MELODEE_VERSION, T_TEXT);
         cv_text(x + 8, y + 67, &AF_X, __DATE__, T_MID);
         draw_about_qr(158, y + 4);
-        cv_text(6, y + 94, &AF_S, "MELODEE by Kerem Kilic (keremimo)", T_TEXT);
-        cv_text(6, y + 112, &AF_S, "\xA9 2026 Kerem Kilic, Ellic Studio", T_SEC);
-        cv_text(6, y + 130, &AF_S, "TESS fork by Rastapopolix", T_TEXT);
-        cv_text(6, y + 148, &AF_S, "Thanks: Inputsignwave", T_SEC);
-        cv_text(6, y + 166, &AF_S, "Based on Felucca by Leo Kuroshita,", T_TEXT);
+        cv_text(6, y + 94, &AF_S, "TESSERA by Rastapopolix", T_TEXT);
+        cv_text(6, y + 112, &AF_S, "Thanks: Inputsignwave", T_SEC);
+        cv_text(6, y + 130, &AF_S, "Based on MELODEE by Kerem Kilic", T_TEXT);
+        cv_text(6, y + 148, &AF_S, "\xA9 2026 Kerem Kilic, Ellic Studio", T_SEC);
+        cv_text(6, y + 166, &AF_S, "and Felucca by Leo Kuroshita,", T_TEXT);
         cv_text(6, y + 184, &AF_S, "H\xFCgelton Instruments", T_SEC);
         cv_text(6, y + 202, &AF_S, "GPL-3.0-only", T_TEXT);
         cv_text(6, y + 220, &AF_S, "github.com/Rastapopolix/melodee-tess", T_MID);

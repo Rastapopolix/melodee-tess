@@ -1456,13 +1456,13 @@ async function installerBuilds() {
   });
   vm.runInContext(script, context);
   await new Promise(resolve => setImmediate(resolve));
-  ok(fetched.join() === "melodee-1.0.2.fwsc" && element("status").textContent === "Melodee (tess) 1.0.2 (standard)"
+  ok(fetched.join() === "melodee-1.0.2.fwsc" && element("status").textContent === "Tessera 1.0.2 (standard)"
     && !element("go").disabled, "installer: the standard (dual-core) build is the default");
   element("build-dual").checked = false; element("build-single").checked = true;
   await element("build-single").listeners.change();
   const status = element("status").textContent;
   await element("go").listeners.click();
-  ok(status === "Melodee (tess) 1.0.2 (single core)" && installed.length === 1 && installed[0][0] === "melodee-1.0.2-1core.fwsc"
+  ok(status === "Tessera 1.0.2 (single core)" && installed.length === 1 && installed[0][0] === "melodee-1.0.2-1core.fwsc"
     && installed[0][1] === "FM-1_91002" && !element("build-dual").disabled, "installer: Single core installs the single-core package");
   element("build-single").checked = false; element("build-dual").checked = true;
   await element("build-dual").listeners.change();
@@ -1472,7 +1472,7 @@ async function installerBuilds() {
   for (const [kind, file, tag] of [["nightly-dual", "melodee-nightly.fwsc", "dual core"], ["nightly-single", "melodee-nightly-1core.fwsc", "single core"]]) {
     for (const k of ALL) element("build-" + k).checked = k === kind;
     await element("build-" + kind).listeners.change();
-    ok(element("status").textContent === `Melodee (tess) next-abcdef0 (nightly, ${tag})`, "installer: nightly label uses its own source version");
+    ok(element("status").textContent === `Tessera next-abcdef0 (nightly, ${tag})`, "installer: nightly label uses its own source version");
     await element("go").listeners.click();
     const [image, product] = installed.at(-1);
     ok(image === file + "?commit=" + revision && product === "FM-1_900", "installer: each nightly installs the chosen package with its own identity");
@@ -1486,7 +1486,7 @@ async function installerBuilds() {
   for (const [kind, file, tag] of [["synth-dual", "melodee-synth.fwsc", "dual core"], ["synth-single", "melodee-synth-1core.fwsc", "single core"]]) {
     for (const k of ALL) element("build-" + k).checked = k === kind;
     await element("build-" + kind).listeners.change();
-    ok(element("status").textContent === `Melodee (tess) synth-1234567 (synth only, ${tag})`, "installer: the synth-only label uses its own source version");
+    ok(element("status").textContent === `Tessera synth-1234567 (synth only, ${tag})`, "installer: the synth-only label uses its own source version");
     await element("go").listeners.click();
     const [image, product] = installed.at(-1);
     ok(image === file + "?commit=" + synthRevision && product === "FM-1_900", "installer: each synth-only build installs the chosen package with its own identity");
@@ -1541,7 +1541,7 @@ async function localBuild() {
   r = await run(file("FM-1.fwsc", "FM-1_015"));
   ok(!r.enabled && r.status.startsWith("Cannot use this file: identity") && r.installed.length === 0, "local: official firmware is refused");
   r = await run(file("patched.fwsc", "FM-1_91029", {loader:false}));
-  ok(!r.enabled && r.status.includes("no Melodee loader") && r.installed.length === 0, "local: a package without Melodee's loader is refused");
+  ok(!r.enabled && r.status.includes("no Tessera loader") && r.installed.length === 0, "local: a package without the loader is refused");
   r = await run(file("broken.fwsc", "FM-1_91029", {crc:false}));
   ok(!r.enabled && r.status.includes("CRC mismatch") && r.installed.length === 0, "local: a damaged package is refused");
 }
@@ -1568,7 +1568,7 @@ async function installerBuildRaces() {
   const single = element("build-single").listeners.change();
   ok(element("go").disabled,"installer: Install is disabled while the selected package loads");
   finish("single");await single;finish("dual");await tick();
-  ok(element("status").textContent === "Melodee (tess) 1.0.2 (single core)","installer: a late standard download cannot replace the selected single-core build");
+  ok(element("status").textContent === "Tessera 1.0.2 (single core)","installer: a late standard download cannot replace the selected single-core build");
   const flash = element("go").listeners.click();await tick();
   ok(installed === "single" && element("build-dual").disabled && element("build-single").disabled,
     "installer: the selected package is fixed and build selection locked throughout writing");

@@ -37,11 +37,8 @@
 #ifndef MELODEE_ID
 #define MELODEE_ID "FM-1_900"    /* package identity (build.py: the .fwsc marker string) */
 #endif
-#ifndef MELODEE_FORK
-#define MELODEE_FORK "(tess)"       /* this fork: melodee(tess); the version below is upstream Melodee's */
-#endif
 #ifndef MELODEE_VERSION
-#define MELODEE_VERSION "v1.3.6" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
+#define MELODEE_VERSION "v1.3.6" /* Tessera's, shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
 #endif
 #if MELODEE_OTA && !MELODEE_FLASH
 #error "MELODEE_OTA needs MELODEE_FLASH"
