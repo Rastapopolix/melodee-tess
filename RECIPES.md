@@ -13,9 +13,9 @@ and ORGANIC under **LFO**, SCL and CHORD under **SCL**.
 - [Your own progression (CHORD USER)](#your-own-progression-chord-user)
 - [Two tracks answering each other (BRANCH)](#two-tracks-answering-each-other-branch)
 - [A harmony line that follows (FOLLOW)](#a-harmony-line-that-follows-follow)
-- [Grids: a groove with fills](#grids-a-groove-with-fills)
-- [Grids: variations that repeat (FORM)](#grids-variations-that-repeat-form)
-- [Grids: movement that repeats (an LFO on X or Y)](#grids-movement-that-repeats-an-lfo-on-x-or-y)
+- [Atlas: a groove with fills](#atlas-a-groove-with-fills)
+- [Atlas: variations that repeat (FORM)](#atlas-variations-that-repeat-form)
+- [Atlas: movement that repeats (an LFO on X or Y)](#atlas-movement-that-repeats-an-lfo-on-x-or-y)
 - [Polyrhythms: POLY and QUAD](#polyrhythms-poly-and-quad)
 - [Notes that travel between tracks (QUAD columns)](#notes-that-travel-between-tracks-quad-columns)
 - [A melody you can come back to (CONSTELLATION)](#a-melody-you-can-come-back-to-constellation)
@@ -24,7 +24,7 @@ and ORGANIC under **LFO**, SCL and CHORD under **SCL**.
 - [Pads from sparse notes (LENGTH HIT)](#pads-from-sparse-notes-length-hit)
 - [Entries and arrangements (COND and FORM)](#entries-and-arrangements-cond-and-form)
 - [From generator to pattern (print, then STEP EVOLVE)](#from-generator-to-pattern-print-then-step-evolve)
-- [Movement over minutes (SLOTH and OCHD)](#movement-over-minutes-sloth-and-ochd)
+- [Movement over minutes (TIDE and SWARM)](#movement-over-minutes-tide-and-swarm)
 - [Driving another synth (MIDI OUT)](#driving-another-synth-midi-out)
 
 **[Tips](#tips)**
@@ -36,7 +36,7 @@ and ORGANIC under **LFO**, SCL and CHORD under **SCL**.
 1. Power on. Track 1 is **GLASS PAD**, track 2 **STRINGS**, track 3 **BELLS**, track 4 the **808 KIT**.
 2. Track 3 (BELLS): **SEQ** for GEN, **MODE** to **TURING**. Press **PLAY**: a looping melody in the track's scale.
 3. **PROB** at about 20: the loop changes a little each time round. At 0 (Lock) it holds.
-4. Track 4: MODE **GRIDS**, **DENS** at 50. A drum groove under it.
+4. Track 4: MODE **ATLAS**, **DENS** at 50. A drum groove under it.
 5. Track 3 again, **EVOLVE**: turn **ROLL** a click at a time until you like the line. The number is its seed: write
    it down and you can always come back to it.
 6. **SCL** on track 3 to change the scale; the generator follows at once.
@@ -47,8 +47,8 @@ A held chord that changes slowly, for ambient beds.
 
 1. Track 1 (GLASS PAD): GEN, MODE **CHORD**, **PROG DRONE** (the I chord alone), **BARS 4**, **HIT HOLD**.
 2. Hold **OCT+** on GEN: **CHRD DIA7** (a seventh in the scale), **VOICING OPEN**, **OCTAVES −1** for weight.
-3. **MODS**: a cord from **T1 TORPOR** (SLOTH's slowest circuit) to **T1 CUTOFF**, amount about +30 %.
-4. A second cord from **T1 OCHD 2** to **T1 PAN**, about +20 %: the pad drifts across the stereo field.
+3. **MODS**: a cord from **T1 TIDE 1** (TIDE's slowest circuit) to **T1 CUTOFF**, amount about +30 %.
+4. A second cord from **T1 SWARM 2** to **T1 PAN**, about +20 %: the pad drifts across the stereo field.
 5. For a drone that moves through the scale, set PROG to **WALK**: four chords from the seed, and EVOLVE (EVERY 8,
    AMOUNT 30) changes one now and then.
 
@@ -74,7 +74,7 @@ A held chord that changes slowly, for ambient beds.
 2. Track 3, **TWEAK 2**: **TO** to **T1 COIN**, **BRANCH 40 %**. About four hits in ten now play on the pad.
 3. **TOGGLE** instead of COIN alternates: at 100 % every other hit goes across, a strict call and response.
 4. **LATCH** tosses once a bar: whole bars swap between the two sounds.
-5. The tosses replay with the seed. A cord from an **OCHD** to **BRANCH** sweeps how often hits cross over.
+5. The tosses replay with the seed. A cord from a **SWARM** to **BRANCH** sweeps how often hits cross over.
 
 ## A harmony line that follows (FOLLOW)
 
@@ -84,32 +84,32 @@ A held chord that changes slowly, for ambient beds.
 3. **SHIFT −7** for a line an octave below in a seven-note scale. **DROP 50** thins the harmony so it only answers
    now and then.
 
-## Grids: a groove with fills
+## Atlas: a groove with fills
 
-1. Track 4 (808 KIT): MODE **GRIDS**, **X** and **Y** where you like the groove, **DENS 60**.
+1. Track 4 (808 KIT): MODE **ATLAS**, **X** and **Y** where you like the groove, **DENS 60**.
 2. Hold **OCT+** on GEN: **TOMS 40** brings in the hits the kick and snare only just miss, so fills follow the
    groove. Press a **black key** (still holding OCT+) to put that part on **CLAP**, **OPEN HAT**, **RIM** or **BELL**
    instead.
 3. Still holding OCT+: **HAT 30** thins the hats, **KICK 100** keeps the kick full.
-4. **TWEAK 2**: **COND 4:4** on a second GRIDS track, with the fourth part on CLAP and DENS high, gives a fill on
+4. **TWEAK 2**: **COND 4:4** on a second ATLAS track, with the fourth part on CLAP and DENS high, gives a fill on
    every fourth bar only.
 
-## Grids: variations that repeat (FORM)
+## Atlas: variations that repeat (FORM)
 
-FORM turns a GRIDS track into a short song form: sections A, B and C, each a point on the Grids map, played in an
+FORM turns an ATLAS track into a short song form: sections A, B and C, each a point on the Atlas map, played in an
 order such as AABA. A section played again comes back exactly, so the variations repeat.
 
-1. GEN: **MODE GRIDS**; set **X** and **Y** (where on the map) and **DENS** (how full). This is section A.
+1. GEN: **MODE ATLAS**; set **X** and **Y** (where on the map) and **DENS** (how full). This is section A.
 2. EVOLVE: **EVERY** sets how long each section lasts: 1, 2, 4, 8 or 16 bars. (Turning FORM on with EVERY OFF sets
    4 bars.)
 3. FORM: **FORM** picks the order: AB, ABAC, ABCB, AABA, ABCA or AABC. The whole form lasts the sections times
    EVERY: AB at 2 bars repeats every 4 bars, AABA at 4 bars every 16.
 4. FORM: **CONTR** (contrast) sets how far a new section moves from the one before: low, a small change of pattern;
    high, a different groove.
-5. For exact repeats, take out the other randomness: EVOLVE **LOCK** at 100 (for GRIDS, LOCK is CHAOS turned round:
+5. For exact repeats, take out the other randomness: EVOLVE **LOCK** at 100 (for ATLAS, LOCK is CHAOS turned round:
    100 is no chaos), and TWEAK **DROP** and **HUMAN** at 0. A lower LOCK brings back a little variation in every bar
    on top of the form.
-6. FORM **FLRSH**, TWEAK **SHIFT** and **FOLLOW** do nothing on a GRIDS track (they would change which drum plays).
+6. FORM **FLRSH**, TWEAK **SHIFT** and **FOLLOW** do nothing on an ATLAS track (they would change which drum plays).
 
 Shaping the sections by hand:
 
@@ -122,22 +122,22 @@ Shaping the sections by hand:
 EVOLVE without FORM (EVERY and AMOUNT set, FORM OFF) is the other way round: every EVERY bars X and Y take a random
 step of up to AMOUNT, so the groove keeps wandering and does not come back.
 
-## Grids: movement that repeats (an LFO on X or Y)
+## Atlas: movement that repeats (an LFO on X or Y)
 
 A cord from an LFO synced to the bars moves the point across the map in a loop, the same every time. FORM can be on
 as well: the sections set the point, the LFO moves around it.
 
-1. On the GRIDS track, the LFO pages:
+1. On the ATLAS track, the LFO pages:
    - **LFO 2**: **SYNC** to **4BAR**, **2BAR** or **1/1** (the loop's length); **TRIG** to **FREE**. TRIG NOTE (the
      default) restarts the LFO with every note, and a drum track plays nearly every step, so the LFO would hardly
      move. FREE starts it on PLAY and keeps it in time with the bars.
    - **LFO**: **WAVE** SIN or TRI sweeps back and forth; SAW ramps and jumps back; SQR swaps between two points (an
      A/B change every half loop). **PHS** sets where in its loop it starts. **FADE** at 0.
    - **LFO DEST**: leave PIT, FLT, SHP and AMP at 0, so the LFO moves only the cord, not the drum sound.
-2. **MODS**: a cord with source **LFO** (this track's), destination **G X** (or **G Y**, **G DENS**, **G TOMS**) on
+2. **MODS**: a cord with source **LFO** (this track's), destination **AT X** (or **AT Y**, **AT DENS**, **AT TOMS**) on
    this track, and an amount: how far it moves X from the knob's setting.
 3. For a figure on the map, move X and Y with two different loops: a second cord from another track's LFO (with its
-   own SYNC, say 2BAR against 4BAR) to **G Y**. With that track's LFO DEST at 0 its sound stays as it is.
+   own SYNC, say 2BAR against 4BAR) to **AT Y**. With that track's LFO DEST at 0 its sound stays as it is.
 
 Not for repeating: **DRIFT** wanders freely, and **RAND** and the LFO's **S&H** wave pick new values. They make a
 groove that keeps changing, which is the other use.
@@ -179,7 +179,7 @@ groove that keeps changing, which is the other use.
 3. **FILL ARP** fills the steps between stars with the last four stars, low to high and softer.
 4. Let the ship steer itself: **MODS**, a cord with no source (`--`) to **C AUTO** on this track, offset to taste:
    low values wander slowly, **SEEK** flies to the next star.
-5. **Y** sets where the melody sits; a slow LFO or OCHD on **C Y** moves it up and down the sky.
+5. **Y** sets where the melody sits; a slow LFO or SWARM on **C Y** moves it up and down the sky.
 
 ## A slow lead from the infinity series (SERIES)
 
@@ -195,7 +195,7 @@ groove that keeps changing, which is the other use.
    high, one in seven an octave down.
 2. **ANGLE** is now **WIND**: the middle is calm; turning it leans the melody low or high. Further out, gusts send the
    leaves down together, in bursts.
-3. **MODS**: a cord from an **OCHD** (OCHD 3, about 25 s a turn) to **B ANGLE**: the wind rises and falls.
+3. **MODS**: a cord from a **SWARM** (SWARM 3, about 25 s a turn) to **B ANGLE**: the wind rises and falls.
 4. **SPEED** slower (10 to 20) for a sparse, rain-like part.
 
 ## Pads from sparse notes (LENGTH HIT)
@@ -226,15 +226,15 @@ groove that keeps changing, which is the other use.
    a note moved, one dropped, a ghost note. The steps themselves do not change.
 5. Like a variation? Hold **REC** to keep it (KEPT n STEPS). **CLEAR** goes back to the steps as written.
 
-## Movement over minutes (SLOTH and OCHD)
+## Movement over minutes (TIDE and SWARM)
 
 1. **LFO** to **ORGANIC** on any track: **SPEED** and **RATE** at 50 to start.
-2. **MODS**: **T1 APATHY** (about a minute a turn) to **T2 CUTOFF**; **T1 INERTIA** (about 3 minutes) to **T3 FX
-   SEND**; **T1 OCHD 5** (about 10 s) to **T4 G DENS**.
+2. **MODS**: **T1 TIDE 3** (about a minute a turn) to **T2 CUTOFF**; **T1 TIDE 2** (about 3 minutes) to **T3 FX
+   SEND**; **T1 SWARM 5** (about 10 s) to **T4 AT DENS**.
 3. Press **OCT+** on a mod to make it **UNI**: it moves only up from the knob, never below, which is often what you
    want for FX SEND and density.
 4. **MATRIX** shows the patch at a glance: rows are sources, columns destinations, lit as they move.
-5. Because PLAY restarts SLOTH and OCHD from the seed, the same project unfolds the same way each time.
+5. Because PLAY restarts TIDE and SWARM from the seed, the same project unfolds the same way each time.
 
 ## Driving another synth (MIDI OUT)
 
@@ -259,7 +259,7 @@ groove that keeps changing, which is the other use.
 
 - The small number on **ROLL** is the track's seed. Note the ones you like: the same seed with the same settings
   always plays the same line.
-- **PLAY** restarts every generator's random choices, and SLOTH and OCHD, from the top: with EVERY OFF a project
+- **PLAY** restarts every generator's random choices, and TIDE and SWARM, from the top: with EVERY OFF a project
   sounds the same every time. Set EVERY to let it drift.
 - On TURING, **PROB 0** (Lock) freezes the loop you are hearing; turn it up a little to let it evolve again.
 
