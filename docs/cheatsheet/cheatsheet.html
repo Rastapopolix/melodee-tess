@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tessera shortcuts</title>
+<!-- made by tools/gen_cheatsheet.py from CHEATSHEET.md: edit that, not this -->
+<style>
+@page { size: A4; margin: 11mm 10mm 10mm 10mm; }
+:root { --lapis: #1d3461; --gold: #b8892b; --ink: #1a1a1a; --line: #d9d4c7; --tint: #f6f3ea; }
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: #fff; font: 7.6pt/1.28 "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+header { border-bottom: 2px solid var(--gold); margin-bottom: 3mm; padding-bottom: 1.5mm; }
+h1 { margin: 0; color: var(--lapis); font-size: 15pt; letter-spacing: .02em; }
+header p { margin: 1mm 0 0; color: #444; }
+main { column-count: 2; column-gap: 6mm; }
+section { break-inside: avoid; margin: 0 0 3mm; }
+h2 { margin: 0 0 1mm; padding: .6mm 1.6mm; color: #fff; background: var(--lapis); font-size: 8.4pt; }
+table { width: 100%; border-collapse: collapse; }
+td { padding: .55mm 1.4mm; vertical-align: top; border-bottom: .3mm solid var(--line); }
+td:first-child { width: 42%; }
+tr:nth-child(even) td { background: var(--tint); }
+b { color: var(--lapis); }
+footer { margin-top: 2mm; color: #666; font-size: 6.6pt; text-align: right; }
+</style>
+</head>
+<body>
+<header>
+<h1>Tessera shortcuts</h1>
+<p><b>A + B</b>: hold A, then press or turn B. <b>Held</b>: about 0.7 s (the GLO and SCL layers: MENU &gt; HOLD, 0.3 to 0.6 s); ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act when let go. KNOB 1 to 4 are the four knobs from the left.</p>
+</header>
+<main>
+<section>
+<h2>Getting around</h2>
+<table>
+<tr><td><b>HOME</b></td><td>The home page: four tracks, their sounds and knobs</td></tr>
+<tr><td><b>HOME</b> held</td><td>The menu (held again: leaves it)</td></tr>
+<tr><td><b>ALGORITHM</b></td><td>Picks the track, on every page (MENU &gt; TRACK KNOB LEFT swaps it with PRESETS)</td></tr>
+<tr><td><b>SELECT</b></td><td>The pages of the section shown, both ways</td></tr>
+<tr><td>A page button again</td><td>That section's next page (from elsewhere most return to the page last used)</td></tr>
+<tr><td><b>OCT&#8209;</b> (off HOME)</td><td>Back: closes a list, sheet or map, else HOME</td></tr>
+<tr><td><b>OCT+</b> (off HOME)</td><td>Enter: opens the row, slot or note picked; does the action picked</td></tr>
+<tr><td><b>OCT+</b> held</td><td>The page's sheet: the sound's (HOME, EDIT, ENV, LFO, FX), the pattern's (GEN, NOTES, PATTERN), the song's (SONG), the pattern's on PATTERNS</td></tr>
+<tr><td>A sheet: <b>KNOB 1</b>, <b>OCT+</b> / <b>OCT&#8209;</b></td><td>Picks the row / does it / closes</td></tr>
+<tr><td>A dialog: <b>OCT+</b> / <b>OCT&#8209;</b></td><td>Yes / no</td></tr>
+<tr><td>Lists (menu, SCL, VOICE): <b>KNOB 1</b> / <b>KNOB 2</b></td><td>The row / its value</td></tr>
+</table>
+</section>
+<section>
+<h2>The page buttons</h2>
+<table>
+<tr><td><b>SEQ</b></td><td>GEN, then the MODE's pages. STEP: EVOLVE, NOTES. ARP: ARP, ARP 2, NOTES. A generator: EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, TIMING, ENERGY. All: PATTERN, TEMPO, PATTERNS, SONG</td></tr>
+<tr><td><b>SEQ</b> held</td><td>PATTERNS</td></tr>
+<tr><td><b>ARP</b></td><td>STEP track: switches it to ARP, the ARP page (again: ARP 2). Generator track: GEN ("ARP: MODE ON GEN")</td></tr>
+<tr><td><b>LFO</b></td><td>MODS, MATRIX, LFO, LFO 2, ORGANIC, LFO DEST; on FM6 then FM LFO, FM LFO 2</td></tr>
+<tr><td><b>ENV</b></td><td>ENV, ENV DEST; on FM6 instead EG RATE, EG LVL, PITCH EG, PITCH LV</td></tr>
+<tr><td><b>SCL</b></td><td>SCALES, SCL, CHORD</td></tr>
+<tr><td><b>EDIT</b></td><td>The sound's EDIT pages</td></tr>
+<tr><td><b>EDIT</b> on an EDIT page</td><td>The map of the sound's pages: KNOB 1 across, KNOB 2 rows, OCT+ opens, OCT&#8209; or EDIT closes</td></tr>
+<tr><td><b>PRESETS</b> on an EDIT page</td><td>The next / previous section (FM6: Algo, OP1 to OP6, Pitch, LFO, Ctrl, Store)</td></tr>
+<tr><td><b>FX</b></td><td>The insert and send effects</td></tr>
+<tr><td><b>GLO</b></td><td>MIXER, GLOBAL, SYSTEM</td></tr>
+<tr><td><b>SAVE</b></td><td>USER (save the sound), PROJECT, PRESETS</td></tr>
+</table>
+</section>
+<section>
+<h2>Quick layers: hold GLO or SCL</h2>
+<table>
+<tr><td><b>GLO</b> held</td><td>[GLO] SET over the page</td></tr>
+<tr><td><b>GLO</b> + black keys F#3 G#3 A#3 C#4</td><td>Mute / unmute track 1 to 4 (lit: sounding)</td></tr>
+<tr><td><b>GLO</b> + white keys F3 G3 A3 B3</td><td>Solo track 1 to 4 while the key is held</td></tr>
+<tr><td><b>GLO</b> + C4 / F4</td><td>Unmute all / tap the tempo (three taps or more; INT clock)</td></tr>
+<tr><td><b>GLO</b> + KNOB 1 to 4</td><td>Level of track 1 to 4</td></tr>
+<tr><td><b>GLO</b> + PLAY</td><td>Restart from the top without stopping</td></tr>
+<tr><td><b>SCL</b> + any key</td><td>ROOT: that key's note name</td></tr>
+<tr><td><b>SCL</b> + KNOB 1 to 4</td><td>ROOT, SCALE, CHRD, VOIC</td></tr>
+<tr><td><b>GLO</b> / <b>SCL</b> + OCT&#8209;</td><td>Puts back what the layer changed since it opened</td></tr>
+<tr><td><b>GLO</b> or <b>SCL</b> tapped twice</td><td>Locks the layer open; press it again to close</td></tr>
+</table>
+</section>
+<section>
+<h2>Knob holds</h2>
+<table>
+<tr><td><b>ARP</b> + a knob</td><td>The help card for that knob; turn on: larger text, or scroll</td></tr>
+<tr><td><b>FX</b> + a knob</td><td>Mod shortcut: a cord from the track's LFO to that parameter, the turn sets its amount</td></tr>
+<tr><td><b>FX</b> + SELECT</td><td>The mod shortcut's source</td></tr>
+<tr><td><b>LFO</b> + a knob</td><td>A momentary change: back as it was when LFO is let go</td></tr>
+<tr><td><b>LFO</b> + a knob, then <b>OCT+</b></td><td>Keeps the change ("KEPT")</td></tr>
+<tr><td><b>OCT&#8209;</b> / <b>OCT+</b> on HOME</td><td>Octave down / up; both together: octave 0</td></tr>
+</table>
+</section>
+<section>
+<h2>Steps and notes (SEQ &gt; NOTES)</h2>
+<table>
+<tr><td>Keys</td><td>The cursor step (pressed together: a chord of up to 4); let go: the cursor moves on</td></tr>
+<tr><td>A key + SELECT</td><td>That note's length</td></tr>
+<tr><td><b>ENV</b> + SELECT or KNOB 1</td><td>The cursor's note longer / shorter</td></tr>
+<tr><td><b>SCL</b> + SELECT or KNOB 1</td><td>Moves the note (ties, chord and velocity with it)</td></tr>
+<tr><td><b>EDIT</b> tapped</td><td>Deletes the note and its ties</td></tr>
+<tr><td><b>OCT+</b></td><td>The note's sheet (length, velocity...)</td></tr>
+<tr><td><b>OCT+</b> + SELECT, KNOB 1 or 2</td><td>Selects a run of notes; let go: the Selected notes sheet (move, copy, quantize, delete)</td></tr>
+<tr><td><b>OCT&#8209;</b></td><td>Clears the selection</td></tr>
+<tr><td><b>PRESETS</b></td><td>Zooms the notes</td></tr>
+</table>
+</section>
+<section>
+<h2>The drum grid (NOTES on a DRUM track)</h2>
+<table>
+<tr><td>White keys</td><td>The selected lane's hit on that step, on or off</td></tr>
+<tr><td>Black keys F#3 to A#4</td><td>Pick lane 1 to 8</td></tr>
+<tr><td>C#5 + white key</td><td>The hit's accent</td></tr>
+<tr><td>D#5 / F#5</td><td>Page down / up (patterns over 16 steps)</td></tr>
+<tr><td>KNOB 1 to 4</td><td>STEP, LANE, HIT, ACC</td></tr>
+<tr><td><b>EDIT</b></td><td>Clears the cursor step</td></tr>
+<tr><td><b>OCT+</b></td><td>The hit's sheet (accent, chance...)</td></tr>
+</table>
+</section>
+<section>
+<h2>Patterns</h2>
+<table>
+<tr><td><b>SEQ</b> + white keys F3 to F4</td><td>Pattern 1 to 8 (playing: from the next bar)</td></tr>
+<tr><td><b>SEQ</b> + a pattern key held + another</td><td>Copies the first pattern onto the second</td></tr>
+<tr><td><b>SEQ</b> + SELECT</td><td>The next / previous pattern</td></tr>
+<tr><td>PATTERNS: KNOB 1 to 4</td><td>Track 1 to 4's next pattern</td></tr>
+<tr><td>PATTERNS: <b>OCT&#8209;</b></td><td>Clears the queue (again: HOME)</td></tr>
+</table>
+</section>
+<section>
+<h2>Recording and transport</h2>
+<table>
+<tr><td><b>PLAY</b></td><td>Start / stop; on SONG: plays the song. Generators start from the top of their seed</td></tr>
+<tr><td><b>REC</b></td><td>Arms / disarms the track (playing: waits for the loop)</td></tr>
+<tr><td><b>REC</b> + PLAY</td><td>Records now</td></tr>
+<tr><td><b>REC</b> held</td><td>Generator track: prints its last bars into STEP. STEP EVOLVE: keeps the changes. STEP: captures what you played</td></tr>
+<tr><td><b>REC</b> held on SONG</td><td>Take jam: the patterns played since PLAY become the song</td></tr>
+<tr><td><b>EDIT</b> held, recording on NOTES</td><td>Erases as the steps pass</td></tr>
+<tr><td><b>EDIT</b> held</td><td>Undo (the last load, capture or print; on NOTES the last edit)</td></tr>
+<tr><td><b>EDIT</b> + OCT&#8209; / OCT+</td><td>Undo / redo</td></tr>
+</table>
+</section>
+<section>
+<h2>Saving and projects</h2>
+<table>
+<tr><td><b>SAVE</b> + REC</td><td>Saves the project to its slot (stops playback first)</td></tr>
+<tr><td><b>SAVE</b></td><td>USER, its Save sheet ready: OCT+ saves the sound</td></tr>
+<tr><td><b>EDIT</b> on USER or PROJECT</td><td>Renames the slot</td></tr>
+<tr><td><b>OCT+</b> on a PROJECT slot</td><td>Load, Save here, Rename, Boot, Erase</td></tr>
+</table>
+</section>
+<section>
+<h2>Generators</h2>
+<table>
+<tr><td>GEN: <b>KNOB 1</b></td><td>MODE: STEP, ARP or a generator</td></tr>
+<tr><td>GEN: <b>OCT+</b> held</td><td>The second layer of QUAD, CHORD, ATLAS and CONSTL</td></tr>
+<tr><td>ATLAS: <b>OCT+</b> + a black key</td><td>The fourth part's sound (TOM, CLAP, OPEN HAT, RIM, BELL)</td></tr>
+<tr><td>CHORD, PROG USER: <b>OCT+</b> + keys</td><td>One chord a key, its root the key's note</td></tr>
+<tr><td>AWAKE: a white key</td><td>Picks that step: KNOB 1 its A, KNOB 2 its B; the key again lets it go</td></tr>
+<tr><td>EVOLVE: <b>KNOB 4</b> (ROLL)</td><td>A new seed a click; turn back for the last one</td></tr>
+<tr><td>FORM: <b>KNOB 3</b> (CLEAR)</td><td>Forgets B and C</td></tr>
+<tr><td>MODS: <b>OCT+</b></td><td>The picked mod: BI / UNI</td></tr>
+<tr><td>MATRIX: <b>OCT+</b></td><td>Opens the picked mod in MODS</td></tr>
+</table>
+</section>
+<section>
+<h2>Power-on and update</h2>
+<table>
+<tr><td><b>OCT&#8209;</b> alone while switching on</td><td>The update loader (three key-light flashes), to reinstall from the web installer</td></tr>
+<tr><td><b>OCT&#8209;</b> + <b>OCT+</b> while switching on</td><td>HARDWARE CALIBRATION: teach each button and knob</td></tr>
+<tr><td><b>OCT&#8209;</b> + <b>OCT+</b> held 5 s</td><td>Update mode (UBOOT); a countdown from 2 s, let go to cancel</td></tr>
+</table>
+</section>
+</main>
+<footer>Tessera 2.0, generative firmware. GPL-3.0. The manual: MANUAL.md</footer>
+</body>
+</html>

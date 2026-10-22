@@ -9,8 +9,9 @@ pages around them evolve the phrases, build song forms, pass hits between tracks
 anything.
 
 This manual covers what Tessera adds and changes. The step sequencer, the effects and the song pages work as in
-upstream Melodee. For recipes and tips, see **[RECIPES.md](RECIPES.md)**. Every setting, with its range and
-default, is listed in [docs/PARAMETERS.md](docs/PARAMETERS.md).
+upstream Melodee. For recipes and tips, see **[RECIPES.md](RECIPES.md)**; every button and combination on one
+sheet, **[CHEATSHEET.md](CHEATSHEET.md)** (and [a printable PDF](docs/cheatsheet/tessera-cheatsheet.pdf)). Every
+setting, with its range and default, is listed in [docs/PARAMETERS.md](docs/PARAMETERS.md).
 
 Page and knob names are the ones on the screen. KNOB 1 to KNOB 4 are the four knobs from left to right, and each
 page's four settings sit along the top of the screen in the same order.
@@ -52,13 +53,13 @@ page's four settings sit along the top of the screen in the same order.
 | **SCL** | SCALES, SCL, CHORD | |
 | **EDIT** | The sound's EDIT pages; on an EDIT page, the map | With OCT- / OCT+: undo / redo |
 | **FX** | The insert and send effects | The mod amount of any knob you turn |
-| **GLO** | GLOBAL, SYSTEM, MIXER | |
-| **SAVE** | PRESETS, USER, PROJECT | With REC: save the project to its slot |
+| **GLO** | MIXER, GLOBAL, SYSTEM | |
+| **SAVE** | USER (ready to save the sound), PROJECT, PRESETS | With REC: save the project to its slot |
 | **REC** | Record | Capture or print the last bars (see [Print and keep](#print-and-keep)) |
 | **OCT+** | Octave up; on some pages, an action (shown on screen) | A page's extra layer (see [OCT+ layers](#oct-layers-on-gen)) |
 
-On the home page each track's tile shows its sound and engine. **SELECT** picks the track (or the left knob, with
-MENU > TRACK KNOB set to LEFT). The four sounds a new project starts with are an ambient set: **GLASS PAD**,
+On the home page each track's tile shows its sound and engine. **ALGORITHM** picks the track on every page (or
+the left knob, with MENU > TRACK KNOB set to LEFT), and **SELECT** turns the pages of the section shown. The four sounds a new project starts with are an ambient set: **GLASS PAD**,
 **STRINGS** and **BELLS** on FM6, and the **808 KIT** on DRUM. A new project has no mods, so nothing moves until
 you patch it.
 
