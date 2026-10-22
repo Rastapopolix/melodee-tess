@@ -865,14 +865,23 @@ static void draw_columns(void)
                     T_DIM, -1, ICON_NONE);
         return;
     }
-    if (cur_page()->graph == GR_TIMING) {                /* SUB (seq_sub.c): RATCH, its CHANCE (dim at x1) */
+    if (cur_page()->graph == GR_TIMING) {                /* SUB (seq_sub.c): RATCH, its CHANCE (dim at x1), SHAPE */
         uint32_t tr = song.sel % TESSERA_TRACKS, r = tessera.sub_ratch[tr], ch = tessera.sub_chance[tr];
+        uint32_t sh = tessera.sub_shape[tr] % 3u, step_trk = tessera.mode[tr] == TESS_ENG_OFF;
+        static const char *const SHAPE[3] = {"EVEN", "ACCEL", "DECEL"};
         static const char *const RATCH[8] = {"x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"};
         char w1[8];
         fmt_int(w1, ch);
+        if (step_trk) {                                   /* (a STEP track: RATCH a step's, in its sheet) */
+            draw_column(0, "RATCH", "STEP", "", T_DIM, -1, ICON_NONE);
+            draw_column(1, "", "", "", T_DIM, -1, ICON_NONE);
+            draw_column(2, "SHAPE", SHAPE[sh], "", VAL(2u), (int32_t)sh * 500, ICON_AUTO);
+            draw_column(3, "", "", "", T_DIM, -1, ICON_NONE);
+            return;
+        }
         draw_column(0, "RATCH", RATCH[r & 7u], "", VAL(0u), (int32_t)(r & 7u) * 1000 / 7, ICON_AUTO);
         draw_column(1, "CHANCE", w1, "%", r ? VAL(1u) : T_DIM, (int32_t)ch * 10, ICON_AUTO);
-        draw_column(2, "", "", "", T_DIM, -1, ICON_NONE);
+        draw_column(2, "SHAPE", SHAPE[sh], "", r ? VAL(2u) : T_DIM, (int32_t)sh * 500, ICON_AUTO);
         draw_column(3, "", "", "", T_DIM, -1, ICON_NONE);
         return;
     }

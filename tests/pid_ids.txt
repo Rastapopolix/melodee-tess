@@ -216,3 +216,4 @@
 0x25f ANSWER SHIFT             track 0..7 def 2
 0x260 ANSWER SPACE             track 0..100 def 25
 0x261 ANSWER LEN               track 0..2 def 1
+0x262 TIMING SHAPE             track 0..2 def 0

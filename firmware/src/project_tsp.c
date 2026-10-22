@@ -15,7 +15,7 @@
 #define TSP_HEAD 12u
 #define TSP_STEP_BYTES 10u                      /* step v2: 80 bits */
 enum { TSP_META = 1, TSP_TRACKS, TSP_STEPS, TSP_TIMING, TSP_SONG, TSP_MOTION, TSP_FM6, TSP_DRUM, TSP_REC, TSP_NAME,
-       TSP_TESSERA, TSP_CORDS, TSP_PARTS };
+       TSP_TESSERA, TSP_CORDS, TSP_SUB, TSP_PARTS };   /* (TSP_SUB: each track's SHAPE; none: EVEN) */
 #if MELODEE_FLASH
 _Static_assert(TSP_MAX <= ST_PROJ_MAX, "a record fits one project copy");
 #endif
@@ -248,6 +248,9 @@ static uint32_t tsp_pack(uint8_t *raw, const project_t *q, int runtime)
             tsp_bytes(&w, c, sizeof c);
         }
         tsp_end(&w);
+        tsp_begin(&w, TSP_SUB, 1);                     /* (SUB: each track's SHAPE, outside the Tessera block) */
+        tsp_bytes(&w, tessera.sub_shape, NTRK);
+        tsp_end(&w);
     }
     motion_unguard(f);
     if (!w.ok) return 0;
@@ -390,6 +393,10 @@ static int tsp_valid(const uint8_t *raw, uint32_t len)
         if (tsp_seen.ver[TSP_TESSERA] != 1u || tsp_seen.len[TSP_TESSERA] < 1u ||
             tsp_seen.len[TSP_TESSERA] != 1u + tessera_pk_bytes(p[0]) || !tessera_check(p[0], p + 1)) return 0;
     }
+    if (tsp_seen.at[TSP_SUB]) {
+        if (tsp_seen.ver[TSP_SUB] != 1u || tsp_seen.len[TSP_SUB] != NTRK) return 0;
+        for (uint32_t k = 0; k < NTRK; k++) if (raw[tsp_seen.at[TSP_SUB] + k] >= SUB_SHAPES) return 0;
+    }
     if (tsp_seen.at[TSP_CORDS]) {
         if (tsp_seen.ver[TSP_CORDS] != 1u || tsp_seen.len[TSP_CORDS] != CORD_PK_BYTES ||
             !cord_check(raw + tsp_seen.at[TSP_CORDS])) return 0;
@@ -424,6 +431,7 @@ static void tsp_restore(const uint8_t *raw)
     tessera_reset();                                   /* (generators OFF, no cords: a record without them) */
     if (tsp_seen.at[TSP_TESSERA]) tessera_unpack_ver(raw[tsp_seen.at[TSP_TESSERA]], raw + tsp_seen.at[TSP_TESSERA] + 1u);
     if (tsp_seen.at[TSP_CORDS]) (void)cord_unpack(raw + tsp_seen.at[TSP_CORDS]);
+    if (tsp_seen.at[TSP_SUB]) memcpy(tessera.sub_shape, raw + tsp_seen.at[TSP_SUB], NTRK);
 }
 
 /* a record's length as its header gives it (0: not a TSP1 record or one longer than TSP_MAX) */

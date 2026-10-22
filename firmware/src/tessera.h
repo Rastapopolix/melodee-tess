@@ -162,6 +162,8 @@ typedef struct {
     /* SUB (the TIMING page; seq.c seq_sub.c): a generator's notes again within their step */
     uint8_t          sub_ratch[TESSERA_TRACKS];  /* 0..7: RATCH x1..x8, the hits a step (0 x1: as before) */
     uint8_t          sub_chance[TESSERA_TRACKS]; /* 0..100: the chance a step ratchets (100: every step) */
+    uint8_t          sub_shape[TESSERA_TRACKS];  /* SUB_EVEN / ACCEL / DECEL: where a ratchet's hits fall, any track's
+                                                  * (STEP ones too); not in the packed block: the record's SUB part */
     /* CHORD's BREATH (HIT HOLD): its voices on slow cycles of their own, one now and then sitting out */
     uint8_t          ch_breath[TESSERA_TRACKS];  /* 0..100: 0 off (as before) */
     /* ENERGY (energy.c; the ENERGY page), the project's, not a track's: its slow tide and its rests */
@@ -289,6 +291,7 @@ enum {
     TX_CH_BREATH,
     TX_EN_ARC, TX_EN_RESTS,                         /* (the project's: one value, whichever track) */
     TX_AN_VARY, TX_AN_ECHO, TX_AN_FADE, TX_AN_ORDER, TX_AN_SHIFT, TX_AN_SPACE, TX_AN_LEN,
+    TX_SUB_SHAPE,                                   /* (0x262: SUB's SHAPE, any track's) */
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
