@@ -1058,6 +1058,8 @@ static void seq_grid_tick(track_t *t, uint32_t n)
     }
     t->seq_pos += n;
     seq_sub_tick(t, step_samples(t, period, t->seq_idx));   /* (SUB: this step's repeats due, before the next step) */
+    if (trk_index(t) >= TESSERA_TRACKS || tessera.mode[trk_index(t)] == TESS_ENG_OFF)
+        seq_nudge_tick(t, period, step_samples(t, period, t->seq_idx), len);   /* (NUDGE: a held step, the next early) */
     for (;;) {
         uint32_t cur_len = step_samples(t, period, t->seq_idx);
         if (t->seq_pos < cur_len && t->seq_pos != 0x7FFFFFFFu + n)
@@ -1108,15 +1110,14 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             if (tr_idx < TESSERA_TRACKS && tessera.mode[tr_idx] != TESS_ENG_OFF) {
                 seq_sub_begin(t);                   /* (SUB: the notes it plays recorded, its RATCH armed) */
                 tessera_clock_step(t);
-                seq_sub_arm(t, seq_sub_can(t) ? tessera_ratchet(tr_idx) : 1u, step_samples(t, period, t->seq_idx));
+                seq_sub_arm(t, seq_sub_can(t) ? tessera_ratchet(tr_idx) : 1u, step_samples(t, period, t->seq_idx), 0);
             } else {
-                step_t sv;                          /* (STEP EVOLVE: the step with its change, tessera.c) */
-                uint32_t hits;
-                s = tessera_step_vary(t, s, &sv);
-                hits = step_ratch(s);
-                if (hits > 1u) seq_sub_begin(t);    /* (SUB: the step's RATCH, x2..x8: its notes repeated) */
-                seq_step(t, s, step_gate(s) ? step_samples(t, period, t->seq_idx) : period, skip);
-                if (hits > 1u) seq_sub_arm(t, seq_sub_can(t) ? hits : 1u, step_samples(t, period, t->seq_idx));
+                step_t sv;                          /* (STEP EVOLVE: the step with its change, tessera.c; not again for a
+                                                     * step NUDGE played early) */
+                uint32_t span = step_samples(t, period, t->seq_idx);
+                if (!(seq_nudge_early & (1u << tr_idx)))
+                    s = tessera_step_vary(t, s, &sv);
+                seq_nudge_step(t, s, step_gate(s) ? span : period, span, skip);   /* (SUB: its NUDGE, RATCH) */
                 if (tr_idx < TESSERA_TRACKS)
                     tessera.hit[tr_idx] = t->seq_n != 0;   /* (TWEAK 2's LOGIC on another track reads it) */
             }

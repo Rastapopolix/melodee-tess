@@ -1016,9 +1016,36 @@ static uint32_t sub_step_play(uint32_t ratch, uint32_t hit, uint32_t *gap, uint3
     *held = nl_gates(0);
     return n;
 }
+/* a STEP track's note on step 4 only (1/16, 120 BPM: a step 172 blocks, step 4's line at 689), its NUDGE nudge and
+ * RATCH ratch: the blocks its voices started at in the first bar, into at[] (up to 4); returns how many */
+static uint32_t sub_nudge_play(int32_t nudge, uint32_t ratch, uint32_t *at)
+{
+    uint32_t f, bar, n = 0, a0;
+    int32_t o[2 * CTL];
+    const uint8_t note = 60;
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    trk[0].p[P_SDIV] = 2;
+    put_step(&trk[0], 4, 1, &note, ST_NOTE, 0);
+    step_set_nudge(&trk[0].step[4], nudge);
+    step_set_ratch(&trk[0].step[4], ratch);
+    bar = 4u * seq_beat_samples() / CTL;
+    transport_req = 1;
+    a0 = vage;
+    for (f = 0; f < bar; f++) {
+        mix_block(o, CTL);
+        if (started_since(&trk[0], a0) && n < 4u) at[n++] = f;
+        a0 = vage;
+    }
+    transport_req = 2;
+    for (f = 0; f < 4u; f++) mix_block(o, CTL);
+    return n;
+}
 /* "1": RATCH x1..x4 and x8 play 8 16 24 32 and 64 notes in two bars, its hits 172 / hits blocks apart; CHANCE 0 none
  * ratchet, 50 some, the same ones again; NOTE LENGTH FIXED's held notes play once; Grids' parts all repeat; nothing held
- * after STOP. A STEP track's per-step RATCH: x4 and x8 repeat each of its 8 notes 3 and 7 times, a drum hit's too */
+ * after STOP. A STEP track's per-step RATCH: x4 and x8 repeat each of its 8 notes 3 and 7 times, a drum hit's too; its
+ * NUDGE moves a step 4/16 late or early, a ratchet with it */
 static int sub_near(uint32_t got, uint32_t want) { return got + 2u >= want && got <= want + 2u; }
 static void sub_check(char *res, size_t cap)
 {
@@ -1041,6 +1068,17 @@ static void sub_check(char *res, size_t cap)
     m = sub_step_play(8, 1u << 2, &gap, &held);         /* (a lane's hit, no note) */
     printf("sub: STEP track x8 %u repeats, a drum hit's %u (%u blocks apart)\n", (unsigned)n, (unsigned)m, (unsigned)gap);
     ok &= n == 56u && m == 56u && sub_near(gap, 21) && !held;
+    {   /* NUDGE: 4/16 of a step (43 blocks) late or early; with x2, the repeat half of what is left of the step on */
+        uint32_t at[4], k;
+        static const int32_t NG[5] = {0, 4, -4, 4, -4};
+        static const uint32_t RT[5] = {1, 1, 1, 2, 2}, WANT[5][2] = {{689, 0}, {732, 0}, {646, 0}, {732, 797}, {646, 732}};
+        for (k = 0; k < 5u; k++) {
+            n = sub_nudge_play(NG[k], RT[k], at);
+            printf("sub: NUDGE %+d x%u: %u start(s), at %u %u\n", (int)NG[k], (unsigned)RT[k], (unsigned)n, (unsigned)at[0],
+                   n > 1u ? (unsigned)at[1] : 0u);
+            ok &= n == RT[k] && sub_near(at[0], WANT[k][0]) && (n < 2u || sub_near(at[1], WANT[k][1]));
+        }
+    }
     n = sub_play(TESS_ENG_EUCLID, 3, 0, NL_STEP, &gap, &held);
     ok &= n == 8u && !held;
     n = sub_play(TESS_ENG_EUCLID, 3, 50, NL_STEP, &gap, &held);
@@ -2570,7 +2608,7 @@ int main(int argc, char **argv)
             waitpid(pid, 0, 0);
         }
         bad += check("SUB: RATCH x1..x8 in equal parts of the step, CHANCE tossed on the SEED, NOTE LENGTH's held notes "
-                     "once, Grids' parts repeated, STEP tracks' per-step RATCH; STOP releases", ok);
+                     "once, Grids' parts repeated, STEP tracks' per-step RATCH and NUDGE; STOP releases", ok);
     }
     {   /* BREATH (CHORD) */
         unsigned ok = 0;

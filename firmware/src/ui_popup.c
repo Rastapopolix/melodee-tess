@@ -190,6 +190,23 @@ static void nt_ratch(int32_t s)
     step_set_ratch(st, (uint32_t)clamp((int32_t)step_ratch(st) + (s > 0 ? 1 : -1), 1, 8));
     fm1_irq_on();
 }
+static void nt_nudge_v(char *b)                        /* the step's NUDGE: "+3/16" of a step, "0" on its line */
+{
+    int32_t v = step_nudge(st_at());
+    if (!v) { str_cpy(b, "0", 4); return; }
+    b[0] = v > 0 ? '+' : '-';
+    fmt_int(b + 1, v > 0 ? v : -v);
+    str_cpy(b + str_len(b), "/16", 4);
+}
+static void nt_nudge(int32_t s)
+{
+    step_t *st = st_at();
+    if (!st_free())
+        return;
+    fm1_irq_off();
+    step_set_nudge(st, clamp(step_nudge(st) + (s > 0 ? 1 : -1), -8, 7));
+    fm1_irq_on();
+}
 static void nt_slide_v(char *b) { str_cpy(b, st_at()->flags & SF_SLIDE ? "On" : "Off", 8); }
 static void nt_slide(void)
 {
@@ -206,7 +223,8 @@ static void nt_delete(void)
 }
 static void nt_copy(void) { if(st_free())note_copy_arm(); }
 static const sheet_row_t SHEET_NOTE[] = {{"Length", nt_len_v, nt_len, 0, 0}, {"Velocity", nt_vel_v, nt_vel, 0, 0},
-    {"Chance", nt_chance_v, nt_chance, 0, 0}, {"Ratchet", nt_ratch_v, nt_ratch, 0, 0}, {"Slide", nt_slide_v, 0, nt_slide, 0},
+    {"Chance", nt_chance_v, nt_chance, 0, 0}, {"Ratchet", nt_ratch_v, nt_ratch, 0, 0}, {"Nudge", nt_nudge_v, nt_nudge, 0, 0},
+    {"Slide", nt_slide_v, 0, nt_slide, 0},
     {"Move note",0,0,note_move_arm,0}, {"Copy note",0,0,nt_copy,0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
 static const sheet_row_t SHEET_REC_NOTE[] = {{"Length", nt_len_v, nt_len, 0, 0}, {"Velocity", nt_vel_v, nt_vel, 0, 0},
     {"Move note",0,0,note_move_arm,0}, {"Copy note",0,0,nt_copy,0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
@@ -215,7 +233,7 @@ static void ht_acc_v(char *b) { str_cpy(b, ht_acc_on() ? "On" : "Off", 8); }
 static void ht_acc(void) { edit_param(3u, ht_acc_on() ? -1 : 1); }
 static void ht_clear(void) { edit_param(2u, -1); }
 static const sheet_row_t SHEET_HIT[] = {{"Accent", ht_acc_v, 0, ht_acc, 0}, {"Chance", nt_chance_v, nt_chance, 0, 0},
-    {"Ratchet", nt_ratch_v, nt_ratch, 0, 0}, {"Clear hit", 0, 0, ht_clear, SR_RED}};
+    {"Ratchet", nt_ratch_v, nt_ratch, 0, 0}, {"Nudge", nt_nudge_v, nt_nudge, 0, 0}, {"Clear hit", 0, 0, ht_clear, SR_RED}};
 
 /* OCT+ on NOTES / the drum grid: an empty place gets a note (the last one played) / the lane's hit; on a note or a
  * hit: its sheet. 0: not such a page */
