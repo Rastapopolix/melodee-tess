@@ -38,6 +38,7 @@ typedef struct {
     char name[11];
 } fm6_rom_t;
 #include "eng_fm6_rom.h"         /* FM6_ROM[FM6_NROM]: F9.. */
+#include "eng_fm6_zen.h"         /* FM6_ZEN[FM6_NZEN]: ZEN-1's and FuMi-1's, the presets after INIT VOICE */
 
 #define ENGI_FM6 12u             /* engines.c ENGINES[] (append-only) */
 #define FM6_NFAC (FM6_NFACTORY + FM6_NROM)        /* F1..F24: the factory patches */
@@ -227,9 +228,12 @@ static void fm6_track_loaded(const track_t *t)
     uint32_t tr = (uint32_t)(t - trk);
     if (tr < NTRK && t->eng_req == ENGI_FM6) {
         uint8_t pk[FM6_PACKED], v[FP_SIZE + 1u];
+        uint32_t z = t->preset - FM6_NFAC - 1u;              /* ZEN-1's: after INIT VOICE */
         if (t->preset < FM6_NFAC)
             fm6_factory(t->preset, pk);
-        fm6_unpack(t->preset < FM6_NFAC ? pk : FM6_INIT, v);   /* (past F24: INIT VOICE) */
+        else if (MELODEE_FM6 && z < FM6_NZEN)
+            memcpy(pk, FM6_ZEN[z], FM6_PACKED);
+        fm6_unpack(t->preset < FM6_NFAC || z < FM6_NZEN ? pk : FM6_INIT, v);   /* (F25: INIT VOICE) */
         fm6_put_patch(tr, v, 1);
     }
 }
@@ -1111,10 +1115,26 @@ static const preset_t FM6_PRESETS[] = {
     FM6_PR("TUBULAR", 0),
     FM6_PR("INIT VOICE", 0),          /* the DX7's init voice, dry (after F24: the stores keep the
                                                          * factory's numbers) */
+    /* ZEN-1's and FuMi-1's (eng_fm6_zen.h, Tessera 2026-10-22): after INIT VOICE, so the numbers above stay */
+    FM6_PR("SOFT PAD", 0),
+    FM6_PR("SOFT SWELL", 0),
+    FM6_PR("DEEP PAD", 0),
+    FM6_PR("DROP", 0),
+    FM6_PR("MALLET", 0),
+    FM6_PR("ZEN BELL", 0),
+    FM6_PR("RIN", 0),
+    FM6_PR("BAMBOO", 0),
+    FM6_PR("FURIN", 0),
+    FM6_PR("HYOSHIGI", 0),
+    FM6_PR("MOKUGYO", 0),
+    FM6_PR("KOTO PLUCK", 0),
+    FM6_PR("KOTO RING", 0),
+    FM6_PR("KOTO WARM", 0),
+    FM6_PR("KUGO HARP", 0),
 };
 #undef FM6_PR
 _Static_assert(FM6_NROM == 16u, "FM6: the presets name F9..F24");
-_Static_assert(NELEM(FM6_PRESETS) == FM6_NFAC + 1u, "FM6: F1..F24, then INIT VOICE");
+_Static_assert(NELEM(FM6_PRESETS) == FM6_NFAC + 1u + FM6_NZEN, "FM6: F1..F24, INIT VOICE, then ZEN-1's");
 
 static const engine_t ENG_FM6 = {
     .name = "FM6",
