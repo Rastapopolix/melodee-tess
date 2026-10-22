@@ -239,6 +239,8 @@ static uint32_t tess_loop_len(uint32_t tr)
     if (tessera.mode[tr] == TESS_ENG_TURING) n = tessera.turing[tr].len ? tessera.turing[tr].len : 16u;
     else if (tessera.mode[tr] == TESS_ENG_EUCLID) n = tessera.euclid[tr].steps ? tessera.euclid[tr].steps : 16u;
     else if (tessera.mode[tr] == TESS_ENG_GRIDS) n = gen_grids_steps(tess_steps_per_bar(&trk[tr]));
+    else if (tessera.mode[tr] == TESS_ENG_MARKOV || tessera.mode[tr] == TESS_ENG_MORPH)   /* no length of their own: */
+        n = trk[tr].p[P_SLEN] > 0 ? (uint32_t)trk[tr].p[P_SLEN] : 16u;                     /* PATTERN's LEN (issue #3) */
     return n > 32u ? 32u : n;
 }
 
