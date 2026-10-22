@@ -123,8 +123,9 @@ Tap **SEQ** for **GEN**, where **KNOB 1, MODE** picks what the selected track pl
 
 - **STEP**: the step sequencer.
 - **ARP**: the arpeggiator over the keys held (the ARP button gets here too).
-- One of thirteen generators: **TURING**, **EUCLID**, **MARKOV**, **MORPH**, **ATLAS**, **BOUNCE**, **AWAKE**,
-  **POLY**, **QUAD**, **CONSTL** (Constellation), **SERIES**, **CHORD** or **ANSWER**.
+- One of thirteen generators, in the knob's order: **CHORD** first, then **TURING**, **EUCLID**, **MARKOV**,
+  **MORPH**, **ATLAS**, **BOUNCE**, **AWAKE**, **POLY**, **QUAD**, **CONSTL** (Constellation), **SERIES** and
+  **ANSWER**.
 
 SEQ then shows only that mode's pages:
 

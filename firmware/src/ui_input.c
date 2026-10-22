@@ -967,7 +967,7 @@ static void edit_param(uint32_t slot, int32_t steps)
         }
         if (sel_tr < TESSERA_TRACKS) {
             if (slot == 0u && !(tessera.mode[sel_tr] == TESS_ENG_AWAKE && tessera_awake(sel_tr)->edit)) {
-                seqm_set(sel_tr, (int32_t)seqm_get(sel_tr) + steps);   /* MODE: STEP ARP and the generators (ui.c) */
+                seqm_step(sel_tr, steps);                      /* MODE: STEP ARP and the generators (ui.c) */
                 ui.force = 1;
                 return;
             }

@@ -310,13 +310,13 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     G_(G_BUDGET, PID_F_DEVICE, "VOICE BUDGET",
        "How much sound work the FM-1 shares out between the tracks; lower leaves more headroom, higher allows more voices."),
     X_(TX_MODE, "GENERATOR MODE", "SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the "
-                                  "keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; "
+                                  "keys held, as an arpeggio (the ARP button opens it too); CHORD plays a progression's chords in the track's scale "
+                                  "(QNT CHRD: the other tracks follow them); TURING, EUCLID, MARKOV and MORPH make its notes; "
                                   "ATLAS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball "
                                   "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
                                   "QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) "
                                   "plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity "
-                                  "series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the "
-                                  "other tracks follow them)."),
+                                  "series; ANSWER answers what you play on its keys."),
     X_(TX_TUR_LEN, "TURING LENGTH", "How many steps the register loops over before it comes round again."),
     X_(TX_TUR_PROB, "TURING PROB",
        "The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass."),
