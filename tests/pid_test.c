@@ -82,14 +82,14 @@ static int reference(FILE *f)
             "1 while the track's generator plays a note", "the generator's last note (C4 = 0)",
             "the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the "
             "degree it moved to", "a slow wander of the track's own, a new point every 12 s or so, eased between",
-            "SLOTH's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50)",
-            "SLOTH's fastest chaotic circuit, about 1 min a turn", "SLOTH's middle chaotic circuit, about 3 min a turn",
+            "TIDE's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50)",
+            "TIDE's fastest chaotic circuit, about 1 min a turn", "TIDE's middle chaotic circuit, about 3 min a turn",
             "a free LFO, 64 s a turn (ORGANIC page, RATE 50)", "a free LFO, 40 s a turn", "a free LFO, 25 s a turn",
             "a free LFO, 15.6 s a turn", "a free LFO, 9.8 s a turn", "a free LFO, 6.1 s a turn", "a free LFO, 3.8 s a turn",
             "a free LFO, 2.4 s a turn"};
         fprintf(f, "\n## Mods\n\nA mod (the MODS page, under LFO) moves a destination on any track by a source on any "
                    "track: by its AMOUNT (-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) "
-                   "plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, SLOTH, OCHD) swings both ways "
+                   "plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, TIDE, SWARM) swings both ways "
                    "from the knob; OCT+ on MODS makes a mod UNI, the source folded to 0 to 1, so it moves one way only, as ENV "
                    "does. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track "
                    "follow each note, as a chord's; elsewhere the latest note. Room for %u, %u in use. They are the project's, saved with it. Melodee's MOD page is "

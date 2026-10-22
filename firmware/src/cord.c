@@ -55,9 +55,9 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_TW_HUMAN] = S_(CD_TW_HUMAN, TX_TW_HUMAN, "HUMAN", "TWEAK's HUMAN: velocity and gate variation"),
     [CD_EV_AMOUNT] = S_(CD_EV_AMOUNT, TX_EV_AMOUNT, "EV AMT", "EVOLVE's AMOUNT: how much each mutation changes"),
     [CD_FM_CONTRAST] = S_(CD_FM_CONTRAST, TX_FM_CONTRAST, "CONTR", "FORM's CONTRAST: how different a new section is"),
-    [CD_GRD_X] = S_(CD_GRD_X, TX_GRD_X, "G X", "Grids' X: across its map of drum patterns"),
-    [CD_GRD_Y] = S_(CD_GRD_Y, TX_GRD_Y, "G Y", "Grids' Y: down its map of drum patterns"),
-    [CD_GRD_DENS] = S_(CD_GRD_DENS, TX_GRD_DENS, "G DENS", "Grids' density: how full its parts are"),
+    [CD_GRD_X] = S_(CD_GRD_X, TX_GRD_X, "AT X", "Atlas' X: across its map of drum patterns"),
+    [CD_GRD_Y] = S_(CD_GRD_Y, TX_GRD_Y, "AT Y", "Atlas' Y: down its map of drum patterns"),
+    [CD_GRD_DENS] = S_(CD_GRD_DENS, TX_GRD_DENS, "AT DENS", "Atlas' density: how full its parts are"),
     [CD_BNC_SPEED] = S_(CD_BNC_SPEED, TX_BNC_SPEED, "B SPEED", "Bounce's speed: how far the balls move a step"),
     [CD_BNC_ANGLE] = S_(CD_BNC_ANGLE, TX_BNC_ANGLE, "B ANGLE", "Bounce's angle: the balls' paths (FALL: the wind)"),
     [CD_AWK_PROB] = S_(CD_AWK_PROB, TX_AWK_PROB, "A PROB", "Awake's PROB: the chance a note plays"),
@@ -69,10 +69,10 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_SR_START] = S_(CD_SR_START, TX_SR_START, "S START", "Series' START: where in the infinity series it plays"),
     [CD_CS_AUTO] = S_(CD_CS_AUTO, TX_CS_AUTO, "C AUTO", "Constellation's AUTO: who steers the ship (OFF, a wander, SEEK)"),
     [CD_CH_PROG] = S_(CD_CH_PROG, TX_CH_PROG, "CH PROG", "Chord's PROG: which progression its chords follow"),
-    [CD_GRD_KICK] = S_(CD_GRD_KICK, TX_GRD_KICK, "G KICK", "Grids' KICK: how much of its density the kick gets"),
-    [CD_GRD_SNR] = S_(CD_GRD_SNR, TX_GRD_SNR, "G SNR", "Grids' SNR: how much of its density the snare gets"),
-    [CD_GRD_HAT] = S_(CD_GRD_HAT, TX_GRD_HAT, "G HAT", "Grids' HAT: how much of its density the hat gets"),
-    [CD_GRD_TOMS] = S_(CD_GRD_TOMS, TX_GRD_TOMS, "G TOMS", "Grids' TOMS: how many of the near misses play the tom"),
+    [CD_GRD_KICK] = S_(CD_GRD_KICK, TX_GRD_KICK, "AT KICK", "Atlas' KICK: how much of its density the kick gets"),
+    [CD_GRD_SNR] = S_(CD_GRD_SNR, TX_GRD_SNR, "AT SNR", "Atlas' SNR: how much of its density the snare gets"),
+    [CD_GRD_HAT] = S_(CD_GRD_HAT, TX_GRD_HAT, "AT HAT", "Atlas' HAT: how much of its density the hat gets"),
+    [CD_GRD_TOMS] = S_(CD_GRD_TOMS, TX_GRD_TOMS, "AT TOMS", "Atlas' TOMS: how many of the near misses play the tom"),
 };
 #undef V_
 #undef B_
@@ -86,9 +86,9 @@ const cord_dest_t *cord_dest(uint32_t code)
 /* ------------------------------------------------------------ sources --- */
 _Static_assert(CS_LFO == MS_LFO && CS_SLEW == MS_SLEW && CS_EXPR == MS_EXPR, "CS_LFO .. CS_SLEW == mod.c's MS_*");
 static const char *const CORD_SRC_NAME[CS_N] = {"--", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H",
-                                                "SLEW", "GATE", "NOTE", "CV", "DRIFT", "TORPOR", "APATHY",
-                                                "INERTIA", "OCHD 1", "OCHD 2", "OCHD 3", "OCHD 4", "OCHD 5", "OCHD 6",
-                                                "OCHD 7", "OCHD 8"};
+                                                "SLEW", "GATE", "NOTE", "CV", "DRIFT", "TIDE 1", "TIDE 3",
+                                                "TIDE 2", "SWARM 1", "SWARM 2", "SWARM 3", "SWARM 4", "SWARM 5", "SWARM 6",
+                                                "SWARM 7", "SWARM 8"};   /* (TIDE by speed: CS_TORPOR 1, CS_INERTIA 2, CS_APATHY 3) */
 const char *cord_src_name(uint32_t code) { return code < CS_N ? CORD_SRC_NAME[code] : 0; }
 
 /* DRIFT: each track's slow wander, -1..1: a point every 2^14 audio blocks (11.9 s), the way between them eased

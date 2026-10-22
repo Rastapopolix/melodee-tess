@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, GRIDS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CHORD | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; GRIDS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the other tracks follow them). |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, ATLAS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CHORD | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; ATLAS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the other tracks follow them). |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -152,7 +152,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x20A | MORPH POSITION | 0 to 127 | 64 | Blends rhythm A (0) into rhythm B (full). |
 | 0x20B | MORPH RHYTHM A | 0 to 7 | 0 | Rhythm A: one of eight preset patterns. |
 | 0x20C | MORPH RHYTHM B | 0 to 7 | 2 | Rhythm B: one of eight preset patterns. |
-| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a step plays its loop instead of the sky; Euclid, Bounce, Awake, Poly and Quad have none. |
+| 0x20D | EVOLVE LOCK | 0 to 100 % | 0 | How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every time. Turing's is its PROB turned round, Atlas' its CHAOS; Constellation's the chance a step plays its loop instead of the sky; Euclid, Bounce, Awake, Poly and Quad have none. |
 | 0x20E | EVOLVE EVERY | OFF, 1, 2, 4, 8, 16 | OFF | Bars between mutations; OFF keeps the phrase as it is. |
 | 0x20F | EVOLVE AMOUNT | 0 to 100 % | 30 | How much changes at each mutation. |
 | 0x210 | EVOLVE ROLL | 1 to 128 | 1 | The track's seed, 1 to 128: each one a line of its own, the same every time. Playing, a new one starts on the next bar line. |
@@ -163,9 +163,9 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x215 | TWEAK DROP | 0 to 100 % | 0 | The chance a hit is left out, whatever the generator. |
 | 0x216 | TWEAK HUMAN | 0 to 100 % | 0 | Varies velocity and gate a little, as a player would. |
 | 0x217 | TWEAK FOLLOW | OFF, T1, T2, T3, T4 | OFF | Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own. |
-| 0x218 | GRIDS X | 0 to 255 | 128 | Where on the map of drum patterns, left to right; between two, a blend of both. |
-| 0x219 | GRIDS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |
-| 0x21A | GRIDS DENSITY | 0 to 100 % | 50 | How full the kick, snare, hat and toms are: 0 silent, 100 every hit the map offers. Hold OCT+ on GEN for each part's own: KICK, SNR, HAT and TOMS. |
+| 0x218 | ATLAS X | 0 to 255 | 128 | Where on the map of drum patterns, left to right; between two, a blend of both. |
+| 0x219 | ATLAS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |
+| 0x21A | ATLAS DENSITY | 0 to 100 % | 50 | How full the kick, snare, hat and toms are: 0 silent, 100 every hit the map offers. Hold OCT+ on GEN for each part's own: KICK, SNR, HAT and TOMS. |
 | 0x21B | BOUNCE SPEED | 1 to 64 | 24 | How far the ball travels each step: faster, more wall hits, more notes. In FALL, how fast the leaves fall. |
 | 0x21C | BOUNCE ANGLE | 0 to 90 | 37 | The ball's path from the floor, in degrees: 0 and 90 go back and forth, an angle between draws a longer loop. EVOLVE nudges it. In FALL it is the WIND: the middle is calm, lower blows the leaves left (the melody leans low), higher right (high); further out, gusts hurry them down together. |
 | 0x21D | BOUNCE BALLS | 1 to 5 | 1 | How many balls: each one more starts from a place and an angle of its own, so they cross; balls hitting on the same step play together, three notes at most. Past 4, FALL: eight leaves fall at speeds of their own and play where they land (left low, right high; one in seven an octave down), rest, and fall again. |
@@ -183,12 +183,12 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x229 | TWEAK LOGIC | OFF, AND, OR, XOR, NOT | OFF | Combines the hits with track WITH's: AND plays only when both hit, OR when either does, XOR when one does, NOT only when the other rests; OFF is its own. |
 | 0x22A | TWEAK LOGIC WITH | OFF, T1, T2, T3, T4 | OFF | The track LOGIC reads: a lower track's hit on this step, a higher one's on the step before. |
 | 0x22B | TWEAK COND | OFF, 1:2, 2:2, 1:4, 2:4, 3:4, 4:4, 1:8, 8:8, FIRST, !FIRST | OFF | The bars a hit may play in, counted from PLAY (with FORM on, from the section's start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest. |
-| 0x22C | SLOTH SPEED | 0 to 100 | 50 | How fast the track's SLOTH drifts (mods: TORPOR, APATHY, INERTIA): 50 is about 17, 1 and 3 minutes a turn; each 12.5 more twice as fast. |
-| 0x22D | OCHD RATE | 0 to 100 | 50 | How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for OCHD 8; each 12.5 more twice as fast. |
+| 0x22C | TIDE SPEED | 0 to 100 | 50 | How fast the track's TIDE drifts (mods: TIDE 1, 2, 3, three slow chaotic circuits): 50 is about 17, 3 and 1 minutes a turn; each 12.5 more twice as fast. |
+| 0x22D | SWARM RATE | 0 to 100 | 50 | How fast the track's eight SWARM LFOs run: 50 is 64 s for SWARM 1 down to 2.4 s for SWARM 8; each 12.5 more twice as fast. |
 | 0x22E | QUAD DIRECTION | FWD, BACK, PEND, RAND, HOLD | FWD | How the track's playhead moves along its row of the grid: forward, back, back and forth, at random; HOLD rests on its own steps and moves only when a LINK moves it. |
 | 0x22F | QUAD PROB | 0 to 100 % | 100 | The chance each of the row's notes plays: 100 every one, lower leaves gaps. |
 | 0x230 | QUAD LINK | OFF, T1, T2, T12, T3, T13, T23, T123, T4, T14, T24, T124, T34, T134, T234, T1234 | OFF | Other QUAD tracks this one's steps also move on, one, two or all three, each played for this step's gate: slow tracks pulled along by a fast one, or HOLD tracks played only by this one. |
-| 0x231 | NOTE LENGTH | STEP, FIXED, HIT | STEP | How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP. |
+| 0x231 | NOTE LENGTH | STEP, FIXED, HIT | STEP | How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever DIV. HIT: until the next hit, so rests let notes ring on. Atlas keeps STEP. |
 | 0x232 | NOTE LENGTH LEN | 1/32, 1/16, 1/8, 1/4, 1/2, 1/1 | 1/8 | FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts. |
 | 0x233 | NOTE LENGTH KEYS | 1 to 4 | 4 | FIXED: how many notes may hold at once. One more ends the note nearest its end; the same pitch again ends the one before. |
 | 0x234 | CONSTELLATION Y | 0 to 14 | 7 | The height of the ship's crosshair in the sky: the stars crossing it play as they cross, so it sets where the melody sits. AUTO steers it instead. |
@@ -213,21 +213,21 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x24A | CHORD BARS | 1/2, 1, 2, 4 | 1 | How long each chord lasts: half a bar, 1, 2 or 4 bars. |
 | 0x24B | CHORD HIT | HOLD, BEAT, STEP | HOLD | How the chord plays: HOLD once, held to the next chord; BEAT struck again every beat; STEP every step, for the step's GATE. |
 | 0x24C | CHORD OCT | -2 to 2 | 0 | The chords' register, -2 to +2 octaves from their home around C3. OCT+ held on GEN, KNOB 1; KNOB 2 and 3 there are SCL CHORD's CHRD and VOIC. |
-| 0x24D | GRIDS KICK | 0 to 100 % | 100 | How much of DENSITY the kick gets: 100 all of it, 50 half, 0 none (the kick silent). OCT+ held on GEN, KNOB 1. |
-| 0x24E | GRIDS SNARE | 0 to 100 % | 100 | How much of DENSITY the snare gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 2. |
-| 0x24F | GRIDS HAT | 0 to 100 % | 100 | How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 3. |
-| 0x250 | GRIDS TOMS | 0 to 100 % | 0 | A fourth part, on the tom or the sound PART4 picks: the hits the kick and snare only just miss, so fills follow the groove. 0 none; up, misses further under the line play too (DENSITY scales it). OCT+ held on GEN, KNOB 4; with it held, a black key picks the sound. |
+| 0x24D | ATLAS KICK | 0 to 100 % | 100 | How much of DENSITY the kick gets: 100 all of it, 50 half, 0 none (the kick silent). OCT+ held on GEN, KNOB 1. |
+| 0x24E | ATLAS SNARE | 0 to 100 % | 100 | How much of DENSITY the snare gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 2. |
+| 0x24F | ATLAS HAT | 0 to 100 % | 100 | How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, KNOB 3. |
+| 0x250 | ATLAS TOMS | 0 to 100 % | 0 | A fourth part, on the tom or the sound PART4 picks: the hits the kick and snare only just miss, so fills follow the groove. 0 none; up, misses further under the line play too (DENSITY scales it). OCT+ held on GEN, KNOB 4; with it held, a black key picks the sound. |
 | 0x251 | CHORD USER LEN | 1 to 8 | 4 | How many of USER's chords play, 1 to 8: playing them in on the keys (OCT+ held on GEN) sets it; shorten it to leave the last ones out. OCT+ held on GEN, KNOB 4. |
 | 0x252 | STEP EVOLVE LOCK | 0 to 100 % | 50 | A STEP track's EVOLVE page: how much of the variation stays from round to round. 100 holds it, 0 makes a fresh one each time. |
 | 0x253 | STEP EVOLVE EVERY | OFF, 1, 2, 4, 8, 16 | 1 | A STEP track's EVOLVE page: bars between rounds of changes; OFF plays the steps as written. |
 | 0x254 | STEP EVOLVE AMOUNT | 0 to 100 % | 0 | A STEP track's EVOLVE page: how many steps play a change, 100 half of them: a note moved by a degree or two or an octave, a step dropped, two notes swapped, a ghost note in a rest. 0 plays the steps as written; the steps themselves never change until REC held keeps the changes. |
-| 0x255 | GRIDS PART4 | TOM, CLAP, HATOP, RIM, BELL | TOM | The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black key (as on the drum grid: CP OH TM RS CB). |
+| 0x255 | ATLAS PART4 | TOM, CLAP, HATOP, RIM, BELL | TOM | The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black key (as on the drum grid: CP OH TM RS CB). |
 | 0x256 | TIMING RATCH | x1, x2, x3, x4 | x1 | Plays each step's notes 1 to 4 times in equal parts of the step, a ratchet; x1 plays them once, as written. Each hit gets its share of the step's GATE. Notes NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once. |
 | 0x257 | TIMING CHANCE | 0 to 100 % | 100 | How often a step ratchets: 100 every step, 0 none. The toss replays with the track's SEED. |
 
 ## Mods
 
-A mod (the MODS page, under LFO) moves a destination on any track by a source on any track: by its AMOUNT (-100 to 100 %, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, SLOTH, OCHD) swings both ways from the knob; OCT+ on MODS makes a mod UNI, the source folded to 0 to 1, so it moves one way only, as ENV does. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track follow each note, as a chord's; elsewhere the latest note. Room for 32, 16 in use. They are the project's, saved with it. Melodee's MOD page is gone: the four routes a project or a sound was saved with become mods on their track, the same move (a sound's go when another sound is loaded on the track, unless one was edited).
+A mod (the MODS page, under LFO) moves a destination on any track by a source on any track: by its AMOUNT (-100 to 100 %, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, TIDE, SWARM) swings both ways from the knob; OCT+ on MODS makes a mod UNI, the source folded to 0 to 1, so it moves one way only, as ENV does. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track follow each note, as a chord's; elsewhere the latest note. Room for 32, 16 in use. They are the project's, saved with it. Melodee's MOD page is gone: the four routes a project or a sound was saved with become mods on their track, the same move (a sound's go when another sound is loaded on the track, unless one was edited).
 
 | Source | |
 | --- | --- |
@@ -245,17 +245,17 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | NOTE | the generator's last note (C4 = 0) |
 | CV | the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the degree it moved to |
 | DRIFT | a slow wander of the track's own, a new point every 12 s or so, eased between |
-| TORPOR | SLOTH's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50) |
-| APATHY | SLOTH's fastest chaotic circuit, about 1 min a turn |
-| INERTIA | SLOTH's middle chaotic circuit, about 3 min a turn |
-| OCHD 1 | a free LFO, 64 s a turn (ORGANIC page, RATE 50) |
-| OCHD 2 | a free LFO, 40 s a turn |
-| OCHD 3 | a free LFO, 25 s a turn |
-| OCHD 4 | a free LFO, 15.6 s a turn |
-| OCHD 5 | a free LFO, 9.8 s a turn |
-| OCHD 6 | a free LFO, 6.1 s a turn |
-| OCHD 7 | a free LFO, 3.8 s a turn |
-| OCHD 8 | a free LFO, 2.4 s a turn |
+| TIDE 1 | TIDE's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50) |
+| TIDE 3 | TIDE's fastest chaotic circuit, about 1 min a turn |
+| TIDE 2 | TIDE's middle chaotic circuit, about 3 min a turn |
+| SWARM 1 | a free LFO, 64 s a turn (ORGANIC page, RATE 50) |
+| SWARM 2 | a free LFO, 40 s a turn |
+| SWARM 3 | a free LFO, 25 s a turn |
+| SWARM 4 | a free LFO, 15.6 s a turn |
+| SWARM 5 | a free LFO, 9.8 s a turn |
+| SWARM 6 | a free LFO, 6.1 s a turn |
+| SWARM 7 | a free LFO, 3.8 s a turn |
+| SWARM 8 | a free LFO, 2.4 s a turn |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |
@@ -300,9 +300,9 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | HUMAN | the generator's step | TWEAK's HUMAN: velocity and gate variation |
 | EV AMT | the generator's step | EVOLVE's AMOUNT: how much each mutation changes |
 | CONTR | the generator's step | FORM's CONTRAST: how different a new section is |
-| G X | the generator's step | Grids' X: across its map of drum patterns |
-| G Y | the generator's step | Grids' Y: down its map of drum patterns |
-| G DENS | the generator's step | Grids' density: how full its parts are |
+| AT X | the generator's step | Atlas' X: across its map of drum patterns |
+| AT Y | the generator's step | Atlas' Y: down its map of drum patterns |
+| AT DENS | the generator's step | Atlas' density: how full its parts are |
 | B SPEED | the generator's step | Bounce's speed: how far the balls move a step |
 | B ANGLE | the generator's step | Bounce's angle: the balls' paths (FALL: the wind) |
 | A PROB | the generator's step | Awake's PROB: the chance a note plays |
@@ -314,7 +314,7 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | S START | the generator's step | Series' START: where in the infinity series it plays |
 | C AUTO | the generator's step | Constellation's AUTO: who steers the ship (OFF, a wander, SEEK) |
 | CH PROG | the generator's step | Chord's PROG: which progression its chords follow |
-| G KICK | the generator's step | Grids' KICK: how much of its density the kick gets |
-| G SNR | the generator's step | Grids' SNR: how much of its density the snare gets |
-| G HAT | the generator's step | Grids' HAT: how much of its density the hat gets |
-| G TOMS | the generator's step | Grids' TOMS: how many of the near misses play the tom |
+| AT KICK | the generator's step | Atlas' KICK: how much of its density the kick gets |
+| AT SNR | the generator's step | Atlas' SNR: how much of its density the snare gets |
+| AT HAT | the generator's step | Atlas' HAT: how much of its density the hat gets |
+| AT TOMS | the generator's step | Atlas' TOMS: how many of the near misses play the tom |

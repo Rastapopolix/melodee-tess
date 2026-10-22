@@ -906,7 +906,7 @@ static int test_grids_layer(void)
     for (i = 0; i < 5u; i++) turn(EN_K1 + 3u, 1);       /* TOMS 10 */
     for (i = 0; i < 6u; i++) { frame(); fm1_ms += 200u; host_ticks += 200000u; }   /* (held 1.2 s) */
     help_find(3);
-    bad += check("GRIDS, OCT+ held: KNOB 1 KICK 80, KNOB 2 SNR 98, KNOB 3 HAT 100, KNOB 4 TOMS 10; its help",
+    bad += check("ATLAS, OCT+ held: KNOB 1 KICK 80, KNOB 2 SNR 98, KNOB 3 HAT 100, KNOB 4 TOMS 10; its help",
                  tessera_param_get(tr, TX_GRD_KICK) == 80 && tessera_param_get(tr, TX_GRD_SNR) == 98 &&
                  tessera_param_get(tr, TX_GRD_HAT) == 100 && tessera_grids(tr)->toms == 10u &&
                  help.pid == PID_TESS(TX_GRD_TOMS) && pid_find(help.pid));
@@ -1190,8 +1190,8 @@ static int test_organic(void)
                  (help_find(1), help.pid == PID_TESS(TX_ORG_RATE)));
     {
         cord_t c = {CS_TORPOR, 1, CD_CUTOFF, 0, 50, 0};
-        bad += check("a mod from T2 TORPOR: taken, named TORPOR", cord_set(0, &c) && str_eq(cord_src_name(CS_TORPOR), "TORPOR") &&
-                     str_eq(cord_src_name(CS_OCHD8), "OCHD 8"));
+        bad += check("a mod from T2 TIDE 1 (CS_TORPOR): taken, named TIDE 1", cord_set(0, &c) && str_eq(cord_src_name(CS_TORPOR), "TIDE 1") &&
+                     str_eq(cord_src_name(CS_OCHD8), "SWARM 8"));
         cord_clear();
     }
     song.sel = 0;
