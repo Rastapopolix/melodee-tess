@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- Tessera's project page (GitHub Pages root). web/make_site.py copies it to the site's index.html, with the
-     gallery (assets/gallery) in media/gallery and the brand pictures (assets/brand) in media/brand. -->
+     gallery (assets/gallery) in media/gallery and the brand pictures (assets/brand) in media/brand, and fills in
+     the release (its version, and its packages for both cores and for one) where marked. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -117,6 +118,19 @@ section > .wrap > header p { color: var(--mid); max-width: 44em; margin-top: 10p
 .recipes a:hover { color: var(--accent); }
 .recipes small { color: var(--dim); display: block; font-size: 14px; }
 
+/* links: one card each, as tiles */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--gap); margin-top: 28px; }
+.card { display: block; background: var(--surf); padding: 18px 20px; color: var(--text); text-decoration: none;
+        border-left: 4px solid var(--c, var(--gold)); }
+a.card:hover { background: var(--raise); color: var(--text); }
+.card b { display: block; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.card span { color: var(--mid); font-size: 15px; line-height: 1.4; display: block; margin-top: 4px; }
+.card a { color: var(--accent); }
+code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: var(--bg); padding: 1px 5px;
+       overflow-wrap: anywhere; }
+.note { margin-top: 28px; padding: 16px 20px; border: 1px solid var(--line); color: var(--mid); font-size: 16px; }
+.note b { color: var(--text); }
+
 footer { border-top: 1px solid var(--line); padding: 36px 0 48px; color: var(--mid); font-size: 15px; }
 footer p { max-width: 52em; }
 @media (prefers-reduced-motion: reduce) { .mark.laid i { animation: none; background: var(--c); } html { scroll-behavior: auto; } }
@@ -153,7 +167,7 @@ footer p { max-width: 52em; }
       <p class="lede">Four tracks, twelve generators. Evolve the phrases, build them into song forms, let the tracks
         answer and follow each other, and modulate anything from anything. Small tiles, set into a larger pattern.</p>
       <div class="cta">
-        <a class="btn main" href="webapp/installer/">Install</a>
+        <a class="btn main" href="webapp/installer/">Install @VERSION@</a>
         <a class="btn" href="webapp/sim/">Try it in your browser</a>
         <a class="btn" href="https://github.com/Rastapopolix/melodee-tess/blob/HEAD/MANUAL.md">Manual</a>
       </div>
@@ -250,12 +264,22 @@ footer p { max-width: 52em; }
       <div class="step"><h3>Flash</h3><p>Start with the standard build. If your FM-1 crashes with it, use the single-core build from the same release.</p></div>
       <div class="step"><h3>Play</h3><p>Tap SEQ, pick a MODE, press PLAY. Edit sounds from the computer with the <a href="webapp/editor/">web editor</a>.</p></div>
     </div>
-    <p style="margin-top:22px;color:var(--mid)">Do not unplug the FM-1 while it is writing. This is experimental firmware: use it at your own risk.
-      The installer also takes you back to the official firmware, with a backup first.</p>
-    <div class="cta" style="margin-top:20px">
-      <a class="btn main" href="webapp/installer/">Open the installer</a>
-      <a class="btn" href="https://github.com/Rastapopolix/melodee-tess/releases/latest">Releases</a>
+    <p style="margin-top:22px;color:var(--mid)">Do not unplug the FM-1 while it is writing. This is experimental firmware: use it at your own risk.</p>
+    <div class="cards">
+      <a class="card" style="--c:var(--t1)" href="webapp/installer/"><b>Install @VERSION@</b><span>The web installer, in Chrome or Edge.</span></a>
+      <a class="card" style="--c:var(--t2)" href="webapp/sim/"><b>Try it in your browser</b><span>The same firmware on an on-screen FM-1, with sound.</span></a>
+      <div class="card" style="--c:var(--t3)"><b>Download .fwsc</b><span><a href="firmware/@FWSC@">Standard</a> ·
+        <a href="firmware/@FWSC1@">single core</a> ·
+        <a href="https://github.com/Rastapopolix/melodee-tess/releases">all releases</a>. From a terminal:
+        <code>python3 tools/fm1_install.py @FWSC@</code> (<a href="https://github.com/Rastapopolix/melodee-tess/blob/HEAD/tools/fm1_install.py">fm1_install.py</a>, needs mido and python-rtmidi).</span></div>
+      <a class="card" style="--c:var(--t4)" href="https://github.com/Rastapopolix/melodee-tess/blob/HEAD/MANUAL.md"><b>Manual</b><span>Every page, knob and mode.</span></a>
+      <a class="card" style="--c:var(--t1)" href="https://github.com/Rastapopolix/melodee-tess/blob/HEAD/docs/cheatsheet/tessera-cheatsheet.pdf"><b>Cheatsheet</b><span>The buttons and combinations on one printable page.</span></a>
+      <a class="card" style="--c:var(--t2)" href="webapp/editor/"><b>Web editor</b><span>Edit sounds and sequences from the computer.</span></a>
+      <a class="card" style="--c:var(--t3)" href="https://github.com/Rastapopolix/melodee-tess"><b>Source</b><span>GPL-3.0, on GitHub, with the changes in every release.</span></a>
     </div>
+    <div class="note"><b>Back to the stock firmware.</b> Open the installer and choose <i>Return to official V15</i>, or
+      install M-Vave's own <code>FM-1.fwsc</code> with <code>fm1_install.py</code>. If an update is cut off, see the
+      <a href="https://github.com/Rastapopolix/melodee-tess/blob/HEAD/docs/RECOVERY.md">recovery guide</a>.</div>
   </div>
 </section>
 </main>
@@ -268,7 +292,8 @@ footer p { max-width: 52em; }
       scripts Fall (ambalek), Constellation (timothy-taylor), initenere, Awake (tehn) and nørgård; TIDE and SWARM are inspired
       by Triple Sloth (Nonlinear Circuits, Andrew Fitch) and ochd (Instruō, DivKid). GPL-3.0-only:
       <a href="https://github.com/Rastapopolix/melodee-tess">source on GitHub</a>,
-      <a href="firmware/LICENSES/">licence texts</a>. Not affiliated with M-Vave.</p>
+      <a href="firmware/LICENSES/">licence texts</a>. Tessera is an independent project, not affiliated with or
+      endorsed by M-Vave; M-Vave and FM-1 are trademarks of their respective owners.</p>
   </div>
 </footer>
 
