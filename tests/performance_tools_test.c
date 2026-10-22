@@ -78,12 +78,6 @@ static void test_editing_tools(void)
     set_engine_of(TSEL,ENGI_FM6);TSEL->engine=TSEL->eng_req;page_named("ALGO");
     uint8_t patch[FP_SIZE+1];memcpy(patch,fm6_patch[0],sizeof patch);
     btn_down(B_LFO);turn(EN_K1,1);assert(momentary.active);fm1_in.buttons=0;frame();assert(!memcmp(patch,fm6_patch[0],sizeof patch));
-    set_engine_of(TSEL,ENGI_CZ);TSEL->engine=TSEL->eng_req;
-    page_named("CZ LINE");
-    cz_patch_t cz=cz_patch[0];btn_down(B_LFO);turn(EN_K1,1);assert(momentary.active);fm1_in.buttons=0;frame();assert(!memcmp(&cz,cz_patch,sizeof cz));
-    set_engine_of(TSEL,ENGI_PROPHET);TSEL->engine=TSEL->eng_req;page_named("P5 FILTER");
-    p5_patch_t p5=*p5_patch_of(TSEL);TSEL->p[P_PRIO]=2;btn_down(B_LFO);turn(EN_K1,-1);assert(momentary.active);fm1_in.buttons=0;frame();
-    assert(!memcmp(&p5,p5_patch_of(TSEL),sizeof p5) && TSEL->p[P_PRIO]==2);
 }
 static void test_midi_and_levels(void)
 {
@@ -92,8 +86,8 @@ static void test_midi_and_levels(void)
     midi_event(0xb0,0,74,0);assert(TSEL->p[P_E4]==0);
     midi_event(0xb0,0,71,127);assert(TSEL->p[P_E5]==ENGINES[TSEL->eng_req]->edit[5].max);   /* (SID's RES: 0..15) */
     song.g[G_ROUTE]=0;midi_event(0xb0,1,91,88);assert(!trk[1].p[P_RESERVED36] && !trk[0].p[P_RESERVED36]);
-    set_engine_of(TSEL,ENGI_PROPHET);TSEL->engine=TSEL->eng_req;
-    midi_event(0xb0,0,73,70);assert(p5_patch_of(TSEL)->raw[P5_ATTACK_AMP]==70);
+    set_engine_of(TSEL,ENGI_FM6);TSEL->engine=TSEL->eng_req;
+    midi_event(0xb0,0,73,70);for(uint32_t op=0;op<6;op++)assert(fm6_patch[0][op*FP_OP]==99u-70u*99u/127u);   /* (FM6's own envelope: R1) */
     reset_tools();song.rec=1;seq_start();seq_advance(0);midi_event(0xb0,0,7,17);
     assert(motion.count==1 && motion.event[0].param==P_LEVEL && motion.event[0].value==17);seq_stop();
     reset_tools();track_select(3);TSEL->p[P_LN0]=0;trk_note_on(TSEL,36,127);

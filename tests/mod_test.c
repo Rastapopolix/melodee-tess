@@ -122,7 +122,7 @@ static uint64_t phrase_child(uint32_t k)
     fflush(stdout);
     if (!(pid = fork())) {
         int16_t keep[P_COUNT];
-        fresh(HOST_SYNTH, 0);
+        fresh(HOST_SYNTH, HOST_PLAIN);
         if (k == 1u) {
             slot(&trk[0], 0, MS_LFO, MD_CUT, 0);   /* AMT 0 */
             slot(&trk[0], 1, MS_OFF, MD_PAN, 40);  /* SRC OFF */
@@ -173,7 +173,7 @@ static void test_math(void)
     uint32_t e_trio, k_pw;
 
     /* per-track sources on per-voice destinations */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     lfo_at(t, 32767);
     lfo = mulq15(32767, 32767);
     slot(t, 0, MS_LFO, MD_CUT, 63);
@@ -218,7 +218,7 @@ static void test_math(void)
     mod_end(t);
 
     /* per-voice sources on per-voice destinations (mod_voice) */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     t->p[P_VOICE] = V_POLY;
     slot(t, 0, MS_KEY, MD_CUT, 63);
     slot(t, 1, MS_VEL, MD_AMP, 63);
@@ -250,7 +250,7 @@ static void test_math(void)
     mod_end(t);
 
     /* clamping of the per-voice sums */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     lfo_at(t, 32767);
     for (k_pw = 0; k_pw < 4u; k_pw++)
         slot(t, k_pw, MS_LFO, k_pw < 2u ? MD_CUT : MD_PITCH, 63);
@@ -265,7 +265,7 @@ static void test_math(void)
     mod_end(t);
 
     /* per-block destinations: AMT 64 = the whole range, clamped, restored */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     t->p[P_PAN] = 0;
     t->mw = 127;
     slot(t, 0, MS_MODW, MD_PAN, 16);
@@ -330,7 +330,7 @@ static void test_math(void)
                                                           str_eq(mod_dst_name(t, MD_CUT), "CUT"));
 
     /* per-voice sources on a per-block destination: the latest note-on */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     slot(t, 0, MS_VEL, MD_PAN, 63);
     trk_note_on(t, 60, 20);
     mod_begin(t);
@@ -374,7 +374,7 @@ static int pan_e2e(void)                       /* MODW -> PAN moves the pan the 
 {
     int64_t l = 0, r = 0;
     uint32_t i, k;
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     slot(&trk[0], 0, MS_MODW, MD_PAN, 63);
     trk[0].p[P_RESERVED34] = trk[0].p[P_RESERVED35] = trk[0].p[P_RESERVED36] = 0;   /* (the buses are in the middle) */
     pkt(0xB0, 1, 127);
@@ -394,7 +394,7 @@ static void test_midi(void)
 {
     static const uint8_t TRS[] = {0xB0, 1, 0x40, 1, 0x7F, 0xF8, 11, 0x20, 0xD2, 0x33, 0x34, 0x90, 60, 0, 0xB4, 1, 9};
     uint32_t i;
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     song.sel = 1;
     pkt(0xB0, 1, 100);                           /* ch 1 CC1 */
     pkt(0xB2, 11, 40);                           /* ch 3 CC11 */
@@ -408,7 +408,7 @@ static void test_midi(void)
     pkt(0xB0, 121, 0);                           /* reset all controllers */
     blocks(1);
     check("CC121 resets MODW / AT / EXPR of the channel's track", trk[0].mw == 0 && trk[1].mw == 0);
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     song.sel = 1;
     for (i = 0; i < sizeof TRS; i++)
         um_byte(TRS[i]);
@@ -439,7 +439,7 @@ static double cost(const uint8_t parts[NPART][3], int on)
     static const uint8_t NOTES[8] = {48, 52, 55, 59, 60, 64, 67, 71};
     uint32_t p, i, rep;
     double best = 1e30;
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     for (p = 0; p < NPART; p++) {
         track_t *t = &trk[p];
         host_preset(t, parts[p][0], parts[p][1]);
@@ -518,7 +518,7 @@ static int demos(const char *dir)
     FILE *f;
     track_t *t = &trk[0];
     /* LFO -> CUT: the host synth (CZ-1), a held chord, a slow sine LFO opens and closes the filter */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     t->p[P_LRATE] = 30;
     slot(t, 0, MS_LFO, MD_CUT, 48);
     if ((f = demo_open(dir, "lfo_cut", 6u * FS / CTL * CTL))) {

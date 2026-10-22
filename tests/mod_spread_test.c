@@ -146,7 +146,7 @@ static void test_matrix(void)
           !MD_ENGINE(MD_DEPTH) && MD_ENGINE(MD_E1 + 7));
 
     /* S&H and SLEW over a few LFO cycles: one value per cycle, the steps at the wraps; SLEW continuous */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     t->p[P_LRATE] = 90;                                   /* a few Hz */
     t->p[P_LWAVE] = 4;                                    /* S&H: the LFO's own value is the same random */
     trk_note_on(t, 60, 100);
@@ -196,14 +196,14 @@ static void test_matrix(void)
     /* S&H follows RATE: a faster LFO steps more often */
     {
         uint32_t s1 = 0, s2 = 0;
-        fresh(HOST_SYNTH, 0);
+        fresh(HOST_SYNTH, HOST_PLAIN);
         t->p[P_LRATE] = 70;
         for (k = 0; k < 2u * FS / CTL; k++) {
             uint32_t ph0 = t->lfo_ph;
             blocks(1);
             s1 += t->lfo_ph < ph0;
         }
-        fresh(HOST_SYNTH, 0);
+        fresh(HOST_SYNTH, HOST_PLAIN);
         t->p[P_LRATE] = 70;
         slot(t, 0, MS_MODW, MD_RATE, 63);                 /* the matrix's RATE: S&H with it */
         t->mw = 127;
@@ -216,7 +216,7 @@ static void test_matrix(void)
     }
 
     /* DEPTH: the LFO's gain, as AMP's */
-    fresh(HOST_SYNTH, 0);
+    fresh(HOST_SYNTH, HOST_PLAIN);
     t->lfo_val = 32767;
     t->lfo_fade = 32767;
     slot(t, 0, MS_MODW, MD_DEPTH, 63);
@@ -293,9 +293,9 @@ static void sh_on_nothing(track_t *t)             /* S&H and SLEW slots with AMT
 }
 static void test_matrix_sound(void)
 {
-    uint64_t h0 = phrase_child(HOST_SYNTH, 0, 0), hn = phrase_child(HOST_SYNTH, 0, sh_on_nothing);
-    uint64_t p0 = phrase_child(HOST_SYNTH, 0, vib_plain), d0 = phrase_child(HOST_SYNTH, 0, vib_depth0);
-    uint64_t d1 = phrase_child(HOST_SYNTH, 0, vib_depth1), f1 = phrase_child(HOST_SYNTH, 0, vib_full);
+    uint64_t h0 = phrase_child(HOST_SYNTH, HOST_PLAIN, 0), hn = phrase_child(HOST_SYNTH, HOST_PLAIN, sh_on_nothing);
+    uint64_t p0 = phrase_child(HOST_SYNTH, HOST_PLAIN, vib_plain), d0 = phrase_child(HOST_SYNTH, HOST_PLAIN, vib_depth0);
+    uint64_t d1 = phrase_child(HOST_SYNTH, HOST_PLAIN, vib_depth1), f1 = phrase_child(HOST_SYNTH, HOST_PLAIN, vib_full);
     check("S&H / SLEW / DEPTH slots at AMT 0: bit for bit no matrix", h0 && h0 == hn);
     check("DEPTH closed: LFO DEST PIT plays nothing (bit for bit LFO DEST PIT 0)", p0 && p0 == d0);
     check("DEPTH open: the vibrato is there (not the plain note), as without the matrix but for the gain",
@@ -319,7 +319,7 @@ static lr_t spread_run(int32_t sp, int32_t pan, uint32_t mode, const uint8_t *no
     track_t *t = &trk[0];
     lr_t a = {0};
     uint32_t k, i;
-    fresh(HOST_SYNTH, preset_by_name(HOST_SYNTH, "SYN STRINGS"));
+    fresh(HOST_SYNTH, preset_by_name(HOST_SYNTH, "STRING MACH"));
     dry(t);
     song.master_q12 = 1024;                               /* below the limiter: the levels as mixed */
     t->p[P_VOICE] = (int16_t)mode;

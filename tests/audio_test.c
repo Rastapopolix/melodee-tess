@@ -34,7 +34,7 @@ static void fresh(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     host_tracks_init();
-    for (p = 0; p < NPART; p++) host_preset(&trk[p], HOST_SYNTH, 0);
+    for (p = 0; p < NPART; p++) host_preset(&trk[p], HOST_SYNTH, HOST_PLAIN);
     memset(&melodee_dbg, 0, sizeof melodee_dbg);
     audio_cpu_rem = audio_halves = audio_max_us = 0;
     shed_req = 0; shed_count = 0; shed_over = 0;
