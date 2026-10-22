@@ -461,9 +461,13 @@ Hold **HOME** for the menu. Tessera's additions:
 
 ## Saving and older projects
 
-Generator settings, seeds, sections, layers and cords are saved with the project, in their own block next to it.
-Projects saved by earlier Tess versions load and convert, and every new setting starts at a value that plays as
-before. Stock Melodee projects load with every track on STEP. Melodee's own preset banks are not carried over.
+A project holds everything in one record: the patterns, the sounds, the generators with their seeds, sections and
+layers, ENERGY, and the cords. Tessera 2.0 has a project format of its own: projects saved by Melodee (Tess) 1.x or
+by Melodee show **OLD FORMAT** in their slot and do not load (there is no converter), and the first save writes over
+them. Melodee's own preset banks are not carried over.
+
+The web editor's **Complete backup** saves and restores the music, slots A to D, the sound banks and the settings.
+To try the [demo projects](demos/README.md), `tools/demo_backup.py` puts them into slots of your own backup.
 
 ---
 
