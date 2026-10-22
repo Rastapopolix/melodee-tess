@@ -4032,6 +4032,39 @@ static int test_key_lights(void)
         settings_export(&p); settings_lights = LIGHTS_MID;
         bad += check("  LIGHTS kept with the settings", settings_import(&p, sizeof p) && settings_lights == LIGHTS_FULL);
     }
+    settings_lights = LIGHTS_AUTO;                       /* AUTO: MID while touched, all dark after 30 s untouched */
+    fm1_in.notes |= 1u << cs;
+    frame();
+    fm1_in.notes = 0;
+    frame(); ui_leds();
+    bad += check("LIGHTS AUTO, just touched: as MID (C glows, the dim plane at 1/4, idle buttons glow)",
+                 key_light(14u + c) == 1u && fm1_led_dim_mask[0] == 3u &&
+                 ((fm1_led_dim[1][led_pos[panel.btn[B_LFO]] >> 3] >> (led_pos[panel.btn[B_LFO]] & 7u)) & 1u));
+    fm1_ms += LIGHTS_AUTO_MS - 100u;
+    frame(); ui_leds();
+    bad += check("  29.9 s untouched: still lit", key_light(14u + c) == 1u);
+    fm1_ms += 200u;
+    frame(); ui_leds();
+    for (k = 0, ok = 1; k < FM1_NCOL; k++)
+        ok &= !fm1_led[k] && !fm1_led_dim[0][k] && !fm1_led_dim[1][k] && !fm1_led_dim[2][k];
+    bad += check("  30 s untouched: every light dark", ok);
+    song.playing = 1;
+    frame(); ui_leds();
+    for (k = 0, ok = 1; k < FM1_NCOL; k++)
+        ok &= !fm1_led[k];
+    bad += check("  .. the transport running too (PLAY dark)", ok);
+    song.playing = 0;
+    fm1_in.notes |= 1u << cs;
+    frame(); ui_leds();
+    bad += check("  the first touch lights them again", key_light(14u + cs) == 2u && key_light(14u + c) == 1u);
+    fm1_in.notes = 0;
+    frame();
+    {
+        persist_t p = {0};
+        p.magic = PERSIST_MAGIC; p.panel = panel;
+        settings_export(&p); settings_lights = LIGHTS_MID;
+        bad += check("  AUTO kept with the settings", settings_import(&p, sizeof p) && settings_lights == LIGHTS_AUTO);
+    }
     settings_lights = LIGHTS_MID;
     led_pos_init();
     return bad;

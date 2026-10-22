@@ -170,7 +170,7 @@ static uint32_t play_key_led(const track_t *t, uint32_t k)
     return KL_DIM;
 }
 
-static const uint8_t LIGHTS_MASK[LIGHTS_N] = {0, 7, 3, 1, 0};   /* the dim keys' duty: -, 1/8, 1/4, 1/2, all */
+static const uint8_t LIGHTS_MASK[LIGHTS_N] = {0, 7, 3, 1, 0, 3};   /* the dim keys' duty: -, 1/8, 1/4, 1/2, all, 1/4 */
 #define BTN_DIM_MASK 3u                                         /* idle buttons: 1/4 duty each scan */
 /* The lights' grammar, keys and buttons alike: dark nothing there, dim something there, bright happening now, breathing
  * waiting (a pattern for the bar, REC armed before the transport runs, PLAY counting in). Breathing: the third dim plane,
@@ -189,6 +189,11 @@ static void ui_leds(void)
     if (!ready) {
         led_pos_init();
         ready = 1;
+    }
+    if (lights == LIGHTS_AUTO && !ui.menu && (int32_t)(fm1_ms - scrn.idle) >= (int32_t)LIGHTS_AUTO_MS) {
+        memset(fm1_led, 0, sizeof fm1_led);             /* AUTO, untouched a while: all dark (screen.c scrn.idle) */
+        memset(fm1_led_dim, 0, sizeof fm1_led_dim);
+        return;
     }
     if (fam == FAM_ARP && cur_page()->graph != GR_ARP && cur_page()->graph != GR_NONE)
         fam = FAM_SEQ;                                  /* (GEN EVOLVE FORM TWEAK: SEQ's, ui.c fam_grp) */
