@@ -45,6 +45,12 @@ jobs:
         env:
           MELODEE_DUAL_CORE: '1'
         run: ./build.sh 2>&1 | tee head.log
+      - name: Flash report (this branch)
+        run: |
+          python tools/flash_report.py build/melodee.elf --csv flash_symbols.csv | tee flash_report.md
+          cat flash_report.md >> "$GITHUB_STEP_SUMMARY"
+          echo '----- flash_symbols.csv'
+          cat flash_symbols.csv
       - name: Build the base branch (dual core)
         if: github.event_name == 'pull_request'
         env:
@@ -70,3 +76,5 @@ jobs:
             build/*.fwsc
             head.log
             base.log
+            flash_report.md
+            flash_symbols.csv
