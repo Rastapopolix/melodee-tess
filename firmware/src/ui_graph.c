@@ -341,7 +341,7 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
         for (uint32_t k = n; k-- > 0;) {
             int32_t r = 5;
             int32_t bx = x0 + 2 + (int32_t)b->x[k] * (sw - 4 - r) / 255, by = top + bh - 2 - r - (int32_t)b->y[k] * (bh - 4 - r) / 255;
-            cv_rrect(bx, by, r, r, 1, T_TEXT, bg);
+            cv_ball(bx + r / 2, by + r / 2, r, T_TEXT);
         }
     } else if (mode == TESS_ENG_AWAKE) {
         /* loop A (the notes) over loop B (their lift), 16 cells each: A's value a bar its height (1..8; 1 two pixels at
@@ -809,7 +809,7 @@ static void graph_organic(const track_t *t, uint16_t c)
         cv_text(PANEL_X0, y - 5, &AF_X, NAME[i], T_MID);
         cv_rect(PANEL_X0 + 26, y, 84, 1, T_RAISE);
         cv_rect(PANEL_X0 + 67, y - 4, 1, 9, T_RAISE);
-        cv_rrect(PANEL_X0 + 64 + v * 38 / 32767, y - 3, 7, 7, 3, c, T_SURF);
+        cv_ball(PANEL_X0 + 67 + v * 38 / 32767, y, 7, c);
     }
     cv_rect(PANEL_X0 + 120, 50, 100, 1, T_RAISE);
     for (i = 0; i < 8u; i++) {
@@ -916,7 +916,7 @@ static void graph_energy(uint16_t c)
     }
     at = (int32_t)en_frac(energy.ph, energy.per, (uint32_t)w);
     if (a && song.playing)
-        cv_rrect(x0 + at - 3, 50 - energy_now() * 36 / 32767 - 3, 7, 7, 3, c, T_SURF);
+        cv_ball(x0 + at, 50 - energy_now() * 36 / 32767, 7, c);
     if (song.playing && energy_resting()) {
         int32_t len = (int32_t)(energy.rest_left / EN_BPS) * w / 18;
         cv_rrect(x0, 6, len < 4 ? 4 : len > w ? w : len, 6, 3, c, T_SURF);

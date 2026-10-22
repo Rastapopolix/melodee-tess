@@ -667,7 +667,8 @@ static void cv_rrect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint
 }
 
 /* a disc of diameter d (px) centred on (cx, cy) (odd d: a pixel's centre; even: its corner), anti-aliased over
- * what is on the canvas (4 x 4 samples a pixel); ring: only its outer 1 px (the patterns' track numbers) */
+ * what is on the canvas (4 x 4 samples a pixel); ring 1: only its outer 1 px (the patterns' track numbers), 2: the
+ * whole disc, round (BOUNCE's balls, TIDE's dots) */
 static uint16_t mix565(uint16_t bg, uint16_t fg, uint32_t a);
 static void cv_disc(int32_t cx, int32_t cy, int32_t d, uint16_t c, int ring)
 {
@@ -684,7 +685,7 @@ static void cv_disc(int32_t cx, int32_t cy, int32_t d, uint16_t c, int ring)
             for (j = 0; j < 4; j++)
                 for (i = 0; i < 4; i++) {
                     int32_t dx = x * 8 + 1 + 2 * i - qx, dy = y * 8 + 1 + 2 * j - qy, q = dx * dx + dy * dy;
-                    n += q <= r * r && !(ring && q < ri * ri);
+                    n += q <= r * r && !(ring == 1 && q < ri * ri);
                 }
             if (n) {
                 uint16_t *p = &cv_px[(uint32_t)y * cv_w + (uint32_t)x];
@@ -694,6 +695,7 @@ static void cv_disc(int32_t cx, int32_t cy, int32_t d, uint16_t c, int ring)
 }
 static void cv_circle(int32_t cx, int32_t cy, int32_t d, uint16_t c, uint16_t under) { (void)under; cv_disc(cx, cy, d, c, 0); }
 static void cv_ring(int32_t cx, int32_t cy, int32_t d, uint16_t c) { cv_disc(cx, cy, d, c, 1); }
+static void cv_ball(int32_t cx, int32_t cy, int32_t d, uint16_t c) { cv_disc(cx, cy, d, c, 2); }
 /* column x from y a to y b (1/16 px, either order) 2 px thick, its ends anti-aliased, blended over the canvas: a
  * smooth trace drawn a column at a time (Stage's waveform, docs/design) */
 static void cv_vspan_aa(int32_t x, int32_t a, int32_t b, uint16_t c)
