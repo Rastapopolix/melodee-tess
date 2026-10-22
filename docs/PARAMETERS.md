@@ -161,7 +161,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x213 | FORM FLOURISH | -12 to 12 semitones | 0 | Semitones added on the last beat of every phrase; 0 is off. |
 | 0x214 | TWEAK SHIFT | -24 to 24 semitones | 0 | Transposes the notes by semitones; while following, by scale steps from the followed note. |
 | 0x215 | TWEAK DROP | 0 to 100 % | 0 | The chance a hit is left out, whatever the generator. |
-| 0x216 | TWEAK HUMAN | 0 to 100 % | 0 | Varies velocity and gate a little, as a player would. |
+| 0x216 | TWEAK HUMAN | 0 to 100 % | 0 | Varies velocity, gate and timing a little, as a player would: at 100 a note up to 20 ms behind the beat, never early; the same each time the piece plays. |
 | 0x217 | TWEAK FOLLOW | OFF, T1, T2, T3, T4 | OFF | Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own. |
 | 0x218 | ATLAS X | 0 to 255 | 128 | Where on the map of drum patterns, left to right; between two, a blend of both. |
 | 0x219 | ATLAS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |

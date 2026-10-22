@@ -34,9 +34,18 @@ static struct {
 } seq_nudge[NTRK] __attribute__((section(".pool")));
 static uint8_t seq_nudge_due;       /* bit per track: a step held, to play at seq_nudge[].at */
 static uint8_t seq_nudge_early;     /* bit per track: the next step played already */
+/* HUMAN (TWEAK, a generator track's): its step late by up to 20 ms at 100, as a player a little behind the beat, never
+ * more than 1/8 of the step; drawn from the track's SEED and the steps since PLAY (its own stream: the notes the
+ * generators draw stay as they were), so a piece replays the same */
+static uint8_t seq_hum_due;         /* bit per track: a generator step held, to play at seq_hum_at */
+static uint32_t seq_hum_at[NTRK], seq_hum_span[NTRK], seq_hum_n[NTRK];
 
 /* PLAY, STOP: nothing recorded, armed or held on any track */
-static void seq_sub_clear(void) { seq_sub_rec = seq_sub_armed = seq_nudge_due = seq_nudge_early = 0; }
+static void seq_sub_clear(void)
+{
+    seq_sub_rec = seq_sub_armed = seq_nudge_due = seq_nudge_early = seq_hum_due = 0;
+    for (uint32_t k = 0; k < NTRK; k++) seq_hum_n[k] = 0;
+}
 
 /* A step starts: what it plays is recorded from here, the last step's repeats are dropped */
 static void seq_sub_begin(const track_t *t)
@@ -175,5 +184,46 @@ static void seq_nudge_tick(track_t *t, uint32_t period, uint32_t cur_len, uint32
         seq_step(t, &seq_nudge[tr].s, step_gate(s) ? next_len : period, 0);
         t->seq_idx = was;
         seq_nudge_early |= (uint8_t)(1u << tr);
+    }
+}
+
+/* ---- HUMAN's timing: a generator track's step a little late */
+static uint32_t seq_human_late(uint32_t tr, uint32_t span)   /* samples late, 0..: this step's draw */
+{
+    uint32_t h = tr < TESSERA_TRACKS ? tessera.evolve[tr].human : 0u, x, most;
+    if (!h) return 0;
+    x = ((uint32_t)tessera.seed[tr] << 16 ^ seq_hum_n[tr]++ ^ 0x48554Du) * 0x9E3779B1u;
+    x ^= x >> 15; x *= 0x2C1B3C6Du; x ^= x >> 12;
+    most = 882u * h / 100u;                             /* (20 ms at 44.1 kHz) */
+    if (most > span / 8u) most = span / 8u;
+    return most ? x % (most + 1u) : 0u;
+}
+static void seq_gen_play(track_t *t, uint32_t tr, uint32_t span, uint32_t at)   /* the generator step, at samples in */
+{
+    seq_sub_begin(t);                                   /* (SUB: the notes it plays recorded, its RATCH armed) */
+    tessera_clock_step(t);
+    seq_sub_arm(t, seq_sub_can(t) ? tessera_ratchet(tr) : 1u, span > at ? span - at : 1u, (int32_t)at);
+}
+/* a generator track's step on its line: played now, or held for HUMAN (one still held from the last step plays
+ * first: its place did not come, a DIV change) */
+static void seq_gen_step(track_t *t, uint32_t tr, uint32_t span)
+{
+    uint32_t late;
+    if (seq_hum_due & (1u << tr)) {
+        seq_hum_due &= (uint8_t)~(1u << tr);
+        seq_gen_play(t, tr, 1u, 0u);
+    }
+    late = seq_human_late(tr, span);
+    if (!late) { seq_gen_play(t, tr, span, 0u); return; }
+    seq_hum_at[tr] = late;
+    seq_hum_span[tr] = span;
+    seq_hum_due |= (uint8_t)(1u << tr);
+}
+static void seq_gen_tick(track_t *t, uint32_t cur_len)   /* as the step goes on: a held step when its place comes */
+{
+    uint32_t tr = trk_index(t);
+    if ((seq_hum_due & (1u << tr)) && t->seq_pos >= seq_hum_at[tr] && t->seq_pos < cur_len) {
+        seq_hum_due &= (uint8_t)~(1u << tr);
+        seq_gen_play(t, tr, seq_hum_span[tr], seq_hum_at[tr]);
     }
 }

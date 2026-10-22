@@ -30,8 +30,8 @@ form_markov_aaba_lock50 0xd3e9800b 300
 form_markov_aaba_lock50.state 0x8f7c93c9
 form_euclid_abcb_morph_aabc 0x42887912 246
 form_euclid_abcb_morph_aabc.state 0xa1447cef
-tweak_shift_drop_human_follow 0x3ae74b57 118
-tweak_shift_drop_human_follow.state 0x9058c9d5
+tweak_shift_drop_human_follow 0x94ea21c1 118
+tweak_shift_drop_human_follow.state 0xe9d9fe9a
 scale_root_transpose 0x04c917e3 94
 scale_root_transpose.state 0x29d477b3
 division_gate_length 0xd0fd4cc4 139
@@ -66,8 +66,8 @@ replay_markov 0x76e6bd46 47
 replay_markov.state 0xf1e4849f
 grids 0x3d9b246c 61
 grids.state 0xd5eec55d
-grids_x48_y228_dens80_chaos40_drop_human 0x9c5b1b25 235
-grids_x48_y228_dens80_chaos40_drop_human.state 0xe6280b61
+grids_x48_y228_dens80_chaos40_drop_human 0xcdbe2e81 234
+grids_x48_y228_dens80_chaos40_drop_human.state 0xf0032174
 evolve_grids_every1_amount70_abac 0x1f06b032 237
 evolve_grids_every1_amount70_abac.state 0x862eff10
 bounce 0x40d8e6ed 16
@@ -84,8 +84,8 @@ evolve_awake_every1_amount70_abac 0xe166e79e 185
 evolve_awake_every1_amount70_abac.state 0x31bd5a15
 poly 0x3b042a26 33
 poly.state 0x770cabc1
-poly_div_4_3_5_7_span2_human40 0x30db1e86 85
-poly_div_4_3_5_7_span2_human40.state 0xd8bc6351
+poly_div_4_3_5_7_span2_human40 0xbb58c74d 84
+poly_div_4_3_5_7_span2_human40.state 0x8d73aa23
 evolve_poly_every1_amount100_ab 0x5687774e 129
 evolve_poly_every1_amount100_ab.state 0x8470acd8
 branch_markov_coin50_to_step_track 0xfd251671 90
