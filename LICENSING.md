@@ -44,6 +44,7 @@ Melodee's additions and modifications are credited separately in the source file
 | --- | --- | --- |
 | Original Felucca portions retained in the firmware, tools, web pages and tests | GPL-3.0-only | Source notices; `LICENSE` |
 | Felucca 1.6's fix for its issue #236 (rows dark while a storage erase stops the LED scan), ported by hand | GPL-3.0-only | `firmware/src/storage_hw.c` |
+| Felucca 1.6.1's safe CPU1 hold (`fm1_cpu1_halt`, release commit a53ecf4), as adapted in Melodee 1.4.3 (keremimo/melodee 6e6a580) | GPL-3.0-only | `firmware/hal/fm1_core1_stop.h` |
 | The PHASE engine's waveforms: a C port of the oscillator of CrispyZebra (<https://github.com/hugelton/CrispyZebra>) | GPL-3.0 | `firmware/src/eng_phase.c` |
 | The panel picture | GPL-3.0-only | `docs/panel.jpg` |
 | The Fukiai icon font (<https://github.com/hugelton/Fukiai>): the web editor's icons (the firmware draws its own: `tools/gen_icons.py`, GPL-3.0-only; `tools/gen_aa_icons.py` still rasterises Fukiai for comparison) | MIT | `web/fukiai.ttf`, `LICENSES/MIT-Fukiai.txt`, `web/FUKIAI-LICENSE.txt` |
