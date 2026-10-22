@@ -66,18 +66,18 @@ patches and tips.
 <table>
 <tr>
 <td align="center" valign="top" width="33%"><img src="assets/gallery/home.png" alt="HOME" width="240"><br><b>HOME</b><br><sub>The four tracks, their sounds and knobs.</sub></td>
-<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_constel.png" alt="CONSTELLATION" width="240"><br><b>CONSTELLATION</b><br><sub>Stars play as they cross the ship's crosshair.</sub></td>
-<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_grids.png" alt="GRIDS" width="240"><br><b>GRIDS</b><br><sub>The Grids drum map: kick, snare, hat and a fourth part.</sub></td>
+<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_constel.png" alt="CONSTELLATION" width="240"><br><b>CONSTELLATION</b><br><sub>Stars play as they cross the ship's crosshair (after the norns script Constellation).</sub></td>
+<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_grids.png" alt="GRIDS" width="240"><br><b>GRIDS</b><br><sub>Émilie Gillet's Grids drum map (Mutable Instruments): kick, snare, hat and a fourth part.</sub></td>
 </tr>
 <tr>
-<td align="center" valign="top"><img src="assets/gallery/gen_quad.png" alt="QUAD" width="240"><br><b>QUAD</b><br><sub>A 4 x 4 grid of notes the tracks share, a row each.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_quad.png" alt="QUAD" width="240"><br><b>QUAD</b><br><sub>A 4 x 4 grid of notes the tracks share, a row each (after the norns script initenere).</sub></td>
 <td align="center" valign="top"><img src="assets/gallery/gen_chord.png" alt="CHORD" width="240"><br><b>CHORD</b><br><sub>Progressions in the track's scale; QNT CHRD makes the others follow.</sub></td>
 <td align="center" valign="top"><img src="assets/gallery/gen_series.png" alt="SERIES" width="240"><br><b>SERIES</b><br><sub>Per Nørgård's infinity series.</sub></td>
 </tr>
 <tr>
 <td align="center" valign="top"><img src="assets/gallery/gen_turing.png" alt="TURING" width="240"><br><b>TURING</b><br><sub>A looping shift register.</sub></td>
 <td align="center" valign="top"><img src="assets/gallery/gen_poly.png" alt="POLY" width="240"><br><b>POLY</b><br><sub>Four notes on four rhythms.</sub></td>
-<td align="center" valign="top"><img src="assets/gallery/gen_fall.png" alt="FALL" width="240"><br><b>FALL</b><br><sub>Leaves in the wind, playing where they land.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_fall.png" alt="FALL" width="240"><br><b>FALL</b><br><sub>Leaves in the wind, playing where they land (after the norns script Fall).</sub></td>
 </tr>
 <tr>
 <td align="center" valign="top"><img src="assets/gallery/gen_evolve.png" alt="EVOLVE" width="240"><br><b>EVOLVE</b><br><sub>LOCK, EVERY, AMOUNT; ROLL picks the seed.</sub></td>
@@ -110,5 +110,9 @@ See [BUILDING.md](BUILDING.md). The host tests run with `tests/run_tests.sh`; th
 ## Credits and licence
 
 GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved. Melodee is by keremimo,
-Felucca by Leo Kuroshita / Hügelton Instruments; see [LICENSING.md](LICENSING.md) for every third-party part and
-its licence.
+Felucca by Leo Kuroshita / Hügelton Instruments.
+
+The GRIDS generator uses the drum map of **Grids** by Émilie Gillet / Mutable Instruments. Several generators are
+inspired by **norns** scripts (ideas only, no code copied): **QUAD** by initenere, **FALL** by ambalek's Fall,
+**CONSTELLATION** by timothy-taylor's Constellation, **AWAKE** by tehn's Awake and **SERIES** by nørgård. See
+[LICENSING.md](LICENSING.md) for every third-party part and its licence.
