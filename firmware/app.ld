@@ -38,6 +38,8 @@ SECTIONS
     _resource_data_start = _bss_end;
     _resource_data_end = ORIGIN(RAM) + LENGTH(RAM);
     .pool (NOLOAD) : { _pool_start = .; *(.pool*) . = ALIGN(4); _pool_end = .; } > POOL
+    /* .audio_text's C functions are aligned(16) where they are declared: placed by 2 bytes, an edit anywhere
+     * before them could start one off a word (FM6's control code was, 2026-10-23: plucky voices glitched) */
     .audio_text : { _audio_start = .; *(.audio_text*) . = ALIGN(4); _audio_end = .; } > POOL AT > XIP
     _audio_load = LOADADDR(.audio_text);
     _guard_ram_end = SIZEOF(.audio_text) ? _audio_end : _dsp_end;
