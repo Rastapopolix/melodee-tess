@@ -273,7 +273,8 @@ static double render_chord(uint32_t seconds)
     for (f = 0; f < seconds * FS; f += CTL) {
         int32_t o[2 * CTL];
         mix_block(o, CTL);
-        for (i = 0; i < 2u * CTL; i++) sum += (double)o[i] * (double)(1u + (f / CTL + i) % 7u);   /* (the order counts) */
+        for (i = 0; i < 2u * CTL; i++) sum += fabs((double)o[i]) * (double)(1u + (f / CTL + i) % 7u);   /* (the order counts; magnitudes:
+                                                                                            * > 0 when it sounds) */
     }
     for (i = 0; i < 3u; i++) trk_note_off(&trk[1], N[i]);
     trk_note_off(&trk[0], 60);

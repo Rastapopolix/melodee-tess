@@ -24,7 +24,7 @@ static struct result render(uint32_t channel, int sliced, int variant)
         close(fd[0]);
         usb.up=usb.config=1;usb.suspended=0;ua.cap_alt=1;ua_cap_channels=4;
         host_tracks_init();
-        for (uint32_t k = 0; k < NPART; k++) host_preset(&trk[k], HOST_SYNTH, 0);
+        for (uint32_t k = 0; k < NPART; k++) host_preset(&trk[k], HOST_SYNTH, HOST_PLAIN);
         t->p[P_RESERVED33] = 60;
         t->p[P_RESERVED45] = sliced ? 2 : 0;
         t->p[P_RESERVED46] = 1;
@@ -79,7 +79,7 @@ static struct result stereo_render(int insert, int send, uint32_t master)
         int32_t out[CTL * 2];
         close(fd[0]);
         host_tracks_init();
-        for (uint32_t k = 0; k < NPART; k++) host_preset(&trk[k], HOST_SYNTH, 0);
+        for (uint32_t k = 0; k < NPART; k++) host_preset(&trk[k], HOST_SYNTH, HOST_PLAIN);
         trk[0].p[P_PAN] = -40;
         trk[0].p[P_FXTYPE] = insert ? FX_ECHO : FX_OFF;
         trk[0].p[P_FXMIX] = 100;

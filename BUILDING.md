@@ -88,7 +88,7 @@ Build options (environment; most use `0` or `1`; defaults in `firmware/src/build
 | `MELODEE_USB_AUDIO` | 1 | USB audio: "Melodee Out" plays the computer through the FM-1, "Melodee In" records the four tracks (16 / 24 bit, 44.1 kHz) |
 | `MELODEE_CDC` | 0 (1 without USB audio) | USB serial console; it shares EP2 / EP3 with USB audio, so `MELODEE_USB_AUDIO=0` |
 | `MELODEE_UART` | 1 | TRS MIDI IN |
-| `MELODEE_DUAL_CORE` | 1 | paired FM6/Prophet rendering on CPU1; `0` builds serial-only firmware |
+| `MELODEE_DUAL_CORE` | 1 | paired FM6 rendering on CPU1; `0` builds serial-only firmware |
 | `MELODEE_SLICE` | 1 | the SLICE engine |
 | `MELODEE_ICONS` | 1 | parameter icons on the knob cards |
 
@@ -294,6 +294,9 @@ Verify boot, sustained audio/MIDI/USB activity, persistence and update entry
 before enabling this option by default.
 
 ## Second-core FM6/Prophet rendering
+
+(Tessera retired the CZ-1, Prophet and PHASE engines on 2026-10-22: CPU1 now pairs FM6 voices only. The Prophet notes
+below are the history of how the paired rendering was proven; their stores stay until the new project format.)
 
 The first experimental hardware install bootlooped with `DBG_MSG=0x400`
 (`c1_pc_limit_err_r`) during CPU1's ready handshake. This identifies a CPU1

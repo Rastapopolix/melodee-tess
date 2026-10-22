@@ -115,27 +115,11 @@ static void blk(void)
 static uint32_t at(double s) { return (uint32_t)(s * FS) / CTL * CTL; }
 static void run_to(uint32_t f) { while (fpos < f) blk(); }
 
-/* Casio's CZ-1 presets whose DCA has no SUS point: the whole envelope plays whatever the key does (the CZ's
- * own behaviour, docs/CZ1_SYSEX.md), and these ring past FREE_CAP_S: BELLS decays at R2 18, SITAR holds on a
- * rate-0 step, JET ROAR rises at R2 6 */
-#define FREE_LONG_S 90
-static const char *const LONG_TAIL[] = {"preset/CZ-1/47_BELLS", "preset/CZ-1/51_SITAR", "preset/CZ-1/62_JET_ROAR"};
 static uint32_t free_cap_s = FREE_CAP_S;         /* this job's (run_job_body) */
 static uint32_t tail_s = TAIL_S;                 /* .. its FX tail (a delay send's: job_sends) */
-/* the Prophet's release is calibrated (tau = 10^(4 v / 127) ms: gen_tables.py p5ms) and its voice is free at -60 dB
- * (P5_ENV_END: about 6.9 tau): a program with a long RELEASE rings that long, as the instrument does */
-static uint32_t release_cap(void)
-{
-    const track_t *t = &trk[0];
-    if (t->eng_req == ENGI_PROPHET) {
-        const uint8_t *p = p5_patch_of(t)->raw;
-        uint32_t v = p[P5_RELEASE_AMP] > 127u ? 127u : p[P5_RELEASE_AMP];
-        uint32_t s = p[P5_RELEASE_ON] ? (uint32_t)(7.0 * pow(10000.0, v / 127.0) / 1000.0) + 2u : 0u;
-        if (s > free_cap_s)
-            return s;
-    }
-    return free_cap_s;
-}
+/* (the Prophet's calibrated long releases and the CZ-1's presets without a SUS point rang longer: both retired
+ * 2026-10-22) */
+static uint32_t release_cap(void) { return free_cap_s; }
 
 /* after the last note-off (rel_at): until the voices are free, then the FX tail */
 static void finish(void)
@@ -248,8 +232,8 @@ static void job_drums(const job_t *j)           /* every GM note through 808 DRU
  * pattern 6, 1/16), 1 STUT (DIGITAL PAD, pattern 7, 1/32, DEPTH 100 %) */
 
 
-/* the 4-track mix: T1 the power-on bass (PROPHET FUNK BASS II; ANALOG ACID until 2.0), T2 the power-on pad
- * (TRK_DEF: FM6 STRINGS; GLASS PAD, PAD, DIGITAL PAD before) (tied chords), T3 SID lead (12 steps against 16),
+/* the 4-track mix: T1 the power-on bass (TRK_DEF: SID; PROPHET FUNK BASS II until 2026-10-22, ANALOG ACID until
+ * 2.0), T2 the power-on pad (TRK_DEF: FM6 STRINGS; GLASS PAD, PAD, DIGITAL PAD before) (tied chords), T3 SID lead (12 steps against 16),
  * T4 808 DRUM drums; 120 BPM, 4 bars (the hostsim TRACKS demo without the recording), stop, the tail.
  * arg 1: with the SLICER (GATE on the pad, STUT on the bass line and the drums, SWING 20 %) */
 static void job_song(const job_t *j)
@@ -361,9 +345,6 @@ static int run_job_body(job_t *j)
     memset(&R, 0, sizeof R);
     free_cap_s = FREE_CAP_S;
     tail_s = TAIL_S;
-    for (uint32_t i = 0; i < sizeof LONG_TAIL / sizeof LONG_TAIL[0]; i++)
-        if (!strcmp(j->name, LONG_TAIL[i]))
-            free_cap_s = FREE_LONG_S;
     switch (j->kind) {
     case J_PRESET:
         job_preset(j);
@@ -458,7 +439,7 @@ static void midi_pkt(uint32_t st, uint32_t d1, uint32_t d2)   /* as usb.c: the q
     midi_in_q[mi_w++ % MQ] = (st >> 4) | st << 8 | d1 << 16 | d2 << 24;
 }
 
-/* the shared budget: 4 POLY parts (the host synth (CZ-1; ANALOG until 2.0), FM6's BELL (DIGITAL's BELL until DIGITAL
+/* the shared budget: 4 POLY parts (the host synth (TRIO; the CZ-1 until 2026-10-22, ANALOG until 2.0), FM6's BELL (DIGITAL's BELL until DIGITAL
  * was retired), VOICE (retired: SID), 808 DRUM) play random notes on and off for
  * 6 s, up to 8 held each; after every block: at most 8 part voices active, none still fading (a stolen voice
  * fades within its one block), the VOICE part at most 4; then all off: every voice free */
@@ -568,7 +549,7 @@ static int chk_cap_mode_budget(char *msg, uint32_t n)
         host_tracks_init();
         for (p = 0; p < NPART; p++) {
             memset(trk[p].v, 0, sizeof trk[p].v);
-            host_preset(&trk[p], HOST_SYNTH, 0);
+            host_preset(&trk[p], HOST_SYNTH, HOST_PLAIN);
             trk[p].p[P_VOICE] = p ? V_MONO : V_POLY;
             trk[p].p[P_AMODE] = 0;
             trk[p].p[P_SUS] = 127;
@@ -619,7 +600,7 @@ static int chk_mode_budget(char *msg, uint32_t n)
             host_tracks_init();
             for (p = 0; p < NPART; p++) {
                 memset(trk[p].v, 0, sizeof trk[p].v);
-                host_preset(&trk[p], HOST_SYNTH, 0);
+                host_preset(&trk[p], HOST_SYNTH, HOST_PLAIN);
                 trk[p].p[P_VOICE] = V_MONO;
                 trk[p].p[P_AMODE] = 0;
             }
@@ -722,7 +703,7 @@ static int chk_mode_release(char *msg, uint32_t n)
     return !bad;
 }
 
-/* a stolen voice fades: plain sines (filter open, no sends) on 3 parts; part 1 holds 7 notes, part 2 one,
+/* a stolen voice fades: plain pads (hostsim steal_pad: no sends) on 3 parts; part 1 holds 7 notes, part 2 one,
  * then parts 2 and 3 take voices in turn. The largest sample step in the 2 blocks of each take must stay
  * within 1.5 x the largest one in the 0.25 s before it (a hard cut is several times larger) */
 static int chk_steal_fade(char *msg, uint32_t n)
@@ -735,7 +716,7 @@ static int chk_steal_fade(char *msg, uint32_t n)
     int32_t wat = 0, wcalm = 0;
     host_tracks_init();
     for (p = 0; p < NPART; p++)
-        xfade_sine(&trk[p]);
+        steal_pad(&trk[p]);
     for (f = 0; f < frames; f += CTL) {
         uint32_t ms = f * 1000u / FS, k0 = voice_kills;
         if (f == 0)
@@ -777,7 +758,7 @@ static int chk_keep(char *msg, uint32_t n, uint32_t mode)
     static const char *const MN[4] = {"POLY", "MONO", "LEGATO", "UNISON"};
     uint32_t k, lost = 0, kills0 = voice_kills;
     host_tracks_init();
-    host_preset(&trk[0], HOST_SYNTH, 0);
+    host_preset(&trk[0], HOST_SYNTH, HOST_PLAIN);
     trk[0].p[P_VOICE] = (int16_t)mode;
     trk[0].p[P_AMODE] = 0;
     trk[0].p[P_SUS] = 100;
@@ -970,7 +951,7 @@ int main(int argc, char **argv)
     uint32_t jobs_at_once = getenv("JOBS") ? (uint32_t)atoi(getenv("JOBS")) : 8u;
     static const char *const MN[4] = {"POLY", "MONO", "LEGATO", "UNISON"};
     static const char *const SN[6] = {"dry", "chorus", "delay", "reverb", "all", "dist"};
-    static const uint8_t MODE_E[3][2] = {{HOST_SYNTH, 0}, {ENGI_FM6, 1}, {5, 0}};   /* engine, preset */
+    static const uint8_t MODE_E[3][2] = {{HOST_SYNTH, HOST_PLAIN}, {ENGI_FM6, 1}, {5, 0}};   /* engine, preset */
     static const uint8_t SEND_E[2][2] = {{HOST_SYNTH, 4}, {ENGI_FM6, 0}};
     static uint8_t cpu_parts[MAXJ][NPART][3];
     static kv_t gold[MAXJ], cpu[MAXJ];
@@ -1044,8 +1025,8 @@ int main(int argc, char **argv)
             j->e = (uint8_t)e;
             j->pi = (uint8_t)pi;
         }
-    {   /* mixes: idle (subtracted from the presets' counts), idle + drums (part 4 808 DRUM), FM6 + PHASE + VOICE
-         * asking 8 + 8 + 4 + the drums (the budget keeps 8; FM6 plays 6) */
+    {   /* mixes: idle (subtracted from the presets' counts), idle + drums (part 4 808 DRUM), FM6 + TRIO (PHASE until
+         * 2026-10-22) + VOICE asking 8 + 8 + 4 + the drums (the budget keeps 8; FM6 plays 6) */
         job_t *j = add(J_CPU, "cpu/mix/idle");
         memset(cpu_parts[ncpu], 0, sizeof cpu_parts[ncpu]);
         j->parts = (const uint8_t (*)[3])cpu_parts[ncpu++];
@@ -1058,7 +1039,7 @@ int main(int argc, char **argv)
         j = add(J_CPU, "cpu/mix/3parts_full_drums");
         memset(cpu_parts[ncpu], 0, sizeof cpu_parts[ncpu]);
         cpu_parts[ncpu][0][0] = ENGI_FM6, cpu_parts[ncpu][0][1] = 0, cpu_parts[ncpu][0][2] = 8;
-        cpu_parts[ncpu][1][0] = 2, cpu_parts[ncpu][1][1] = 0, cpu_parts[ncpu][1][2] = 8;
+        cpu_parts[ncpu][1][0] = 6, cpu_parts[ncpu][1][1] = 0, cpu_parts[ncpu][1][2] = 8;
         cpu_parts[ncpu][2][0] = 5, cpu_parts[ncpu][2][1] = 0, cpu_parts[ncpu][2][2] = 4;
         cpu_parts[ncpu][3][0] = 4, cpu_parts[ncpu][3][1] = 4, cpu_parts[ncpu][3][2] = DRUM_HITS;
         j->parts = (const uint8_t (*)[3])cpu_parts[ncpu++];

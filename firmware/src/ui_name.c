@@ -19,7 +19,7 @@
  *   KNOB 1       the cursor; KNOB 2 the character at the cursor (SPACE A..Z 0..9 - . _ / # +; at the end: a new one).
  *   LEDs         every key that types or edits is lit; the key whose letters are being cycled blinks.
  * Spaces at either end are dropped when it is written; an empty name: USER the automatic one, PROJECT none. */
-enum { NK_NONE, NK_USER_SAVE, NK_USER_RENAME, NK_PROJ_SAVE, NK_PROJ_RENAME, NK_CZ_NAME };
+enum { NK_NONE, NK_USER_SAVE, NK_USER_RENAME, NK_PROJ_SAVE, NK_PROJ_RENAME };
 #define NM_LEN 12u
 #define NM_TAP_MS 800u                                 /* multi-tap: the next letter within this */
 #define NM_REP_MS 450u                                 /* a held arrow / DELETE repeats after this, */
@@ -39,14 +39,13 @@ static struct {
     uint8_t rep;                                       /* the key (+ 1) of a held arrow / DELETE, 0 none */
     uint32_t t, rep_t;                                 /* fm1_ms of the last tap; of the next repeat */
     uint32_t sig;                                      /* drawn-state cache */
-    char s[P5_NAME_LEN + 1u];
-    char ph[P5_NAME_LEN + 1u];                              /* what an empty name saves as / shows ("PROJECT A") */
+    char s[NM_LEN + 1u];
+    char ph[NM_LEN + 1u];                                   /* what an empty name saves as / shows ("PROJECT A") */
 } nm __attribute__((section(".pool")));                /* (zero-initialised; main loop only: off the audio code's .bss) */
 
 static uint32_t name_limit(void)
 {
-    if(nm.kind==NK_CZ_NAME)return CZ_NAME_LEN;
-    if((nm.kind==NK_USER_SAVE || nm.kind==NK_USER_RENAME) && native_limit(TSEL->eng_req))return TSEL->eng_req==ENGI_PROPHET?P5_NAME_LEN:TSEL->eng_req==ENGI_FM6?10u:CZ_NAME_LEN;
+    if((nm.kind==NK_USER_SAVE || nm.kind==NK_USER_RENAME) && native_limit(TSEL->eng_req))return 10u;   /* (FM6's) */
     return NM_LEN;
 }
 static int name_on(void) { return nm.kind != NK_NONE; }
@@ -82,22 +81,17 @@ static uint32_t nm_black(uint32_t k)                   /* black key k's function
 
 static void name_open(uint32_t kind, uint32_t slot)
 {
-    char b[P5_NAME_LEN+1u];
+    char b[NM_LEN+1u];
     nm.kind = (uint8_t)kind; ui.name_active = 1;
     nm.slot = (uint8_t)slot;
     nm.num = nm.key = nm.rep = 0;
     b[0] = 0;
-    if(kind==NK_CZ_NAME){
-        memcpy(b,cz_patch[slot].raw+128,CZ_NAME_LEN);b[CZ_NAME_LEN]=0;
-        for(uint32_t k=0;k<CZ_NAME_LEN;k++)if(b[k]<' ' || b[k]>'~')b[k]=' ';   /* (LCD custom characters) */
-        for(uint32_t k=CZ_NAME_LEN;k && b[k-1]==' ';k--)b[k-1]=0;
-        str_cpy(nm.ph,"CZ TONE",sizeof nm.ph);
-    }else if (kind == NK_USER_SAVE || kind == NK_USER_RENAME) {
+    if (kind == NK_USER_SAVE || kind == NK_USER_RENAME) {
         uint32_t e = kind == NK_USER_RENAME && !native_limit(TSEL->eng_req) ? up_engine(slot) : TSEL->eng_req;
         up_auto_name(nm.ph, e, slot);
         uint32_t origin=kind==NK_USER_RENAME?slot:user_of(TSEL);
         if(origin<USER_NONE && (kind==NK_USER_RENAME || TSEL->user_native) && native_limit(e)){
-            uint32_t len=e==ENGI_PROPHET?20u:e==ENGI_FM6?10u:16u,off=e==ENGI_PROPHET?P5_NAME:e==ENGI_FM6?118u:128u;
+            uint32_t len=10u,off=118u;                  /* (FM6's name) */
             memcpy(b,native_raw(e,origin)+off,len);b[len]=0;
             for(uint32_t i=0;i<len;i++)if(b[i]<' ' || b[i]>'~')b[i]=' ';
             for(uint32_t i=len;i && b[i-1]==' ';i--)b[i-1]=0;
@@ -105,7 +99,7 @@ static void name_open(uint32_t kind, uint32_t slot)
         else if (origin < UP_SLOTS)
             up_name(origin, b);
         else if(native_limit(e)){
-            if(e==ENGI_PROPHET)p5_patch_name(b,p5_patch_of(TSEL));else if(e==ENGI_FM6)fm6_name(b,fm6_patch[song.sel]);else {memcpy(b,cz_patch[song.sel].raw+128,16);b[16]=0;}
+            fm6_name(b,fm6_patch[song.sel]);
         }
         else
             str_cpy(b, nm.ph, sizeof b);
@@ -228,7 +222,7 @@ static void nm_knob(uint32_t k, int32_t s)             /* KNOB 1 the cursor, KNO
 /* OCT+: the name (spaces at its ends dropped) is written; the screen stays while that is refused (playing) */
 static void name_ok(void)
 {
-    char b[P5_NAME_LEN + 1u];
+    char b[NM_LEN + 1u];
     uint32_t a = 0, z;
     nm_commit();
     for (z = nm.len; z && nm.s[z - 1u] == ' '; z--)
@@ -242,9 +236,6 @@ static void name_ok(void)
         return;
     }
     switch (nm.kind) {
-    case NK_CZ_NAME:
-        cz_compare_take(nm.slot);memset(cz_patch[nm.slot].raw+128,' ',CZ_NAME_LEN);memcpy(cz_patch[nm.slot].raw+128,b,str_len(b));
-        ui_message("TONE NAMED");break;
     case NK_USER_SAVE:
         user_ui_named(2, nm.slot, b);
         break;
@@ -319,7 +310,6 @@ static uint32_t name_leds(void)
 static void nm_title(char *b)
 {
     str_cpy(b, nm.kind == NK_USER_SAVE || nm.kind == NK_PROJ_SAVE ? "SAVE " : "NAME ", 8);
-    if(nm.kind==NK_CZ_NAME){str_cpy(b,"NAME CZ TONE",24);return;}
     if (nm.kind <= NK_USER_RENAME)
         user_label(b + 5, nm.slot);
     else
@@ -337,7 +327,7 @@ static void nm_draw_name(void)
     int32_t x, w = 0;
     cv_begin(240, 18, T_BG);                            /* "Save U07", "7 / 12" */
     nm_title(b);
-    for (i = 1, x = 0; b[i]; i++) {                     /* "SAVE PROJECT C" -> "Save project C"; U07, CZ kept */
+    for (i = 1, x = 0; b[i]; i++) {                     /* "SAVE PROJECT C" -> "Save project C"; U07 kept */
         uint32_t e = i, alpha = 1;
         if (b[i - 1] != ' ' || b[i] == ' ')
             continue;

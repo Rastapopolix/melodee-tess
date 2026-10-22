@@ -11,7 +11,7 @@ Two sources, neither complete on its own (see assets/cz1-factory/README.md):
   VIRTUALCZ_CZ1_DIR  VST2/CZ1/*.fxp from Oli Larkin's VirtualCZ_Casio_Presets.zip: the same 64 tones as
                      VirtualCZ parameters, with the CZ-1 line LEVEL and the three velocity amounts.
 The 128 bytes are kept verbatim except what a CZ-1 adds: the CZ-1 DCW key-follow byte (as the device's
-own 128-byte import, cz_store.c cz_sx_import), the LEVEL / velocity nibbles and the 16-character name.
+own 128-byte import, cz_p5_store.c cz_sx_import), the LEVEL / velocity nibbles and the 16-character name.
 Every envelope rate, level and SUS of the two sources is checked to agree.
 """
 import re
@@ -29,7 +29,7 @@ NAMES = [  # the CZ-1's LCD names, A-1 .. H-8
     "SYNTH.STRINGS", "FAT ENSEMBLE", "SITAR", "SYNTH.LEAD 1", "SYNTH.LEAD 2", "SYNTH.LEAD 3", "SYNTH.LEAD 4",
     "SWEEP SOUND 1", "SYNTH.DRUMS 1", "SYNTH.DRUMS 2", "CONGA", "STEEL DRUM", "SWEEP SOUND 2", "JET ROAR",
     "MOTORCYCLE", "TYPHOON SOUND"]
-KW_CZ1 = (0, 31, 44, 57, 70, 83, 96, 111, 146, 255)  # cz_store.c: the CZ-1's DCW key-follow bytes
+KW_CZ1 = (0, 31, 44, 57, 70, 83, 96, 111, 146, 255)  # cz_p5_store.c: the CZ-1's DCW key-follow bytes
 VCZ_PARAMS = 2128                                    # VirtualCZ fxp: the parameter doubles start here
 # VirtualCZ parameter index per line: LEVEL, then the PITCH / DCW / AMP velocity amounts (0..15)
 VCZ_EXTRA = ((126, 29, 77, 127), (151, 53, 102, 152))

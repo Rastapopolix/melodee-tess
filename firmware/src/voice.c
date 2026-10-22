@@ -123,28 +123,10 @@ static uint32_t trk_vmode(const track_t *t)
 }
 
 /* ------------------------------------------------- the shared voice budget --- */
-#if MELODEE_ADMISSION
-static const track_t *voice_admitting;
-static uint8_t voice_admitting_p5parts;
-static uint32_t voice_p5_parts(void)
-{
-    if(voice_admitting)return voice_admitting_p5parts;
-    uint32_t parts=0;
-    for(uint32_t p=0;p<NPART;p++)if(trk[p].engine==ENGI_PROPHET){
-        uint32_t live=0;for(uint32_t i=0;i<NVOICE;i++)live|=trk[p].v[i].active && trk[p].v[i].stage!=4u;
-        parts+=live!=0;
-    }
-    return parts;
-}
-#endif
 static uint32_t voice_units(const track_t *t)
 {
     const engine_t *e = ENGINES[t->engine];
 #if MELODEE_ADMISSION
-    if(e==&ENG_P5_TEST){
-        return voice_p5_parts()>1u?4u:3u;
-    }
-    if(e==&ENG_CZ)return 3u;
     if(e==&ENG_FM6 || e==&ENG_SID || e==&ENG_DRUM)return 2u;
 #endif
     return e->units ? e->units(t) : trk_nvoice(t) > NPOLY ? 1u : 2u;
@@ -547,15 +529,7 @@ static void midi_out_flush(uint32_t k);
 static void trk_note_on(track_t *t,uint32_t note,uint32_t vel)
 {
     midi_out_on(t, note, vel);
-#if MELODEE_ADMISSION
-    const track_t *previous=voice_admitting;uint8_t previous_parts=voice_admitting_p5parts;
-    voice_admitting=0;uint32_t parts=voice_p5_parts();
-    if(t->engine==ENGI_PROPHET){uint32_t live=0;for(uint32_t i=0;i<NVOICE;i++)live|=t->v[i].active && t->v[i].stage!=4u;parts+=!live;}
-    voice_admitting=t;voice_admitting_p5parts=(uint8_t)parts;
-    trk_note_on_work(t,note,vel);voice_admitting=previous;voice_admitting_p5parts=previous_parts;
-#else
     trk_note_on_work(t,note,vel);
-#endif
 }
 
 static void trk_note_off(track_t *t, uint32_t note)
@@ -711,11 +685,6 @@ static __attribute__((noinline)) void spread_sum(int32_t *out)
 /* render one block of a part into out (cleared here); returns the voices rendered */
 /* Channel bend is live performance state, outside projects/presets. Q8 semitones. */
 static int32_t midi_bend_q8[NTRK], midi_bend_target[NTRK];
-static __attribute__((noinline)) void p5_update_bend(track_t *t)
-{
-    uint32_t ti=(uint32_t)(t-trk);int32_t range=(clamp(p5_patch_of(t)->raw[P5_BEND],0,11)+1)*256;
-    midi_bend_target[ti]=t->bend_raw*range/(t->bend_raw<0?8192:8191);
-}
 static struct { int16_t cents; uint8_t valid; int32_t pitch, fine; } tune_cache;
 static __attribute__((noinline)) void tune_cache_update(void)
 {
@@ -742,11 +711,11 @@ static void engine_batch_kernel(const void *data,int32_t *pcm)
 static inline void engine_join(void) {}
 static void engine_render(track_t *t,voice_t *v,const engine_t *e,int32_t *out,uint32_t n,const vmod_t *m)
 {
-    if(audio_batch_active && (e==&ENG_CZ || (MELODEE_SID&&e==&ENG_SID) || e==&ENG_DRUM)){
+    if(audio_batch_active && ((MELODEE_SID&&e==&ENG_SID) || e==&ENG_DRUM)){
         engine_batch_t j;j.track=t;j.voice=v;j.engine=e;j.modulation=*m;j.n=n;
         for(uint32_t k=0;k<8u;k++)j.engine_params[k]=t->p[P_E0+k];
         for(uint32_t k=0;k<DV_NLANE;k++)j.lane_params[k]=t->p[P_LN0+k];
-        audio_batch_push(engine_batch_kernel,&j,sizeof j,out,n,e==&ENG_CZ?AP_CZ:(MELODEE_SID&&e==&ENG_SID)||drum_issid(t)?AP_SID:drum_is909(t)?AP_909:AP_808);return;
+        audio_batch_push(engine_batch_kernel,&j,sizeof j,out,n,(MELODEE_SID&&e==&ENG_SID)||drum_issid(t)?AP_SID:drum_is909(t)?AP_909:AP_808);return;
     }
     e->render(t,v,out,n,m);
 }
@@ -851,9 +820,6 @@ static __attribute__((noinline)) uint32_t track_render_audio(track_t *t, int32_t
         if (v->vel > 110)                               /* accent opens the filter with the env */
             m.cutoff += (m.envq15 * 24) >> 7;
         m.shape = (64 << 8) + ((lfo * p[P_LD_SHP]) >> 7) + ((m.envq15 * p[P_ED_SHP]) >> 7);
-        if ((MELODEE_LEGACY_EXTRAS && e == ENGINES[2]) || e == &ENG_CZ)   /* native DCA remains the matrix's ENV source */
-            m.envq15 = phase_env_source(t, v);
-        if(e==&ENG_P5_TEST)m.envq15=p5_env_source(t,v);
         if (mod.on){
             AP_START(mod_start);mod_voice(t,v,&m,m.fine);AP_END(AP_MODULATION,mod_start);
         }

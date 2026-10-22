@@ -16,14 +16,13 @@ _ROOT = Path(__file__).resolve().parents[1]
 SRC = _ROOT / "firmware" / "src" if (_ROOT / "firmware" / "src").is_dir() else _ROOT / "src"   # either layout
 # the UI, the stores, the editor and the console: main loop only, never called by sound code
 SIZE_FILES = ["ui.c", "gfx.c", "favorites.c", "icons.c", "ui_graph.c", "ui_draw.c", "ui_menu.c", "ui_input.c",
-              "editor_native.c", "scale_picker.c", "seq_edit.c", "seq_notes.c", "seq_undo.c", "prophet_patch.c", "native_presets.c", "prophet_user.c", "note_tools.c", "sysex_library.c", "fm6_store.c", "cz_store.c", "editor_prophet.c", "ui_browser.c", "ui_designer.c", "ui_designer_input.c", "ui_layer.c", "ui_list.c", "ui_motion.c", "ui_name.c",
+              "editor_native.c", "scale_picker.c", "seq_edit.c", "seq_notes.c", "seq_undo.c", "prophet_patch.c", "native_presets.c", "prophet_user.c", "note_tools.c", "sysex_library.c", "fm6_store.c", "cz_p5_store.c", "ui_browser.c", "ui_designer.c", "ui_designer_input.c", "ui_layer.c", "ui_list.c", "ui_motion.c", "ui_name.c",
               "ui_new.c", "ui_pages.c", "ui_patterns.c", "ui_popup.c", "ui_scales.c", "ui_sections.c", "ui_slots.c", "ui_stage.c",
               "storage.c", "upreset.c", "project.c", "settings_persist.c",
-              "editor.c", "editor_cz.c", "cz_bank.c", "cz_patch.h", "pattern_store.c", "editor_fm6.c", "editor_preferences.c", "editor_backup.c", "console.c",
+              "editor.c", "cz_bank.c", "cz_patch.h", "pattern_store.c", "editor_fm6.c", "editor_preferences.c", "editor_backup.c", "console.c",
               # main-loop only too: the boot and the main loop (main.c, not its ISR), parameters and their text, the
-              # browser, the screen saver, calibration, the CZ / Prophet editing helpers, the update entry
-              "main.c", "params.c", "browse.c", "screen.c", "panel.c", "cz_edit.h", "prophet_edit.h", "ota.c", "favorites.c",
-              "cz_panel.h"]
+              # browser, the screen saver, calibration, the update entry
+              "main.c", "params.c", "browse.c", "screen.c", "panel.c", "ota.c", "favorites.c"]
 DEF = re.compile(r"^(?:static|void|int|uint\w*|int\w*|const)\b[^;=(]*?\b([A-Za-z_]\w*)\s*\(", re.M)
 # Stopped note transforms are infrequent main-loop work.
 # Keep their callers' common input/render paths compact as well as the helpers.
@@ -56,7 +55,7 @@ def size_names():
     # Playback, live capture and erase functions retain the normal optimization.
     names = {"recording_restore_note", "recording_copy", "recording_reindex",
              "drum909_init", "drum909_set", "drum_note_on", "voice_start",
-             "audio_batch_push", "mix_prepare_batch", "fm6_sync", "cz_native_block"}
+             "audio_batch_push", "mix_prepare_batch", "fm6_sync"}
     for f in SIZE_FILES:
         names.update(n for n in definitions((SRC / f).read_text()) if not n.endswith("_irq"))   # (ISRs stay as they are)
     return names

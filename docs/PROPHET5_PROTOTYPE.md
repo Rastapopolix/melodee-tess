@@ -1,5 +1,8 @@
 # Prophet-5 Rev-4 playable prototype
 
+(Tessera retired the Prophet engine on 2026-10-22: the firmware keeps its stored programs until the new project
+format, but no longer plays, loads or edits them. This page describes the engine as it was.)
+
 Work on `codex/prophet5-prototype`, based on local `next` at `2688403`.
 The playable engine, native patch storage and editor are implemented. This is
 an engineering prototype; reference calibration and human listening/control

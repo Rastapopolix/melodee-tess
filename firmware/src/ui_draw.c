@@ -546,8 +546,7 @@ static void sound_name(const track_t *t, char *b)
 {
     const engine_t *e = ENGINES[t->eng_req % NENGINES];
     b[0] = 0;
-    if(t->eng_req==ENGI_PROPHET)p5_short_name(t,b,16);
-    else if(t->user_native && user_of(t)<USER_NONE)native_name(t->eng_req,user_of(t),b);
+    if(t->user_native && user_of(t)<USER_NONE)native_name(t->eng_req,user_of(t),b);
     else if (user_of(t) < UP_SLOTS)
         up_name(user_of(t), b);
     else if (e->npresets)
@@ -1329,10 +1328,8 @@ static void draw_columns(void)
         }
         if (vp >= TSEL->p && vp < TSEL->p + P_COUNT)     /* a track parameter: the mods on it, live */
             col_mods(PID_TRACK(vp - TSEL->p));
-        draw_column(c, d->label, val, unit, (cur_page()->scope == SC_CZ1 &&   /* CZ-1: no effect on the tone as it is */
-                    !cz_ed_active(cz_patch[song.sel % NTRK].raw, cur_page()->id[c])) ||
-                    (cur_page()->scope == SC_P5 && !p5_ed_active(TSEL, cur_page()->id[c])) ||
-                    (vp == &TSEL->p[P_LRATE] && TSEL->p[P_LSYNC]) ? T_DIM : VAL(c),   /* LFO 2 SYNC on: RATE does nothing */
+        draw_column(c, d->label, val, unit,
+                    vp == &TSEL->p[P_LRATE] && TSEL->p[P_LSYNC] ? T_DIM : VAL(c),   /* LFO 2 SYNC on: RATE does nothing */
                     d->fmt == F_ENUM && d->max < 2 ? -1 : RATIO(d, *vp), param_icon(d, *vp));
     }
 }

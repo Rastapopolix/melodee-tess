@@ -85,42 +85,11 @@ def main(path):
     L += arr("CUTOFF_HZ", "uint16_t", [int(round(f)) for f in fc])
     # trapezoidal (Simper) SVF: g = tan(pi fc / FS), Q12; stable at any cutoff/resonance
     L += arr("SVF_G", "uint16_t", [int(4096 * math.tan(math.pi * min(f, 0.45 * FS) / FS)) for f in fc])
-    L += ["#if 1  /* (melodee-tess: always; MELODEE_PROPHET 0 leaves them to the linker, nothing reading them) */"]
-    L += [f"#define P5_KEYTRACK_HALF_Q7 {round(128 * 256 * 127 * math.log(2) / (2 * 192 * math.log(fc[-1] / fc[0])))}"]
-    # LFO rate, raw 0..127. Measured on a Rev-4 factory demo (rates 74..97 -> 2.4..8.4 Hz,
-    # within 2 %): ln Hz = -3.1005 + 0.05387 raw, bent at the ends to the documented .022 / 500 Hz.
-    def p5_lfo_hz(v):
-        x = -3.1005 + 0.05387 * v
-        if v > 100:
-            x += (math.log(500) - (-3.1005 + 0.05387 * 127)) * ((v - 100) / 27) ** 2
-        if v < 20:
-            x -= (-3.1005 - math.log(.022)) * ((20 - v) / 20) ** 2
-        return math.exp(x)
-    L += arr("P5_LFO_INC", "uint32_t", [int(p5_lfo_hz(v) / FS * 2**32) for v in range(128)], 8)
-    # LFO amount response (initial + wheel + pressure), normalized. Rev-4 vibrato depth measured at
-    # 18..55 fits 0.0519 * raw^1.737 cents; the full scale (235 cents) lives in the engine.
-    L += arr("P5_AMOUNT", "float", [f"{(v / 127) ** 1.737:.9e}f" for v in range(128)])
-    # Keep the calibrated times, without quantizing rates to Q24/Q16.
-    p5ms = [10000 ** (v / 127) for v in range(128)]
-    L += arr("P5_ENV_ATK", "float", [f"{CTL / (m * FS / 1000):.9e}f" for m in p5ms])
-    L += arr("P5_ENV_EXP", "float", [f"{1 - math.exp(-CTL / (m / 1000 * FS)):.9e}f" for m in p5ms])
-    L += arr("P5_ENV_SSM", "float", [f"{CTL / (3.6 * m * FS / 1000):.9e}f" for m in p5ms])
-    # TPT coefficients at the selected oversampling rate. Keep this small
-    # RAM table for audio-rate Poly-Mod; feedback division and tanh use fp32.
-    for os in (2, 1):
-        L += ["#if P5_OVERSAMPLE == 2" if os == 2 else "#else"]
-        vals = [math.tan(math.pi * f / (os * FS)) / (1 + math.tan(math.pi * f / (os * FS))) for f in fc]
-        g = arr("P5_TPT_G", "float", [f"{v:.9e}f" for v in vals])
-        g[0] = g[0].replace(" =", ' __attribute__((section(".dsp_tables"))) =')
-        L += g
-    L += ["#endif"]  # oversampling
-    tanh = arr("P5_TANH", "float", [f"{math.tanh(i / 128):.9e}f" for i in range(1025)])
+    # tanh(i / 128), i = 0..1024, in RAM: the 909 kit's saturation (gen_909_tables.py x0x_tanh_tab; the Prophet's
+    # P5_TANH until it was retired, 2026-10-22)
+    tanh = arr("DSP_TANH", "float", [f"{math.tanh(i / 128):.9e}f" for i in range(1025)])
     tanh[0] = tanh[0].replace(" =", ' __attribute__((section(".dsp_tables"))) =')
     L += tanh
-    exp2 = arr("P5_EXP2", "float", [f"{2 ** (i / 512):.9e}f" for i in range(514)])
-    exp2[0] = exp2[0].replace(" =", ' __attribute__((section(".dsp_tables"))) =')
-    L += exp2
-    L += ["#endif"]
     # level: 0 = off, else dB = (v - 112) / 2  (112 = 0 dB, 127 = +7.5 dB)
     db = [None] + [(v - 112) / 2 for v in range(1, 128)]
     L += arr("LEVEL_Q12", "uint16_t", [0] + [int(round(4096 * 10 ** (d / 20))) for d in db[1:]])
@@ -447,8 +416,8 @@ def fm6_tables():
           "{",
           "    int32_t u = 1 << 30, v = 0, x;",
           "    uint32_t i, e;",
-          "#if defined(MELODEE_FM6) && !MELODEE_FM6 && defined(MELODEE_CZ) && !MELODEE_CZ   /* (melodee-tess: neither built, */",
-          "    return;                                      /* the tables left to the linker) */",
+          "#if defined(MELODEE_FM6) && !MELODEE_FM6   /* (melodee-tess: FM6 not built, the tables left to the linker) */",
+          "    return;",
           "#endif",
           "    for (i = 0; i < 512u; i++) {",
           "        x = (v + 32) >> 6;",

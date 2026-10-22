@@ -546,9 +546,6 @@ stall:
 /* SysEx assembly: only short commands matter here */
 static void sysex_byte(uint8_t b)
 {
-#ifdef CZ_RX
-    cz_sx_byte(b);
-#endif
     static const uint8_t UBOOT_KEY[6] = {0xF0, 0x22, 0x24, 0x35, 0x7D, 0xF7};
 #ifdef FM6_RX
     fm6_sx_byte(b);                                    /* DX7 voices, banks, parameter changes (eng_fm6.c) */

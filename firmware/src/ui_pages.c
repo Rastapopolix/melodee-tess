@@ -879,8 +879,6 @@ static void pv_strip(uint32_t k)
     if (m < pvm.meter[k] - 1)
         m = pvm.meter[k] - 1;                           /* (falls ~2 dB a frame) */
     trk_short_name(k, nm);
-    if (t->eng_req == ENGI_PROPHET)
-        p5_short_name(t, nm, sizeof nm);
     sig = str_hash(1u + sel * 2u + mute * 4u + arm * 8u + hot * 16u, nm) + lvl * 7919u +
           (uint32_t)(pan + 128) * 104729u;
     if (!ui.force && sig == pvm.strip[k]) {

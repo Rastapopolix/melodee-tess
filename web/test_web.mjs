@@ -58,41 +58,7 @@ const E = vm.runInNewContext(proto + `
     "native motion: existing motion replies remain compatible");
 }
 
-async function prophetTests(){
-  {   /* bulk .syx import into a native collection: empty slots first, else overwrite from the selected slot */
-    const slots=(used)=>Array.from({length:128},(_,slot)=>({slot,used:used(slot)}));
-    const some=E.nativeImportTargets(slots(s=>s%2===0),3,10);
-    ok(!some.overwrite&&some.targets.map(x=>x.slot).join()==="1,3,5","native import: free slots are filled before anything is overwritten");
-    const full=E.nativeImportTargets(slots(()=>true),5,10);
-    ok(full.overwrite&&full.overwrite.from===10&&full.overwrite.to===14&&full.overwrite.used===5&&full.targets.map(x=>x.slot).join()==="10,11,12,13,14",
-      "native import: a full collection overwrites consecutive slots from the selected one");
-    const bank=E.nativeImportTargets(slots(s=>s<100),40,0);
-    ok(bank.overwrite&&bank.overwrite.used===40&&bank.targets.length===40,"native import: a bank larger than the free space asks to overwrite from P001");
-    let refused=false;try{E.nativeImportTargets(slots(()=>true),40,100);}catch(e){refused=/do not fit/.test(e.message);}
-    ok(refused,"native import: a bank that does not fit after the selected slot is refused before any write");
-  }
-  const b=E.P5.init();for(let i=88;i<133;i++)b[i]=(i*179)&255;b[97]=255;b[98]=255;
-  let exact=true;for(const size of [128,133])for(const cmd of [2,3])for(const model of [49,50]){const raw=b.slice();raw[133]=size;raw[134]=model;raw[135]=cmd;raw[136]=9;raw[137]=39;const f=E.P5.sysex(raw),v=E.P5.read(f).voices[0];exact&&=eq(f,E.P5.sysex(v.raw));}
-  ok(exact,"Prophet: exact single/edit SysEx round trips for both models and sizes");
-  const good=E.P5.sysex(b);let malformed=0;for(const f of [good.slice(0,-1),[...good,247],[...good.slice(0,4),128,...good.slice(5)],[240,1,51,...good.slice(3)]])try{E.P5.read(f);}catch{malformed++;}
-  ok(malformed===4,"Prophet: malformed masks, framing and foreign models rejected");
-  const factoryDir=join(HERE,"../build/prophet5/Prophet-5+10-Factory-Programs-ReadMe1.03");
-  if(existsSync(factoryDir)){const names=execFileSync("find",[factoryDir,"-name","*.syx"],{encoding:"utf8"}).trim().split("\n");for(const name of names){const bytes=new Uint8Array(readFileSync(name)),v=E.P5.read(bytes).voices;ok(v.length===200&&eq(bytes,v.flatMap(v=>Array.from(E.P5.sysex(v.raw)))),"Prophet: real factory bank preserves all 200 complete frames");}}
-  const m=E.makeMockDevice(),input=[...m.access.inputs.values()][0],output=[...m.access.outputs.values()][0],link=new E.Link(d=>output.send(d),{timeout:500});input.onmidimessage=e=>link.receive(e.data);const rq=(r,o)=>link.request(r,o),info=E.parse[E.CMD.INFO](await rq(E.req.info()));
-  ok(info.prophet&&info.native[19]===128&&info.namespace.general===16&&info.namespace[12]===17&&info.namespace[15]===18&&info.namespace[19]===20,"Prophet: stable engine/collection capability identifiers");
-  const defaultPool=await E.nativeBank.list(rq,19);
-  ok(defaultPool.slots.length===128&&defaultPool.slots.every(s=>!s.used),"Prophet: user collection starts empty");
-  const official=E.P5.read(new Uint8Array(readFileSync(join(HERE,"../assets/prophet5-factory/prophet5-v1.03.syx")))).voices;
-  ok(eq(E.P5_FACTORY[0],official[0].raw),"Prophet: first factory patch matches Sequential's original bytes");
-  await rq(E.req.track(2));const pt=E.p5LibraryPatch({name:E.P5.name(b),raw:b},info);pt.p[34]=77;await E.auditionPatch(rq,info,pt);const captured=(await E.capturePatch(rq,info,"CAPTURED")).patch;
-  ok(eq(captured.p5,b)&&m.state.tracks[2].engine===19&&m.state.tracks[2].p[34]===0,"Prophet: audition and capture target selected track and discard removed effects");
-  const ctx={keys:Array.from({length:92},(_,i)=>`P${i}`),engines:info.engines,pe0:84};const file=E.libraryFile("library",[pt],ctx),back=E.readLibraryFile(JSON.parse(JSON.stringify(file)),ctx).patches[0];ok(eq(back.p5,b),"Prophet: librarian JSON retains every native byte and metadata");
-  await E.nativeBank.put(rq,19,127,pt);const native=await E.nativeBank.get(rq,info,19,127);ok(eq(native.p5,b)&&(await E.nativeBank.list(rq,19)).total===128,"Prophet: highest native slot uses 138-byte records and lists 128 slots");
-  let writes=0;try{await E.nativeBank.put(async()=>{writes++;},19,0,{engine:19,p5:b.slice(0,133)});}catch{}ok(!writes,"Prophet: invalid native program rejected before sending any write");
-  let calls=0;try{await E.auditionPatch(async()=>{calls++;},{...info,prophet:false},pt);}catch{}ok(!calls,"Prophet: older firmware rejected before changing the sound");
-  link.close();m.stop();
-}
-await prophetTests();
+/* (the PROPHET and CZ-1 engines, their editor protocol and the mock's: retired 2026-10-22) */
 
 async function prophetBackupTests(){
   const B=await import("./fm1backup.js"),raw=new Uint8Array(3600),v=new DataView(raw.buffer);v.setUint32(0,0x31553550,true);v.setUint32(4,1<<23,true);v.setUint32(8,1<<23,true);raw.set(E.P5.init(),12+23*138);
@@ -108,50 +74,6 @@ async function prophetBackupTests(){
 }
 await prophetBackupTests();
 
-async function czTests() {
-  const b=E.CZ.init();E.CZ.setName(b,"EIGHT POINT TEST");b[20]=0x37;b[16]=0x42;b[17]=17;b[18]=5;b[19]=83;
-  for(let k=0;k<8;k++){b[21+2*k]=(k*15)&127;b[22+2*k+1-1]=(k*17)&127;}b[28]|=128;
-  // Include uncommon native wave pairs and untouched raw rate encodings.
-  b[14]=0xE0;b[15]=0xDE;
-  const file=E.CZ.sysex(b,3);const r=E.CZ.read(file);
-  ok(eq(r.voices[0].raw,b),"CZ: native 144-byte .syx import/export preserves every byte");
-  const dump=[240,68,0,0,115,48,...E.CZ.nibbles(b),247];
-  const bank=E.CZ.read([...dump,...file]);ok(bank.voices.length===2 && eq(bank.voices[1].raw,b),"CZ: dump and receive frames in a multi-tone bank");
-  const old=[240,68,0,0,112,32,96,...E.CZ.nibbles(b).slice(0,256),247];
-  ok(E.CZ.read(old,"legacy.syx").voices[0].raw.length===144,"CZ: compatible 128-byte tones gain native defaults");
-  let invalid=0;for(const f of [file.slice(0,-1),[...file.slice(0,8),16,...file.slice(9)],[240,67,0,0,112,48,...E.CZ.nibbles(b),247]])try{E.CZ.read(f);}catch{invalid++;}
-  ok(invalid===3,"CZ: malformed, foreign and truncated files are rejected");
-  const edited=b.slice();E.CZ.editPoint(edited,0,2,4,"rate",53);
-  ok(edited.every((x,i)=>i===29||x===b[i]),"CZ: one edited rate leaves every other native byte intact");
-  const m=E.makeMockDevice();const inp=[...m.access.inputs.values()][0],out=[...m.access.outputs.values()][0];const link=new E.Link(d=>out.send(d),{timeout:500});inp.onmidimessage=e=>link.receive(e.data);const rq=(r,o)=>link.request(r,o);
-  const info=E.parse[E.CMD.INFO](await rq(E.req.info()));ok(info.cz,"CZ: firmware capability is advertised");
-  await rq(E.req.track(2));const pt=E.czLibraryPatch({name:E.CZ.name(b),raw:b},info);pt.p[34]=77;pt.p[13]=12;
-  await E.auditionPatch(rq,info,pt);const live=E.parse[E.CMD.CZ_GET](await rq(E.req.czGet(0,2)));
-  ok(eq(live.raw,b),"CZ: audition targets selected track 3 with complete native data");
-  const sound=E.parse[E.CMD.DUMP](await rq(E.req.dump()),info);ok(sound.engine===15 && info.engines[2]==="-" && info.engines[15]==="CZ-1" && sound.p[34]===0 && sound.p[13]===12,"CZ: native library audition ignores removed effects and restores modulation after raw tone upload");
-  const captured=await E.capturePatch(rq,info,"Captured");ok(eq(captured.patch.cz,b),"CZ: capture reads the selected track's native tone");
-  ok(await E.bank.put(rq,8,pt)===0,"CZ: upload to user preset bank");const saved=await E.bank.get(rq,info,8);ok(eq(saved.cz,b),"CZ: user preset bank returns all 144 tone bytes");
-  const ctx={keys:Array.from({length:92},(_,i)=>`P${i}`),pe0:84,engines:info.engines};const lib=E.libraryFile("library",[captured.patch],ctx);const imported=E.readLibraryFile(lib,ctx);ok(eq(imported.patches[0].cz,b),"CZ: library JSON round trip retains native bytes");
-  let calls=0;try{await E.auditionPatch(async()=>{calls++;}, {...info,cz:false},pt);}catch{}ok(!calls,"CZ: unsupported firmware is rejected before changing sound");
-  ok(info.czBanks===0 && info.native?.[15]===128 && info.native?.[12]===64,"CZ: independent native preset collections advertised");
-  const tones=Array.from({length:16},(_,i)=>{const t=b.slice();E.CZ.setName(t,`TONE ${i+1}`);return t;});
-  await E.czBankUpload(rq,0,{name:"FIRST BANK",tones});await E.czBankUpload(rq,7,{name:"LAST BANK",tones:[b]});
-  const first=await E.czBankRead(rq,0),last=await E.czBankRead(rq,7);
-  ok(first.name==="FIRST BANK" && eq(first.tones[15],tones[15]) && eq(last.tones[0],b) && !last.tones[1],"CZ: independent named banks retain all native bytes and empty slots");
-  const before=Array.from(m.state.czbanks[0]);let writes=0;
-  try{await E.czBankUpload(async(...args)=>{writes++;return rq(...args);},0,{name:"BAD",tones:[b.slice(0,128)]});}catch{}
-  ok(!writes && eq(before,Array.from(m.state.czbanks[0])),"CZ: invalid bank refused before any write");
-  let chunks=0;try{await E.czBankUpload(async(r,o)=>{if(r[1][0]===1 && ++chunks===3)throw Error("Disconnected");return rq(r,o);},0,{name:"CUT SHORT",tones:[b]});}catch{}
-  ok(eq(before,Array.from(m.state.czbanks[0])),"CZ: interrupted bank upload keeps previously committed bank");
-  const exported=first.tones.flatMap(t=>Array.from(E.CZ.sysex(t)));const again=E.CZ.read(exported);
-  ok(again.voices.length===16 && eq(again.voices[15].raw,tones[15]),"CZ: dedicated bank exports a complete reusable .syx bank");
-  const legacy=Array(165).fill(0);legacy[2]=1;for(let i=149;i<165;i++)legacy[i]=32;legacy[149]=77;
-  for(let l=0;l<2;l++){const base=23+l*8;legacy[base+4]=15;legacy[base+2]=5;for(let e=0;e<3;e++){const b=39+(l*3+e)*18;for(let k=0;k<8;k++)legacy[b+k]=99;legacy[b+8]=e?99:0;legacy[b+17]=1;}}
-  const migrated=E.readLibraryFile({format:"felucca-library",version:1,pE0:84,engines:["CZ-1"],patches:[{name:"OLD CZ",engine:0,engineName:"CZ-1",params:Array(92).fill(0),cz1:legacy}]},ctx).patches[0];
-  ok(migrated.engine===15 && migrated.cz[128]===77 && migrated.cz[18]===5 && migrated.cz[19]===83 && migrated.p[91]===2,"CZ: earlier next librarian tones migrate to native bank-ready patches");
-  link.close();m.close?.();
-}
-await czTests();
 
 async function nativeTests() {
   const m=E.makeMockDevice(), inp=[...m.access.inputs.values()][0], out=[...m.access.outputs.values()][0];
@@ -164,20 +86,22 @@ async function nativeTests() {
   ok(eq(a.fm6,fm) && eq(b.cz,cz) && b.name==="FULL CZ NAME XY!","native: highest slots return exact native bytes and full CZ name");
   ok(a.p.every(x=>x===null) && !a.pattern && !b.grid,"native: returned presets contain no Felucca effects or pattern");
   await rq(E.req.set(0,34,77));await rq(E.req.set(0,13,12));const before=JSON.stringify(m.state.tracks[0].step);
-  await E.nativeBank.load(rq,15,127,0);const sound=E.parse[E.CMD.DUMP](await rq(E.req.dump()),info);
-  ok(sound.engine===15 && sound.p[34]===0 && sound.p[13]===12 && JSON.stringify(m.state.tracks[0].step)===before,"native: loading changes the tone and keeps modulation and steps without effects");
-  await rq(E.req.set(0,info.pe0,3));await E.nativeBank.load(rq,15,127,0);
-  ok(E.parse[E.CMD.DUMP](await rq(E.req.dump()),info).p[info.pe0]===3,"native: scrolling within CZ keeps track macros");
-  const status=E.parse[E.CMD.NATIVE](await rq(E.req.native(15,7,0)));ok(status.user===128,"native: Z128 current slot survives 7-bit protocol encoding");
-  await E.nativeBank.store(rq,15,126,0,"SECOND CZ");const stored=await E.nativeBank.get(rq,info,15,126);
-  ok(stored.name==="SECOND CZ" && eq(stored.cz.slice(0,128),cz.slice(0,128)),"native: saving the playing tone and rename preserve the complete sound");
-  await rq(E.req.favSet(info.namespace[15],127,true));const names=[];
+  const refused=await E.nativeBank.load(rq,15,127,0);
+  ok(refused===1 && E.parse[E.CMD.DUMP](await rq(E.req.dump()),info).engine!==15,"native: a CZ tone stays stored, its load refused (the CZ-1 retired)");
+  await E.nativeBank.load(rq,12,63,0);const sound=E.parse[E.CMD.DUMP](await rq(E.req.dump()),info);
+  ok(sound.engine===12 && sound.p[34]===0 && sound.p[13]===12 && JSON.stringify(m.state.tracks[0].step)===before,"native: loading changes the voice and keeps modulation and steps without effects");
+  await rq(E.req.set(0,info.pe0,3));await E.nativeBank.load(rq,12,63,0);
+  ok(E.parse[E.CMD.DUMP](await rq(E.req.dump()),info).p[info.pe0]===3,"native: scrolling within FM6 keeps track macros");
+  const status=E.parse[E.CMD.NATIVE](await rq(E.req.native(12,7,0)));ok(status.user===64,"native: F064 current slot survives 7-bit protocol encoding");
+  await E.nativeBank.store(rq,12,62,0,"SECOND FM");const stored=await E.nativeBank.get(rq,info,12,62);
+  ok(stored.name==="SECOND FM" && eq(stored.fm6.slice(0,118),fm.slice(0,118)),"native: saving the playing voice and rename preserve the complete sound");
+  await rq(E.req.favSet(info.namespace[12],63,true));const names=[];
   const prefs=await E.readDevicePreferences(rq,info,names);const rows=E.devicePresetRows(info,names,prefs);
-  ok(rows.some(r=>r.nativeEngine===15 && r.preset===127 && r.favorite),"native: normal preset browser includes CZ user favorites");
+  ok(rows.some(r=>r.nativeEngine===12 && r.preset===63 && r.favorite),"native: normal preset browser includes FM6 user favorites");
   let writes=0;const counted=(...args)=>{writes++;return rq(...args);};
   for(const [engine,pt] of [[12,{engine:15,cz}],[15,{engine:15,cz:cz.slice(0,128)}],[12,{engine:12,fm6:[...fm.slice(0,127),128]}]])try{await E.nativeBank.put(counted,engine,0,pt);}catch{}
   ok(!writes,"native: wrong collection and malformed tones are rejected before writing");
-  await rq(E.req.preset(3, 0));ok(E.parse[E.CMD.NATIVE](await rq(E.req.native(15,7,0))).user===0,"native: choosing a factory preset clears native origin");
+  await rq(E.req.preset(3, 0));ok(E.parse[E.CMD.NATIVE](await rq(E.req.native(12,7,0))).user===0,"native: choosing a factory preset clears native origin");
   await E.nativeBank.erase(rq,15,127);ok(!(await E.nativeBank.get(rq,info,15,127)).used && !(await E.nativeBank.list(rq,15)).slots[127].used,"native: erase removes the slot from the scrollable collection");
   link.close();m.stop();
 }
@@ -190,7 +114,7 @@ async function editorMock() {
   inp.onmidimessage = (e) => link.receive(e.data);
   const rq = async (r, o) => link.request(r, o);
   const info = E.parse[E.CMD.INFO](await rq(E.req.info()));
-  ok(info.nengines === 20 && info.engines[14] === "-" && info.engines[1] === "-" && info.engines[12] === "FM6" && info.engines[13] === "-"
+  ok(info.nengines === 22 && info.engines[15] === "-" && info.engines[19] === "-" && info.engines[14] === "-" && info.engines[1] === "-" && info.engines[12] === "FM6" && info.engines[13] === "-"
  && info.engines[2] === "-" && info.engines[5] === "-" && info.engines[6] === "TRIO" && info.engines[7] === "-" && info.engines[8] === "-" && info.engines[9] === "PHYS" && info.engines[10] === "DRUM" && info.engines[11] === "-" && info.pcount === 119 && info.pe0 === 111 && info.engines[4] === "-",
     "editor: INFO");
   let descs = 0;
@@ -265,13 +189,13 @@ async function editorMock() {
   ok(E.parse[E.CMD.UI_SET](await rq(E.req.uiSet(0, 8))).rc === 1, "editor: out-of-range palette refused");
   ok(E.parse[E.CMD.UI_SET](await rq(E.req.uiSet(1, 1))).rc === 2, "editor: the retired font weight answers not supported");
   ok(E.parse[E.CMD.FAV_SET](await rq(E.req.favSet(info.namespace.general, 31, true))).rc === 1, "editor: empty user slot cannot be favorited");
-  await rq(E.req.favSet(19, 0, true));
+  await rq(E.req.favSet(6, 0, true));
   await rq(E.req.uiSet(3, 1));
   prefs = await E.readDevicePreferences(rq, info, names, prefs);
-  ok(E.devicePresetRows(info, names, prefs).length === 1 && prefs.favorites[19][0], "editor: favorites filter follows device state");
-  m.state.favorites[19][0] = false; m.state.favorites[3][0] = true;
+  ok(E.devicePresetRows(info, names, prefs).length === 1 && prefs.favorites[6][0], "editor: favorites filter follows device state");
+  m.state.favorites[6][0] = false; m.state.favorites[3][0] = true;
   prefs = await E.readDevicePreferences(rq, info, names, prefs);
-  ok(!prefs.favorites[19][0] && prefs.favorites[3][0], "editor: panel-side favorite changes refresh");
+  ok(!prefs.favorites[6][0] && prefs.favorites[3][0], "editor: panel-side favorite changes refresh");
   await rq(E.req.upStore(31, "FAVORITE"));
   await rq(E.req.favSet(info.namespace.general, 31, true));
   prefs = await E.readDevicePreferences(rq, info, names, prefs);
@@ -282,17 +206,18 @@ async function editorMock() {
   await rq(E.req.upErase(31));
   prefs = await E.readDevicePreferences(rq, info, names, prefs);
   ok(!prefs.favorites[info.namespace.general][31] && !E.devicePresetRows(info, names, prefs).some((r) => r.user), "editor: erased slot disappears and loses star");
-  {   /* the lists in the device's order (engines.c ENGINE_ORDER): FM6 second, DRUM last, "-" never; the numbers stay */
+  {   /* the lists in the device's order (engines.c ENGINE_ORDER): FM6 first (second until the PROPHET was retired,
+       2026-10-22), DRUM last, "-" never; the numbers stay */
     const shown = E.engineOrder(info.engines).map((i) => info.engines[i]);
-    ok(shown.join() === "PROPHET,FM6,CZ-1,SID,TRIO,PHYS,DRUM" &&
-       E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines).at(-1) === 10,
-       "editor: engines listed FM6 second, DRUM last (indices kept)");
+    ok(shown.join() === "FM6,SID,TRIO,PHYS,DRUM" &&
+       E.engineOrder(info.engines)[0] === 12 && E.engineOrder(info.engines).at(-1) === 10,
+       "editor: engines listed FM6 first, DRUM last (indices kept)");
     ok(E.engineOrder(["ANALOG", "X", "-", "DRUM", "FM6"]).join() === "0,4,3,1", "editor: an unknown engine follows the known ones");
     m.state.favorites[10][0] = m.state.favorites[12][0] = true;
     await rq(E.req.uiSet(3, 0));
     prefs = await E.readDevicePreferences(rq, info, names, prefs);
     const rows = E.devicePresetRows(info, names, prefs).filter((r) => !r.user), eng = [...new Set(rows.map((r) => r.engine))];
-    ok(eng[0] === 19 && eng[1] === 12 && eng[eng.length - 1] === 10, "editor: device presets in the device's engine order");
+    ok(eng[0] === 12 && eng[eng.length - 1] === 10, "editor: device presets in the device's engine order");
   }
   const none = await E.readDevicePreferences(() => { throw new Error("unexpected request"); }, { uiCaps: 0 }, []);
   ok(none === null, "editor: old firmware receives no unsupported preference requests");
@@ -662,7 +587,7 @@ async function editorLibrarian() {
   const ctx = { keys, engines: info.engines, firmware: info.version, pe0: info.pe0 };
   const pts = [cap, { ...bass, engineName: info.engines[bass.engine], tags: ["bass", "device"] }];
   const file = JSON.parse(JSON.stringify(E.libraryFile("library", pts, ctx)));
-  ok(file.format === "felucca-library" && file.version === 1 && file.pCount === 119 && file.paramLabels.length === 119 && file.paramLabels[81] === "CHRD" && file.paramLabels[82] === "VOIC" && file.paramLabels[83] === "DEG" && file.paramLabels.slice(92, 96).join() === "SYNC,TRIG,POL,SPRD" && file.engines.length === 20,
+  ok(file.format === "felucca-library" && file.version === 1 && file.pCount === 119 && file.paramLabels.length === 119 && file.paramLabels[81] === "CHRD" && file.paramLabels[82] === "VOIC" && file.paramLabels[83] === "DEG" && file.paramLabels.slice(92, 96).join() === "SYNC,TRIG,POL,SPRD" && file.engines.length === 22,
     "library file: versioned, with P_COUNT, labels and engines");
   const back = E.readLibraryFile(file, ctx);
   const oldKeys = keys.slice(); oldKeys[8] = "FX";
@@ -860,7 +785,7 @@ async function editorTracks() {
   const { m, rq, ev, done } = attachMock({ watchMs: 1000 });
   const info = E.parse[C.INFO](await rq(E.req.info()));
   const tr = E.parse[C.TRACK](await rq(E.req.track()));
-  ok(info.ntrk === 4 && tr.sel === 0 && tr.ntrk === 4 && tr.tracks[0].engine === 19 && tr.tracks[1].engine === 12
+  ok(info.ntrk === 4 && tr.sel === 0 && tr.ntrk === 4 && tr.tracks[0].engine === 3 && tr.tracks[1].engine === 12
     && tr.tracks[3].engine === 10 && tr.tracks[3].preset === 0, "tracks: INFO NTRK, TRACK lists 4 parts (track 4: DRUM KIT)");
   /* the v1 commands follow the selected track */
   const d0 = E.parse[C.DUMP](await rq(E.req.dump()), info);
@@ -869,7 +794,7 @@ async function editorTracks() {
   await rq(E.req.set(0, 1, 77));
   const td0 = E.parse[C.TRACK_DUMP](await rq(E.req.trackDump(0)), info);
   const td1 = E.parse[C.TRACK_DUMP](await rq(E.req.trackDump(1)), info);
-  ok(t1.sel === 1 && d1.engine === 12 && d0.engine === 19 && td1.p[1] === 77 && td0.p[1] === d0.p[1] && td0.p[1] !== 77,
+  ok(t1.sel === 1 && d1.engine === 12 && d0.engine === 3 && td1.p[1] === 77 && td0.p[1] === d0.p[1] && td0.p[1] !== 77,
     "tracks: TRACK selects; DUMP / SET act on it, TRACK_DUMP reads any track");
   /* steps of a track that is not selected */
   const w = E.parse[C.TRACK_STEP](await rq(E.req.trackStep(2, 5, { n: 2, notes: [60, 67, 0, 0], time: 0, flags: 1, vel: 99 })));
