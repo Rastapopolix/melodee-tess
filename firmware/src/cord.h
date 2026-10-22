@@ -42,6 +42,7 @@ enum {
     CD_CS_AUTO,
     CD_CH_PROG,
     CD_GRD_KICK, CD_GRD_SNR, CD_GRD_HAT, CD_GRD_TOMS,
+    CD_AN_VARY,
     CD_N
 };
 
