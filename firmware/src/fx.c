@@ -193,7 +193,7 @@ static __attribute__((noinline,section(".dsp_text"))) void fx_tape(fx_state_t *r
 #else
 #define FX_FILTER_SECTION ".dsp_text"
 #endif
-static __attribute__((noinline,section(FX_FILTER_SECTION))) void fx_filter(fx_state_t *restrict f,uint32_t ch,int32_t *restrict b,uint32_t n)
+static __attribute__((noinline,section(FX_FILTER_SECTION),aligned(16))) void fx_filter(fx_state_t *restrict f,uint32_t ch,int32_t *restrict b,uint32_t n)
 {
 #if MELODEE_HW_EQ
     if(fx_hw_status==1){
@@ -274,7 +274,7 @@ static inline __attribute__((always_inline)) int32_t fx_chorus_read(const int16_
     return (a*256+(b-a)*(int32_t)frac)>>6;
 }
 /* Use the existing POOL SRAM code section; low DSP SRAM is already full. */
-static __attribute__((noinline,section(".audio_text"))) void fx_chorus(fx_state_t *restrict f,int16_t *restrict mem,uint32_t n,const int32_t *step,int32_t target)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) void fx_chorus(fx_state_t *restrict f,int16_t *restrict mem,uint32_t n,const int32_t *step,int32_t target)
 {
     int32_t l=f->rev_l,r=f->rev_r,mix=f->mix;uint32_t pos=f->pos;
     for(uint32_t i=0;i<n;i++){
@@ -490,7 +490,7 @@ static __attribute__((noinline,section(".dsp_text"))) void fx_pan(track_t *t,int
 /* Position the finished track once. A mono engine stays mono through its
  * filter chain even when PAN is slightly off centre; stereo effects and
  * genuine engine spread retain their independent channels and tails. */
-static __attribute__((noinline,section(".audio_text"))) void fx_post_pan(track_t *t,uint32_t n)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) void fx_post_pan(track_t *t,uint32_t n)
 {
     int32_t pan=t->p[P_PAN];if(!pan)return;
     int32_t gl=4096-(pan>0?pan*64:0),gr=4096+(pan<0?pan*64:0);
@@ -498,12 +498,12 @@ static __attribute__((noinline,section(".audio_text"))) void fx_post_pan(track_t
         fx_left[i]=fx_scale(fx_left[i],(uint32_t)gl*16u);fx_right[i]=fx_scale(fx_right[i],(uint32_t)gr*16u);
     }
 }
-static __attribute__((noinline,section(".audio_text"))) void fx_zero(fx_state_t *f)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) void fx_zero(fx_state_t *f)
 {
     typedef uint32_t word_t __attribute__((may_alias));word_t *words=(word_t *)f;for(uint32_t k=0;k<sizeof *f/4u;k++)words[k]=0;
 }
 static __attribute__((noinline)) void *fx_memory(uint32_t id,uint32_t bytes){return resource_get(id,bytes);}
-static __attribute__((noinline,section(".audio_text"))) int fx_active(const track_t *t)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) int fx_active(const track_t *t)
 {
     uint32_t ti=(uint32_t)(t-trk);
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
@@ -554,7 +554,7 @@ static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p)
     }
     plan->f=f;plan->mem=mem;plan->target=target;plan->active=1;
 }
-static __attribute__((noinline,section(".audio_text"))) int fx_slot_run(const fx_plan_t *plan,uint32_t n)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) int fx_slot_run(const fx_plan_t *plan,uint32_t n)
 {
     if(!plan->active)return 0;
     fx_state_t *f=plan->f;int16_t *mem=plan->mem;int32_t target=plan->target;
@@ -588,12 +588,12 @@ static __attribute__((noinline,section(".audio_text"))) int fx_slot_run(const fx
     }
     return 1;
 }
-static __attribute__((noinline,section(".audio_text"))) int fx_slot_values(uint32_t si,const int16_t *p,uint32_t n)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) int fx_slot_values(uint32_t si,const int16_t *p,uint32_t n)
 {
     fx_plan_t plan;void (*volatile prepare)(fx_plan_t *,uint32_t,const int16_t *)=fx_slot_prepare;prepare(&plan,si,p);
     int (*volatile run)(const fx_plan_t *,uint32_t)=fx_slot_run;return run(&plan,n);
 }
-static __attribute__((noinline,section(".audio_text"))) int fx_process_impl(track_t *t,int32_t *b,uint32_t n)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) int fx_process_impl(track_t *t,int32_t *b,uint32_t n)
 {
     uint32_t ti=(uint32_t)(t-trk);
     if(!fx_active(t)){
