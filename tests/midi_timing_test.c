@@ -256,9 +256,9 @@ static int recorded_gate_storage_test(void)
     pattern_request(&trk[0], 1);
     trk[0].step[2] = (step_t){{64}, 1, ST_NOTE, 0, 70, 0, 211};
     project_capture(&proj_scratch);
-    int ok = bank_pack(proj_wire_u.raw, &proj_scratch, 1) && bank_valid(proj_wire_u.raw, BANK_STORE_SIZE);
+    uint32_t n = tsp_pack(proj_wire_u.raw, &proj_scratch, 1); int ok = n && tsp_valid(proj_wire_u.raw, n);
     if (ok) {
-        project_restore_runtime(&proj_scratch); bank_restore(proj_wire_u.raw);
+        project_restore_runtime(&proj_scratch); tsp_restore(proj_wire_u.raw);
         ok = trk[0].step[2].acc == 211 && pattern_at(0, 0)->step[0].acc == 83;
     }
     return check("recorded gates survive project save/load in active and inactive banks", ok);

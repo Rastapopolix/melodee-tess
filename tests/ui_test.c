@@ -3112,6 +3112,8 @@ static int test_chain(void)
     bad += check("SONG invalid bank refuses before changing any track", chain_prepare() == 1 && !chain.armed &&
         !memcmp(trk[0].step, before[0], sizeof before[0]));
     chain_patterns[1][3] = 1;
+    tessera_reset();                                     /* (step tracks: the record keeps generators, and the tests before
+                                                          * left one on track 1) */
     project_save(2); chain_defaults(&chain_config); pattern_init(); project_load(2);
     bad += check("SONG bank assignments saved and loaded with all patterns", chain_config.count == 2 &&
         chain_config.row[0].repeat == 2 && chain_patterns[1][3] == 1);
@@ -4275,8 +4277,9 @@ static int test_fm6_pages(void)
                  fm6_fn[tr][FN_PTIME] == 9u);
     {   /* a project saved before (no function settings in its record): Dexed's */
         uint8_t *raw = proj_bank_slot[3];
-        memset(raw + BANK_FN_OFF, 0, 4u + NTRK * FM6_NFN);
-        bank_checksum(raw);
+        tsp_valid(raw, proj_bank_len[3]);                /* (TSP1: the FM6 part's "function settings" byte 0) */
+        raw[tsp_seen.at[TSP_FM6] + sizeof proj_scratch.fm6] = 0;
+        tsp_resum(raw);
         project_load(3);
         bad += check("  a project of before: Dexed's", fm6_fn[tr][FN_ENGINE] == FM6_MARK1 && !fm6_fn[tr][FN_PTIME]);
     }

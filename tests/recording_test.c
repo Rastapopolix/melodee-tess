@@ -96,15 +96,15 @@ static int raw_storage(void)
     pattern_switch(t,7); t->p[P_RECQ]=5;
     seq_start(); seq_advance(0); seq_advance(1800); input_on(t,67,81); seq_advance(600); input_off(t,67); seq_stop();
     project_capture(&proj_scratch);
-    int packed = bank_pack(proj_wire_u.raw,&proj_scratch,1);
-    int valid = packed && bank_valid(proj_wire_u.raw,BANK_STORE_SIZE);
+    uint32_t packed = tsp_pack(proj_wire_u.raw,&proj_scratch,1);
+    int valid = packed && tsp_valid(proj_wire_u.raw,packed);
     int ok = valid;
 
-    if(ok){ project_restore_runtime(&proj_scratch);bank_restore(proj_wire_u.raw); }
+    if(ok){ project_restore_runtime(&proj_scratch);tsp_restore(proj_wire_u.raw); }
     ok &= t->pattern==7 && t->p[P_RECQ]==5 && !memcmp(&original,&recording[0],sizeof original) && recording[1].owner==7;
     pattern_switch(t,0); t->p[P_RECQ]=0; raw_replay(); seq_advance(605);ok &= !gate_note(t,60);seq_advance(1);ok &= gate_note(t,60);
     int bad = check("active and inactive bank recordings survive save/load and replay at their original time",ok);
-    bad += check("the complete new project fits its base and two extension sectors", BANK_STORE_SIZE<=(5u * 4096u - 256u + 2u * 3840u));
+    bad += check("the complete new project fits its record (TSP1, a project copy)", packed && packed<=TSP_MAX && TSP_MAX<=38368u);
     return bad;
 }
 static int raw_capacity(void)
@@ -183,8 +183,8 @@ static int full_recording_replay(void)
      * not mutate the take, and its last event must survive project storage. */
     for(uint32_t i=0;i<RECORD_MAX;i++) {seq_advance(54);input_on(t,60,70+i%58u);seq_advance(12);input_off(t,60);}
     seq_stop();recorded_note_t last=recording[RECORD_MAX-1];
-    project_capture(&proj_scratch);int ok=bank_pack(proj_wire_u.raw,&proj_scratch,1) && bank_valid(proj_wire_u.raw,BANK_STORE_SIZE);
-    if(ok){ok=!project_restore_runtime(&proj_scratch);bank_restore(proj_wire_u.raw);}
+    project_capture(&proj_scratch);uint32_t n=tsp_pack(proj_wire_u.raw,&proj_scratch,1);int ok=n && tsp_valid(proj_wire_u.raw,n);
+    if(ok){ok=!project_restore_runtime(&proj_scratch);tsp_restore(proj_wire_u.raw);}
     ok &= !memcmp(&last,&recording[RECORD_MAX-1],sizeof last);
     raw_replay();
     for(uint32_t i=0;i<RECORD_MAX;i++) {
@@ -513,8 +513,8 @@ static int take_quantization(void)
         t->p[P_RECQ] = q == 10 ? 1 : q + 1u; seq_stop(); raw_replay();
         bad += check("changing or disabling QNT never re-quantizes a completed take", !memcmp(snapped, recording, sizeof snapped));
         seq_stop(); project_capture(&proj_scratch);
-        int packed = bank_pack(proj_wire_u.raw, &proj_scratch, 1);
-        if (packed) { project_restore_runtime(&proj_scratch); bank_restore(proj_wire_u.raw); }
+        uint32_t packed = tsp_pack(proj_wire_u.raw, &proj_scratch, 1);
+        if (packed && tsp_valid(proj_wire_u.raw, packed)) { project_restore_runtime(&proj_scratch); tsp_restore(proj_wire_u.raw); }
         bad += check("committed quantized timing and independent durations survive project save/load", packed && !memcmp(snapped, recording, sizeof snapped));
     }
 

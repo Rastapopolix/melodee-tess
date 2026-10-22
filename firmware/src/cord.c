@@ -240,11 +240,9 @@ static void cord_pack(uint8_t *out)
         out[4] = (uint8_t)c->amount; out[5] = (uint8_t)c->offset;
     }
 }
-/* a saved block -> the cords: every cord checked first (a code, a track, a percentage out of range: refused whole,
- * nothing changed); 1 loaded, 0 refused. Main loop */
-static int cord_unpack(const uint8_t *in)
+/* a saved block -> got: every cord checked (a code, a track, a percentage out of range): 1 all good, 0 refused */
+static int cord_parse(const uint8_t *in, cord_t *got)
 {
-    cord_t got[CORD_MAX];
     uint32_t i;
     for (i = 0; i < CORD_MAX; i++, in += 6) {
         cord_t *c = &got[i];
@@ -255,6 +253,21 @@ static int cord_unpack(const uint8_t *in)
             c->amount < -100 || c->amount > 100 || c->offset < -100 || c->offset > 100)
             return 0;
     }
+    return 1;
+}
+/* the checks alone, nothing changed (project.c reads a record before it replaces anything) */
+static int cord_check(const uint8_t *in)
+{
+    cord_t got[CORD_MAX];
+    return cord_parse(in, got);
+}
+/* a saved block -> the cords: every cord checked first (refused whole, nothing changed); 1 loaded, 0 refused. Main
+ * loop */
+static int cord_unpack(const uint8_t *in)
+{
+    cord_t got[CORD_MAX];
+    uint32_t i;
+    if (!cord_parse(in, got)) return 0;
     TESS_IRQ_OFF();
     memcpy(cords, got, sizeof cords);
     cord_masks();

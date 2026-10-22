@@ -352,21 +352,29 @@ static int test_compact_history(void)
                     exact &= !memcmp(&s, &decoded, sizeof s);
                 }
     bad += check("compact history preserves every step byte for all control combinations", exact);
+    {   /* step v2: RATCH and NUDGE (the sub byte) go through history too */
+        step_t v = {{60}, 1, ST_NOTE, 0, 96, 0, 0, 0, 0}, w;
+        step_snapshot_t snap;
+        step_set_ratch(&v, 3); step_set_nudge(&v, -5);
+        step_snapshot_put(&snap, &v); w = step_snapshot_get(&snap);
+        bad += check("history keeps RATCH and NUDGE", !memcmp(&v, &w, sizeof v) && step_ratch(&w) == 3u && step_nudge(&w) == -5);
+    }
     bad += check("all eight levels have fixed storage even for dense patterns",
-                 sizeof step_history.state[0].step == NSTEP * 9u && sizeof undo_sram[0].step == NSTEP * 9u);
+                 sizeof step_history.state[0].step == NSTEP * 10u && sizeof undo_sram[0].step == NSTEP * 10u);
     track_t *t = edit_setup();
     for (uint32_t i = 0; i < NSTEP; i++) {
         put_note(t, i, 48u + i % 36u, 1);
         t->step[i].vel = (uint8_t)(30u + i);
     }
     project_capture(&proj_scratch);
-    uint32_t sum = proj_scratch.sum;
     bad += check("decoded project borrows canvas with a separate archive buffer",
                  (void *)&proj_scratch == (void *)cv_primary && (void *)proj_wire_u.raw != (void *)cv_primary);
-    bad += check("dense project packs while decoded and serialized scratch coexist", bank_pack(proj_wire_u.raw, &proj_scratch, 1));
+    uint32_t len = tsp_pack(proj_wire_u.raw, &proj_scratch, 1), h = len ? proj_hash(proj_wire_u.raw, len) : 0u;
+    bad += check("dense project packs while decoded and serialized scratch coexist", len != 0u);
     cv_begin(240, 124, RGB(10, 20, 30));
-    bad += check("screen drawing cannot damage a pending archive; decoding reacquires scratch",
-                 bank_valid(proj_wire_u.raw, BANK_STORE_SIZE) && proj_scratch.sum == sum);
+    int same = tsp_valid(proj_wire_u.raw, len) && proj_hash(proj_wire_u.raw, len) == h;
+    for (uint32_t i = 0; i < NSTEP; i++) same &= proj_scratch.t[t - trk].step[i].vel == 30u + i;
+    bad += check("screen drawing cannot damage a pending archive; decoding reacquires scratch", same);
     return bad;
 }
 

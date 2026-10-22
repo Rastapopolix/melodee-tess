@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments; Theo Dainis (melodee-tess) */
 /* A project saved by an older build of the fork, loaded by this one (after an upstream merge): the music and the
- * Tessera state (OBJ_TESSERA, tagged with the project record's hash) must come back as saved. The same source builds
- * in both trees (the harness of tests/persistence_test.c):
+ * Tessera state (in the project's TSP1 record since Tessera's own format, 2026-10-22) must come back as saved. An
+ * older build saving FBKK (before own-format) has no converter: its slots read as empty here, so upgrade_check.sh
+ * only means something from a REF that saves TSP1. The same source builds in both trees (the harness of
+ * tests/persistence_test.c):
  *   upgrade_test save OUT.nor    the older build: a project with a generator on each track, EVOLVE and FORM, saved
  *                                in slot 1, the whole NOR written out
  *   upgrade_test load IN.nor     this build: boot from that NOR (persist_boot), load slot 1, compare

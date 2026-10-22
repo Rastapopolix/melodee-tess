@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
  * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
-/* Projects: four slots in NOR, each holding 32 independent pattern banks.
- * FBKK (pattern_store.c) contains the FUN20 sound/current-pattern record below.
- * Hardware retains only slot names/occupancy in RAM; full records use one
- * main-loop staging buffer. Host fixtures also provide a RAM storage backend.
+/* Projects: four slots in NOR (storage.c OBJ_PROJ0..3), each a TSP1 record (project_tsp.c, Tessera 2026-10-22) with
+ * all 32 pattern banks, the generators and the cords. Hardware retains only slot names/occupancy in RAM; full records
+ * use one main-loop staging buffer. Host fixtures also provide a RAM storage backend.
+ * The FUN20 record below is no longer stored: it remains the import of an older backup and the host tests' view of a
+ * slot (proj_slot), until the next step removes it.
  *
  * FUN18, FUN17 and FUN16 are read: 1.2's boot pass rewrote older ones, and
  * archives of before 1.0.0 restore through 1.2. A record keeps np (byte 66), the P_COUNT it was written with;
@@ -95,9 +96,19 @@ _Static_assert(sizeof(project_store_t) == 13212u, "FUN17 keeps the FUN16 extent"
 #define PROJ_DEF_SOUND 0xFFu                   /* preset byte: the track's power-on sound, no steps (kept from an
                                                 * import of before 1.0) */
 #define PROJ_DEF_KEEP 0xFEu                    /* .. the 808 DRUM sound, steps and the rest kept (old drums) */
+#define TSP_MAX 32768u                         /* a TSP1 record at most (project_tsp.c): its RAM buffers are in the pool, beside the audio arena */
 #if !defined(FM1_IRQ_TARGET)
-project_store_t proj_slot[4];                 /* host-only cache; hardware reads complete projects from NOR */
-static uint8_t proj_bank_slot[4][PROJ_BANK_BYTES];
+project_store_t proj_slot[4];                 /* host-only cache: each slot's project as FUN, for the host tests */
+static uint8_t proj_bank_slot[4][TSP_MAX];    /* host-only: each slot's TSP1 record (MELODEE_FLASH 0: the slots) */
+static uint32_t proj_bank_len[4];
+/* MELODEE_FLASH 0: a slot holds its record only while its FUN view is there too (a test empties a slot by clearing
+ * proj_slot, as before) */
+static uint32_t proj_ram_len(uint32_t slot)
+{
+    uint32_t m;
+    memcpy(&m, proj_slot[slot & 3u].raw, 4);
+    return m == PROJ_MAGIC ? proj_bank_len[slot & 3u] : 0u;
+}
 #endif
 static struct { uint8_t used, old; char name[PROJ_NAME_LEN + 1u]; } proj_meta[4];   /* old: a record this firmware
                                                      * does not read (written before 1.0): shown, kept, never overwritten unasked */
@@ -400,7 +411,7 @@ static uint8_t proj_cur = PROJ_NO_SLOT;      /* the slot the music was loaded fr
                                               * renames the music too); PROJ_NO_SLOT none (the editor's restore) */
 static union {                               /* serialized main-loop work, also used for archive transfers */
     project_store_t p;                       /* standalone legacy record view */
-    uint8_t raw[PROJ_BANK_BYTES];              /* complete FBKG, including legacy imports */
+    uint8_t raw[TSP_MAX];                      /* a whole TSP1 record, also an import's FUN */
 } proj_wire_u __attribute__((section(".pool")));
 #define proj_wire proj_wire_u.p
 static uint8_t proj_wire_gen;                /* +1 whenever proj_wire is rewritten (a backup's runtime copy lives there) */
@@ -438,30 +449,34 @@ static void proj_bound(project_t *q)
     q->sum = proj_sum(q);
 }
 
-#include "pattern_store.c"
+#include "project_tsp.c"                      /* TSP1: the record a slot holds */
 
 /* FNV of each slot's stored bytes, as last written or read (0: unknown): autosave writes only what differs */
 static uint32_t proj_saved_hash[4];
+static uint8_t proj_read_fun;                  /* host RAM slots: the slot read held only a FUN record (proj_slot) */
+/* slot -> proj_wire_u (its record) and proj_scratch (its project); the record's length, 0 = none / unreadable */
 static int proj_read_slot(uint32_t slot)
 {
-    int n = -1;
+    int n = -1, valid;
     slot &= 3u;
     proj_wire_gen++;
+    proj_read_fun = 0;
 #if MELODEE_FLASH
-    if (flash_ok) {
-        n = st_load(OBJ_SLOT(slot), proj_wire_u.raw, sizeof proj_wire_u.raw);
-    }
+    if (flash_ok) n = st_load(OBJ_SLOT(slot), proj_wire_u.raw, sizeof proj_wire_u.raw);
 #else
-    if (bank_valid(proj_bank_slot[slot], BANK_STORE_SIZE) &&
-        !memcmp(proj_bank_slot[slot] + 8u, &proj_slot[slot], sizeof proj_slot[slot])) {
-        n = BANK_STORE_SIZE; memcpy(proj_wire_u.raw, proj_bank_slot[slot], BANK_STORE_SIZE);
-    } else { n = sizeof proj_slot[slot]; memcpy(proj_wire_u.raw, &proj_slot[slot], sizeof proj_slot[slot]); }
+    n = (int)proj_ram_len(slot);
+    if (n) memcpy(proj_wire_u.raw, proj_bank_slot[slot], (uint32_t)n);
 #endif
-    int valid = bank_full((uint32_t)n) ? bank_valid(proj_wire_u.raw, n) : proj_import(&proj_scratch, proj_wire_u.raw, n);
+    valid = n > 0 && tsp_valid(proj_wire_u.raw, (uint32_t)n);
+#if !MELODEE_FLASH
+    if (!valid && proj_import(&proj_scratch, &proj_slot[slot], sizeof proj_slot[slot])) {   /* (a test's FUN record) */
+        n = sizeof proj_slot[slot]; valid = 1; proj_read_fun = 1;
+    }
+#endif
 #if MELODEE_FLASH && !defined(FM1_IRQ_TARGET)
-    if (valid) {
-        if (n == BANK_STORE_SIZE) { memcpy(proj_bank_slot[slot], proj_wire_u.raw, BANK_STORE_SIZE); memcpy(&proj_slot[slot], proj_wire_u.raw + 8u, sizeof proj_slot[slot]); }
-        else { memset(proj_bank_slot[slot], 0, sizeof proj_bank_slot[slot]); proj_bound(&proj_scratch); proj_pack(&proj_slot[slot], &proj_scratch); }
+    if (valid) {                                       /* (the host tests' views of it) */
+        memcpy(proj_bank_slot[slot], proj_wire_u.raw, (uint32_t)n); proj_bank_len[slot] = (uint32_t)n;
+        proj_bound(&proj_scratch); (void)proj_pack(&proj_slot[slot], &proj_scratch);
     }
 #endif
     proj_meta[slot].used = (uint8_t)valid;
@@ -470,10 +485,11 @@ static int proj_read_slot(uint32_t slot)
 #endif
     if (valid) proj_name_get(proj_meta[slot].name, (const uint8_t *)proj_scratch.name);
     else proj_meta[slot].name[0] = 0;
-    proj_saved_hash[slot] = valid && n == BANK_STORE_SIZE ? proj_hash(proj_wire_u.raw, BANK_STORE_SIZE) : 0u;
+    proj_saved_hash[slot] = valid && !proj_read_fun ? proj_hash(proj_wire_u.raw, (uint32_t)n) : 0u;
     return valid ? n : 0;
 }
 static void proj_fetch(uint32_t slot) { (void)proj_read_slot(slot); }
+/* a record (len bytes; 0: the slot emptied) -> slot. proj_scratch holds its project. 0 done, 2 the write failed */
 static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
 {
     slot &= 3u;
@@ -483,7 +499,13 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
 #if !defined(FM1_IRQ_TARGET)
     memset(proj_bank_slot[slot], 0, sizeof proj_bank_slot[slot]);
     memset(&proj_slot[slot], 0, sizeof proj_slot[slot]);
-    if (len) { memcpy(proj_bank_slot[slot], raw, len); memcpy(&proj_slot[slot], raw + 8u, sizeof proj_slot[slot]); }
+    proj_bank_len[slot] = len;
+    if (len) {
+        project_t keep;                               /* (host: the FUN view of what was written) */
+        memcpy(proj_bank_slot[slot], raw, len);
+        memcpy(&keep, &proj_scratch, sizeof keep);
+        proj_bound(&keep); (void)proj_pack(&proj_slot[slot], &keep);
+    }
 #endif
     proj_meta[slot].used = len != 0;
     proj_meta[slot].old = 0;
@@ -492,290 +514,6 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
     else proj_meta[slot].name[0] = 0;
     return 0;
 }
-
-
-/* ---- Tessera: its state is one flash object (OBJ_TESSERA: 4 slots x tag + block), apart from the project record
- * (no room in it). A slot's block is valid only while its tag equals the project record's hash (proj_saved_hash):
- * any other write to the slot (an archive, a failed or interrupted save) loads the project with Tessera OFF. */
-#if MELODEE_FLASH
-#define TESS_OBJ_MAGIC 0x37315354u                    /* "TS17": blocks of version 17 (CHORD's BREATH) */
-#define TESS_SLOT_BYTES (4u + TESSERA_PK_BYTES)
-#define TESS_OBJ_BYTES (4u + 4u * TESS_SLOT_BYTES)
-#define TESS_OBJ_MAGIC_V16 0x36315354u                /* "TS16": version 16 (SUB's RATCH), read and converted */
-#define TESS_SLOT_BYTES_V16 (4u + TESSERA_PK_BYTES_V16)
-#define TESS_OBJ_BYTES_V16 (4u + 4u * TESS_SLOT_BYTES_V16)
-#define TESS_OBJ_MAGIC_V15 0x35315354u                /* "TS15": version 15 (Grids' PART4), read and converted */
-#define TESS_SLOT_BYTES_V15 (4u + TESSERA_PK_BYTES_V15)
-#define TESS_OBJ_BYTES_V15 (4u + 4u * TESS_SLOT_BYTES_V15)
-#define TESS_OBJ_MAGIC_V14 0x34315354u                /* "TS14": version 14 (STEP EVOLVE), read and converted */
-#define TESS_SLOT_BYTES_V14 (4u + TESSERA_PK_BYTES_V14)
-#define TESS_OBJ_BYTES_V14 (4u + 4u * TESS_SLOT_BYTES_V14)
-#define TESS_OBJ_MAGIC_V13 0x33315354u                /* "TS13": version 13 (Grids' KICK .. TOMS, Chord's USER), read and converted */
-#define TESS_SLOT_BYTES_V13 (4u + TESSERA_PK_BYTES_V13)
-#define TESS_OBJ_BYTES_V13 (4u + 4u * TESS_SLOT_BYTES_V13)
-#define TESS_OBJ_MAGIC_V12 0x32315354u                /* "TS12": version 12 (CHORD), read and converted */
-#define TESS_SLOT_BYTES_V12 (4u + TESSERA_PK_BYTES_V12)
-#define TESS_OBJ_BYTES_V12 (4u + 4u * TESS_SLOT_BYTES_V12)
-#define TESS_OBJ_MAGIC_V11 0x31315354u                /* "TS11": version 11 (CONSTELLATION's LEN and FILL), read and converted */
-#define TESS_SLOT_BYTES_V11 (4u + TESSERA_PK_BYTES_V11)
-#define TESS_OBJ_BYTES_V11 (4u + 4u * TESS_SLOT_BYTES_V11)
-#define TESS_OBJ_MAGIC_V10 0x30315354u                /* "TS10": version 10 (QUAD's columns, RANGE, LINKs), read and converted */
-#define TESS_SLOT_BYTES_V10 (4u + TESSERA_PK_BYTES_V10)
-#define TESS_OBJ_BYTES_V10 (4u + 4u * TESS_SLOT_BYTES_V10)
-#define TESS_OBJ_MAGIC_V9 0x39525354u                 /* "TSR9": version 9 (with SERIES and CELLS), read and converted */
-#define TESS_SLOT_BYTES_V9 (4u + TESSERA_PK_BYTES_V9)
-#define TESS_OBJ_BYTES_V9 (4u + 4u * TESS_SLOT_BYTES_V9)
-#define TESS_OBJ_MAGIC_V8 0x38525354u                 /* "TSR8": version 8 (with CONSTELLATION), read and converted */
-#define TESS_SLOT_BYTES_V8 (4u + TESSERA_PK_BYTES_V8)
-#define TESS_OBJ_BYTES_V8 (4u + 4u * TESS_SLOT_BYTES_V8)
-#define TESS_OBJ_MAGIC_V7 0x37525354u                 /* "TSR7": version 7 (with NOTE LENGTH), read and converted */
-#define TESS_SLOT_BYTES_V7 (4u + TESSERA_PK_BYTES_V7)
-#define TESS_OBJ_BYTES_V7 (4u + 4u * TESS_SLOT_BYTES_V7)
-#define TESS_OBJ_MAGIC_V6 0x36525354u                 /* "TSR6": version 6 (with QUAD), read and converted */
-#define TESS_SLOT_BYTES_V6 (4u + TESSERA_PK_BYTES_V6)
-#define TESS_OBJ_BYTES_V6 (4u + 4u * TESS_SLOT_BYTES_V6)
-#define TESS_OBJ_MAGIC_V5 0x35525354u                 /* "TSR5": version 5 (with BRANCH, LOGIC, COND), read and converted */
-#define TESS_SLOT_BYTES_V5 (4u + TESSERA_PK_BYTES_V5)
-#define TESS_OBJ_BYTES_V5 (4u + 4u * TESS_SLOT_BYTES_V5)
-#define TESS_OBJ_MAGIC_V4 0x34525354u                 /* "TSR4": version 4 (with Bounce, Awake, Poly), read and converted */
-#define TESS_SLOT_BYTES_V4 (4u + TESSERA_PK_BYTES_V4)
-#define TESS_OBJ_BYTES_V4 (4u + 4u * TESS_SLOT_BYTES_V4)
-#define TESS_OBJ_MAGIC_V3 0x33525354u                 /* "TSR3": version 3 (before them), read and converted */
-#define TESS_SLOT_BYTES_V3 (4u + TESSERA_PK_BYTES_V3)
-#define TESS_OBJ_BYTES_V3 (4u + 4u * TESS_SLOT_BYTES_V3)
-#define TESS_OBJ_MAGIC_V2 0x32525354u                 /* "TSR2": version 2 (before Grids), read and converted */
-#define TESS_SLOT_BYTES_V2 (4u + TESSERA_PK_BYTES_V2)
-#define TESS_OBJ_BYTES_V2 (4u + 4u * TESS_SLOT_BYTES_V2)
-#define TESS_OBJ_MAGIC_V1 0x31525354u                 /* "TSR1": version 1 (before SEED), read and converted */
-#define TESS_SLOT_BYTES_V1 (4u + TESSERA_PK_BYTES_V1)
-#define TESS_OBJ_BYTES_V1 (4u + 4u * TESS_SLOT_BYTES_V1)
-/* the cords (cord.c), after the blocks: "CRD1", then per slot a tag (as the slot's block's) and its cords. An object
- * without them (saved before cords) reads as every slot without cords */
-#define TESS_CRD_MAGIC 0x31445243u                    /* "CRD1" */
-#define TESS_CRD_SLOT (4u + CORD_PK_BYTES)
-#define TESS_CRD_BYTES (4u + 4u * TESS_CRD_SLOT)
-#define TESS_OBJ_BYTES_CRD (TESS_OBJ_BYTES + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V16_CRD (TESS_OBJ_BYTES_V16 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V15_CRD (TESS_OBJ_BYTES_V15 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V14_CRD (TESS_OBJ_BYTES_V14 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V13_CRD (TESS_OBJ_BYTES_V13 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V12_CRD (TESS_OBJ_BYTES_V12 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V11_CRD (TESS_OBJ_BYTES_V11 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V10_CRD (TESS_OBJ_BYTES_V10 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V9_CRD (TESS_OBJ_BYTES_V9 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V8_CRD (TESS_OBJ_BYTES_V8 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V7_CRD (TESS_OBJ_BYTES_V7 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V6_CRD (TESS_OBJ_BYTES_V6 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V5_CRD (TESS_OBJ_BYTES_V5 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V4_CRD (TESS_OBJ_BYTES_V4 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V3_CRD (TESS_OBJ_BYTES_V3 + TESS_CRD_BYTES)
-#define TESS_OBJ_BYTES_V2_CRD (TESS_OBJ_BYTES_V2 + TESS_CRD_BYTES)
-_Static_assert(TESS_OBJ_BYTES_CRD <= ST_SECTOR - 256u - sizeof(st_hdr_t), "Tessera object: one sector");
-static uint8_t tess_blob[TESS_OBJ_BYTES_CRD] __attribute__((section(".pool")));
-static uint8_t *tess_crd(uint32_t slot) { return tess_blob + TESS_OBJ_BYTES + 4u + (slot & 3u) * TESS_CRD_SLOT; }
-static void tess_crd_empty(void)                      /* the cords' part: its magic, no slot's */
-{
-    uint32_t m = TESS_CRD_MAGIC;
-    memset(tess_blob + TESS_OBJ_BYTES, 0, TESS_CRD_BYTES);
-    memcpy(tess_blob + TESS_OBJ_BYTES, &m, 4);
-}
-
-/* The forms a stored object (or a backup of one) may have: its version, whether the cords follow its blocks. 0 = none
- * of them (a length or magic of no version, a cords' part without its magic) */
-typedef struct { uint8_t ver, crd; } tess_form_t;
-static tess_form_t tess_obj_form(const uint8_t *raw, uint32_t len)
-{
-    tess_form_t f = {0, 0};
-    uint32_t got, cm = TESS_CRD_MAGIC;
-    if (len < 4u) return f;
-    memcpy(&got, raw, 4);
-    if (len == TESS_OBJ_BYTES_CRD) { f.ver = 17; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES, 4); }
-    else if (len == TESS_OBJ_BYTES) f.ver = 17;
-    else if (len == TESS_OBJ_BYTES_V16_CRD) { f.ver = 16; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V16, 4); }
-    else if (len == TESS_OBJ_BYTES_V16) f.ver = 16;
-    else if (len == TESS_OBJ_BYTES_V15_CRD) { f.ver = 15; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V15, 4); }
-    else if (len == TESS_OBJ_BYTES_V15) f.ver = 15;
-    else if (len == TESS_OBJ_BYTES_V14_CRD) { f.ver = 14; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V14, 4); }
-    else if (len == TESS_OBJ_BYTES_V14) f.ver = 14;
-    else if (len == TESS_OBJ_BYTES_V13_CRD) { f.ver = 13; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V13, 4); }
-    else if (len == TESS_OBJ_BYTES_V13) f.ver = 13;
-    else if (len == TESS_OBJ_BYTES_V12_CRD) { f.ver = 12; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V12, 4); }
-    else if (len == TESS_OBJ_BYTES_V12) f.ver = 12;
-    else if (len == TESS_OBJ_BYTES_V11_CRD) { f.ver = 11; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V11, 4); }
-    else if (len == TESS_OBJ_BYTES_V11) f.ver = 11;
-    else if (len == TESS_OBJ_BYTES_V10_CRD) { f.ver = 10; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V10, 4); }
-    else if (len == TESS_OBJ_BYTES_V10) f.ver = 10;
-    else if (len == TESS_OBJ_BYTES_V9_CRD) { f.ver = 9; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V9, 4); }
-    else if (len == TESS_OBJ_BYTES_V9) f.ver = 9;
-    else if (len == TESS_OBJ_BYTES_V8_CRD) { f.ver = 8; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V8, 4); }
-    else if (len == TESS_OBJ_BYTES_V8) f.ver = 8;
-    else if (len == TESS_OBJ_BYTES_V7_CRD) { f.ver = 7; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V7, 4); }
-    else if (len == TESS_OBJ_BYTES_V7) f.ver = 7;
-    else if (len == TESS_OBJ_BYTES_V6_CRD) { f.ver = 6; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V6, 4); }
-    else if (len == TESS_OBJ_BYTES_V6) f.ver = 6;
-    else if (len == TESS_OBJ_BYTES_V5_CRD) { f.ver = 5; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V5, 4); }
-    else if (len == TESS_OBJ_BYTES_V5) f.ver = 5;
-    else if (len == TESS_OBJ_BYTES_V4_CRD) { f.ver = 4; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V4, 4); }
-    else if (len == TESS_OBJ_BYTES_V4) f.ver = 4;
-    else if (len == TESS_OBJ_BYTES_V3_CRD) { f.ver = 3; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V3, 4); }
-    else if (len == TESS_OBJ_BYTES_V3) f.ver = 3;
-    else if (len == TESS_OBJ_BYTES_V2_CRD) { f.ver = 2; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V2, 4); }
-    else if (len == TESS_OBJ_BYTES_V2) f.ver = 2;
-    else if (len == TESS_OBJ_BYTES_V1) f.ver = 1;
-    if (!f.ver || got != (f.ver == 17 ? TESS_OBJ_MAGIC : f.ver == 16 ? TESS_OBJ_MAGIC_V16 : f.ver == 15 ? TESS_OBJ_MAGIC_V15 : f.ver == 14 ? TESS_OBJ_MAGIC_V14 : f.ver == 13 ? TESS_OBJ_MAGIC_V13 : f.ver == 12 ? TESS_OBJ_MAGIC_V12 : f.ver == 11 ? TESS_OBJ_MAGIC_V11 : f.ver == 10 ? TESS_OBJ_MAGIC_V10 : f.ver == 9 ? TESS_OBJ_MAGIC_V9 : f.ver == 8 ? TESS_OBJ_MAGIC_V8 : f.ver == 7 ? TESS_OBJ_MAGIC_V7 : f.ver == 6 ? TESS_OBJ_MAGIC_V6 : f.ver == 5 ? TESS_OBJ_MAGIC_V5 : f.ver == 4 ? TESS_OBJ_MAGIC_V4 : f.ver == 3 ? TESS_OBJ_MAGIC_V3 : f.ver == 2 ? TESS_OBJ_MAGIC_V2 :
-                          TESS_OBJ_MAGIC_V1) ||
-        cm != TESS_CRD_MAGIC)
-        f.ver = 0;
-    return f;
-}
-static uint32_t tess_slot_bytes(uint32_t ver) { return 4u + tessera_pk_bytes(ver); }
-
-/* tess_blob holding an object of form f (as stored, at its start) -> version 17 with the cords' part, in place: each
- * slot's tag kept, each track converted (tessera_track_up); the cords moved after the longer blocks,
- * or none. The cords up first, then the blocks from the end down, so nothing is overwritten before it is read
- * (everything moves up) */
-static void tess_obj_upgrade(tess_form_t f)
-{
-    uint32_t m = TESS_OBJ_MAGIC, sb = tess_slot_bytes(f.ver), pk = sb - 4u;
-    if (f.ver == 17) {                                /* (nothing moves) */
-        if (!f.crd) tess_crd_empty();
-        return;
-    }
-    if (f.crd)                                        /* (up, from the end down: no memmove in libc.c) */
-        for (uint32_t i = TESS_CRD_BYTES; i-- > 0;)
-            tess_blob[TESS_OBJ_BYTES + i] = tess_blob[4u + 4u * sb + i];
-    for (int slot = 3; slot >= 0; slot--) {
-        uint8_t *src = tess_blob + 4u + (uint32_t)slot * sb, *dst = tess_blob + 4u + (uint32_t)slot * TESS_SLOT_BYTES;
-        for (int tr = TESSERA_TRACKS - 1; tr >= 0; tr--) {
-            uint8_t rec[TESSERA_PK_BYTES / TESSERA_TRACKS];
-            tessera_track_up(f.ver, src + 4u + (uint32_t)tr * (pk / TESSERA_TRACKS), rec);
-            memcpy(dst + 4u + (uint32_t)tr * sizeof rec, rec, sizeof rec);
-        }
-        {
-            uint32_t tg;                              /* (slot 0: the same place) */
-            memcpy(&tg, src, 4);
-            memcpy(dst, &tg, 4);
-        }
-    }
-    memcpy(tess_blob, &m, 4);
-    if (!f.crd) tess_crd_empty();
-}
-
-/* the stored object -> tess_blob (older versions converted); 0 = none / damaged (tess_blob then empty, ready to fill) */
-static int tess_obj_read(void)
-{
-    uint32_t m = TESS_OBJ_MAGIC;
-    int n = st_load(OBJ_TESSERA, tess_blob, sizeof tess_blob);
-    tess_form_t f = tess_obj_form(tess_blob, n > 0 ? (uint32_t)n : 0u);
-    if (f.ver) {
-        tess_obj_upgrade(f);
-        return 1;
-    }
-    memset(tess_blob, 0, sizeof tess_blob);
-    memcpy(tess_blob, &m, 4);
-    tess_crd_empty();
-    return 0;
-}
-static uint8_t *tess_slot(uint32_t slot) { return tess_blob + 4u + (slot & 3u) * TESS_SLOT_BYTES; }
-#endif
-
-/* FNV of the Tessera state each slot last saved or loaded: autosave also writes when only the generators changed
- * (their state is not in the project record, so the record's hash alone does not see it) */
-static uint32_t tess_saved_hash[4];
-static uint32_t tessera_live_hash(void)
-{
-    uint8_t b[TESSERA_PK_BYTES + CORD_PK_BYTES];      /* (main loop: on the stack; the cords too) */
-    tessera_pack(b);
-    cord_pack(b + TESSERA_PK_BYTES);
-    return proj_hash(b, sizeof b);
-}
-
-/* the live Tessera state -> slot's block, tagged with the record just written: 0 saved */
-static int tessera_store_save(uint32_t slot)
-{
-    tess_saved_hash[slot & 3u] = tessera_live_hash();
-#if MELODEE_FLASH
-    uint32_t tag = proj_saved_hash[slot & 3u];
-    if (!flash_ok) return 1;
-    tess_obj_read();
-    memcpy(tess_slot(slot), &tag, 4);
-    tessera_pack(tess_slot(slot) + 4u);
-    memcpy(tess_crd(slot), &tag, 4);
-    cord_pack(tess_crd(slot) + 4u);
-    return st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob) ? 1 : 0;
-#else
-    (void)slot; return 0;
-#endif
-}
-
-/* slot's block -> the live state, if its tag is the record's hash (else: left as it is) */
-static void tessera_store_load(uint32_t slot)
-{
-#if MELODEE_FLASH
-    uint32_t tag, want = proj_saved_hash[slot & 3u];
-    if (!flash_ok || !want || !tess_obj_read()) return;
-    memcpy(&tag, tess_slot(slot), 4);
-    if (tag == want) tessera_unpack(tess_slot(slot) + 4u);
-    memcpy(&tag, tess_crd(slot), 4);
-    if (tag == want) (void)cord_unpack(tess_crd(slot) + 4u);   /* (else none: tessera_reset cleared them) */
-#else
-    (void)slot;
-#endif
-}
-
-/* the record was rewritten without changing the music (a rename): its block follows the new hash */
-static void tessera_store_retag(uint32_t slot, uint32_t old_tag)
-{
-#if MELODEE_FLASH
-    uint32_t tag, now = proj_saved_hash[slot & 3u];
-    if (!flash_ok || !old_tag || !now || old_tag == now || !tess_obj_read()) return;
-    memcpy(&tag, tess_slot(slot), 4);
-    if (tag != old_tag) return;
-    memcpy(tess_slot(slot), &now, 4);
-    memcpy(&tag, tess_crd(slot), 4);
-    if (tag == old_tag) memcpy(tess_crd(slot), &now, 4);
-    (void)st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob);
-#else
-    (void)slot; (void)old_tag;
-#endif
-}
-
-#if MELODEE_FLASH
-/* the editor's backup (editor_backup.c id 28): the stored object back, every slot's block checked first (each one
- * tried on the live state, which is put back after), nothing written for a damaged one. len 0: no blocks (an archive
- * of a device that had none). 0 done, 2 invalid, 4 the flash write failed */
-static uint32_t tessera_store_restore(const uint8_t *raw, uint32_t len)
-{
-    uint8_t live[TESSERA_PK_BYTES];
-    uint32_t m = TESS_OBJ_MAGIC, tag, slot, ok = 1;
-    if (len) {
-        tess_form_t f = tess_obj_form(raw, len);     /* (older versions, before cords: converted below) */
-        uint32_t sb = tess_slot_bytes(f.ver), crd_at = 4u + 4u * sb;
-        uint8_t live_c[CORD_PK_BYTES];
-        if (!f.ver) return 2;
-        tessera_pack(live);
-        cord_pack(live_c);
-        for (slot = 0; slot < 4u && ok; slot++) {
-            memcpy(&tag, raw + 4u + slot * sb, 4);
-            if (tag) ok = tessera_unpack_ver(f.ver, raw + 4u + slot * sb + 4u) == 1;
-            if (f.crd && ok) {
-                memcpy(&tag, raw + crd_at + 4u + slot * TESS_CRD_SLOT, 4);
-                if (tag) ok = cord_unpack(raw + crd_at + 4u + slot * TESS_CRD_SLOT + 4u);
-            }
-        }
-        tessera_unpack(live);
-        (void)cord_unpack(live_c);
-        if (!ok) return 2;
-        memcpy(tess_blob, raw, len);
-        tess_obj_upgrade(f);
-    } else {
-        memset(tess_blob, 0, sizeof tess_blob);
-        memcpy(tess_blob, &m, 4);
-        tess_crd_empty();
-    }
-    return flash_ok && !st_save(OBJ_TESSERA, tess_blob, sizeof tess_blob) ? 0u : 4u;
-}
-#endif
 
 static void project_capture(project_t *p)
 {
@@ -834,12 +572,12 @@ static int project_save_as(uint32_t slot, const char *name)
         memcpy(p->name, name, str_len(name) < PROJ_NAME_LEN ? str_len(name) : PROJ_NAME_LEN);
     }
     proj_wire_gen++;
-    if (!bank_pack(proj_wire_u.raw, p, 1)) { ui_message("SAVE FORMAT ERROR"); return 2; }
-
-    if (proj_write_slot(slot, proj_wire_u.raw, BANK_STORE_SIZE)) { ui_message("SAVE ERROR"); return 2; }
+    uint32_t len = tsp_pack(proj_wire_u.raw, p, 1);    /* (the generators and cords in it too) */
+    if (!len) { ui_message("SAVE FORMAT ERROR"); return 2; }
+    if (proj_write_slot(slot, proj_wire_u.raw, len)) { ui_message("SAVE ERROR"); return 2; }
     proj_name_get(proj_name, (const uint8_t *)p->name);
     proj_cur = (uint8_t)(slot & 3u);
-    ui_message(tessera_store_save(slot) ? "SAVED (TSR ERR)" : MELODEE_FLASH ? "SAVED" : "SAVED (RAM)");
+    ui_message(MELODEE_FLASH ? "SAVED" : "SAVED (RAM)");
     return 0;
 }
 static int project_save(uint32_t slot) { return project_save_as(slot, 0); }
@@ -879,10 +617,9 @@ static void project_autosave(void)
         return;
     project_capture(p);
     proj_wire_gen++;                                    /* (the staging RAM: a backup's copy there is gone) */
-    if (!bank_pack(proj_wire_u.raw, p, 1))
-        return;
-    if (proj_hash(proj_wire_u.raw, BANK_STORE_SIZE) == proj_saved_hash[slot] && tessera_live_hash() == tess_saved_hash[slot])
-        return;                                         /* as saved, the generators too: nothing to write */
+    uint32_t len = tsp_pack(proj_wire_u.raw, p, 1);
+    if (!len || proj_hash(proj_wire_u.raw, len) == proj_saved_hash[slot])
+        return;                                         /* as saved (the generators are in the record): nothing to write */
     project_quick_save();
 }
 static void project_cur_name(char *b) { str_cpy(b, proj_name, PROJ_NAME_LEN + 1u); }   /* b: 13 bytes */
@@ -911,20 +648,14 @@ static int project_rename(uint32_t slot, const char *name)
     }
     int n = proj_read_slot(slot);
     if (!n) { ui_message("EMPTY SLOT"); return 1; }
-    uint32_t tess_old_tag = proj_saved_hash[slot & 3u];
-    memset(p->name, 0, sizeof p->name);
-    memcpy(p->name, name, str_len(name) < PROJ_NAME_LEN ? str_len(name) : PROJ_NAME_LEN);
-    p->sum = proj_sum(p);
-    if (n == BANK_STORE_SIZE) {
-        memcpy(proj_wire_u.raw + BANK_MOTION_OFF, bank_import_tags, sizeof bank_import_tags);
-        if (!proj_pack((project_store_t *)(proj_wire_u.raw + 8u), p)) return 2;
-        bank_checksum(proj_wire_u.raw);
-    } else {
+    if (proj_read_fun) {                                /* (host RAM slots: a test's FUN record, made a record) */
+        memset(p->name, 0, sizeof p->name);
+        memcpy(p->name, name, str_len(name) < PROJ_NAME_LEN ? str_len(name) : PROJ_NAME_LEN);
         proj_bound(p); chain_defaults(&p->chain);
-        if (!bank_pack(proj_wire_u.raw, p, 0)) return 2;
-    }
-    if (proj_write_slot(slot, proj_wire_u.raw, BANK_STORE_SIZE)) { ui_message("SAVE ERROR"); return 2; }
-    tessera_store_retag(slot, tess_old_tag);
+        if (!(n = (int)tsp_pack(proj_wire_u.raw, p, 0))) return 2;
+        if (!tsp_valid(proj_wire_u.raw, (uint32_t)n)) return 2;
+    } else if (!tsp_rename(proj_wire_u.raw, (uint32_t)n, name)) return 2;   /* (the NAME part, in place) */
+    if (proj_write_slot(slot, proj_wire_u.raw, (uint32_t)n)) { ui_message("SAVE ERROR"); return 2; }
     if (proj_cur == (slot & 3u))
         proj_name_get(proj_name, (const uint8_t *)p->name);
 #if MELODEE_FLASH
@@ -1070,12 +801,11 @@ static void project_load(uint32_t slot)
 {
     int n = proj_read_slot(slot);
     if (!n) { ui_message(project_old(slot) ? "OLD FORMAT" : "EMPTY SLOT"); return; }
+    int fun = proj_read_fun;
     if (!project_restore_runtime(&proj_scratch)) {
-        if (n == BANK_STORE_SIZE) bank_restore(proj_wire_u.raw);
+        if (fun) tessera_reset();                      /* (host RAM slots: a FUN record has no generators) */
+        else tsp_restore(proj_wire_u.raw);             /* (the other patterns, the generators and the cords) */
         proj_cur = (uint8_t)(slot & 3u);
-        tessera_reset();
-        if (n == BANK_STORE_SIZE) tessera_store_load(slot);
-        tess_saved_hash[slot & 3u] = tessera_live_hash();   /* (autosave: what this slot now holds) */
     }
 }
 
@@ -1363,8 +1093,8 @@ static int project_dirty(void)
     if (proj_cur < 4u) {
         project_capture(&proj_scratch);
         proj_wire_gen++;
-        return !bank_pack(proj_wire_u.raw, &proj_scratch, 1) ||
-               proj_hash(proj_wire_u.raw, BANK_STORE_SIZE) != proj_saved_hash[proj_cur];
+        uint32_t len = tsp_pack(proj_wire_u.raw, &proj_scratch, 1);
+        return !len || proj_hash(proj_wire_u.raw, len) != proj_saved_hash[proj_cur];
     }
     for (k = 0; k < NTRK; k++)
         if (!seq_is_empty(&trk[k]) || notes_have_recording(&trk[k]))
@@ -1489,8 +1219,7 @@ static int project_used(uint32_t slot)
 {
 #if !MELODEE_FLASH
     slot &= 3u;
-    int valid = bank_valid(proj_bank_slot[slot], BANK_STORE_SIZE) &&
-        !memcmp(proj_bank_slot[slot] + 8u, &proj_slot[slot], sizeof proj_slot[slot]);
+    int valid = proj_ram_len(slot) && tsp_valid(proj_bank_slot[slot], proj_ram_len(slot));
     if (!valid) valid = proj_import(&proj_scratch, &proj_slot[slot], sizeof proj_slot[slot]);
     proj_meta[slot].used = (uint8_t)valid;
     if (valid) proj_name_get(proj_meta[slot].name, (const uint8_t *)proj_scratch.name);

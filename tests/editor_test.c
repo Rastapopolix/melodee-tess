@@ -427,8 +427,8 @@ static int cz_native_protocol(void)
     a[0]=1;a[1]=8;request(ED_CZ_PUT,a,290);bad+=check("CZ tone uses atomic ordinary preset storage",host_wire[7]==0 && up_used(8) && up_rec(8)->ver==UP_VER_CZ && !memcmp(up_rec(8)->packed,raw,CZ_BYTES));
     song.sel=1;up_load(8);bad+=check("loading user CZ preset restores all 144 native bytes",TSEL->p[P_E7]==CZ_NATIVE && !memcmp(cz_patch[1].raw,raw,CZ_BYTES));
     project_t q,r;project_store_t packed;project_capture(&q);bad+=check("native tones survive project serialization",proj_pack(&packed,&q) && proj_unpack(&r,packed.raw) && !memcmp(q.cz,r.cz,sizeof q.cz));
-    static uint8_t banked[BANK_STORE_SIZE];
-    bad+=check("native tones survive full pattern-bank serialization",bank_pack(banked,&q,1) && bank_valid(banked,sizeof banked) && !memcmp(q.cz,proj_scratch.cz,sizeof q.cz));
+    static uint8_t banked[TSP_MAX];
+    bad+=check("native tones survive full pattern-bank serialization",tsp_pack(banked,&q,1) && tsp_valid(banked,tsp_len(banked)) && !memcmp(q.cz,proj_scratch.cz,sizeof q.cz));
     template_save(); static tmpl_t saved; saved=tmpl;
     memset(cz_patch,0,sizeof cz_patch); memset(&tmpl,0,sizeof tmpl);
     int restored=tmpl_take((const uint8_t *)&saved,sizeof saved);template_load();
