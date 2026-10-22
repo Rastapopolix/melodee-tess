@@ -102,7 +102,7 @@
 0x111 BOOT PROJECT             global device 0..4 def 0
 0x112 PROJECT LOAD             global action 0..1 def 0
 0x113 PROJECT SAVE             global action 0..1 def 0
-0x114 ENGINE                   global action 0..19 def 0
+0x114 ENGINE                   global action 0..21 def 0
 0x115 A4 TUNING                global device 400..480 def 440
 0x116 CLEAR SEQUENCE           global action 0..1 def 0
 0x117 INIT SOUND               global action 0..1 def 0
