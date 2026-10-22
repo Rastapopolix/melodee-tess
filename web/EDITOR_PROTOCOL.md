@@ -343,6 +343,8 @@ grid lives in the steps themselves, so every engine has it:
 - Projects (`PROJECT`) save and load all four tracks, the selection, the song chain and the motion (FUN7;
   FUN5 added the drum grid, FUN6 the chain). Formats 6..1 are converted; a format 1 project loads into track 1. A project saved before
   1.0 loads its drum track as track 4 with the power-on sound (SAMPLE PERC), its steps kept.
+  melodee-tess, since the own project format: a slot holds a TSP1 record; FUN and FBKK records are no longer read
+  (a slot holding one reads as OLD FORMAT). `PROJECT` itself is unchanged.
 - Older firmware (no NTRK in `INFO`): one instrument; skip the track UI.
 
 ## v4: any track's parameters
@@ -452,6 +454,25 @@ an older format before first save), 6..7 original user presets, 8 retired FM6 ba
 FUN8 and 3388-byte FUN7/FUN6 project records; saved legacy restores become FBK9. Full validation precedes
 publication. The web restore checks the target inventory before writes; nonempty samples cannot restore
 onto this firmware. Empty sample objects in an older archive are skipped.
+
+## melodee-tess: backups in the own project format
+
+`BACKUP_LIST` has 30 objects, ids 0..29:
+- **0** the live music and **2..5** the slots: TSP1 records (`firmware/src/project_tsp.c`), up to 32,768 B, their
+  length their own. Layout: "TSP1", u32 length, u16 part count, u16 0, the parts (u8 id, u8 version, u16 length,
+  bytes), u32 FNV-1a of everything before it.
+- **1** the settings record with the template; **6, 7, 17, 18** the user presets; **19..22** the native FM6 voices.
+- **29** the live generators (the Tessera block; versions 1..18 by length).
+- **8, 9..16, 23..27, 28** retired (the old bank, the CZ-1 and Prophet banks, the Tessera side object): listed empty,
+  and `PUT` takes only an empty one.
+
+`PUT` refuses an older project record (FUN, FBKK) before writing anything: rc 1 when it is shorter than a TSP1
+header, rc 2 at the commit. There is no converter either way: older firmware does not read TSP1.
+
+The web restore (`web/fm1backup.js`) reads the first 4 bytes of the device's object 0 to tell the format. It
+refuses an archive whose projects are in the other format, and checks every TSP1 record whole (length, parts,
+checksum) before the first write. The editor moves project records only through backups; `PROJECT` (command 9)
+loads, saves and queries a slot on the device.
 
 ## Historical v6: project-based song chain
 

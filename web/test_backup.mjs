@@ -169,5 +169,32 @@ ok(await athrows(()=>restoreBackup(oldOwnedTarget.request,ownedFile)) && !oldOwn
      "backup: an older archive (no generators) restores on this firmware, the generators left alone");
 }
 
+{   /* melodee-tess, the own project format: the projects (0, 2..5) are TSP1 records, of any length up to 32768 */
+  const tsp = (parts) => {                  // "TSP1", length, part count, 0, the parts, FNV-1a of the rest
+    const body = parts.flatMap(([id, bytes]) => [id, 1, bytes.length & 255, bytes.length >> 8, ...bytes]);
+    const n = 12 + body.length + 4, out = new Uint8Array(n), v = new DataView(out.buffer);
+    v.setUint32(0, 0x31505354, true); v.setUint32(4, n, true); v.setUint16(8, parts.length, true); out.set(body, 12);
+    let h = 0x811c9dc5; for (const b of out.subarray(0, n - 4)) h = Math.imul(h ^ b, 16777619) >>> 0;
+    v.setUint32(n - 4, h, true); return out;
+  };
+  const tessIds = Array.from({ length: 30 }, (_, i) => i);
+  const live = tsp([[1, rnd(40, 40)], [3, rnd(900, 41)]]), slot = tsp([[1, rnd(40, 42)], [3, rnd(9000, 43)]]);
+  const ownObjects = [[0, live], [1, rnd(1200, 44)], [3, slot], [29, rnd(602, 45)]];
+  const ownFile = await captureBackup(device(ownObjects, { ids: tessIds }).request, "OWN FORMAT");
+  ok(readBackup(ownFile).objects[3].size === slot.length, "backup (own format): TSP1 projects capture at their own lengths");
+  const ownTarget = device([[0, tsp([[1, rnd(40, 46)]])]], { ids: tessIds }); await restoreBackup(ownTarget.request, ownFile);
+  ok(ownTarget.objs.get(3).every((x, i) => x === slot[i]) && ownTarget.log.at(-1) === 0,
+     "backup (own format): a slot longer than the live record restores (no fixed-size check)");
+  const torn = JSON.parse(JSON.stringify(ownFile)), tb = slot.slice(); tb[100] ^= 1;
+  torn.objects[3] = { ...torn.objects[3], crc: bkCrc(tb), data: btoa(String.fromCharCode(...tb)) };
+  ok(throws(() => readBackup(torn)), "backup (own format): a damaged TSP1 record is refused when the file is read");
+  const oldOnOwn = device([[0, live.slice()]], { ids: tessIds });
+  ok(await athrows(() => restoreBackup(oldOnOwn.request, file)) && !oldOnOwn.log.length,
+     "backup (own format): an archive of older projects is refused before any write");
+  const ownOnOld = device([], { ids: tessIds });
+  ok(await athrows(() => restoreBackup(ownOnOld.request, ownFile)) && !ownOnOld.log.length,
+     "backup (own format): older firmware refuses an archive of TSP1 projects before any write");
+}
+
 console.log(fails ? `BACKUP WEB TESTS FAILED (${fails})` : "backup web tests passed");
 process.exit(fails ? 1 : 0);
