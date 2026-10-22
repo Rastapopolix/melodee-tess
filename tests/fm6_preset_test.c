@@ -54,6 +54,11 @@ int main(void)
     preset_go(0);bad+=check("filtered global scrolling loads F064 directly",TSEL->eng_req==ENGI_FM6 && TSEL->user==64);
     settings_save();memset(&favorites,0,sizeof favorites);persist_t persisted;int n=st_load(OBJ_SETTINGS,&persisted,sizeof persisted);settings_import(&persisted,n);
     bad+=check("native favorites persist without changing the settings layout",favorite_has(USER_NATIVE_FM,63) && favorite_has(USER_NATIVE_CZ,127));favorites.filter=0;
+    {char zn[11];__typeof__(favorites) keep=favorites;memset(&favorites,0,sizeof favorites);
+     favorite_set(ENGI_FM6,25,1);favorite_set(USER_NATIVE_FM,1,1);favorite_set(USER_NATIVE_FM,1,0);
+     bad+=check("ZEN-1's FM6 presets (after INIT VOICE) keep their favorites apart from the native slots",favorite_has(ENGI_FM6,25) && !favorite_has(ENGI_FM6,26) && !favorite_has(USER_NATIVE_FM,1));
+     favorites=keep;engine_load_of(TSEL,ENGI_FM6,25);fm6_name(zn,fm6_patch[0]);
+     bad+=check("FM6 preset 25 loads ZEN-1's SOFT PAD, INIT VOICE stays at 24",!strcmp(zn,"SOFT PAD") && preset_init(ENGI_FM6)==24u);}
     reboot_presets();
     bad+=check("both native pools survive reboot byte for byte",native_used(ENGI_FM6,63) && native_used(ENGI_CZ,127) && !memcmp(native_raw(ENGI_FM6,63),fm,128) && !memcmp(native_raw(ENGI_CZ,127),cz,144));
     uint8_t newer[128];memcpy(newer,fm,128);newer[118]='N';fail_after=2;

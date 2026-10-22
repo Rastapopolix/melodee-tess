@@ -33,7 +33,7 @@ static const char *const PRESET_CAT[NENGINES] = {
     [9] = "EKUSKDDSU",                                  /* PHYS: BELL TREE, MARIMBA, PLUCK, BOWED METAL, KALIMBA, HAND DRUM, TOMS, DRONE STRING, HARP */
 #endif
     [10] = "DDDD",                                      /* DRUM: the kits (808, 909, SID, SID DIGI) */
-    [12] = "KEBRPEGUKRBEEKGSPLUEWEBEO",                 /* FM6, INIT VOICE */
+    [12] = "KEBRPEGUKRBEEKGSPLUEWEBEOPPPFEEEDEDDUUUU",  /* FM6, INIT VOICE, ZEN-1's (SOFT PAD .. KUGO HARP) */
 #if MELODEE_PLAITS
     [21] = "OBPLKEBGUEE",                          /* MACRO (eng_macro.c MC_PRESETS) */
 #endif
@@ -295,7 +295,7 @@ static uint32_t list_scan(uint32_t m, uint32_t ws, uint32_t wk, uint32_t n, uint
             src = lseg_src(seg);
             init = slot || !len ? 0u : preset_init(src);   /* (an engine's INIT first: FM6's comes after F24) */
             for (i = 0; i < len; i++) {
-                k = (i + init) % len;
+                k = !i ? init : i - 1u + (i - 1u >= init);  /* then the rest in order (FM6: F1.., ZEN-1's after F24) */
                 if (slot && !(src == USER_GENERAL ? up_used(k) : native_used(src_engine(src, k), k)))
                     continue;
                 if (!list_keep(m, src, k))
