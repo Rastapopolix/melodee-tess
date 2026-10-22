@@ -6,7 +6,7 @@
  * CPU meter. tests/pid_test.c keeps the list: an id changing meaning fails it (tests/pid_ids.txt). */
 #include "pid.h"
 
-static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "GRIDS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL", "SERIES",
+static const char *const TX_N_MODE[] = {"STEP", "TURING", "EUCLID", "MARKOV", "MORPH", "ATLAS", "BOUNCE", "AWAKE", "POLY", "QUAD", "CONSTL", "SERIES",
                                         "CHORD"};
 static const char *const TX_N_QDIR[] = {"FWD", "BACK", "PEND", "RAND", "HOLD"};
 static const char *const TX_N_DIV[] = {"OFF", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10", "/11", "/12",
@@ -286,7 +286,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
        "How much sound work the FM-1 shares out between the tracks; lower leaves more headroom, higher allows more voices."),
     X_(TX_MODE, "GENERATOR MODE", "SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the "
                                   "keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; "
-                                  "GRIDS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball "
+                                  "ATLAS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball "
                                   "hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; "
                                   "QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) "
                                   "plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity "
@@ -307,7 +307,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_MRP_SNPA, "MORPH RHYTHM A", "Rhythm A: one of eight preset patterns."),
     X_(TX_MRP_SNPB, "MORPH RHYTHM B", "Rhythm B: one of eight preset patterns."),
     X_(TX_EV_LOCK, "EVOLVE LOCK", "How much of the phrase stays when EVOLVE mutates it: 100 loops it, 0 is new every "
-                                  "time. Turing's is its PROB turned round, Grids' its CHAOS; Constellation's the chance a step plays its loop instead of the sky; Euclid, Bounce, Awake, Poly and Quad have none."),
+                                  "time. Turing's is its PROB turned round, Atlas' its CHAOS; Constellation's the chance a step plays its loop instead of the sky; Euclid, Bounce, Awake, Poly and Quad have none."),
     X_(TX_EV_EVERY, "EVOLVE EVERY", "Bars between mutations; OFF keeps the phrase as it is."),
     X_(TX_EV_AMOUNT, "EVOLVE AMOUNT", "How much changes at each mutation."),
     X_(TX_EV_SEED, "EVOLVE ROLL", "The track's seed, 1 to 128: each one a line of its own, the same every time. "
@@ -320,9 +320,9 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_TW_DROP, "TWEAK DROP", "The chance a hit is left out, whatever the generator."),
     X_(TX_TW_HUMAN, "TWEAK HUMAN", "Varies velocity and gate a little, as a player would."),
     X_(TX_TW_FOLLOW, "TWEAK FOLLOW", "Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own."),
-    X_(TX_GRD_X, "GRIDS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
-    X_(TX_GRD_Y, "GRIDS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
-    X_(TX_GRD_DENS, "GRIDS DENSITY", "How full the kick, snare, hat and toms are: 0 silent, 100 every hit the map "
+    X_(TX_GRD_X, "ATLAS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
+    X_(TX_GRD_Y, "ATLAS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
+    X_(TX_GRD_DENS, "ATLAS DENSITY", "How full the kick, snare, hat and toms are: 0 silent, 100 every hit the map "
                                      "offers. Hold OCT+ on GEN for each part's own: KICK, SNR, HAT and TOMS."),
     X_(TX_BNC_SPEED, "BOUNCE SPEED", "How far the ball travels each step: faster, more wall hits, more notes. In FALL, how fast the "
                                      "leaves fall."),
@@ -368,7 +368,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                 "for this step's gate: slow tracks pulled along by a fast one, or HOLD tracks played "
                                 "only by this one."),
     X_(TX_NL_MODE, "NOTE LENGTH", "How long the generator holds its notes. STEP: the step's GATE. FIXED: LEN, whatever "
-                                  "DIV. HIT: until the next hit, so rests let notes ring on. Grids keeps STEP."),
+                                  "DIV. HIT: until the next hit, so rests let notes ring on. Atlas keeps STEP."),
     X_(TX_NL_LEN, "NOTE LENGTH LEN", "FIXED's length, from a 32nd note to a bar (1/1), at the tempo the note starts."),
     X_(TX_NL_KEYS, "NOTE LENGTH KEYS", "FIXED: how many notes may hold at once. One more ends the note nearest its end; "
                                        "the same pitch again ends the one before."),
@@ -415,13 +415,13 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                "STEP every step, for the step's GATE."),
     X_(TX_CH_OCT, "CHORD OCT", "The chords' register, -2 to +2 octaves from their home around C3. OCT+ held on GEN, "
                                "KNOB 1; KNOB 2 and 3 there are SCL CHORD's CHRD and VOIC."),
-    X_(TX_GRD_KICK, "GRIDS KICK", "How much of DENSITY the kick gets: 100 all of it, 50 half, 0 none (the kick "
+    X_(TX_GRD_KICK, "ATLAS KICK", "How much of DENSITY the kick gets: 100 all of it, 50 half, 0 none (the kick "
                                   "silent). OCT+ held on GEN, KNOB 1."),
-    X_(TX_GRD_SNR, "GRIDS SNARE", "How much of DENSITY the snare gets: 100 all of it, 0 none. OCT+ held on GEN, "
+    X_(TX_GRD_SNR, "ATLAS SNARE", "How much of DENSITY the snare gets: 100 all of it, 0 none. OCT+ held on GEN, "
                                   "KNOB 2."),
-    X_(TX_GRD_HAT, "GRIDS HAT", "How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, "
+    X_(TX_GRD_HAT, "ATLAS HAT", "How much of DENSITY the closed hat gets: 100 all of it, 0 none. OCT+ held on GEN, "
                                 "KNOB 3."),
-    X_(TX_GRD_TOMS, "GRIDS TOMS", "A fourth part, on the tom or the sound PART4 picks: the hits the kick and snare "
+    X_(TX_GRD_TOMS, "ATLAS TOMS", "A fourth part, on the tom or the sound PART4 picks: the hits the kick and snare "
                                   "only just miss, so fills follow the groove. 0 none; up, misses further under the line "
                                   "play too (DENSITY scales it). OCT+ held on GEN, KNOB 4; with it held, a black key picks "
                                   "the sound."),
@@ -435,7 +435,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                            "a note moved by a degree or two or an octave, a step dropped, two notes "
                                            "swapped, a ghost note in a rest. 0 plays the steps as written; the steps "
                                            "themselves never change until REC held keeps the changes."),
-    X_(TX_GRD_PART4, "GRIDS PART4", "The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM "
+    X_(TX_GRD_PART4, "ATLAS PART4", "The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM "
                                     "lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black "
                                     "key (as on the drum grid: CP OH TM RS CB)."),
 #undef QD_MOVE_TEXT

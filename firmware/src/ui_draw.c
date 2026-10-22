@@ -1144,7 +1144,7 @@ static void draw_columns(void)
                     else draw_column(3, p4, "OFF", "", VAL(3u), 0, ICON_AUTO);
                     return;
                 }
-                draw_column(0, "MODE", "GRIDS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
+                draw_column(0, "MODE", "ATLAS", "", VAL(0u), 5 * 1000 / (TESS_ENG_COUNT - 1), ICON_AUTO);
                 fmt_int(v1, g->x);
                 col_mods(PID_TESS(TX_GRD_X));
                 draw_column(1, "X", v1, "", VAL(1u), (int32_t)g->x * 1000 / 255, ICON_AUTO);

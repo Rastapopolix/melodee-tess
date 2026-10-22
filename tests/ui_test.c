@@ -889,7 +889,7 @@ static int test_grids_layer(void)
     for (i = 0; i < 5u; i++) turn(EN_K1 + 3u, 1);       /* TOMS 10 */
     for (i = 0; i < 6u; i++) { frame(); fm1_ms += 200u; host_ticks += 200000u; }   /* (held 1.2 s) */
     help_find(3);
-    bad += check("GRIDS, OCT+ held: KNOB 1 KICK 80, KNOB 2 SNR 98, KNOB 3 HAT 100, KNOB 4 TOMS 10; its help",
+    bad += check("ATLAS, OCT+ held: KNOB 1 KICK 80, KNOB 2 SNR 98, KNOB 3 HAT 100, KNOB 4 TOMS 10; its help",
                  tessera_param_get(tr, TX_GRD_KICK) == 80 && tessera_param_get(tr, TX_GRD_SNR) == 98 &&
                  tessera_param_get(tr, TX_GRD_HAT) == 100 && tessera_grids(tr)->toms == 10u &&
                  help.pid == PID_TESS(TX_GRD_TOMS) && pid_find(help.pid));
