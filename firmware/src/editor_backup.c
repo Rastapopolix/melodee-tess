@@ -102,11 +102,11 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
         uint32_t slot = id - 2u;
 #if MELODEE_FLASH
         st_hdr_t h;
-        uint32_t obj = OBJ_BANK0 + slot;
+        uint32_t obj = OBJ_SLOT(slot);
         int copy = st_current(obj, &h);
         if (copy >= 0) {
             *len = h.len; ed_bk_source_obj = obj; ed_bk_source_copy = (uint32_t)copy; ed_bk_source_crc = h.crc;
-            return ED_BK_FLASH_PTR(st_sector(obj, (uint32_t)copy) + ST_PAYLOAD_OFF);
+            return ED_BK_FLASH_PTR(st_sector(obj, (uint32_t)copy) + st_payload_off(obj));   /* (read by st_read_range) */
         }
         return ED_BK_RAW;                   /* empty: a valid pointer, zero length */
 #else

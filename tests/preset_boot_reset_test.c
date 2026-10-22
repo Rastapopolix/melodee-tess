@@ -28,10 +28,10 @@ static int test_reset(void)
 {
     int bad = 0; fixture();
     uint8_t old[80], got[80]; memset(old, 0x5A, sizeof old);
-    st_save(OBJ_BANK0, old, sizeof old);           /* unrelated unreadable project stays protected */
+    st_save(OBJ_SLOT(0), old, sizeof old);           /* unrelated unreadable project stays protected */
     st_save(OBJ_UPRESET0, old, sizeof old);
     st_save(OBJ_NATIVEFM0, old, sizeof old);
-    st_save(OBJ_CZBANK0, old, sizeof old);
+    /* (the CZ-1 banks: storage retired, storage.c) */
     mixed_bank();
     uint32_t app_crc = st_crc32(nor, 0x93000u), before = erases;
     boot_trace = 1; up_boot();
@@ -43,7 +43,7 @@ static int test_reset(void)
     bad += check("boot resets unsupported general, FM6 and CZ banks", !up_old(0) && !up_used(0) && !native_old(ENGI_FM6, fm_slot) && !native_used(ENGI_FM6, fm_slot) && !native_old(ENGI_CZ, cz_slot) && !native_used(ENGI_CZ, cz_slot));
     up_rec_t good = good_record();
     bad += check("mixed readable bank keeps its good preset and clears only the bad entry", up_used(UP_PER_BANK) && !memcmp(up_rec(UP_PER_BANK), &good, sizeof good) && !up_old(UP_PER_BANK+1) && !up_used(UP_PER_BANK+1));
-    bad += check("all reset writes are visible and application/project bytes survive", erases == before + 4 && !boot_work.state && !boot_trace_bad && st_crc32(nor, 0x93000u) == app_crc && st_load(OBJ_BANK0, got, sizeof got) == sizeof got && !memcmp(got, old, sizeof old));
+    bad += check("all reset writes are visible and application/project bytes survive", erases == before + 3 && !boot_work.state && !boot_trace_bad && st_crc32(nor, 0x93000u) == app_crc && st_load(OBJ_SLOT(0), got, sizeof got) == sizeof got && !memcmp(got, old, sizeof old));
     before = erases; uint32_t flushed = boot_syncs; up_boot();
     bad += check("committed default banks require no writes or progress next boot", erases == before && boot_syncs == flushed);
     return bad;

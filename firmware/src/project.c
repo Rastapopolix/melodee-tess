@@ -449,7 +449,7 @@ static int proj_read_slot(uint32_t slot)
     proj_wire_gen++;
 #if MELODEE_FLASH
     if (flash_ok) {
-        n = st_load(OBJ_BANK0 + slot, proj_wire_u.raw, sizeof proj_wire_u.raw);   /* (the legacy objects: retired) */
+        n = st_load(OBJ_SLOT(slot), proj_wire_u.raw, sizeof proj_wire_u.raw);
     }
 #else
     if (bank_valid(proj_bank_slot[slot], BANK_STORE_SIZE) &&
@@ -466,7 +466,7 @@ static int proj_read_slot(uint32_t slot)
 #endif
     proj_meta[slot].used = (uint8_t)valid;
 #if MELODEE_FLASH
-    proj_meta[slot].old = (uint8_t)(!valid && flash_ok && st_exists(OBJ_BANK0 + slot));
+    proj_meta[slot].old = (uint8_t)(!valid && flash_ok && st_exists(OBJ_SLOT(slot)));
 #endif
     if (valid) proj_name_get(proj_meta[slot].name, (const uint8_t *)proj_scratch.name);
     else proj_meta[slot].name[0] = 0;
@@ -478,7 +478,7 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
 {
     slot &= 3u;
 #if MELODEE_FLASH
-    if (!flash_ok || st_save(OBJ_BANK0 + slot, raw, len)) return 2;
+    if (!flash_ok || st_save(OBJ_SLOT(slot), raw, len)) return 2;
 #endif
 #if !defined(FM1_IRQ_TARGET)
     memset(proj_bank_slot[slot], 0, sizeof proj_bank_slot[slot]);

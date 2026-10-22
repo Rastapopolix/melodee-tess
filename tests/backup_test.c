@@ -190,7 +190,7 @@ static int full_pattern_archive(void)
         ok &= ed_unpack7(rep+9u,rep_n-9u,saved+off,n)==n;
     }
     /* GET emits pack7; the XIP payload itself remains byte-identical after other object reads. */
-    ok &= !memcmp(saved,archive,sizeof saved) && (st_load(OBJ_BANK0,saved,sizeof saved)==sizeof saved && !memcmp(saved,archive,sizeof saved)) && get(0,0,64)==0;
+    ok &= !memcmp(saved,archive,sizeof saved) && (st_load(OBJ_SLOT(0),saved,sizeof saved)==sizeof saved && !memcmp(saved,archive,sizeof saved)) && get(0,0,64)==0;
     bad+=check("saved-bank GET and interleaved screen draws preserve the frozen runtime snapshot",ok);
     bad+=check("full archive restores a saved slot through the A/B path",put_all(3,archive,sizeof archive,st_crc32(archive,sizeof archive))==0);
     pattern_init(); memset(&motion,0,sizeof motion); memset(proj_meta,0,sizeof proj_meta); memset(proj_slot,0,sizeof proj_slot);
@@ -489,7 +489,7 @@ int main(void)
     proj_pack(&st, &proj_scratch);
     bad += check("a bare FUN16 record restores into slot 3 (flash and RAM) as a bank",
                  put_all(4, &st, sizeof st, st_crc32(&st, sizeof st)) == 0 && project_used(2) &&
-                 !memcmp(&proj_slot[2], &st, sizeof st) && st_load(OBJ_BANK0 + 2, proj_wire_u.raw, sizeof proj_wire_u.raw) == BANK_STORE_SIZE);
+                 !memcmp(&proj_slot[2], &st, sizeof st) && st_load(OBJ_SLOT(2), proj_wire_u.raw, sizeof proj_wire_u.raw) == BANK_STORE_SIZE);
     {   /* a record of an older format: refused before anything is written (archives of before 1.0.0: 1.2) */
         static uint8_t old[3388];
         memset(old, 0, sizeof old);
@@ -545,8 +545,8 @@ int main(void)
     reset();
     {
         uint8_t old[3080]; memset(old, 0x5a, sizeof old);
-        const uint32_t objects[] = {OBJ_SETTINGS, OBJ_UPRESET0, OBJ_NATIVEFM0, OBJ_CZBANK0};
-        const uint32_t ids[] = {1u, 6u, 21u, 9u};
+        const uint32_t objects[] = {OBJ_SETTINGS, OBJ_UPRESET0, OBJ_NATIVEFM0};   /* (CZ-1 banks: storage retired) */
+        const uint32_t ids[] = {1u, 6u, 21u};
         int intact = 1;
         for (uint32_t k = 0; k < NELEM(objects); k++) intact &= st_save(objects[k], old, sizeof old) == 0;
         up_cache_reset(); native_cache_reset(); persist_old = 1;

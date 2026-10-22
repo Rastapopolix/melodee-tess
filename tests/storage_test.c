@@ -65,7 +65,7 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
     return 0;
 }
 #include "../firmware/src/storage.c"
-#define T_OBJ OBJ_CZBANK0                        /* (an ordinary one-sector object for the A/B tests) */
+#define T_OBJ OBJ_UPRESET_EXT0                   /* (four ordinary one-sector objects in a row for the A/B tests) */
 
 static int check(const char *what, int ok)
 {
@@ -205,60 +205,100 @@ int main(void)
         bad += check("small destination rejects whole object", st_load(T_OBJ, got, sizeof got - 1u) < 0 && got[0] == 'X');
         bad += check("oversized save rejected", st_save(T_OBJ, a, ST_PAYLOAD_MAX + 1u) < 0);
     }
-    {
-        static uint8_t first[27200], second[27200], back[27200], copies[10u * ST_SECTOR];
-        uint32_t base = st_sector(OBJ_BANK0,0), ok=1;
-        memset(first,0x35,sizeof first); memset(second,0x79,sizeof second);
-        ok &= st_sector(OBJ_BANK0+3,1)+5u*ST_SECTOR <= 0xC8000u;
-        ok &= st_save(OBJ_BANK0,first,sizeof first)==0 && st_save(OBJ_BANK0,second,sizeof second)==0;
-        memcpy(copies,nor+base,sizeof copies);
-        for (uint32_t cut=0; cut<=sizeof first/256u; cut++) {
-            memcpy(nor+base,copies,sizeof copies); fail_after=(int)cut;
-            ok &= st_save(OBJ_BANK0,first,sizeof first)!=0; fail_after=-1;
-            ok &= st_load(OBJ_BANK0,back,sizeof back)==sizeof back && !memcmp(back,second,sizeof back);
+    {   /* Tessera's projects (OBJ_PROJ0..3): ten sectors a copy from the tables, each sector's tail erased (the update
+         * loader's record scan), every sector inside the HAL's storage areas (hal/fm1_flash.h FL_STORE_OK) */
+        static uint8_t payload[ST_PROJ_MAX], got[ST_PROJ_MAX];
+        int ok = 1, inside = 1, tails = 1;
+        for (uint32_t i = 0; i < sizeof payload; i++) payload[i] = (uint8_t)(i * 37u + 11u);
+        memset(nor, 0xFF, sizeof nor);
+        ok &= st_capacity(OBJ_PROJ0) == 38368u && OBJ_SLOT(5u) == OBJ_PROJ0 + 1u;
+        for (uint32_t k = 0; k < 4u; k++)
+            for (uint32_t copy = 0; copy < 2u; copy++) {
+                ok &= st_save(OBJ_PROJ0 + k, payload, sizeof payload) == 0;
+                ok &= st_load(OBJ_PROJ0 + k, got, sizeof got) == (int)sizeof got && !memcmp(got, payload, sizeof got);
+                for (uint32_t i = 0; i < ST_PROJ_SECTORS; i++) {
+                    uint32_t sec = st_proj_sector(OBJ_PROJ0 + k, copy, i);
+                    inside &= (sec >= 0x93000u && sec + ST_SECTOR <= 0xE0000u) || (sec >= 0xE5000u && sec + ST_SECTOR <= 0xFB000u);
+                    for (uint32_t j = ST_SECTOR - ST_TAIL; j < ST_SECTOR; j++) tails &= nor[sec + j] == 0xFFu;
+                }
+            }
+        bad += check("projects: four slots, both copies, 38,368 B each round trip", ok);
+        bad += check("projects: every sector inside the HAL's storage areas", inside);
+        bad += check("projects: every sector's last 256 B stay erased (update records)", tails);
+        uint8_t cross[600];
+        ok = 1;
+        for (uint32_t edge = ST_SECTOR - ST_TAIL - sizeof(st_hdr_t); edge < sizeof payload; edge += ST_SECTOR - ST_TAIL) {
+            st_hdr_t h;
+            int c = st_current(OBJ_PROJ0 + 3u, &h);
+            ok &= c >= 0 && st_read_range(OBJ_PROJ0 + 3u, (uint32_t)c, edge - 300u, cross, sizeof cross) == 0 &&
+                  !memcmp(cross, payload + edge - 300u, sizeof cross);
         }
-        for (uint32_t cut=0; cut<sizeof(st_hdr_t); cut++) {
-            memcpy(nor+base,copies,sizeof copies); fail_bytes=(int)(sizeof first+cut);
-            ok &= st_save(OBJ_BANK0,first,sizeof first)!=0; fail_bytes=-1;
-            ok &= st_load(OBJ_BANK0,back,sizeof back)==sizeof back && !memcmp(back,second,sizeof back);
-        }
-        bad += check("extended project: every page/header cut keeps all banks in the old copy",ok);
-        memcpy(nor+base,copies,sizeof copies); uint32_t span; nor[st_address(OBJ_BANK0,1,sizeof second-1,&span)]^=1;
-        bad += check("bank project CRC fallback covers its final sector",st_load(OBJ_BANK0,back,sizeof back)==sizeof back && !memcmp(back,first,sizeof back));
+        bad += check("projects: range reads cross every sector edge (slot D's split copy too)", ok);
+        uint32_t calls = io_calls;
+        bad += check("projects: one byte over is refused before any flash access",
+                     st_save(OBJ_PROJ0, payload, ST_PROJ_MAX + 1u) < 0 && io_calls == calls);
     }
-    {
-        int ok=1; static uint8_t payload[27200], got[27200];
-        for(uint32_t i=0;i<sizeof payload;i++)payload[i]=(uint8_t)(i*37u);
-        for(uint32_t k=0;k<4u;k++)for(uint32_t copy=0;copy<2u;copy++) {
-            ok &= st_save(OBJ_BANK0+k,payload,sizeof payload)==0;
-            ok &= st_load(OBJ_BANK0+k,got,sizeof got)==sizeof got && !memcmp(got,payload,sizeof got);
-            uint32_t ext=st_extension(OBJ_BANK0+k,copy);
-            for(uint32_t sector=0;sector<2u;sector++)for(uint32_t j=ST_PAYLOAD_MAX;j<ST_SECTOR;j++)
-                ok &= nor[ext+sector*ST_SECTOR+j]==0xFFu;
+    {   /* a save cut at any program (each page) or any header byte keeps the old copy; an erase failure on a later
+         * sector too; the CRC covers the last sector */
+        static uint8_t first[31000], second[31000], back[31000], snap[0x100000];
+        int ok = 1;
+        memset(first, 0x35, sizeof first); memset(second, 0x79, sizeof second);
+        memset(nor, 0xFF, sizeof nor);
+        ok &= st_save(OBJ_PROJ0 + 3u, first, sizeof first) == 0 && st_save(OBJ_PROJ0 + 3u, second, sizeof second) == 0;
+        memcpy(snap, nor, sizeof snap);
+        uint32_t cuts = 0;
+        for (uint32_t cut = 0;; cut++) {                    /* (each program call in turn: the last, the header, completes) */
+            memcpy(nor, snap, sizeof snap); fail_after = (int)cut;
+            int rc = st_save(OBJ_PROJ0 + 3u, first, sizeof first); fail_after = -1;
+            if (!rc) break;
+            cuts++;
+            ok &= st_load(OBJ_PROJ0 + 3u, back, sizeof back) == (int)sizeof back && !memcmp(back, second, sizeof back);
         }
-        ok &= st_extension(OBJ_BANK0,0)==0xEA000u && st_extension(OBJ_BANK0+3,1)+2u*ST_SECTOR==0xFA000u;
-        bad+=check("all four project extension pairs are disjoint and leave SPL scan tails erased",ok);
-        uint32_t calls=io_calls;
-        bad+=check("extension overflow rejected before any flash access",st_save(OBJ_BANK0,payload,st_capacity(OBJ_BANK0)+1u)<0 && io_calls==calls);
-        /* First upgrade: existing FUN12/FBKF can be read without extension
-         * data. Each interrupted write leaves that old five-sector object. */
-        static uint8_t old[20224], snapshot[10u*ST_SECTOR];memset(old,0x62,sizeof old);
-        memset(nor,0xFF,sizeof nor);st_save(OBJ_BANK0,old,sizeof old);
-        memcpy(snapshot,nor+st_sector(OBJ_BANK0,0),sizeof snapshot);ok=1;
-        for(uint32_t cut=0;cut<=sizeof payload/256u;cut++) {
-            memcpy(nor+st_sector(OBJ_BANK0,0),snapshot,sizeof snapshot);fail_after=(int)cut;
-            ok &= st_save(OBJ_BANK0,payload,sizeof payload)!=0;fail_after=-1;
-            ok &= st_load(OBJ_BANK0,got,sizeof got)==sizeof old && !memcmp(got,old,sizeof old);
+        ok &= cuts > sizeof first / 256u;                    /* (every page was cut once, the header too) */
+        for (uint32_t cut = 0; cut < sizeof(st_hdr_t); cut++) {
+            memcpy(nor, snap, sizeof snap); fail_bytes = (int)(sizeof first + cut);
+            ok &= st_save(OBJ_PROJ0 + 3u, first, sizeof first) != 0; fail_bytes = -1;
+            ok &= st_load(OBJ_PROJ0 + 3u, back, sizeof back) == (int)sizeof back && !memcmp(back, second, sizeof back);
         }
-        bad+=check("interrupted first upgrade preserves the old 152-note project",ok);
-        ok=st_save(OBJ_BANK0,payload,sizeof payload)==0;
-        uint8_t cross[512];
-        ok &= st_read_range(OBJ_BANK0,1,ST_BANK_BASE_MAX-128u,cross,sizeof cross)==0 && !memcmp(cross,payload+ST_BANK_BASE_MAX-128u,sizeof cross);
-        ok &= st_read_range(OBJ_BANK0,1,ST_BANK_BASE_MAX+ST_PAYLOAD_MAX-128u,cross,sizeof cross)==0 && !memcmp(cross,payload+ST_BANK_BASE_MAX+ST_PAYLOAD_MAX-128u,sizeof cross);
-        bad+=check("range reads cross the base and padded extension boundaries exactly",ok);
-        fail_erase_off=st_extension(OBJ_BANK0,0);
-        ok=st_save(OBJ_BANK0,old,sizeof old)!=0;fail_erase_off=0xFFFFFFFFu;
-        bad+=check("extension erase failure preserves the committed expanded copy",ok && st_load(OBJ_BANK0,got,sizeof got)==sizeof payload && !memcmp(got,payload,sizeof got));
+        bad += check("projects: every page or header cut keeps the old copy", ok);
+        memcpy(nor, snap, sizeof snap);
+        {
+            st_hdr_t h;
+            int c = st_current(OBJ_PROJ0 + 3u, &h);
+            fail_erase_off = st_proj_sector(OBJ_PROJ0 + 3u, c == 0 ? 1u : 0u, ST_PROJ_SECTORS - 1u);
+        }
+        ok = st_save(OBJ_PROJ0 + 3u, first, sizeof first) != 0; fail_erase_off = 0xFFFFFFFFu;
+        bad += check("projects: an erase failure on the last sector keeps the old copy",
+                     ok && st_load(OBJ_PROJ0 + 3u, back, sizeof back) == (int)sizeof back && !memcmp(back, second, sizeof back));
+        memcpy(nor, snap, sizeof snap);
+        {
+            st_hdr_t h;
+            uint32_t span;
+            int c = st_current(OBJ_PROJ0 + 3u, &h);
+            nor[st_address(OBJ_PROJ0 + 3u, (uint32_t)c, sizeof second - 1u, &span)] ^= 1;
+        }
+        bad += check("projects: the CRC covers the last sector (the older copy loads)",
+                     st_load(OBJ_PROJ0 + 3u, back, sizeof back) == (int)sizeof back && !memcmp(back, first, sizeof back));
+    }
+    {   /* retired: Melodee's bank projects, the CZ-1 and Prophet banks: no load, no save, no flash access; an old bank
+         * project's commit record left in a project's first sector never validates as a project (another type) */
+        uint8_t small[64];
+        uint32_t calls = io_calls, k;
+        int ok = 1;
+        memset(small, 7, sizeof small);
+        for (k = 0; k < 4u; k++) ok &= st_load(OBJ_BANK0 + k, got, sizeof got) < 0 && st_save(OBJ_BANK0 + k, small, sizeof small) < 0;
+        for (k = 0; k < 8u; k++) ok &= st_load(OBJ_CZBANK0 + k, got, sizeof got) < 0 && st_save(OBJ_CZBANK0 + k, small, sizeof small) < 0;
+        for (k = 0; k < 5u; k++) ok &= st_load(OBJ_P5BANK0 + k, got, sizeof got) < 0 && st_save(OBJ_P5BANK0 + k, small, sizeof small) < 0;
+        bad += check("retired bank objects: no load, no save, no flash access", ok && io_calls == calls);
+        memset(nor, 0xFF, sizeof nor);
+        st_hdr_t h = {ST_MAGIC, (uint16_t)OBJ_BANK0, 0, 5, sizeof small, st_crc32(small, sizeof small), {0xFFFFFFFFu, 0xFFFFFFFFu}, 0};
+        h.hcrc = st_crc32(&h, sizeof h - 4u);
+        memcpy(nor + 0xA0000u, &h, sizeof h);                 /* (an old FBKK's place: slot A's first copy now) */
+        memcpy(nor + 0xA0000u + ST_PAYLOAD_OFF, small, sizeof small);
+        bad += check("an old bank's commit record is no project", st_sector(OBJ_PROJ0, 0) == 0xA0000u &&
+                     st_load(OBJ_PROJ0, got, sizeof got) < 0 && !st_exists(OBJ_PROJ0));
+        bad += check("... and the slot saves over it", st_save(OBJ_PROJ0, a, sizeof a) == 0 &&
+                     st_load(OBJ_PROJ0, got, sizeof got) == (int)sizeof a && !memcmp(got, a, sizeof a));
     }
     {   /* every live object saved twice (both copies) at its full size: no sector shared by two objects, none in the
          * app area or the OTA staging. Guards the free pair OBJ_TESSERA uses (0x9D000) at every upstream merge. */
@@ -283,8 +323,8 @@ int main(void)
                      sec_owner[0x9D] == OBJ_TESSERA && sec_owner[0x9E] == OBJ_TESSERA);
     }
     printf("%s\n", bad ? "STORAGE TEST FAILED" : "storage test passed");
-    bad += check("CZ banks have disjoint A/B sectors outside project and preset data",
-        st_sector(OBJ_CZBANK0,0)==0xC8000u && st_sector(OBJ_CZBANK0+7,1)+ST_SECTOR==0xD8000u &&
-        st_capacity(OBJ_CZBANK0)==ST_PAYLOAD_MAX && st_sector(OBJ_UPRESET0,0)==0xDC000u);
+    bad += check("user presets and native FM6 keep their places",
+        st_sector(OBJ_UPRESET0, 0) == 0xDC000u && st_sector(OBJ_NATIVEFM0, 0) == 0xD8000u &&
+        st_sector(OBJ_NATIVEFM0 + 1u, 1) + ST_SECTOR == 0xDC000u);
     return bad != 0;
 }

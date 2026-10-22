@@ -129,8 +129,9 @@ static int native_save_bank(uint32_t e,uint32_t b)
     if (rc != 2) { native_meta[b + (e == ENGI_FM6 ? 0u : 4u)].old = 0; native_index(e, b); }
     return rc;
 }
-/* power-on: every native bank exists; a missing one (a fresh device's, or after the stock firmware) gets its default,
- * written once: FM6 empty, CZ-1 BANK A..D Casio's tones, E..H empty */
+/* power-on: every native FM6 bank exists; a missing one (a fresh device's, or after the stock firmware) gets its
+ * default, written once: empty. The CZ-1 banks are not written: their storage is retired, its sectors the projects'
+ * (storage.c) */
 static void native_boot(void)
 {
     if (boot_work.state == 2u) return;            /* retain an earlier settings-repair failure on screen */
@@ -138,11 +139,6 @@ static void native_boot(void)
     for (uint32_t b = 0; b < 4u; b++) {
         if (native_fm_valid(native_fm_bank(b))) continue;
         pending |= 1u << b;
-        total++;
-    }
-    for (uint32_t b = 0; b < 8u; b++) {
-        if (cz_bank_valid(native_cz_bank(b))) continue;
-        pending |= 1u << (b + 4u);
         total++;
     }
     if (!total) return;

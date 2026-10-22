@@ -60,7 +60,7 @@ static int test_foreign(void)
     st_save(OBJ_SETTINGS, fork, sizeof fork);
     /* Even unreadable musical objects must survive settings cleanup. */
     uint8_t old[80]; memset(old, 0x5A, sizeof old);
-    st_save(OBJ_BANK0, old, sizeof old);
+    st_save(OBJ_SLOT(0), old, sizeof old);
     uint32_t crc = music_crc(), before = erases;
     stale_ram(); boot_trace = 1;
     persist_boot();
@@ -166,18 +166,18 @@ static int test_incompatible_projects(void)
         }
         uint32_t hash = proj_hash(project, PROJ_STORE_SIZE - 4u);
         memcpy(project + PROJ_STORE_SIZE - 4u, &hash, 4); bank_checksum(bank);
-        st_save(OBJ_BANK0, bank, sizeof bank);
+        st_save(OBJ_SLOT(0), bank, sizeof bank);
         uint32_t crc = music_crc(), before = erases;
         persist_boot();
         int ok = !project_used(0) && project_old(0) && project_free_slot() != 0 && erases == before;
         trk[0].p[P_LEVEL] = 71;
         bootguard.failed = 0; project_boot();
-        ok &= trk[0].p[P_LEVEL] == 71 && st_load(OBJ_BANK0, saved, sizeof saved) == sizeof saved &&
+        ok &= trk[0].p[P_LEVEL] == 71 && st_load(OBJ_SLOT(0), saved, sizeof saved) == sizeof saved &&
             !memcmp(saved, bank, sizeof bank) && music_crc() == crc;
         bad += check("incompatible project with valid CRC is quarantined before BOOT load", ok);
     }
     fixture(); project_capture(&proj_scratch); bank_pack(bank, &proj_scratch, 1);
-    st_save(OBJ_BANK0, bank, sizeof bank); persist_boot();
+    st_save(OBJ_SLOT(0), bank, sizeof bank); persist_boot();
     bad += check("valid current Melodee projects remain available after settings reset", project_used(0) && !project_old(0));
     return bad;
 }

@@ -76,11 +76,15 @@ int main(void)
     int layout=1;
     /* (the legacy projects are retired: the Prophet banks took their place when the app area grew) */
     #define RETIRED(o) st_retired(o)
+    static int16_t owner[0x100000/ST_SECTOR];   /* (each sector of each live copy: one owner; a project copy has ten) */
+    for(uint32_t i=0;i<sizeof owner/sizeof owner[0];i++)owner[i]=-1;
     for(uint32_t a=0;a<OBJ_COUNT;a++)for(uint32_t ac=0;ac<2;ac++){
-        uint32_t lo=st_sector(a,ac),len=st_banked(a)?5u*ST_SECTOR:ST_SECTOR;
         if(RETIRED(a))continue;
-        layout &= !(lo<0xE5000u && lo+len>0xE0000u) && lo>=0x93000u;   /* (above the app area) */
-        for(uint32_t b=a+1;b<OBJ_COUNT;b++)for(uint32_t bc=0;bc<2;bc++){uint32_t blo=st_sector(b,bc),blen=st_banked(b)?5u*ST_SECTOR:ST_SECTOR;if(RETIRED(b))continue;layout &=lo+len<=blo || blo+blen<=lo;}
+        for(uint32_t i=0;i<st_sectors(a);i++){
+            uint32_t lo=st_proj(a)?st_proj_sector(a,ac,i):st_sector(a,ac);
+            layout &= !(lo<0xE5000u && lo+ST_SECTOR>0xE0000u) && lo>=0x93000u;   /* (above the app area) */
+            layout &= owner[lo/ST_SECTOR]<0; owner[lo/ST_SECTOR]=(int16_t)a;
+        }
     }
     bad+=check("native storage stays separate from projects, general presets and OTA",layout);
     bad+=bank_import();

@@ -130,9 +130,9 @@ static int test_boot_maintenance_writes(void)
     int bad = 0;
     reset(); boot_trace = 1;
     persist_boot();
-    bad += check("first boot flushes warning before settings and 12 bank erases",
-                 erases == 13u && !boot_trace_bad && boot_syncs >= 17u &&
-                 !boot_work.state && boot_work.total == 12u && boot_work.done == 12u);
+    bad += check("first boot flushes warning before settings and 4 FM6 bank erases",   /* (CZ-1 banks: retired) */
+                 erases == 5u && !boot_trace_bad && boot_syncs >= 9u &&
+                 !boot_work.state && boot_work.total == 4u && boot_work.done == 4u);
     uint32_t before = erases, flushed = boot_syncs;
     persist_boot();
     bad += check("completed first boot needs no more bank writes or progress screen",
@@ -146,9 +146,9 @@ static int test_boot_maintenance_writes(void)
                  native_fm_valid(native_fm_bank(0)) && native_fm_valid(native_fm_bank(2)));
     fail_after = -1; before = erases; boot_syncs = 0;
     persist_boot();
-    bad += check("restart retries only the nine unfinished banks",
-                 !boot_work.state && boot_work.total == 9u && boot_work.done == 9u &&
-                 erases == before + 9u && !boot_trace_bad && boot_syncs >= 11u);
+    bad += check("restart retries only the unfinished bank",
+                 !boot_work.state && boot_work.total == 1u && boot_work.done == 1u &&
+                 erases == before + 1u && !boot_trace_bad && boot_syncs >= 3u);
     reset();
     return bad;
 }
@@ -243,7 +243,7 @@ int main(void)
     project_save(0);
     fail_after = -1;
     bad += check("failed project save keeps RAM and old flash", !strcmp(ui.msg, "SAVE ERROR") &&
-                  !memcmp(&proj_slot[0], &old, sizeof old) && st_load(OBJ_BANK0, got, sizeof got) == (int)sizeof got &&
+                  !memcmp(&proj_slot[0], &old, sizeof old) && st_load(OBJ_SLOT(0), got, sizeof got) == (int)sizeof got &&
                   !memcmp(got + 8u, &old, sizeof old));
     project_save(0);
     bad += check("successful project save publishes new RAM", !strcmp(ui.msg, "SAVED") &&
@@ -272,7 +272,7 @@ int main(void)
         fail_after = 1;
         bad += check("failed project rename: SAVE ERROR, the slot and flash as they were",
                       project_rename(0, "DUB") == 2 && !strcmp(ui.msg, "SAVE ERROR") && !memcmp(&proj_slot[0], &keep, sizeof keep) &&
-                      st_load(OBJ_BANK0, got, sizeof got) == (int)sizeof got && !memcmp(got + 8u, &keep, sizeof keep));
+                      st_load(OBJ_SLOT(0), got, sizeof got) == (int)sizeof got && !memcmp(got + 8u, &keep, sizeof keep));
         fail_after = -1;
         before = erases;
         transport_req = 1;
@@ -298,7 +298,7 @@ int main(void)
         step_t keep = trk[0].step[0];
         project_capture(&proj_scratch); bank_pack(got, &proj_scratch, 1);
         got[BANK_EXTRA_OFF + 3u] |= 0xF0; bank_checksum(got);
-        st_save(OBJ_BANK0, got, sizeof got);
+        st_save(OBJ_SLOT(0), got, sizeof got);
         project_load(0);
         bad += check("damaged inactive-bank chord is refused with runtime unchanged", !strcmp(ui.msg,"OLD FORMAT") &&
             !memcmp(&trk[0].step[0],&keep,sizeof keep));
