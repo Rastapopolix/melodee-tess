@@ -191,7 +191,7 @@ enum { DIV_4, DIV_8, DIV_16, DIV_32, DIV_8T, DIV_16T, DIV_2, DIV_1, DIV_2BAR, DI
 enum { SCL_MIN = 2, SCL_DOR = 3, SCL_IN = 70, SCL_YO, SCL_HIRA, SCL_IWATO, SCL_KUMOI, SCL_RYUKYU };   /* (scales.h N_SCALE) */
 enum { FX_TINE = 8, FX_KALIMBA = 19, FX_SOFT_PAD = 25, FX_DEEP_PAD = 27, FX_DROP = 28, FX_RIN = 31, FX_FURIN = 33, FX_MOKUGYO = 35,
        FX_KOTO_PLUCK = 36, FX_KOTO_RING = 37, FX_KUGO_HARP = 39 };   /* FM6 presets (eng_fm6.c FM6_PRESETS) */
-enum { TR_FAT_BASS = 0, TR_WARM_PAD = 5, TR_HOLLOW_PAD = 7, TR_SUB_BASS = 9, TR_BREATH_FLUTE = 11, TR_ANALOG_BRASS = 13 };   /* TRIO's */
+enum { TR_FAT_BASS = 0, TR_WARM_PAD = 5, TR_STRING_MACH = 6, TR_HOLLOW_PAD = 7, TR_SUB_BASS = 9, TR_BREATH_FLUTE = 11, TR_ANALOG_BRASS = 13 };   /* TRIO's */
 enum { DK_808_KIT, DK_909_KIT };                                   /* DRUM's */
 
 /* ------------------------------------------------------------- the demos --- */
@@ -247,62 +247,55 @@ static void demo_still(void)
     cord(3, CS_ENERGY, 0, CD_FX_SEND, 1, 30, 0, 0);   /* ENERGY -> T2 FX SEND */
 }
 
-/* MOSAIC: dub techno. A filtered Cm7 / Fm7 stab struck only where the EUCLID sub bass hits (CHORD at every step,
- * TWEAK 2 LOGIC AND with T1), thrown into an echo a dotted eighth long; ATLAS keeps a 909 kick on the floor with
- * hats between; a TURING drip far off. C minor, 123 BPM (ECHO's longest time is a dotted eighth here) */
+/* MOSAIC: a minor-key song on a progression of eight chords, one a bar, played in as USER: Cm7 Abmaj7 Ebmaj7 Bb7,
+ * Cm7 Fm7 Abmaj7 Gm7. A string machine holds them, an EUCLID bass FOLLOWs the chord's root, a TURING hook in FORM
+ * ABAC lands on the chord tones (QNT CHRD), ATLAS on the 808 with toms for fills. C minor, 90 BPM */
 static void demo_mosaic(void)
 {
-    track_t *t;
-    song.g[G_BPM] = 123;
-    sound(0, ENGI_TRIO, TR_SUB_BASS);
-    sound(1, ENGI_TRIO, TR_ANALOG_BRASS);
-    sound(2, ENGI_FM6, FX_DROP);
-    sound(3, ENGI_DRUM, DK_909_KIT);
-    scale(0, SCL_MIN, 5);                             /* QNT CHRD: the stab leads */
-    sends(110, 90, 127, 105);
+    static const uint8_t PROG[8] = {0, 8, 3, 10, 0, 5, 8, 7};   /* (the keys played in: C Ab Eb Bb C F Ab G) */
+    song.g[G_BPM] = 90;
+    sound(0, ENGI_TRIO, TR_STRING_MACH);
+    sound(1, ENGI_TRIO, TR_FAT_BASS);
+    sound(2, ENGI_FM6, FX_KUGO_HARP);
+    sound(3, ENGI_DRUM, DK_808_KIT);
+    scale(0, SCL_MIN, 5);                             /* QNT CHRD: the chord track leads */
+    sends(90, 70, 70, 55);
 
-    /* T1: EUCLID 5 of 16 (3, 3, 3, 3, 4): the sub bass, mostly C, and the stab's rhythm */
-    trk[0].p[P_SDIV] = DIV_16;
-    gen(0, TESS_ENG_EUCLID, 13);
-    tx(0, TX_EUC_STEPS, 16); tx(0, TX_EUC_PULSES, 5);
-    tx(0, TX_TW_SHIFT, -12);
-    trk[0].p[P_SGATE] = 50;
-    mixer(0, 104, 0, 0, 0);
+    /* T1: CHORD USER, eight chords a bar each, held, sevenths in the scale */
+    trk[0].p[P_CHRD] = 2;                             /* DIA7 */
+    gen(0, TESS_ENG_CHORD, 3);
+    tx(0, TX_CH_PROG, GEN_CH_USER); tx(0, TX_CH_BARS, 1); tx(0, TX_CH_HIT, GEN_CH_HOLD);
+    for (uint32_t i = 0; i < 8u; i++) tessera_chord_user_key(0, 60u + PROG[i], !i);   /* (OCT+ held, the keys) */
+    tx(0, TX_TW_HUMAN, 20);
+    mixer(0, 80, 0, 80, 10);
 
-    /* T2: the stab. CHORD TWO (i, iv) 4 bars each, struck at every step but only with T1 (LOGIC AND); a saw chord
-     * with no sustain and the filter low, so the echo carries it */
-    t = &trk[1];
-    t->p[P_E0 + 3] = 12; t->p[P_E0 + 5] = 38; t->p[P_E0 + 6] = 45;   /* DTN, CUT, RES */
-    t->p[P_ATK] = 0; t->p[P_DEC] = 52; t->p[P_SUS] = 0; t->p[P_REL] = 40; t->p[P_ED_FLT] = 30;
-    t->p[P_SDIV] = DIV_16;
-    t->p[P_CHRD] = 2;                                 /* DIA7: Cm7, Fm7 */
-    gen(1, TESS_ENG_CHORD, 5);
-    tx(1, TX_CH_PROG, GEN_CH_TWO); tx(1, TX_CH_BARS, 4); tx(1, TX_CH_HIT, GEN_CH_STEP);
-    tx(1, TX_TW_LOGIC, TESS_LG_AND); tx(1, TX_TW_LG_WITH, 1);
-    tx(1, TX_TW_DROP, 20);
-    t->p[P_SGATE] = 25;
-    mixer(1, 108, -10, 70, 110);
+    /* T2: EUCLID 5 of 16 FOLLOWing T1: the chord's root, an octave down */
+    trk[1].p[P_SDIV] = DIV_16;
+    gen(1, TESS_ENG_EUCLID, 23);
+    tx(1, TX_EUC_STEPS, 16); tx(1, TX_EUC_PULSES, 5); tx(1, TX_EUC_ROT, 2);
+    tx(1, TX_TW_FOLLOW, 1); tx(1, TX_TW_SHIFT, -7);       /* (SHIFT counts the scale's degrees here: an octave) */
+    mixer(1, 111, 0, 0, 0);
 
-    /* T3: TURING, a drip now and then far off, mostly echo; a RATCH x2 now and then */
-    trk[2].p[P_SDIV] = DIV_16;
-    gen(2, TESS_ENG_TURING, 31);
-    tx(2, TX_TUR_LEN, 16); tx(2, TX_TUR_PROB, 6); tx(2, TX_TUR_SPAN, 2);
-    tx(2, TX_TW_SHIFT, 12); tx(2, TX_TW_DROP, 75); tx(2, TX_TW_HUMAN, 20);
-    tx(2, TX_SUB_RATCH, 1); tx(2, TX_SUB_CHANCE, 15);
-    mixer(2, 88, 35, 90, 120);
+    /* T3: TURING, 8 steps nearly locked: a hook the chords bend; FORM ABAC of 4 bars; RATCH now and then */
+    trk[2].p[P_SDIV] = DIV_8;
+    gen(2, TESS_ENG_TURING, 88);
+    tx(2, TX_TUR_LEN, 8); tx(2, TX_TUR_PROB, 6); tx(2, TX_TUR_SPAN, 2);
+    tx(2, TX_EV_EVERY, 3); tx(2, TX_FM_FORM, 2); tx(2, TX_FM_CONTRAST, 50);
+    tx(2, TX_TW_SHIFT, 12); tx(2, TX_TW_DROP, 25); tx(2, TX_TW_HUMAN, 25);
+    tx(2, TX_SUB_RATCH, 1); tx(2, TX_SUB_CHANCE, 10);
+    mixer(2, 114, 25, 50, 45);
 
-    /* T4: ATLAS on the 909: the kick on every beat, hats off the beat; EVOLVE moves it a little */
+    /* T4: ATLAS on the 808, toms for fills, EVOLVE walking the map */
     trk[3].p[P_SDIV] = DIV_16;
     gen(3, TESS_ENG_GRIDS, 41);
-    tx(3, TX_GRD_X, 192); tx(3, TX_GRD_Y, 128); tx(3, TX_GRD_DENS, 50);
-    tx(3, TX_GRD_SNR, 42); tx(3, TX_GRD_HAT, 80);   /* a snare now and then on 2 */
-    tx(3, TX_EV_LOCK, 90); tx(3, TX_EV_EVERY, 3); tx(3, TX_EV_AMOUNT, 15);
-    mixer(3, 92, 0, 20, 10);
+    tx(3, TX_GRD_X, 70); tx(3, TX_GRD_Y, 150); tx(3, TX_GRD_DENS, 52);
+    tx(3, TX_GRD_TOMS, 30); tx(3, TX_GRD_HAT, 75);
+    tx(3, TX_EV_LOCK, 85); tx(3, TX_EV_EVERY, 3); tx(3, TX_EV_AMOUNT, 25);
+    mixer(3, 92, 0, 15, 0);
 
-    cord(0, CS_APATHY, 1, CD_CUTOFF, 1, 35, 0, 0);    /* T2 TIDE 3 -> T2 CUTOFF: the stab opens and closes */
-    cord(1, CS_OCHD2, 1, CD_FX_SEND, 1, 25, 0, 0);    /* T2 SWARM 2 -> T2 FX SEND: more and less of it in the room */
-    cord(2, CS_OCHD5, 2, CD_PAN, 2, 40, 0, 0);        /* T3 SWARM 5 -> T3 PAN */
-    cord(3, CS_OCHD1, 3, CD_GRD_X, 3, 15, 0, 0);      /* T4 SWARM 1 -> T4 AT X */
+    cord(0, CS_INERTIA, 0, CD_CUTOFF, 0, 30, 0, 0);   /* T1 TIDE 2 -> T1 CUTOFF: the strings open and close */
+    cord(1, CS_OCHD3, 2, CD_PAN, 2, 35, 0, 0);        /* T3 SWARM 3 -> T3 PAN */
+    cord(2, CS_OCHD1, 3, CD_GRD_X, 3, 25, 0, 0);      /* T4 SWARM 1 -> T4 AT X */
 }
 
 /* KOTO GARDEN: Zen-1's and FuMi-1's FM voices in HIRA on C. Two koto on QUAD's shared grid, one in eighths and one in
