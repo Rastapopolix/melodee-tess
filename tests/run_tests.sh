@@ -172,6 +172,10 @@ demo_tests() {                                    # the demos made again, the sh
     mkdir -p build/demos &&
         "$OUT/demo_projects" make build/demos 20 &&
         "$OUT/demo_projects" check demos &&
+        for _d in demos/*.tsp; do                 # (a note, not a failure: a new setting's default changes them too)
+            cmp -s "$_d" "build/demos/${_d#demos/}" ||
+                echo "== note: $_d differs from the one made now: make the demos again (demos/README.md)"
+        done &&
         "$OUT/demo_projects" archive build/demos/blank.json &&
         python3 tools/demo_backup.py build/demos/blank.json build/demos/with-demos.json &&
         "$OUT/demo_projects" restore build/demos/with-demos.json
