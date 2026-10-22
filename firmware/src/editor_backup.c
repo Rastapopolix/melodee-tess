@@ -6,7 +6,7 @@
  * Runtime and saved projects include all 32 pattern banks. Retired user sample
  * slots are absent from the inventory and cannot be restored over project data.
  * melodee-tess: the projects (0 the music playing, 2..5 the slots) are TSP1 records (project_tsp.c), each with its
- * generators and cords; a FUN record from an older backup still imports into one. 28 (the Tessera object) is retired:
+ * generators and cords; a project of an older format (FUN, FBKK) is refused, nothing written. 28 (the Tessera object) is retired:
  * always empty. 29 is the live generator state (restored before 0: the page restores 0 last, which then wins).
  * The retired banks (8; 9..16 the CZ-1's, 23..27 the Prophet's: their stores removed) list empty and take only empty.
  */
@@ -88,11 +88,8 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
         }
         return ED_BK_RAW;                   /* empty: a valid pointer, zero length */
 #else
-        if (proj_bank_len[slot] && tsp_valid(proj_bank_slot[slot], proj_bank_len[slot])) {
-            *len = proj_bank_len[slot]; return proj_bank_slot[slot];
-        }
-        if (project_used(slot)) *len = sizeof proj_slot[slot];
-        return (const uint8_t *)&proj_slot[slot];
+        if (proj_bank_len[slot] && tsp_valid(proj_bank_slot[slot], proj_bank_len[slot])) *len = proj_bank_len[slot];
+        return proj_bank_slot[slot];
 #endif
     }
     if (id == 6u || id == 7u || id == 17u || id == 18u) {
@@ -145,19 +142,12 @@ static uint32_t ed_bk_commit_inner(void)
     uint32_t obj;
     if (ed_bk_pos != ed_bk_len || st_crc32(raw, ed_bk_len) != ed_bk_crc) return 2;
     if (ed_bk_id == 0u || (ed_bk_id >= 2u && ed_bk_id <= 5u)) {
-        uint32_t magic = 0;
-        if (ed_bk_len >= 4u) memcpy(&magic, raw, 4);
-        int tsp = magic == TSP_MAGIC;                   /* (else an older backup's FUN record) */
-        if (ed_bk_len && !(tsp ? tsp_valid(raw, ed_bk_len) : proj_import(&proj_scratch, raw, (int)ed_bk_len))) return 2;
+        if (ed_bk_len && !tsp_valid(raw, ed_bk_len)) return 2;   /* (an older format's: refused, nothing written) */
         if (ed_bk_id == 0u) {
             if (!ed_bk_len) return 2;
             if (project_restore_runtime(&proj_scratch)) return 2;
-            if (tsp) tsp_restore(raw);
+            tsp_restore(raw);
             return 0;
-        }
-        if (ed_bk_len && !tsp) {                        /* (a FUN record: made a TSP1 one, without generators) */
-            proj_bound(&proj_scratch); chain_defaults(&proj_scratch.chain);
-            if (!(ed_bk_len = tsp_pack(raw, &proj_scratch, 0))) return 2;
         }
         if (proj_write_slot(ed_bk_id - 2u, raw, ed_bk_len)) return 4;
         if (proj_cur == ed_bk_id - 2u) proj_cur = PROJ_NO_SLOT;
@@ -237,7 +227,7 @@ static uint32_t ed_bk_write(const uint8_t *a, uint32_t n)
     if (a[0] == 0u) {
         if (n != 12u || a[6] > 15u || a[11] > 15u) return 1;
         uint32_t len = ed_bk_r32(a + 2);
-        if (len > ED_BK_MAX || (a[1] == 0u && !len) ||   /* (projects: TSP1 or FUN, checked whole at the commit; */
+        if (len > ED_BK_MAX || (a[1] == 0u && !len) ||   /* (projects: TSP1, checked whole at the commit; */
             (a[1] <= 5u && a[1] != 1u && len && len < TSP_HEAD + 4u) ||   /* shorter than any record: refused at once) */
             (a[1] == 1u && len != sizeof(persist_t) && !tmpl_param_count(len - sizeof(persist_t))) ||
             ((a[1] == 6u || a[1] == 7u || a[1] == 17u || a[1] == 18u) && len && len != sizeof(up_bank_t)) ||

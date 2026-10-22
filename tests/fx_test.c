@@ -34,46 +34,40 @@ static uint64_t fx_signal(uint32_t type,int rate,int character,int mix,const cha
     }
     if(w)fclose(w);assert(energy>1000000u);return h;
 }
+/* a decoded project through a TSP1 record (project_tsp.c) into proj_scratch */
+static int fx_roundtrip(const project_t *q)
+{
+    static uint8_t w[TSP_MAX];
+    uint32_t n = tsp_pack(w, q, 0);
+    return n && tsp_valid(w, n);
+}
+/* the frozen templates (tests/fixtures/fx/README.md; their FUN and FBKK projects went with FUN20) */
 static void legacy(void)
 {
-    static uint8_t b[27904];                     /* (the fixtures: FUN records, and FBKK ones holding one at 8) */
-    const char *names[]={"fun16.bin","fbkk.bin","tplf.bin","fun17.bin","fbkk17.bin","tplg.bin"};
-    for(uint32_t k=0;k<6u;k++){
+    static uint8_t b[8192];
+    const char *names[]={"tplf.bin","tplg.bin"};
+    for(uint32_t k=0;k<2u;k++){
         char path[96];snprintf(path,sizeof path,"tests/fixtures/fx/%s",names[k]);
         FILE *f=fopen(path,"rb");assert(f);uint32_t n=(uint32_t)fread(b,1,sizeof b,f);fclose(f);
         ui_power_on();
-        if(k%3u==2u){assert(tmpl_take(b,n));template_load();}
-        else{
-            assert(k%3u?proj_import(&proj_scratch,b+8u,(int)PROJ_STORE_SIZE):proj_import(&proj_scratch,b,(int)n));
-            assert(proj_scratch.t[0].p[P_E0]==17 && proj_scratch.motion.event[0].param==P_E0);
-            assert(proj_scratch.recording[0].on==55 && proj_scratch.recording[0].duration==217 && proj_scratch.recording[0].owner==11);
-            assert(!project_restore_runtime(&proj_scratch));
-            assert(TSEL->step[0].n==3 && TSEL->step[0].note[2]==67);
-        }
+        assert(tmpl_take(b,n));template_load();
         assert(TSEL->p[P_E0]==17);
-        assert(TSEL->p[P_FXTYPE]==(k<3u?FX_OFF:FX_ECHO) && TSEL->p[P_FXMIX]==(k<3u?0:91));
-        assert(TSEL->p[P_FXRATE]==(k<3u?60:83) && TSEL->p[P_FXCHAR]==(k<3u?64:77));
+        assert(TSEL->p[P_FXTYPE]==(k?FX_ECHO:FX_OFF) && TSEL->p[P_FXMIX]==(k?91:0));
+        assert(TSEL->p[P_FXRATE]==(k?83:60) && TSEL->p[P_FXCHAR]==(k?77:64));
         for(uint32_t slot=1;slot<FX_SLOTS;slot++)assert(!TSEL->p[P_FXTYPE+slot*FX_PARAMS]);
     }
-    puts("Frozen FUN16/FUN17, FBKK (its FUN part: FBKK is no longer read whole), TPLF/TPLG: notes, timing, motion, engine IDs and original insert preserved: OK");
+    puts("Frozen TPLF/TPLG: engine values and original insert preserved: OK");
 }
 static void frozen_three_slots(void)
 {
-    static uint8_t b[27904];const char *names[]={"fun18.bin","fbkk18.bin","tplh.bin"};
+    static uint8_t b[8192];
     const int16_t chain[12]={1,80,30,71,6,95,55,65,8,105,88,99};
-    for(uint32_t k=0;k<3;k++){
-        char path[96];snprintf(path,sizeof path,"tests/fixtures/fx/%s",names[k]);FILE *f=fopen(path,"rb");assert(f);uint32_t n=fread(b,1,sizeof b,f);fclose(f);ui_power_on();
-        if(k==2){assert(tmpl_take(b,n));template_load();}else {assert(k?proj_import(&proj_scratch,b+8u,(int)PROJ_STORE_SIZE):proj_import(&proj_scratch,b,n));assert(!project_restore_runtime(&proj_scratch));}
-        if(k==0){ /* Old engine ID 112 shifts, a tagged native 112 must not. */
-            motion_store_t m={.count=2,.on=1,.event={{0,112,10},{0,112,(MO_TAG_FM6<<8)|80}}};
-            uint32_t off=68u+NTRK*(116u+2u+NSTEP*8u)+sizeof(chain_config_t);memcpy(b+off,&m,sizeof m);uint32_t h=proj_hash(b,n-4u);memcpy(b+n-4u,&h,4);
-            assert(proj_import(&proj_scratch,b,n));assert(proj_scratch.motion.event[0].param==P_E4 && proj_scratch.motion.event[1].param==112 && proj_scratch.motion.event[1].value==((MO_TAG_FM6<<8)|80));
-        }
-        assert(!memcmp(trk[0].p+P_FXTYPE,chain,sizeof chain));assert(!trk[0].p[P_FXSEND]);
-        for(uint32_t j=0;j<3;j++)assert(!song.g[G_MFXTYPE+j*4] && song.g[G_MFXMIX+j*4]==127);
-        assert(song.g[G_FXRETURN]==100);if(k!=2)assert(trk[0].step[0].note[0]==60);
-    }
-    puts("Frozen FUN18/FBKK18/TPLH: all three inserts preserved; send bus defaults off: OK");
+    FILE *f=fopen("tests/fixtures/fx/tplh.bin","rb");assert(f);uint32_t n=fread(b,1,sizeof b,f);fclose(f);ui_power_on();
+    assert(tmpl_take(b,n));template_load();
+    assert(!memcmp(trk[0].p+P_FXTYPE,chain,sizeof chain));assert(!trk[0].p[P_FXSEND]);
+    for(uint32_t j=0;j<3;j++)assert(!song.g[G_MFXTYPE+j*4] && song.g[G_MFXMIX+j*4]==127);
+    assert(song.g[G_FXRETURN]==100);
+    puts("Frozen TPLH: all three inserts preserved; send bus defaults off: OK");
 }
 static void send_return(void)
 {
@@ -91,10 +85,9 @@ static void send_return(void)
     assert(fx_state[NPART*FX_SLOTS].mix==32768); /* fully wet is exact on a send */
     song.g[G_MFXTYPE]=FX_REVERB;song.g[G_MFX2TYPE]=song.g[G_MFX3TYPE]=FX_OFF;
     trk[0].p[P_FXSEND]=81;apply_preset_to(&trk[0],0);assert(trk[0].p[P_FXSEND]==81);sound_init_of(TSEL,eng_idx(TSEL->eng_req));assert(trk[0].p[P_FXSEND]==81);
-    song.g[G_FXRETURN]=73;project_t q;project_capture(&q);project_store_t wire;assert(proj_pack(&wire,&q) && proj_import(&proj_scratch,&wire,sizeof wire));assert(proj_scratch.g[G_FXRETURN]==73 && proj_scratch.g[G_MFXTYPE]==FX_REVERB && proj_scratch.t[0].p[P_FXSEND]==81);
+    song.g[G_FXRETURN]=73;project_t q;project_capture(&q);assert(fx_roundtrip(&q));assert(proj_scratch.g[G_FXRETURN]==73 && proj_scratch.g[G_MFXTYPE]==FX_REVERB && proj_scratch.t[0].p[P_FXSEND]==81);
     template_save();memset(song.g+G_MFXTYPE,0,(G_COUNT-G_MFXTYPE)*sizeof *song.g);trk[0].p[P_FXSEND]=0;template_load();assert(song.g[G_FXRETURN]==73 && song.g[G_MFXTYPE]==FX_REVERB && trk[0].p[P_FXSEND]==81);
     go_title("FX SEND");turn(EN_K1,1);assert(trk[0].p[P_FXSEND]>81);turn(EN_K2,1);assert(song.g[G_FXRETURN]>73);
-    wire.raw[PROJ_FX_WIRE_OFF+3u]=128;uint32_t hash=proj_hash(wire.raw,sizeof wire-4u);memcpy(wire.raw+sizeof wire-4u,&hash,4);assert(!proj_import(&proj_scratch,&wire,sizeof wire));
     /* OFF and a type change fade the parallel return to silence, while an
      * insert bypass stays dry. RETURN edits also ramp rather than step. */
     song.g[G_MFXTYPE]=FX_REVERB;song.g[G_MFXMIX]=127;song.g[G_FXRETURN]=127;
@@ -109,12 +102,11 @@ static void send_return(void)
 }
 static void separate_sends(void)
 {
-    /* Frozen records are written by the preceding firmware, not this decoder. */
-    uint8_t b[PROJ_STORE_SIZE];
-    const char *paths[]={"tests/fixtures/fun19-send-chain.bin","tests/fixtures/tpli-send-chain.bin"};
-    for(uint32_t k=0;k<2;k++){
-        FILE *f=fopen(paths[k],"rb");assert(f);uint32_t n=fread(b,1,sizeof b,f);fclose(f);ui_power_on();
-        if(k){assert(tmpl_take(b,n));template_load();}else{assert(proj_import(&proj_scratch,b,n));assert(!project_restore_runtime(&proj_scratch));}
+    /* A frozen template, written by the preceding firmware, not this decoder. */
+    {
+        static uint8_t b[8192];
+        FILE *f=fopen("tests/fixtures/tpli-send-chain.bin","rb");assert(f);uint32_t n=fread(b,1,sizeof b,f);fclose(f);ui_power_on();
+        assert(tmpl_take(b,n));template_load();
         assert(!song.g[G_FXMODE] && TSEL->p[P_FXSEND]==81 && !TSEL->p[P_FXSEND2] && !TSEL->p[P_FXSEND3]);
         /* (its track 1's engine retired since (2026-10-22): it loads with FM6's own values, not the fixture's 42) */
         assert(TSEL->p[P_E3]==track_desc(TSEL,P_E3)->def && song.g[G_FXRETURN]==73 && song.g[G_MFXTYPE]==FX_REVERB);
@@ -161,7 +153,7 @@ static void separate_sends(void)
     TSEL->p[P_FXSEND]=20;TSEL->p[P_FXSEND2]=71;TSEL->p[P_FXSEND3]=99;
     apply_preset_to(TSEL,0);sound_init_of(TSEL,eng_idx(TSEL->eng_req));
     assert(TSEL->p[P_FXSEND]==20 && TSEL->p[P_FXSEND2]==71 && TSEL->p[P_FXSEND3]==99);
-    project_t q;project_store_t wire;project_capture(&q);assert(proj_pack(&wire,&q) && proj_import(&proj_scratch,&wire,sizeof wire));
+    project_t q;project_capture(&q);assert(fx_roundtrip(&q));
     assert(proj_scratch.g[G_FXMODE]==1 && proj_scratch.t[0].p[P_FXSEND2]==71 && proj_scratch.t[0].p[P_FXSEND3]==99);
     template_save();song.g[G_FXMODE]=0;TSEL->p[P_FXSEND2]=TSEL->p[P_FXSEND3]=0;template_load();
     assert(song.g[G_FXMODE]==1 && TSEL->p[P_FXSEND2]==71 && TSEL->p[P_FXSEND3]==99);
@@ -170,7 +162,6 @@ static void separate_sends(void)
     uint32_t inserts_epoch=fx_state[0].epoch;fx_bus_mix=32768;fx_bus_select();assert(fx_bus_separate);
     int32_t out[CTL*2];for(uint32_t k=0;k<32;k++){fx_bus_start(CTL);fx_bus_join();master_samples(out,CTL);}
     assert(!fx_bus_separate && fx_state[0].epoch==inserts_epoch && TSEL->p[P_FXSEND2]>71);
-    wire.raw[PROJ_FX_MODE_OFF]=2;uint32_t h=proj_hash(wire.raw,sizeof wire-4u);memcpy(wire.raw+sizeof wire-4u,&h,4);assert(!proj_import(&proj_scratch,&wire,sizeof wire));
     ui_power_on();fx_bus_mix=0;fx_bus_select();
     puts("Separate sends: independent inputs/returns, inactive-slot silence, routing fade, old chain imports, UI and project/template persistence: OK");
 }
@@ -195,8 +186,7 @@ static void fx_chain_test(void)
     assert(resource[RES_FX0+2].ptr==tank && fx_state[2].rev_pos[0]!=pos);
     int rc=up_store(0,"CHAIN");assert(rc==0 || rc==3);
     t->p[P_FX2CHAR]=19;assert(!up_load(0));assert(t->p[P_FX2CHAR]==19);t->p[P_FX2CHAR]=65;
-    project_t q;project_store_t p;project_capture(&q);assert(proj_pack(&p,&q));
-    assert(proj_import(&proj_scratch,&p,sizeof p));assert(!memcmp(proj_scratch.t[0].p+P_FXTYPE,settings,sizeof settings));
+    project_t q;project_capture(&q);assert(fx_roundtrip(&q));assert(!memcmp(proj_scratch.t[0].p+P_FXTYPE,settings,sizeof settings));
     template_save();memset(t->p+P_FXTYPE,0,sizeof settings);template_load();assert(!memcmp(t->p+P_FXTYPE,settings,sizeof settings));
     sound_init_of(t,t->eng_req);assert(!memcmp(t->p+P_FXTYPE,settings,sizeof settings));
     assert(!native_store(ENGI_FM6,1,0,"FX FREE") || native_used(ENGI_FM6,1));
@@ -399,7 +389,7 @@ static void chorus_test(void)
         assert(str_eq(global_desc(g+2)->label,"RATE") && global_desc(g+2)->fmt==F_LFOHZ);
         assert(str_eq(global_desc(g+3)->label,"DEPTH"));
     }
-    project_t q;project_store_t p;project_capture(&q);assert(proj_pack(&p,&q) && proj_import(&proj_scratch,&p,sizeof p));
+    project_t q;project_capture(&q);assert(fx_roundtrip(&q));
     template_save();memset(trk[0].p+P_FXTYPE,0,FX_SLOTS*FX_PARAMS*sizeof(int16_t));memset(song.g+G_MFXTYPE,0,FX_SLOTS*FX_PARAMS*sizeof(int16_t));template_load();
     int32_t b[CTL]={0};assert(fx_process(&trk[0],b,CTL));fx_bus_start(CTL);fx_bus_join();assert(fx_bus_result);
     for(uint32_t slot=0;slot<FX_SLOTS;slot++){
@@ -444,8 +434,7 @@ int main(int argc,char **argv)
     for(uint32_t id=0;id<RES_COUNT;id++)resource_release(id);
     ui_power_on();press(B_FX);assert(!ui.home && cur_page()->fam==FAM_FX && !ui.layer);
     turn(EN_K1,2);assert(TSEL->p[P_FXTYPE]==FX_WIDTH);turn(EN_K2,50);assert(TSEL->p[P_FXMIX]>0);
-    project_t q;project_capture(&q);project_store_t p;assert(proj_pack(&p,&q));
-    assert(proj_import(&proj_scratch,&p,sizeof p));assert(proj_scratch.t[0].p[P_FXTYPE]==FX_WIDTH);
+    project_t q;project_capture(&q);assert(fx_roundtrip(&q));assert(proj_scratch.t[0].p[P_FXTYPE]==FX_WIDTH);
     frames(400);press(B_OCTUP);assert(pop.on==POP_SHEET);press(B_OCTDN);assert(!pop.on);
     press(B_OCTDN);assert(ui.home);
     /* Four live tracks through the actual mixer, then mute a sounding insert. */

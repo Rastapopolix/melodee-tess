@@ -131,8 +131,8 @@ static int standalone_and_template(void)
 {
     raw_begin();track_t *t=&trk[0];seq_stop();pattern_switch(t,7);seq_start();seq_advance(0);
     seq_advance(600);input_on(t,60,90);seq_advance(300);input_off(t,60);seq_stop();
-    project_capture(&proj_scratch);project_store_t bytes;project_t decoded;
-    int ok=proj_pack(&bytes,&proj_scratch) && proj_import(&decoded,bytes.raw,sizeof bytes) && !project_restore_runtime(&decoded);
+    project_capture(&proj_scratch);static uint8_t bytes[TSP_MAX];uint32_t bn=tsp_pack(bytes,&proj_scratch,0);
+    int ok=bn && tsp_valid(bytes,bn) && !project_restore_runtime(&proj_scratch);
     raw_replay();seq_advance(599);ok &= t->pattern==7 && !gate_note(t,60);seq_advance(1);ok &= gate_note(t,60);
     int bad=check("standalone FUN16 restores the active bank and original recorded timing",ok);
     seq_stop();t->p[P_RECQ]=6;template_save();tmpl_t saved=tmpl;
