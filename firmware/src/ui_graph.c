@@ -981,6 +981,32 @@ static void graph_energy(uint16_t c)
     }
 }
 
+/* MIDI OUT: a row a track, its colour, the channel its notes go out on (AUTO: the one ROUT or DRUM gives it now), and
+ * when the menu's MIDI OUT keeps the steps in (KEYS) or sends nothing (OFF), so */
+static void graph_midich(void)
+{
+    for (uint32_t k = 0; k < TESSERA_TRACKS; k++) {
+        int32_t y = 4 + (int32_t)k * 20;
+        uint32_t ch = midi_out_channel(&trk[k]);
+        char n[4], b[24];
+        fmt_int(n, (int32_t)k + 1);
+        cv_rrect(PANEL_X0 + 6, y, 17, 17, 3, T_TRK(k), T_SURF);
+        cv_text_c(PANEL_X0 + 15, y + 3, &AF_X, n, T_BG, T_TRK(k));
+        if (ch == MIDI_OUT_NONE)
+            str_cpy(b, "OFF", sizeof b);
+        else {
+            str_cpy(b, "CHANNEL ", sizeof b);
+            fmt_int(n, (int32_t)ch + 1);
+            str_cpy(b + str_len(b), n, 4);
+            if (!tessera.midi_ch[k]) str_cpy(b + str_len(b), drum_track(&trk[k]) && settings_drumch ? "  (DRUM)" : "  (ROUT)", 10);
+        }
+        cv_text(PANEL_X0 + 32, y + 3, &AF_X, b, ch == MIDI_OUT_NONE ? T_DIM : T_TEXT);
+    }
+    if (settings_midi_out != MIDI_OUT_ALL)
+        cv_text(PANEL_X0 + 6, 86, &AF_X, settings_midi_out == MIDI_OUT_OFF ? "MENU MIDI OUT: OFF, NOTHING SENT"
+                                                                           : "MENU MIDI OUT: KEYS ONLY", T_DIM);
+}
+
 static void graph_steps(const track_t *t, uint16_t c)
 {
     uint32_t tr = trk_index(t);
@@ -1673,6 +1699,10 @@ static uint32_t graph_sig(int play)
         h ^= ((uint32_t)tessera.nl_mode[trk_index(t)] | (uint32_t)tessera.nl_len[trk_index(t)] << 8 |
               (uint32_t)tessera.nl_keys[trk_index(t)] << 16 | (uint32_t)tessera.mode[trk_index(t)] << 24 ^
               (uint32_t)song.g[G_BPM]) * 2246822519u;
+    if (pg->graph == GR_MIDICH)                      /* (the channels, and what AUTO follows) */
+        h ^= ((uint32_t)tessera.midi_ch[0] | (uint32_t)tessera.midi_ch[1] << 5 | (uint32_t)tessera.midi_ch[2] << 10 |
+              (uint32_t)tessera.midi_ch[3] << 15 | (uint32_t)song.g[G_ROUTE] << 20 | (uint32_t)settings_drumch << 23 |
+              (uint32_t)settings_midi_out << 28) * 2246822519u;
     if (pg->graph == GR_ENERGY)                      /* (it moves: the tide, a rest; the settings) */
         h ^= ((uint32_t)tessera.en_arc | (uint32_t)tessera.en_rests << 8 | (uint32_t)song.playing << 16) * 2246822519u ^
              (uint32_t)(energy_now() >> 9) * 31u ^ (energy.rest_left / EN_BPS) * 7919u ^ en_frac(energy.ph, energy.per, 110u) * 104729u;
@@ -1980,6 +2010,10 @@ static void draw_graph(void)
             break;
         case GR_ENERGY:
             graph_energy(c);
+            break;
+        case GR_MIDICH:
+            cv_oy = 0;
+            graph_midich();
             break;
         case GR_MATRIX:
             mx_graph(c);

@@ -851,6 +851,15 @@ static void draw_columns(void)
         draw_column(3, "", "", "", T_DIM, -1, ICON_NONE);
         return;
     }
+    if (cur_page()->graph == GR_MIDICH) {                /* MIDI OUT: each track's channel (AUTO, 1..16, OFF) */
+        static const char *const NAME[TESSERA_TRACKS] = {"TRACK 1", "TRACK 2", "TRACK 3", "TRACK 4"};
+        const param_desc_t *d = pid_desc(PID_TESS(TX_MIDI_CH), 0);
+        for (uint32_t k = 0; k < TESSERA_TRACKS; k++) {
+            uint32_t v = tessera.midi_ch[k] % (TESS_MIDI_OFF + 1u);
+            draw_column(k, NAME[k], d->names[v], "", VAL(k), (int32_t)v * 1000 / (int32_t)TESS_MIDI_OFF, ICON_AUTO);
+        }
+        return;
+    }
     if (cur_page()->graph == GR_ENERGY) {                /* ENERGY (energy.c), the project's: ARC, RESTS, the tide now, a rest */
         char w0[8], w1[8], w2[8], w3[8];
         int32_t now = energy_now() * 100 / 32767;

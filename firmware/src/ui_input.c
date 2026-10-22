@@ -889,6 +889,12 @@ static void edit_param(uint32_t slot, int32_t steps)
         ui.force = 1;
         return;
     }
+    if (pg->graph == GR_MIDICH) {                   /* MIDI OUT: KNOB k track k's channel, a step a detent */
+        if (slot < TESSERA_TRACKS)
+            tessera_param_set(slot, TX_MIDI_CH, tessera_param_get(slot, TX_MIDI_CH) + steps);
+        ui.force = 1;
+        return;
+    }
     if (pg->graph == GR_ENERGY) {                   /* ENERGY, the project's: ARC and RESTS as percents (the others: none) */
         if (slot < 2u) {
             uint32_t x = slot ? TX_EN_RESTS : TX_EN_ARC;
@@ -1697,7 +1703,7 @@ static void page_knob(uint32_t k, int32_t s)
         edit_param(k, s);
         pg = cur_page();
         if (!(pg->graph == GR_EVOLVE || pg->graph == GR_FORM || pg->graph == GR_TWEAK || pg->graph == GR_TWEAK2 ||
-              pg->graph == GR_ORGANIC || pg->graph == GR_MATRIX || pg->graph == GR_TIMING || pg->graph == GR_ENERGY || (pg->graph == GR_NOTELEN && k < 3u) ||   /* Tessera's own pages: no picker */
+              pg->graph == GR_ORGANIC || pg->graph == GR_MATRIX || pg->graph == GR_TIMING || pg->graph == GR_ENERGY || pg->graph == GR_MIDICH || (pg->graph == GR_NOTELEN && k < 3u) ||   /* Tessera's own pages: no picker */
               (song.sel < TESSERA_TRACKS && pg->graph == GR_STEPS && pg->fam == FAM_GEN && (k == 0u || tessera.mode[song.sel] != TESS_ENG_OFF))))
             pick_touch(k);                              /* a name from a long list: its picker (ui_popup.c) */
     }

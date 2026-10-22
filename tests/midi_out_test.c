@@ -2,7 +2,8 @@
  * Copyright (C) 2026 Theo Dainis (melodee-tess) */
 /* MIDI OUT and CLOCK OUT (firmware/src/midi_out.c) through the real sequencer, keys, MIDI IN and the USB queue
  * (usb.c midi_out_q): KEYS sends the keys only (as before), ALL also the steps, the generators and the ARP, OFF nothing;
- * MIDI IN is never echoed; a track's channel follows ROUT and a drum track the DRUM channel; a mute sends nothing;
+ * MIDI IN is never echoed; a track's channel follows ROUT and a drum track the DRUM channel, unless the track has its
+ * own (GLO > MIDI OUT: 1..16, or OFF); a mute sends nothing;
  * every note-on gets its note-off (STOP, a panic, a channel change); 24 clock pulses a beat with START and STOP while
  * CLK is INT, none from an external clock; the settings survive a save.
  * Run by tests/run_tests.sh (needs build/gen from one firmware build). */
@@ -34,6 +35,7 @@ static void reset(uint32_t out)
     mi_r = mi_w = 0; mo_r = mo_w = 0; usb.config = 1;
     fm1_in.notes = kb_prev = 0; song.sel = 0; song.g[G_ROUTE] = 0; settings_drumch = 10;
     settings_midi_out = (uint8_t)out; settings_clock_out = 0;
+    memset(tessera.midi_ch, 0, sizeof tessera.midi_ch);
     events_block(CTL); drain(); log_n = 0;
 }
 
@@ -135,6 +137,33 @@ static int echo_and_route_test(void)
         bad += check("  DRUM OFF: its track's channel", count(0x90, (int)d, 36) >= 1u);
     } else
         bad += check("a drum track in the power-on project", 0);
+
+    reset(MIDI_OUT_ALL);                                 /* each track's own channel (GLO > MIDI OUT) */
+    tessera_param_set(0, TX_MIDI_CH, 12); tessera_param_set(1, TX_MIDI_CH, 3); song.g[G_ROUTE] = 2;
+    trk[0].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 100};
+    trk[1].step[0] = (step_t){{64}, 1, ST_NOTE, 0, 100};
+    trk[2].step[0] = (step_t){{67}, 1, ST_NOTE, 0, 100};
+    play(1);
+    bad += check("MIDI CH: track 1 on its 12, track 2 on its 3 (ROUT CH5-8 left behind), track 3 AUTO on ROUT's 7",
+                 count(0x90, 11, 60) >= 1u && count(0x90, 2, 64) >= 1u && count(0x90, 6, 67) >= 1u &&
+                 !count(0x90, 4, 60) && !count(0x90, 5, 64));
+    tessera_param_set(0, TX_MIDI_CH, 5);                 /* changed while its note may sound */
+    blocks(4 * beat_blocks());
+    bad += check("  changed: on to channel 5, the old channel's notes ended", count(0x90, 4, 60) >= 1u &&
+                 count(0x80, 11, 60) == count(0x90, 11, 60));
+    tessera_param_set(1, TX_MIDI_CH, (int32_t)TESS_MIDI_OFF);
+    log_n = 0;
+    blocks(4 * beat_blocks());
+    bad += check("  OFF: track 2 sends nothing more, its last note ended", !count(0x90, -1, 64) && count(0x80, 2, 64) <= 1u);
+    stop();
+    bad += check("  nothing left on", balanced());
+    if (d < NTRK) {
+        reset(MIDI_OUT_ALL);
+        tessera_param_set(d, TX_MIDI_CH, 16);
+        trk[d].step[0] = (step_t){{36}, 1, ST_NOTE, 0, 100};
+        play(1); stop();
+        bad += check("  a drum track's own channel wins over DRUM", count(0x90, 15, 36) >= 1u && !count(0x90, 9, 36));
+    }
 
     reset(MIDI_OUT_ALL);
     trk[0].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 100};

@@ -53,7 +53,7 @@ page's four settings sit along the top of the screen in the same order.
 | **SCL** | SCALES, SCL, CHORD | |
 | **EDIT** | The sound's EDIT pages; on an EDIT page, the map | With OCT- / OCT+: undo / redo |
 | **FX** | The insert and send effects | The mod amount of any knob you turn |
-| **GLO** | MIXER, GLOBAL, SYSTEM | |
+| **GLO** | MIXER, GLOBAL, SYSTEM, MIDI OUT | |
 | **SAVE** | USER (ready to save the sound), PROJECT, PRESETS | With REC: save the project to its slot |
 | **REC** | Record | Capture or print the last bars (see [Print and keep](#print-and-keep)) |
 | **OCT+** | Octave up; on some pages, an action (shown on screen) | A page's extra layer (see [OCT+ layers](#oct-layers-on-gen)) |
@@ -503,10 +503,26 @@ Hold **HOME** for the menu. Tessera's additions:
 | Item | What it does |
 |---|---|
 | **COLOR** | The palette: SMALTI (Tessera's own), MARMO, VITRO, NIGHT or CONTRAST. |
-| **MIDI OUT** | What goes out over USB MIDI: **KEYS** (the notes you play, as Melodee sent them), **ALL** (also the steps, the ARP, recordings and every generator) or **OFF**. Each track on its own channel (GLO > SYSTEM, ROUT; a drum track on the DRUM channel). |
+| **MIDI OUT** | What goes out over USB MIDI: **KEYS** (the notes you play, as Melodee sent them), **ALL** (also the steps, the ARP, recordings and every generator) or **OFF**. Each track on its own channel: see [MIDI OUT channels](#midi-out-channels). |
 | **CLOCK OUT** | 24 pulses a beat with START and STOP over USB, while the clock is INT. |
 | **TRACK KNOB** | RIGHT: the ALGORITHM knob picks the track and PRESETS browses sounds, as printed. LEFT: the two swap. |
 | **ABOUT** | Version, credits and, after a crash, LAST CRASH (until power-off). |
+
+### MIDI OUT channels
+
+**GLO > MIDI OUT** sets the channel each track's notes go out on, so every track can play its own instrument:
+**KNOB 1** to **4** for tracks 1 to 4.
+
+- **AUTO** (the default) works as before: the channel follows **SYSTEM > ROUT** (CH1-4: tracks on 1 to 4), and a
+  drum track uses the **DRUM** channel.
+- **1** to **16**: that channel, whatever ROUT and DRUM say.
+- **OFF**: none of the track's notes go out.
+
+The page lists each track's channel as it is now, AUTO's included. The channels are saved with the project. Which
+notes go out at all is still the menu's **MIDI OUT** (KEYS, ALL or OFF): for the steps and the generators, set it to
+**ALL**.
+
+<p align="center"><img src="assets/gallery/midi_out.png" alt="GLO > MIDI OUT" width="240"></p>
 
 ---
 

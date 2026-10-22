@@ -9,8 +9,8 @@
 #define UI_RENDER_NO_MAIN 1
 #include "ui_render.c"
 
-enum { G_SCENE, G_TRIO, G_MODE_STEP, G_MODE_ARP, G_FORM, G_TIMING, G_SHEET };   /* (ARP: the same page, MODE Arp;
-                                                                                 * TIMING: x4 ACCEL; SHEET: x3, +2/16) */
+enum { G_SCENE, G_TRIO, G_MODE_STEP, G_MODE_ARP, G_FORM, G_TIMING, G_SHEET, G_MIDIOUT };   /* (ARP: the same page, MODE
+                                                     * Arp; TIMING: x4 ACCEL; SHEET: x3, +2/16; MIDI: GLO > MIDI OUT) */
 typedef struct { const char *name; int kind; int scene; } gshot_t;
 static const gshot_t SHOTS[] = {
     {"home", G_SCENE, S_HOME}, {"seq_mode", G_MODE_STEP, 0},
@@ -31,7 +31,7 @@ static const gshot_t SHOTS[] = {
     {"edit_fm6", G_SCENE, S_FM6_ALG5}, {"fm6_eg", G_SCENE, S_FM6_EG}, {"edit_trio", G_TRIO, 0},
     {"drum", G_SCENE, S_DRUM}, {"patterns", G_SCENE, S_PATGRID}, {"mixer", G_SCENE, S_MIXER},
     {"gen_timing", G_TIMING, 0}, {"gen_energy", G_SCENE, S_GEN_ENERGY}, {"gen_answer", G_SCENE, S_GEN_ANSWER},
-    {"sheet_note", G_SHEET, 0}, {"about", G_SCENE, S_ABOUT},
+    {"sheet_note", G_SHEET, 0}, {"midi_out", G_MIDIOUT, 0}, {"about", G_SCENE, S_ABOUT},
 };
 
 int main(int argc, char **argv)
@@ -60,6 +60,13 @@ int main(int argc, char **argv)
             tessera_param_set(0, TX_SUB_RATCH, 3);
             tessera_param_set(0, TX_SUB_CHANCE, 100);
             tessera_param_set(0, TX_SUB_SHAPE, SUB_ACCEL);
+        } else if (g->kind == G_MIDIOUT) {                 /* MIDI OUT: track 1 on 1, 2 AUTO, 3 on 10, 4 OFF; ALL sent */
+            setup(S_HOME);
+            settings_midi_out = MIDI_OUT_ALL;
+            tessera_param_set(0, TX_MIDI_CH, 1);
+            tessera_param_set(2, TX_MIDI_CH, 10);
+            tessera_param_set(3, TX_MIDI_CH, (int32_t)TESS_MIDI_OFF);
+            go_title("MIDI OUT");
         } else { setup(S_HOME); eng(6u); go_title("EDIT 1"); }   /* TRIO */
         pal(UI_DEFAULT_INDEX);
         draw(g->kind == G_SCENE ? g->scene : -1);

@@ -12,6 +12,7 @@ static struct {
     uint16_t pid;                                       /* PID_NONE: name and text below (CORDS, FORM's CLEAR) */
     const char *name, *text;
 } help;
+static uint32_t help_tr;                                /* the track the card's value is (MIDI OUT: its knob's) */
 
 /* the parameter knob k reaches on the page shown: Tessera's pages by their knobs, CORDS and CLEAR by words, the others
  * by where the knob's value lives (a track's p, the globals) */
@@ -42,6 +43,7 @@ static void help_find(uint32_t k)
     help.pid = PID_NONE;
     help.name = help.text = 0;
     k &= 3u;
+    help_tr = song.sel;
     if (pg->graph == GR_CORDS) {
         help.name = CORD_NAME[k];
         help.text = CORD_TEXT[k];
@@ -74,6 +76,7 @@ static void help_find(uint32_t k)
     else if (pg->graph == GR_NOTELEN) x = NL[k];
     else if (pg->graph == GR_TIMING && k < 3u) x = k == 2u ? TX_SUB_SHAPE : k ? TX_SUB_CHANCE : TX_SUB_RATCH;
     else if (pg->graph == GR_ENERGY && k < 2u) x = k ? TX_EN_RESTS : TX_EN_ARC;
+    else if (pg->graph == GR_MIDICH) { x = TX_MIDI_CH; help_tr = k; }   /* (KNOB k: track k's) */
     else if (pg->graph == GR_ORGANIC && k < 2u) x = k ? TX_ORG_RATE : TX_ORG_SPEED;
     else if (pg->graph == GR_FORM) {
         x = FM[k];
@@ -278,13 +281,13 @@ static void help_strip(int32_t top, int32_t h, const char *name, const char *val
 /* the card's value: as the knobs' columns show it, a name whole ("TURING": the columns cut one to 5) */
 static void help_value(const pid_entry_t *e, char *val, uint32_t size)
 {
-    const param_desc_t *d = e && !(e->flags & PID_F_ACTION) ? pid_desc(e->pid, song.sel) : 0;
+    const param_desc_t *d = e && !(e->flags & PID_F_ACTION) ? pid_desc(e->pid, help_tr) : 0;
     const char *unit = "";
     int32_t v;
     val[0] = 0;
     if (!d)
         return;
-    v = pid_get(e->pid, song.sel);
+    v = pid_get(e->pid, help_tr);
     param_format(d, v, val, &unit);
     if (d->fmt == F_ENUM && d->names && d->names != N_ROUTE)
         str_cpy(val, d->names[clamp(v, d->min, d->max)], size);

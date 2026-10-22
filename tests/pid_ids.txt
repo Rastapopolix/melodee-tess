@@ -217,3 +217,4 @@
 0x260 ANSWER SPACE             track 0..100 def 25
 0x261 ANSWER LEN               track 0..2 def 1
 0x262 TIMING SHAPE             track 0..2 def 0
+0x263 MIDI OUT CHANNEL         track 0..17 def 0
