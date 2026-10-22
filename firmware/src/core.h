@@ -42,8 +42,8 @@
 #endif
 /* Tessera (phase 4, tessera-notes/docs/design/phase4/PLAN.md): an engine left out of the build (0) is never offered; its stored ID
  * stays reserved and a project's track of it loads SID's INIT (project.c). Its code goes where nothing reaches it */
-/* CZ-1 and PROPHET: retired as engines 2026-10-22 (their IDs stay reserved), their user stores and factory sounds
- * with the own project format (cz_p5_store.c: what FUN20 still carries) */
+/* CZ-1 and PROPHET: retired as engines 2026-10-22 (their IDs stay reserved), their stores and tones with the own
+ * project format */
 #ifndef MELODEE_FM6
 #define MELODEE_FM6 1
 #endif
@@ -70,6 +70,7 @@
 #if !MELODEE_FM6 && !MELODEE_SID
 #error "MELODEE_FM6 or MELODEE_SID: one of them is the place of an engine left out"
 #endif
+#define ENGI_CZ 15u      /* retired (the CZ-1) */
 #define ENGI_PROPHET 19u /* 16..18 reserved: historical preset namespaces */
 #define USER_GENERAL 16u
 #define USER_NATIVE_P5 20u
@@ -369,10 +370,6 @@ static void step_set_nudge(step_t *s, int32_t v)
 {
     s->sub = (uint8_t)((s->sub & ~0x3Cu) | (((uint32_t)(v < -8 ? -8 : v > 7 ? 7 : v) & 15u) << 2));
 }
-typedef struct {                 /* a step as formats 1..4 (projects to FUN4) stored it: no hits */
-    uint8_t note[4];
-    uint8_t n, time, flags, vel;
-} step8_t;
 
 /* Probability keeps zero-initialized and legacy patterns at 100%. */
 static uint32_t step_chance(const step_t *s) { return !s->probability ? 100u : s->probability <= 100u ? s->probability : 0u; }

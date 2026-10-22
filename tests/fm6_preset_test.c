@@ -10,7 +10,7 @@ static void reboot_presets(void)
 static int bank_import(void)
 {
     int bad=0;static uint8_t bank[4096],old[4096];uint32_t saved;
-    reset();fm6_init();cz_init();up_boot();
+    reset();fm6_init();up_boot();
     for(uint32_t k=0;k<32;k++)fm6_factory(k%FM6_NFAC,bank+k*128u);
     uint32_t writes=erases;
     bad+=check("32-voice import commits two storage objects, not 32 saves",native_fm_import32(32,bank,&saved)==0 && saved==32 && erases==writes+2);
@@ -31,9 +31,9 @@ static int bank_import(void)
 }
 int main(void)
 {
-    int bad=0;uint8_t fm[FM6_PACKED],cz[CZ_BYTES],got[FM6_PACKED];
-    reset();fm6_init();cz_init();up_boot();
-    fm6_factory(3,fm);memcpy(fm+118,"MY VOICE  ",10);cz_patch_init(cz);memcpy(cz+128,"MY CZ TONE      ",16);cz[20]=0x37;
+    int bad=0;uint8_t fm[FM6_PACKED],cz[144u],got[FM6_PACKED];
+    reset();fm6_init();up_boot();
+    fm6_factory(3,fm);memcpy(fm+118,"MY VOICE  ",10);memset(cz,0,sizeof cz);memcpy(cz+128,"MY CZ TONE      ",16);cz[20]=0x37;
     bad+=check("64 FM6 slots, independent from 64 general slots; no CZ-1 or Prophet pool",native_limit(ENGI_FM6)==64 && !native_limit(ENGI_CZ) && !native_limit(ENGI_PROPHET) && UP_SLOTS==64 && !native_count(ENGI_FM6));
     bad+=check("F064 stores original 128-byte DX7 VMEM",native_put(ENGI_FM6,63,fm)==0 && !memcmp(native_raw(ENGI_FM6,63),fm,128));
     bad+=check("a CZ-1 tone is refused (its store retired with the engine)",native_put(ENGI_CZ,127,cz)==1 && !native_used(ENGI_CZ,127));

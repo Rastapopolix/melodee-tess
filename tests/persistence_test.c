@@ -78,7 +78,7 @@ static void reset(void)
     memset(trk, 0, sizeof trk);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     up_cache_reset(); native_cache_reset();
     memset(&persist_saved, 0, sizeof persist_saved);
     memset(&settings, 0, sizeof settings);
@@ -223,7 +223,8 @@ int main(void)
     int bad = test_boot_maintenance_writes() + test_tsp_record(), ok;
     uint32_t before;
     persist_t p;
-    project_store_t old;
+    static uint8_t old[TSP_MAX], keep[TSP_MAX];   /* (a slot's record as it was) */
+    uint32_t oldlen, keeplen;
     static uint8_t got[TSP_MAX];
     up_bank_t bank;
     up_rec_t r;
@@ -302,16 +303,17 @@ int main(void)
     reset();
     trk[0].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 96, 0, 0};
     project_save(0);
-    old = proj_slot[0];
+    oldlen = proj_bank_len[0]; memcpy(old, proj_bank_slot[0], oldlen);
     trk[0].step[0].note[0] = 72;
     fail_after = 1;
     project_save(0);
     fail_after = -1;
     bad += check("failed project save keeps RAM and old flash", !strcmp(ui.msg, "SAVE ERROR") &&
-                  !memcmp(&proj_slot[0], &old, sizeof old) && st_load(OBJ_SLOT(0), got, sizeof got) > 0 && !memcmp(&proj_slot[0], &old, sizeof old));
+                  proj_bank_len[0] == oldlen && !memcmp(proj_bank_slot[0], old, oldlen) &&
+                  st_load(OBJ_SLOT(0), got, sizeof got) == (int)oldlen && !memcmp(got, old, oldlen));
     project_save(0);
     bad += check("successful project save publishes new RAM", !strcmp(ui.msg, "SAVED") &&
-                  proj_import(&proj_scratch, &proj_slot[0], sizeof proj_slot[0]) &&
+                  tsp_valid(proj_bank_slot[0], proj_bank_len[0]) &&
                   proj_scratch.t[0].step[0].note[0] == 72u && proj_ok(&proj_scratch));
     before = erases;
     transport_req = 1;
@@ -325,18 +327,17 @@ int main(void)
     erase_error = 0;
     {   /* names: a project's through flash; a failed rename keeps the old one in RAM and flash */
         char n[16];
-        project_store_t keep;
         step_t st0 = trk[0].step[0];
         project_save_as(0, "LOFI JAM");
-        memset(proj_slot[0].raw, 0, 8);                       /* (the RAM copy lost: read it back from flash) */
+        memset(proj_bank_slot[0], 0, 8);                       /* (the RAM copy lost: read it back from flash) */
         proj_fetch(0);
         bad += check("a project's name goes to flash and comes back", project_name(0, n) && !strcmp(n, "LOFI JAM") &&
                       !strcmp(proj_name, "LOFI JAM"));
-        keep = proj_slot[0];
+        keeplen = proj_bank_len[0]; memcpy(keep, proj_bank_slot[0], keeplen);
         fail_after = 1;
         bad += check("failed project rename: SAVE ERROR, the slot and flash as they were",
-                      project_rename(0, "DUB") == 2 && !strcmp(ui.msg, "SAVE ERROR") && !memcmp(&proj_slot[0], &keep, sizeof keep) &&
-                      st_load(OBJ_SLOT(0), got, sizeof got) > 0 && tsp_valid(got, tsp_len(got)) && !memcmp(&proj_slot[0], &keep, sizeof keep));
+                      project_rename(0, "DUB") == 2 && !strcmp(ui.msg, "SAVE ERROR") &&
+                      st_load(OBJ_SLOT(0), got, sizeof got) == (int)keeplen && !memcmp(got, keep, keeplen));
         fail_after = -1;
         before = erases;
         transport_req = 1;
@@ -344,7 +345,7 @@ int main(void)
                       !strcmp(ui.msg, "STOP TO SAVE"));
         transport_req = 0;
         bad += check("project rename: flash has the new name, the music as it was", project_rename(0, "DUB") == 0 &&
-                      !strcmp(ui.msg, "RENAMED") && (memset(proj_slot[0].raw, 0, 8), proj_fetch(0), project_name(0, n)) &&
+                      !strcmp(ui.msg, "RENAMED") && (memset(proj_bank_slot[0], 0, 8), proj_fetch(0), project_name(0, n)) &&
                       !strcmp(n, "DUB") && proj_scratch.t[0].step[0].note[0] == st0.note[0]);
     }
     {   /* CLK TUNE MIDI ROUT are the device's: a project saved with others loads without changing them; its BPM loads */

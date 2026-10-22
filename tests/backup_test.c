@@ -75,7 +75,7 @@ static void reset(void)
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
     pattern_init();
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     up_cache_reset(); native_cache_reset();
     memset(&persist_saved, 0, sizeof persist_saved);
     memset(&settings, 0, sizeof settings);
@@ -193,7 +193,7 @@ static int full_pattern_archive(void)
     ok &= !memcmp(saved,archive,len) && (st_load(OBJ_SLOT(0),saved,sizeof saved)==(int)len && !memcmp(saved,archive,len)) && get(0,0,64)==0;
     bad+=check("saved-bank GET and interleaved screen draws preserve the frozen runtime snapshot",ok);
     bad+=check("full archive restores a saved slot through the A/B path",put_all(3,archive,len,st_crc32(archive,len))==0);
-    pattern_init(); memset(&motion,0,sizeof motion); memset(proj_meta,0,sizeof proj_meta); memset(proj_slot,0,sizeof proj_slot);
+    pattern_init(); memset(&motion,0,sizeof motion); memset(proj_meta,0,sizeof proj_meta); memset(proj_bank_len,0,sizeof proj_bank_len);
     proj_fetch(1); project_load(1); ok=1;
     for (uint32_t k=0; k<NTRK; k++) for (uint32_t b=0; b<NPAT; b++) {
         track_t *t=&trk[k]; pattern_request(t,b);
@@ -335,8 +335,8 @@ int main(void)
 
     int bad = 0;
     uint32_t len = 0, crc = 0, before;
-    static project_store_t st;
-    static project_store_t v6;
+    static uint8_t st[TSP_MAX], v6[TSP_MAX];   /* (a project's record; the slot's copy as it was) */
+    uint32_t stn;
     persist_t ps;
 
     reset();
@@ -363,7 +363,7 @@ int main(void)
         bad+=check("previous TPLF settings archive restores through PUT and remains dry",
             n==sizeof(tmpl_fx_legacy_t) && put_all(1,old_settings,sizeof old_settings,st_crc32(old_settings,sizeof old_settings))==0 &&
             template_used() && tmpl.t[0].p[P_E0]==17 && !tmpl.t[0].p[P_FXTYPE]);
-        uint32_t before=erases;old_settings[sizeof defaults+__builtin_offsetof(tmpl_fx_legacy_t,cz)+2u]=255;
+        uint32_t before=erases;old_settings[sizeof defaults+__builtin_offsetof(tmpl_fx_legacy_t,t)]=255;   /* (track 1's engine) */
         bad+=check("damaged previous template is refused before any flash erase",
             put_all(1,old_settings,sizeof old_settings,st_crc32(old_settings,sizeof old_settings))==2 && erases==before);
     }
@@ -464,11 +464,11 @@ int main(void)
     reset();
     trk[1].step[3] = (step_t){{64}, 1, ST_NOTE, 0, 96, 0, 0};
     project_capture(&proj_scratch);
-    proj_pack(&st, &proj_scratch);
-    bad += check("a bare FUN16 record restores into slot 3 (flash and RAM) as a bank",
-                 put_all(4, &st, sizeof st, st_crc32(&st, sizeof st)) == 0 && project_used(2) &&
-                 !memcmp(&proj_slot[2], &st, sizeof st) && st_load(OBJ_SLOT(2), proj_wire_u.raw, sizeof proj_wire_u.raw) > 0 &&
-                 tsp_valid(proj_wire_u.raw, tsp_len(proj_wire_u.raw)));
+    stn = tsp_pack(st, &proj_scratch, 0);
+    bad += check("a project record restores into slot 3 (flash and RAM)",
+                 put_all(4, st, stn, st_crc32(st, stn)) == 0 && project_used(2) && proj_bank_len[2] == stn &&
+                 !memcmp(proj_bank_slot[2], st, stn) && st_load(OBJ_SLOT(2), proj_wire_u.raw, sizeof proj_wire_u.raw) == (int)stn &&
+                 !memcmp(proj_wire_u.raw, st, stn));
     {   /* a record of an older format: refused before anything is written (archives of before 1.0.0: 1.2) */
         static uint8_t old[3388];
         memset(old, 0, sizeof old);
@@ -476,6 +476,11 @@ int main(void)
         before = erases;
         bad += check("a FUN6 project archive is refused before anything is written",
                      put_all(5, old, sizeof old, st_crc32(old, sizeof old)) == 2u && erases == before && !project_used(3));
+        static uint8_t fun20[13212];                     /* (an older backup's FUN20 project: not read any more) */
+        memset(fun20, 0, sizeof fun20);
+        ((uint32_t *)fun20)[0] = 0x46554E47u; ((uint32_t *)fun20)[1] = sizeof fun20;
+        bad += check("a FUN20 project of an older backup is refused before anything is written",
+                     put_all(5, fun20, sizeof fun20, st_crc32(fun20, sizeof fun20)) == 2u && erases == before && !project_used(3));
     }
     {   /* the retired FM6 bank (8) and owned-voice archives (19, 20 at 4,240 B) are refused; native voices restore */
         static native_fm_t got;
@@ -500,26 +505,26 @@ int main(void)
         fm6_pack(fm6_patch[0], pk);
         bad += check("U64 keeps its own voice in native bank 3 (id 20)", native_used(ENGI_FM6, 63) && !memcmp(native_raw(ENGI_FM6, 63), pk, FM6_PACKED) && list(20, &len, &crc) == 0 && len == sizeof(native_fm_t));
     }
-    memcpy(&st, &proj_slot[2], sizeof st);
+    stn = proj_bank_len[2]; memcpy(st, proj_bank_slot[2], stn);
     erase_error = 1;
-    proj_slot[2].raw[100] ^= 1;                          /* (marks the RAM copy, to see it is kept) */
-    memcpy(&v6, &proj_slot[2], sizeof v6);
+    proj_bank_slot[2][100] ^= 1;                         /* (marks the RAM copy, to see it is kept) */
+    memcpy(v6, proj_bank_slot[2], stn);
     bad += check("a flash error on commit (4) keeps the slot's RAM copy",
-                 put_all(4, &st, sizeof st, st_crc32(&st, sizeof st)) == 4u && !memcmp(&proj_slot[2], &v6, sizeof v6));
+                 put_all(4, st, stn, st_crc32(st, stn)) == 4u && proj_bank_len[2] == stn && !memcmp(proj_bank_slot[2], v6, stn));
     erase_error = 0;
     bad += check("an empty project object clears the slot", put_all(4, 0, 0, st_crc32(0, 0)) == 0 && !project_used(2));
-    st.raw[200] ^= 1;                                    /* hash no longer matches */
-    bad += check("a project whose own hash fails is refused", put_all(4, &st, sizeof st, st_crc32(&st, sizeof st)) == 2u);
+    st[200] ^= 1;                                        /* hash no longer matches */
+    bad += check("a project whose own hash fails is refused", put_all(4, st, stn, st_crc32(st, stn)) == 2u);
 
     /* the runtime */
     reset();
     trk[2].step[5] = (step_t){{67}, 1, ST_NOTE, 0, 96, 0, 0};
     trk[2].p[P_LEVEL] = 77;
     project_capture(&proj_scratch);
-    proj_pack(&st, &proj_scratch);
+    stn = tsp_pack(st, &proj_scratch, 1);
     host_tracks_init();
     bad += check("the runtime object restores the tracks",
-                 put_all(0, &st, sizeof st, st_crc32(&st, sizeof st)) == 0 && trk[2].step[5].note[0] == 67u &&
+                 put_all(0, st, stn, st_crc32(st, stn)) == 0 && trk[2].step[5].note[0] == 67u &&
                  trk[2].p[P_LEVEL] == 77);
 
     /* Unsupported banks and settings export their committed bytes, not empty cache defaults. */
@@ -552,8 +557,8 @@ int main(void)
         b.r[4].packed[0] = 55;
         bad += check("a bank with a future record version restores byte for byte",
                      put_all(6, &b, sizeof b, st_crc32(&b, sizeof b)) == 0 &&
-                     st_load(OBJ_UPRESET0, &proj_wire, sizeof proj_wire) == (int)sizeof b &&
-                     !memcmp(&proj_wire, &b, sizeof b));
+                     st_load(OBJ_UPRESET0, proj_wire_u.raw, sizeof proj_wire_u.raw) == (int)sizeof b &&
+                     !memcmp(proj_wire_u.raw, &b, sizeof b));
         b.nslot = 3;
         bad += check("a bank with the wrong slot count is refused", put_all(7, &b, sizeof b, st_crc32(&b, sizeof b)) == 2u);
     }

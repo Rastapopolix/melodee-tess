@@ -61,7 +61,7 @@ static void power_on(void)
     memset(trk, 0, sizeof trk);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     up_cache_reset(); native_cache_reset();
     memset(&settings, 0, sizeof settings);
     memset(&ui, 0, sizeof ui);
@@ -171,7 +171,7 @@ static int load(const char *path)
         fclose(f);
         if (tess_side_read(path)) { printf("upgrade: cannot read %s.tess\n", path); return 1; }
     }
-    memset(proj_slot, 0, sizeof proj_slot);       /* the power-off: only the flash is left */
+    memset(proj_bank_len, 0, sizeof proj_bank_len);       /* the power-off: only the flash is left */
     persist_boot();
     check("the slot is listed after boot", project_used(0));
     project_load(0);
@@ -200,7 +200,7 @@ static int autosave(void)
     tessera_pack(edited);
     project_autosave();
     power_on();                                   /* power-off, power-on, load */
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     persist_boot();
     project_load(0);
     tessera_pack(got);

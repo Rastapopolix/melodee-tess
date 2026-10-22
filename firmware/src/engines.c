@@ -4,7 +4,6 @@
  * sounds at power-on. */
 #include "dsp.c"
 #include "audio_batch.h"
-#include "cz_p5_store.c"        /* CZ-1's and the Prophet's patches and factory sounds, kept for the stores */
 #include "eng_sid.c"
 #include "eng_formant.c"
 #include "eng_trio.c"
@@ -128,7 +127,7 @@ static const engine_t *const ENGINES[NENGINES] = {
     &ENG_RETIRED,             /* 13: reserved (MELODEE_SLICE=0 builds without SLICE) */
 #endif
     &ENG_RETIRED,                /* 14: retired OBXF; stored index reserved */
-    &ENG_RETIRED,                /* 15: retired CZ-1 (2026-10-22); stored ID reserved, its tones kept (cz_p5_store.c) */
+    &ENG_RETIRED,                /* 15: retired CZ-1 (2026-10-22); stored ID reserved */
     &ENG_RETIRED, &ENG_RETIRED, &ENG_RETIRED, /* 16..18 reserved */
     &ENG_RETIRED,                /* 19: retired Prophet (2026-10-22); stored ID reserved, its programs kept */
     &ENG_RETIRED,                /* 20: reserved (USER_NATIVE_P5, the browser's Prophet user bank) */

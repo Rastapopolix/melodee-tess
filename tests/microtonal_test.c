@@ -87,9 +87,9 @@ static void lifecycle(void)
     song.rec = song.playing = 1;
     input_on(t, 62, 100); input_off(t, 62);
     assert(t->step[0].n == 1 && t->step[0].note[0] == 62);
-    static project_t before, after; static project_store_t wire;
-    project_capture(&before); assert(proj_pack(&wire, &before));
-    assert(proj_unpack(&after, wire.raw));
+    static project_t before, after; static uint8_t wire[TSP_MAX];
+    project_capture(&before); uint32_t wn = tsp_pack(wire, &before, 0); assert(wn);
+    assert(tsp_valid(wire, wn)); after = proj_scratch;
     assert(after.t[0].p[P_SCALE] == (int16_t)scale_id("JI-MAJ") && after.t[0].step[0].note[0] == 62);
     assert(micro_pitch(t, 62) == 600000 + (int32_t)round(120000 * log2(1.25)));
     puts("microtonal: close pitches, MIDI releases after changes, chords, ARP periods and project recordings ok");

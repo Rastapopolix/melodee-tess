@@ -5,6 +5,17 @@
 #define UI_TEST_NO_MAIN 1
 #include "ui_test.c"
 
+/* two decoded projects hold the same music (a record keeps no CZ-1 / Prophet tones and compacts the timed notes) */
+static int same_music(const project_t *a, const project_t *b)
+{
+    int ok = !memcmp(a->g, b->g, sizeof a->g) && a->sel == b->sel && !memcmp(a->pattern, b->pattern, sizeof a->pattern) &&
+             !memcmp(&a->motion, &b->motion, sizeof a->motion) && !memcmp(a->fm6, b->fm6, sizeof a->fm6) &&
+             !memcmp(a->drum, b->drum, sizeof a->drum) && !memcmp(a->name, b->name, sizeof a->name);
+    for (uint32_t t = 0; t < NTRK; t++)
+        ok &= a->t[t].engine == b->t[t].engine && a->t[t].preset == b->t[t].preset &&
+              !memcmp(a->t[t].p, b->t[t].p, sizeof a->t[t].p) && !memcmp(a->t[t].step, b->t[t].step, sizeof a->t[t].step);
+    return ok;
+}
 static int motion_recording(void)
 {
     int bad = 0; ui_power_on(); track_t *t = &trk[0];
@@ -16,10 +27,10 @@ static int motion_recording(void)
     t->p[P_LEVEL] = 110; motion_capture(t, P_LEVEL, 110);
     bad += check("same step/parameter overwrites rather than consuming capacity", motion.count == 1u && motion.event[0].value == 110);
     bad += check("sounding values never replace the original patch base", t->p[P_LEVEL] == 110 && motion_base_value(t, P_LEVEL) == 23);
-    project_t q; project_store_t packed;
+    project_t q; static uint8_t packed[TSP_MAX];
     project_capture(&q);
     bad += check("project snapshot saves base + independent events while sounding", q.t[0].p[P_LEVEL] == 23 && q.motion.event[0].value == 110 &&
-        proj_pack(&packed, &q) && sizeof packed == PROJ_STORE_SIZE);
+        tsp_pack(packed, &q, 0) != 0u);
     seq_stop();
     bad += check("stop before another step restores the original parameter", t->p[P_LEVEL] == 23);
     seq_start(); seq_tick(t, CTL);
@@ -76,61 +87,80 @@ static int compact_project(void)
     t->step[3] = (step_t){{60, 67}, 2, ST_NOTE, SF_ACCENT, 110, 0x81, 0x80, 0};
     step_set_chance(&t->step[3], 25); t->p[P_FM1_LEVEL] = 80; t->p[P_ED_FLT] = -50;
     motion_set_event(t, 3, P_LEVEL, 110);
-    project_t before, after; project_store_t packed, corrupt;
+    static project_t before, after; static uint8_t packed[TSP_MAX], corrupt[TSP_MAX];
+    uint32_t n;
     project_capture(&before);
-    bad += check("FUN16 fits the retained and flash extent", sizeof(proj_slot) == 4u * PROJ_STORE_SIZE && proj_pack(&packed, &before));
-    fm6_fn[0][FN_PTIME] = 33;                            /* (FM6 functions: in the FBKK around FUN16, not in FUN16) */
+    bad += check("a project packs into a record of at most a copy", (n = tsp_pack(packed, &before, 0)) != 0u && n <= TSP_MAX);
+    fm6_fn[0][FN_PTIME] = 33;
     project_capture(&before);
     {
         static uint8_t fbk[TSP_MAX];
         bad += check("TSP1 keeps the tracks' FM6 function settings", tsp_pack(fbk, &before, 1) &&
                      tsp_valid(fbk, tsp_len(fbk)) && proj_scratch.fm6_fn_ok && proj_scratch.fm6_fn[0][FN_PTIME] == 33u);
     }
-    proj_fn_none(&before); proj_pack(&packed,&before);
-    bad += check("FUN16 round trip preserves signed values/FM params/probability/motion", proj_import(&after, &packed, sizeof packed) &&
-        !memcmp(&before, &after, sizeof before));
-    corrupt = packed; corrupt.raw[112] ^= 1u;
-    bad += check("FUN16 torn or corrupted payload is refused", !proj_import(&after, &corrupt, sizeof corrupt));
-    corrupt = packed; corrupt.raw[68] = 255; uint32_t sum = proj_hash(corrupt.raw, sizeof corrupt - 4u);
-    memcpy(corrupt.raw + sizeof corrupt - 4u, &sum, 4);
-    bad += check("compact parameter range is validated even with a correct hash", !proj_import(&after, &corrupt, sizeof corrupt));
-    corrupt = packed; uint32_t probability_byte = 68u + P_COUNT + 2u + 7u; corrupt.raw[probability_byte] = 255;
-    sum = proj_hash(corrupt.raw, sizeof corrupt - 4u); memcpy(corrupt.raw + sizeof corrupt - 4u, &sum, 4);
-    bad += check("invalid probability is refused even with a correct hash", !proj_import(&after, &corrupt, sizeof corrupt));
+    n = tsp_pack(packed, &before, 0);
+    bad += check("TSP1 round trip preserves signed values/FM params/probability/motion", n && tsp_valid(packed, n) &&
+        (after = proj_scratch, same_music(&before, &after)));
+    memcpy(corrupt, packed, n); corrupt[n / 2u] ^= 1u;
+    bad += check("TSP1 torn or corrupted payload is refused", !tsp_valid(corrupt, n));
+    memcpy(corrupt, packed, n); tsp_valid(corrupt, n);   /* (track 1's P_LEVEL far out of its range: clamped when loaded) */
+    corrupt[tsp_seen.at[TSP_TRACKS] + 3u + 2u * P_LEVEL] = 0xFF; corrupt[tsp_seen.at[TSP_TRACKS] + 4u + 2u * P_LEVEL] = 0x7F;
+    tsp_resum(corrupt);
+    bad += check("a parameter out of its range reads as it is and is clamped when it loads", tsp_valid(corrupt, n) &&
+        proj_scratch.t[0].p[P_LEVEL] == 32767);
+    memcpy(corrupt, packed, n); tsp_valid(corrupt, n);
+    {   /* (track 1's step 8 in its current pattern: its chance byte 255) */
+        uint32_t pos = 57u;
+        proj_bits_put(corrupt + tsp_seen.at[TSP_STEPS] + NTRK + ((uint32_t)before.pattern[0] * NSTEP + 7u) * TSP_STEP_BYTES, &pos, 255u, 8u);
+    }
+    tsp_resum(corrupt);
+    bad += check("invalid probability is refused even with a correct hash", !tsp_valid(corrupt, n));
     project_save(1); motion_clear(t); t->p[P_FM1_LEVEL] = 127; step_set_chance(&t->step[3], 100);
     project_load(1);
     bad += check("actual project save/load restores motion, chance and operator settings", motion_count(t) == 1u &&
         step_chance(&t->step[3]) == 25u && t->p[P_FM1_LEVEL] == 80);
     return bad;
 }
-/* a FUN16 record written with np parameters (np < P_COUNT: a firmware of before parameters were added): its first
- * np - 8 values in place, then the engine's E0..E7; motion ids from np - 8 on for E0..E7 (m: its events as that
- * firmware numbered them). The fixed parts (patches, tones, name) as today's */
-static void pack_np(project_store_t *out, const project_t *q, const motion_store_t *m, uint32_t np)
+/* a TSP1 record written by a firmware of np parameters (np < P_COUNT: before parameters were added): its TRACKS part
+ * with the first np - 8 values, then the engine's E0..E7; its MOTION with m (its events as that firmware numbered
+ * them). The other parts as today's. out holds the record; its length */
+static uint32_t pack_np(uint8_t *out, const project_t *q, const motion_store_t *m, uint32_t np)
 {
-    uint8_t *b = out->raw; uint32_t pos = 68u, t, i, sum;
-    proj_pack(out, q);
-    memset(b + 68, 0, PROJ_FM6_OFF - 68u);
-    uint32_t magic=0x46554E43u;memcpy(b,&magic,4);memcpy(b+8,q->g,2u*PROJ_GLOBALS);
-    b[66] = (uint8_t)np;
-    for (t = 0; t < NTRK; t++) {
-        for (i = 0; i < np; i++) b[pos++] = (uint8_t)(q->t[t].p[i < np - 8u ? i : i - (np - 8u) + P_E0] + 64);
-        b[pos++] = q->t[t].engine; b[pos++] = q->t[t].preset;
-        for (i = 0; i < NSTEP; i++) {
-            const step_t *s = &q->t[t].step[i];
-            memcpy(b + pos, s->note, 4); pos += 4;
-            b[pos++] = (uint8_t)(s->n | s->time << 3 | s->flags << 5);
-            b[pos++] = s->vel; b[pos++] = s->hit; b[pos++] = s->acc; b[pos++] = s->probability;
+    static uint8_t today[TSP_MAX];
+    uint32_t n = tsp_pack(today, q, 0), in = 12u, o = 12u, t, i, parts, sum;
+    memcpy(out, today, 12);
+    parts = today[8] | (uint32_t)today[9] << 8;
+    for (uint32_t k = 0; k < parts; k++) {
+        uint32_t id = today[in], len = today[in + 2u] | (uint32_t)today[in + 3u] << 8, at = o;
+        out[o++] = (uint8_t)id; out[o++] = today[in + 1u]; o += 2u;
+        if (id == TSP_TRACKS) {
+            out[o++] = (uint8_t)np;
+            for (t = 0; t < NTRK; t++) {
+                out[o++] = q->t[t].engine; out[o++] = q->t[t].preset;
+                for (i = 0; i < np; i++) {
+                    uint16_t v = (uint16_t)q->t[t].p[i < np - 8u ? i : i - (np - 8u) + P_E0];
+                    out[o++] = (uint8_t)v; out[o++] = (uint8_t)(v >> 8);
+                }
+            }
+        } else if (id == TSP_MOTION) {
+            memcpy(out + o, m, sizeof *m); o += sizeof *m;
+            memset(out + o, 0, MOTION_MAX); o += MOTION_MAX;
+        } else {
+            memcpy(out + o, today + in + 4u, len); o += len;
         }
+        out[at + 2u] = (uint8_t)(o - at - 4u); out[at + 3u] = (uint8_t)((o - at - 4u) >> 8);
+        in += 4u + len;
     }
-    memcpy(b + pos, &q->chain, sizeof q->chain); pos += sizeof q->chain;
-    memcpy(b + pos, m, sizeof *m);
-    sum = proj_hash(b, PROJ_STORE_SIZE - 4u); memcpy(b + PROJ_STORE_SIZE - 4u, &sum, 4);
+    (void)n;
+    o += 4u;
+    memcpy(out + 4, &o, 4);
+    sum = proj_hash(out, o - 4u); memcpy(out + o - 4u, &sum, 4);
+    return o;
 }
 static int older_count(void)
 {
     int bad = 0, ok; ui_power_on(); track_t *t = &trk[0];
-    project_t before, after; project_store_t old; motion_store_t m;
+    static project_t before, after; static uint8_t old[TSP_MAX]; motion_store_t m; uint32_t n;
     const uint32_t np = 104u, e0 = np - 8u;
     uint32_t i, k;
     for (k = 0; k < NTRK; k++)
@@ -144,27 +174,29 @@ static int older_count(void)
     m.event[0] = (motion_event_t){3, P_LEVEL, 90};
     m.event[1] = (motion_event_t){5, (uint8_t)e0, 40};             /* its P_E0 */
     m.event[2] = (motion_event_t){6, P_FM1_ATK, 20};               /* below its P_E0: the same id then and now */
-    pack_np(&old, &before, &m, np);
-    ok = proj_import(&after, &old, sizeof old);
+    n = pack_np(old, &before, &m, np);
+    ok = tsp_valid(old, n);
+    after = proj_scratch;
     for (k = 0; ok && k < NTRK; k++) {
         for (i = 0; i < 8u; i++) ok &= after.t[k].p[P_E0 + i] == before.t[k].p[P_E0 + i];
         for (i = 0; i < e0; i++) ok &= after.t[k].p[i] == before.t[k].p[i];
         for (i = e0; i < P_E0; i++) ok &= after.t[k].p[i] == param_desc_of(after.t[k].engine, i)->def;
     }
-    bad += check("FUN16 of P_COUNT 104: E0..E7 in place, FX defaults, the rest kept", ok &&
+    bad += check("a record of P_COUNT 104: E0..E7 in place, FX defaults, the rest kept", ok &&
         after.t[0].p[P_FM1_ATK] == 33 && !memcmp(after.t[0].step, before.t[0].step, sizeof before.t[0].step));
     bad += check("  its motion: its E0 -> P_E0, REV and FM OP1 ATK kept",
         after.motion.count == 3u && after.motion.event[0].param == P_LEVEL && after.motion.event[1].param == P_E0 &&
         after.motion.event[1].value == 40 && after.motion.event[2].param == P_FM1_ATK);
-    bad += check("  written again with today's count: the same project", proj_pack(&old, &after) && old.raw[66] == P_COUNT &&
-        proj_import(&before, &old, sizeof old) && !memcmp(&before, &after, sizeof before));
-    pack_np(&old, &before, &m, np); memcpy(&proj_slot[2], &old, sizeof old);
+    n = tsp_pack(old, &after, 0);
+    bad += check("  written again with today's count: the same project", n && tsp_valid(old, n) &&
+        old[tsp_seen.at[TSP_TRACKS]] == P_COUNT && same_music(&proj_scratch, &after));
+    n = pack_np(old, &before, &m, np); memcpy(proj_bank_slot[2], old, n); proj_bank_len[2] = n;
     project_load(2);
     bad += check("such a project's motion loads at today's parameter ids", motion.count == 3u &&
         motion.event[1].param == P_E0 && trk[0].pattern == 0u);
     m.event[1].param = (uint8_t)(e0 + 1u);                          /* (any id of its E0 .. E7 moves by 2) */
-    pack_np(&old, &before, &m, np);
-    bad += check("  its E1 -> P_E1", proj_import(&after, &old, sizeof old) && after.motion.event[1].param == P_E1);
+    n = pack_np(old, &before, &m, np);
+    bad += check("  its E1 -> P_E1", tsp_valid(old, n) && proj_scratch.motion.event[1].param == P_E1);
     return bad;
 }
 static int loads_and_song(void)
@@ -211,12 +243,12 @@ static int native_motion_test(void)
         motion_native_peek(t, old); *motion_native_at(t, i) = changed; motion_native_edited(t, old);
         bad += check("native edit records tagged motion and keeps its patch base", motion.count == 1u &&
             motion.event[0].param == id && motion.event[0].value == (int16_t)(tag << 8 | changed) && motion_nbase[0][i] == base);
-        project_t q, restored; project_store_t packed; uint8_t unpacked[FP_SIZE + 1u];
+        static project_t q, restored; static uint8_t packed[TSP_MAX]; uint8_t unpacked[FP_SIZE + 1u]; uint32_t pn;
         project_capture(&q); fm6_unpack(q.fm6[0], unpacked);
         bad += check("native project snapshot saves the original patch while motion sounds",
             unpacked[i] == base &&
-            proj_pack(&packed, &q) && proj_import(&restored, &packed, sizeof packed) &&
-            restored.motion.event[0].value == (int16_t)(tag << 8 | changed));
+            (pn = tsp_pack(packed, &q, 0)) && tsp_valid(packed, pn) &&
+            (restored = proj_scratch, restored.motion.event[0].value == (int16_t)(tag << 8 | changed)));
         seq_stop(); bad += check("native stop immediately restores the original patch", *motion_native_at(t, i) == base);
         song.rec = 0; seq_start(); seq_tick(t, CTL);
         bad += check("native motion replays from the real sequencer", *motion_native_at(t, i) == changed);

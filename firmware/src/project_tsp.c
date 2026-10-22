@@ -289,8 +289,6 @@ static int tsp_valid(const uint8_t *raw, uint32_t len)
         q->t[t].engine = 0;
         for (i = 0; i < P_COUNT; i++) q->t[t].p[i] = param_desc_of(0, i)->def;
         for (i = 0; i < NSTEP; i++) q->t[t].step[i].time = ST_REST;
-        cz_patch_init(q->cz[t].raw);                   /* (CZ-1 and Prophet: not stored, their engines leaving) */
-        p5_patch_init(&q->p5[t]);
     }
     chain_defaults(&q->chain);
 
