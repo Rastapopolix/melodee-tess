@@ -77,8 +77,8 @@ stay in the factory preset list, and unsaved user slots start empty.
 
 ## Factory tones
 
-Casio's 64 CZ-1 preset tones are built into the firmware (`assets/cz1-factory/`, see its README for
-where they come from). PRESETS 1–64 load these factory tones independently of the native user collection.
+Retired with the CZ-1 engine and its user store (2026-10-22): the firmware no longer carries Casio's 64
+preset tones.
 
 ## Device pages: dim values
 

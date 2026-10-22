@@ -42,16 +42,10 @@
 #endif
 /* Tessera (phase 4, tessera-notes/docs/design/phase4/PLAN.md): an engine left out of the build (0) is never offered; its stored ID
  * stays reserved and a project's track of it loads SID's INIT (project.c). Its code goes where nothing reaches it */
-/* CZ-1 and PROPHET: retired as engines 2026-10-22 (their IDs stay reserved); MELODEE_CZ / MELODEE_PROPHET keep their
- * stored tones, factory sounds and banks (cz_p5_store.c, cz_bank.c, prophet_user.c) until the own project format */
-#ifndef MELODEE_PROPHET
-#define MELODEE_PROPHET 1
-#endif
+/* CZ-1 and PROPHET: retired as engines 2026-10-22 (their IDs stay reserved), their user stores and factory sounds
+ * with the own project format (cz_p5_store.c: what FUN20 still carries) */
 #ifndef MELODEE_FM6
 #define MELODEE_FM6 1
-#endif
-#ifndef MELODEE_CZ
-#define MELODEE_CZ 1
 #endif
 #ifndef MELODEE_SID
 #define MELODEE_SID 1            /* SID as a melodic engine (eng_sid.c); DRUM's SID KIT and SID DIGI keep the chip core either

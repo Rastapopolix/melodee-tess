@@ -237,8 +237,7 @@ sound && [ $TABLES = 1 ] && job dsp_tracks
 
 if core; then
     t "flash storage (A/B, torn writes)" storage_test
-    t "native FM6 user presets (CZ slots stored), scrolling, migration and interrupted saves" fm6_preset_test -O1 $FW
-    t "Prophet user bank (engine retired): native slots, atomic saves and favorites" prophet_integration_test -O1 $FW
+    t "native FM6 user presets, scrolling, migration and interrupted saves" fm6_preset_test -O1 $FW
     t "resource lifetimes, cache eviction, tails and capacity" resources_test -O2 $FW
     t "aligned libc: copy/clear bounds, ordering and float aliasing" libc_word_test -O2 -fstrict-aliasing
     t "audio worker: stalled jobs and wrapping deadlines" audio_worker_test

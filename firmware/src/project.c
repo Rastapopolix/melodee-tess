@@ -533,8 +533,6 @@ static void project_capture(project_t *p)
         for (uint32_t j = 0; j < P_COUNT; j++) p->t[i].p[j] = motion_base_value(&trk[i], j);
         p->t[i].engine = trk[i].eng_req;
         p->t[i].preset = trk[i].preset;
-        if (trk[i].eng_req == ENGI_PROPHET && trk[i].user_native && user_of(&trk[i]) < P5_USER_SLOTS)
-            *proj_p5_origin(p,i) = (uint8_t)(user_of(&trk[i])+1u);
         p->pattern[i] = trk[i].pattern;
         memcpy(p->t[i].step, trk[i].step, sizeof trk[i].step);
         p->cz[i] = cz_patch[i];
@@ -743,25 +741,6 @@ static int project_restore_runtime(const project_t *input)
             uint8_t v[FP_SIZE + 1u];
             fm6_unpack(p->fm6[k], v);
             p5_patch[k]=p->p5[k];p5_ready[k]=1;
-            if(e==ENGI_PROPHET){
-                uint32_t origin=*proj_p5_origin(p,k),slot;
-                if(origin && native_used(e,origin-1u)){
-                    t->user=(uint8_t)origin;t->user_native=1;
-                }else if(!t->preset){
-                    /* Older projects have no origin. Locate an unchanged
-                     * factory or saved user sound by its complete patch. */
-                    for(slot=0;slot<P5_FACTORY_N;slot++){
-                        p5_patch_t f;p5_factory(slot,&f);
-                        if(!memcmp(&p->p5[k],&f,sizeof f)){t->preset=(uint8_t)(slot+1u);break;}
-                    }
-                    if(slot==P5_FACTORY_N)for(slot=0;slot<P5_USER_SLOTS;slot++){
-                        p5_patch_t saved;
-                        if(!p5_user_get(slot,&saved) && !memcmp(&p->p5[k],&saved,sizeof saved)){
-                            t->user=(uint8_t)(slot+1u);t->user_native=1;break;
-                        }
-                    }
-                }
-            }
             cz_patch[k] = p->cz[k];
             cz_track_accept(t);
             fm6_set_patch(k, v);

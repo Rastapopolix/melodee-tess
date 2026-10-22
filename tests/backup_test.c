@@ -206,34 +206,28 @@ static int full_pattern_archive(void)
 }
 static int native_archive(void)
 {
-    reset();up_boot();int ok=1;uint8_t fm[FM6_PACKED],cz[CZ_BYTES];
-    const uint32_t slots[4]={0,16,32,63},ids[4]={21,22,19,20};static native_fm_t saved[4];static cz_bank_t savedcz;
+    reset();up_boot();int ok=1;uint8_t fm[FM6_PACKED];
+    const uint32_t slots[4]={0,16,32,63},ids[4]={21,22,19,20};static native_fm_t saved[4];
     for(uint32_t b=0;b<4;b++){fm6_factory(b,fm);ok &= !native_put(ENGI_FM6,slots[b],fm);saved[b]=(*native_fm_bank(b));}
-    cz_patch_init(cz);cz[128]='Z';ok &= !native_put(ENGI_CZ,127,cz);savedcz=(*native_cz_bank(7));
     for(uint32_t b=0;b<4;b++){uint32_t len;const uint8_t *raw=ed_bk_object(ids[b],&len);ok &= len==sizeof saved[b] && !memcmp(raw,&saved[b],len);ok &= !native_put(ENGI_FM6,slots[b],0);}
-    ok &= !native_put(ENGI_CZ,127,0);
     for(uint32_t b=0;b<4;b++)ok &= !put_all(ids[b],(uint8_t *)&saved[b],sizeof saved[b],st_crc32(&saved[b],sizeof saved[b]));
-    ok &= !put_all(16,(uint8_t *)&savedcz,sizeof savedcz,st_crc32(&savedcz,sizeof savedcz));
-    native_cache_reset();cz_bank_cached=255;up_boot();
+    native_cache_reset();up_boot();
     for(uint32_t b=0;b<4;b++)ok &= !memcmp(native_fm_bank(b),&saved[b],sizeof saved[b]);
-    ok &= native_used(ENGI_CZ,127) && !memcmp(native_raw(ENGI_CZ,127),cz,sizeof cz);
-    return check("all four native FM6 objects and Z128 restore exactly after reboot",ok);
+    return check("all four native FM6 objects restore exactly after reboot",ok);
 }
-static int prophet_archive(void)
+/* the CZ-1's banks (9..16) and the Prophet's (23..27), retired with their stores: like 8, listed empty, an empty one
+ * taken, a payload refused before anything is written */
+static int retired_archive(void)
 {
-    reset();up_boot();int bad=0,ok=1;static p5_bank_t saved[5],readback;p5_patch_t patch;
-    p5_patch_init(&patch);patch.raw[97]=255;patch.raw[98]=255;
-    for(uint32_t b=0;b<5;b++){uint32_t slot=b==4?127:b*26;patch.raw[84]=(uint8_t)('A'+b);ok &= !native_put(ENGI_PROPHET,slot,(const uint8_t *)&patch);ok &= favorite_set(USER_NATIVE_P5,slot,1);saved[b]=*p5_user_bank(b);}
-    for(uint32_t b=0;b<5;b++){uint32_t len;const uint8_t *raw=ed_bk_object(23+b,&len);ok &= len==sizeof readback&&!memcmp(raw,&saved[b],len);ok &= !put_all(23+b,0,0,0);ok &= !put_all(23+b,&saved[b],sizeof readback,st_crc32(&saved[b],sizeof readback));}
-    native_cache_reset();for(uint32_t b=0;b<5;b++)ok &= !memcmp(p5_user_bank(b),&saved[b],sizeof readback);
-    bad+=check("all five Prophet backup objects restore patches, names, metadata and stars exactly",ok);
-    uint32_t before=erases;readback=saved[4];readback.used|=1u<<24;
-    bad+=check("out-of-range Prophet slot masks are rejected before an erase",put_all(27,&readback,sizeof readback,st_crc32(&readback,sizeof readback))==2&&erases==before);
-    readback=saved[4];readback.patch[23].model=99;
-    bad+=check("invalid Prophet wire metadata is rejected before an erase",put_all(27,&readback,sizeof readback,st_crc32(&readback,sizeof readback))==2&&erases==before);
-    readback=saved[4];erase_error=1;
-    bad+=check("failed Prophet backup commit keeps the previous cached and flash bank",put_all(27,&readback,sizeof readback,st_crc32(&readback,sizeof readback))==4&&!memcmp(p5_user_bank(4),&saved[4],sizeof readback));erase_error=0;
-    return bad;
+    reset();up_boot();int ok=1;static uint8_t payload[3612];uint32_t len,crc,before=erases;
+    memset(payload,0x5A,sizeof payload);
+    for(uint32_t id=9;id<=27;id++){
+        if(id>16u && id<23u)continue;
+        ok &= list(id,&len,&crc)==0 && !len;
+        ok &= put_all(id,payload,0,st_crc32(payload,0))==0;
+        ok &= put_begin(id,sizeof payload,st_crc32(payload,sizeof payload))==1u;
+    }
+    return check("the CZ-1 and Prophet bank ids list empty, take an empty one and refuse a payload unwritten",ok && erases==before);
 }
 static int expanded_recording_archive(void)
 {
@@ -563,25 +557,8 @@ int main(void)
         b.nslot = 3;
         bad += check("a bank with the wrong slot count is refused", put_all(7, &b, sizeof b, st_crc32(&b, sizeof b)) == 2u);
     }
-    {   /* CZ-1 banks: a never-saved bank (BANK A..D: Casio's factory tones) is no object of the backup, so a
-         * restore keeps it the default; a saved one is carried byte for byte */
-        static cz_bank_t cb;
-        reset();
-        cz_bank_boot();
-        bad += check("CZ-1: a never-saved BANK A (its factory default) lists as length 0",
-                     list(9, &len, &crc) == 0 && len == 0 && cz_bank_load(0)->used == 0xFFFFu);
-        cz_bank_empty(&cb, 0);
-        memcpy(cb.tone[3].raw, cz_fac(7), CZ_BYTES);
-        cb.used = 1u << 3;
-        bad += check("CZ-1: a saved BANK A restores and lists with its 2332 B",
-                     put_all(9, &cb, sizeof cb, st_crc32(&cb, sizeof cb)) == 0 && list(9, &len, &crc) == 0 &&
-                     len == sizeof cb && cz_bank_load(0)->used == 1u << 3);
-        bad += check("CZ-1: length 0 clears native presets while keeping factory tones separate",
-                     put_all(9, &cb, 0, st_crc32(&cb, 0)) == 0 && !native_cz_bank(0)->used &&
-                     list(9, &len, &crc) == 0 && len == sizeof(cz_bank_t));
-    }
     bad += native_archive();
-    bad += prophet_archive();
+    bad += retired_archive();
     bad += full_pattern_archive();
     printf("backup test %s\n", bad ? "FAILED" : "passed");
     return (bad + expanded_bad) != 0;

@@ -8,7 +8,9 @@
  * melodee-tess: the projects (0 the music playing, 2..5 the slots) are TSP1 records (project_tsp.c), each with its
  * generators and cords; a FUN record from an older backup still imports into one. 28 (the Tessera object) is retired:
  * always empty. 29 is the live generator state (restored before 0: the page restores 0 last, which then wins).
+ * The retired banks (8; 9..16 the CZ-1's, 23..27 the Prophet's: their stores removed) list empty and take only empty.
  */
+#define ED_BK_RETIRED(id) ((id) == 8u || ((id) >= 9u && (id) <= 16u) || ((id) >= 23u && (id) <= 27u))
 #ifndef ED_BK_FLASH_PTR
 #define ED_BK_FLASH_PTR(off) fm1_xip_ptr(off)
 #endif
@@ -61,7 +63,7 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
     } else if (id >= 19u && id <= 22u) {
         uint32_t b = id < 21u ? id - 17u : id - 21u;
         if (native_old(ENGI_FM6, b * 16u)) old_obj = native_fm_obj(b);
-    } else if (id >= 9u && id <= 16u && native_old(ENGI_CZ, (id - 9u) * 16u)) old_obj = OBJ_CZBANK0 + id - 9u;
+    }
     if (old_obj < OBJ_COUNT) {
         st_hdr_t h; int copy = st_current(old_obj, &h);
         if (copy >= 0) {
@@ -70,7 +72,6 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
         }
     }
 #endif
-    if(id>=23u && id<=27u){p5_bank_t *b=p5_user_bank(id-23u);*len=sizeof *b;return (const uint8_t *)b;}
     if (id == 28u) return ED_BK_RAW;                /* (retired: always empty) */
     if (id == 29u) { *len = sizeof ed_bk_tess_live; return ed_bk_tess_live; }
     if (id == 0u) { *len = ed_bk_run_len; return ED_BK_RAW; }
@@ -99,13 +100,12 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
         if (up_cache_bank(b)->magic == UP_BANK_MAGIC) *len = sizeof (*up_cache_bank(0));
         return (const uint8_t *)up_cache_bank(b);
     }
-    if (id == 8u) return ED_BK_RAW; /* retired bank: always empty */
+    if (ED_BK_RETIRED(id)) return ED_BK_RAW; /* retired banks: always empty */
     if (id >= 19u && id <= 22u) {
         uint32_t nb=id<21u?id-17u:id-21u;
         if(native_fm_valid(native_fm_bank(nb))){*len=sizeof(native_fm_t);return (const uint8_t *)native_fm_bank(nb);}
         return ED_BK_RAW;
     }
-    if(id>=9u && id<=16u){if(cz_bank_valid(native_cz_bank(id-9u))){*len=sizeof(cz_bank_t);return (const uint8_t *)native_cz_bank(id-9u);}cz_bank_t *b=cz_bank_load(id-9u);if(cz_bank_saved)*len=sizeof *b;return (const uint8_t *)b;}
     return 0;
 }
 static uint32_t ed_bk_capture(void)
@@ -182,21 +182,14 @@ static uint32_t ed_bk_commit_inner(void)
         if (ed_bk_len && (!up_bank_shape(ed_bk_len,p->rsize) || p->magic != UP_BANK_MAGIC || p->nslot != UP_PER_BANK)) return 2;
         /* Unknown record versions remain inert bytes, preserving future/older bank data. */
         obj = ed_bk_id < 8u ? OBJ_UPRESET0 + ed_bk_id - 6u : OBJ_UPRESET_EXT0 + ed_bk_id - 17u;
-    } else if (ed_bk_id == 8u) {
+    } else if (ED_BK_RETIRED(ed_bk_id)) {
         if (!ed_bk_len) return 0;
-        return 2; /* retired selector-based bank archives are unsupported */
+        return 2; /* retired banks (selector-based, CZ-1, Prophet): their archives are not read */
     } else if (ed_bk_id >= 19u && ed_bk_id <= 22u && (ed_bk_len==sizeof(native_fm_t) || !ed_bk_len)) {
         uint32_t b=ed_bk_id<21u?ed_bk_id-17u:ed_bk_id-21u;
         if(ed_bk_len && !native_fm_valid((const native_fm_t *)raw))return 2;
         native_fm_t old=(*native_fm_bank(b));if(ed_bk_len)memcpy(native_fm_bank(b),raw,sizeof (*native_fm_bank(b)));else native_fm_empty(b);
         if(native_save_bank(ENGI_FM6,b)==2){(*native_fm_bank(b))=old;return 4;}
-        up_gen++;sync_reload=1;ui.force=1;return 0;
-    } else if(ed_bk_id>=9u && ed_bk_id<=16u){
-        if(ed_bk_len && (ed_bk_len!=sizeof(cz_bank_t)||!cz_bank_valid((const cz_bank_t *)raw)))return 2;
-        uint32_t b=ed_bk_id-9u;cz_bank_t old=(*native_cz_bank(b));
-        if(ed_bk_len)memcpy(native_cz_bank(b),raw,sizeof(cz_bank_t));else {cz_bank_empty(native_cz_bank(b),b);native_cz_bank(b)->ver=2;}
-        if(native_save_bank(ENGI_CZ,b)==2){(*native_cz_bank(b))=old;return 4;}
-        cz_bank_import(b,(const uint8_t *)native_cz_bank(b),sizeof(cz_bank_t));
         up_gen++;sync_reload=1;ui.force=1;return 0;
     } else if (ed_bk_id == 28u) {                  /* the Tessera object, retired: an empty one only */
         return ed_bk_len ? 2u : 0u;
@@ -205,13 +198,6 @@ static uint32_t ed_bk_commit_inner(void)
         else if (tessera_unpack_ver(ed_bk_tess_ver(ed_bk_len), raw) != 1) return 2;   /* (v1..v9: an older backup) */
         sync_reload = 1; ui.force = 1;
         return 0;
-    } else if(ed_bk_id>=23u && ed_bk_id<=27u){
-        uint32_t bank=ed_bk_id-23u;
-        if(ed_bk_len && (ed_bk_len!=sizeof(p5_bank_t)||!p5_bank_valid((const p5_bank_t *)raw,bank)))return 2;
-        p5_bank_t *dst=p5_user_bank(bank),old=*dst;
-        if(ed_bk_len)memcpy(dst,raw,sizeof *dst);else {memset(dst,0,sizeof *dst);dst->magic=P5_BANK_MAGIC;}
-        if(p5_user_save_bank(bank)){*dst=old;p5_index(bank,dst);return 4;}
-        up_gen++;sync_reload=1;ui.force=1;return 0;
     } else return 1;
 #if MELODEE_FLASH
     if (!flash_ok || st_save(obj, ed_bk_id == 17u || ed_bk_id == 18u ? raw + 8u : raw,
@@ -231,10 +217,6 @@ static uint32_t ed_bk_commit_inner(void)
 #if MELODEE_FLASH
         persist_saved = ed_bk_set.p; persist_pending = persist_repair = 0;
 #endif
-    } else if(ed_bk_id>=9u && ed_bk_id<=16u){
-        cz_bank_import(ed_bk_id-9u,raw,ed_bk_len);
-        if(ed_bk_len)memcpy(native_cz_bank(ed_bk_id-9u),raw,sizeof(cz_bank_t));else {cz_bank_empty(native_cz_bank(ed_bk_id-9u),ed_bk_id-9u);native_cz_bank(ed_bk_id-9u)->ver=2;}
-        up_gen++;
     } else {
         uint32_t b = ed_bk_id < 8u ? ed_bk_id - 6u : ed_bk_id - 15u;
         memset(up_cache_bank(b), 0, sizeof (*up_cache_bank(b)));
@@ -259,9 +241,7 @@ static uint32_t ed_bk_write(const uint8_t *a, uint32_t n)
             (a[1] <= 5u && a[1] != 1u && len && len < TSP_HEAD + 4u) ||   /* shorter than any record: refused at once) */
             (a[1] == 1u && len != sizeof(persist_t) && !tmpl_param_count(len - sizeof(persist_t))) ||
             ((a[1] == 6u || a[1] == 7u || a[1] == 17u || a[1] == 18u) && len && len != sizeof(up_bank_t)) ||
-            (a[1] == 8u && len) ||
-            (a[1]>=9u && a[1]<=16u && len && len!=sizeof(cz_bank_t)) ||
-            (a[1]>=23u && a[1]<=27u && len && len!=sizeof(p5_bank_t)) ||
+            (ED_BK_RETIRED(a[1]) && len) ||
             (a[1] == 28u && len) ||
             (a[1] == 29u && len && !ed_bk_tess_ver(len)) ||
             (a[1]>=19u && a[1]<=22u && len && len!=sizeof(native_fm_t))) return 1;
