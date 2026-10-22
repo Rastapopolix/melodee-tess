@@ -168,6 +168,14 @@ web_tests() {                                     # the editor mock's tables mus
     fi
 }
 desc_json() { "$OUT/descdump" > "$OUT/desc.json"; }
+demo_tests() {                                    # the demos made again, the shipped ones loaded, and put into a backup
+    mkdir -p build/demos &&
+        "$OUT/demo_projects" make build/demos 20 &&
+        "$OUT/demo_projects" check demos &&
+        "$OUT/demo_projects" archive build/demos/blank.json &&
+        python3 tools/demo_backup.py build/demos/blank.json build/demos/with-demos.json &&
+        "$OUT/demo_projects" restore build/demos/with-demos.json
+}
 old_to_new() {                                    # a package of another app (this one cut short) -> this build
     head -c 200000 build/melodee.bin > "$OUT/old_app.bin" &&
         python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null &&
@@ -318,6 +326,8 @@ if core && [ $TABLES = 1 ]; then
     t "first boot: reset unsupported preset banks, preserve good entries and retry cuts" preset_boot_reset_test $FW
     t "storage safety: protect unreadable records until confirmed replacement" storage_safety_test $FW
     t "full backup: CRC before writes, stale runtime, USB reset / timeout, malformed objects, older projects" backup_test $FW
+    t "demo projects (demos/): made, saved, backed up, loaded and played; the shipped ones load; put into a backup" \
+        demo_projects -O2 $FW -DMELODEE_SID=0 -DMELODEE_PHYS=0 -DTRK_START_TESS=1 -- demo_tests
     t "engines off (FM6, CZ-1, Prophet left out): never offered, a project's tracks of them SID INIT, the parts play" \
         engine_switch_test $FW -DMELODEE_FM6=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0
     t "engines off (SID, PHYS, CZ-1, Prophet left out, FM back): never offered, their tracks FM6's first voice, the parts play" \
