@@ -32,8 +32,8 @@ form_euclid_abcb_morph_aabc 0x42887912 246
 form_euclid_abcb_morph_aabc.state 0x3b60ee2f
 tweak_shift_drop_human_follow 0x3ae74b57 118
 tweak_shift_drop_human_follow.state 0x60e52915
-scale_root_transpose 0x94df196d 94
-scale_root_transpose.state 0x4c3a2cec
+scale_root_transpose 0x04c917e3 94
+scale_root_transpose.state 0xd2a56ff3
 division_gate_length 0xd0fd4cc4 139
 division_gate_length.state 0x87ea63cf
 all_four_tracks 0x3d8c80b3 888
@@ -138,6 +138,8 @@ chord_walk_half_beat_dia7 0x79a2a736 132
 chord_walk_half_beat_dia7.state 0xc45b0de0
 chord_link_turing_markov 0x80f6919d 163
 chord_link_turing_markov.state 0xddaae522
+key_e_minor 0x81c6ea17 336
+key_e_minor.state 0xc3410d8c
 chord_form_ab_evolve 0x598d5772 27
 chord_form_ab_evolve.state 0x0a91f1c8
 saved_block 0x51e3f0d4 602

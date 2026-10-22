@@ -194,6 +194,17 @@ static void s_scale(void)
     trk[1].p[P_SCALE] = 5;                            /* major pentatonic */
     trk[1].p[P_ROOT] = 9;
 }
+static void s_key(void)                              /* E minor: the generators that write C minor, moved to E */
+{
+    static const uint32_t MODE[4] = {TESS_ENG_TURING, TESS_ENG_EUCLID, TESS_ENG_AWAKE, TESS_ENG_QUAD};
+    for (uint32_t tr = 0; tr < 4u; tr++) {
+        gen(tr, MODE[tr]);
+        trk[tr].p[P_SCALE] = 2;                       /* minor */
+        trk[tr].p[P_ROOT] = 4;
+    }
+    sel(0);
+    knob(tessera_knob, 2, 10);
+}
 static void s_div_gate(void)
 {
     gen(0, TESS_ENG_MARKOV);
@@ -718,6 +729,7 @@ static const scen_t SCEN[] = {
     {"chord", 8, 0x1041u, s_chord, 0},
     {"chord_walk_half_beat_dia7", 8, 0x1042u, s_chord_var, 0},
     {"chord_link_turing_markov", 8, 0x1043u, s_chord_link, 0},
+    {"key_e_minor", 8, 0x1044u, s_key, 0},
     {"chord_form_ab_evolve", 8, 0x1044u, s_chord_form, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
@@ -859,6 +871,22 @@ static void follow_run(char *res, size_t cap)
         n2++;
     }
     snprintf(res, cap, "%u %u", n2, bad);
+}
+
+/* ROOT: the notes of key_e_minor, all four tracks: "notes outside E minor, E minor's notes heard (a bit each)" */
+static void key_run(char *res, size_t cap)
+{
+    const scen_t *sc = 0;
+    uint32_t i, out = 0, heard = 0, n = 0;
+    for (i = 0; i < NSCEN; i++) if (!strcmp(SCEN[i].name, "key_e_minor")) sc = &SCEN[i];
+    scen_run(sc, 0, res, cap);
+    for (i = 0; i < tt_n; i++) {
+        uint32_t pc = tt_ev[i].note % 12u;
+        if ((0xAD5u >> pc) & 1u) heard |= 1u << pc;  /* (E F# G A B C D: 4 6 7 9 11 0 2) */
+        else out++;
+        n++;
+    }
+    snprintf(res, cap, "%u %u %u", n, out, heard);
 }
 
 /* track tr's notes from block blk on, at most cap (note | vel << 8) into out: the count */
@@ -2375,6 +2403,25 @@ int main(int argc, char **argv)
         }
         snprintf(line, sizeof line, "FOLLOW a STEP melody: all %u notes a third above it (in C major)", n2);
         bad += check(line, n2 > 16u && !wrong);
+    }
+    {   /* ROOT: generators that write C minor play E minor's notes, every one of them, with ROOT on E */
+        unsigned n = 0, outside = 1, heard = 0;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                key_run(res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u %u %u", &n, &outside, &heard);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        snprintf(line, sizeof line, "ROOT E, minor: TURING EUCLID AWAKE QUAD's %u notes all in E minor, all 7 heard", n);
+        bad += check(line, n > 32u && !outside && heard == 0xAD5u);
     }
     {   /* QNT CHRD: the other generators on the chord's notes */
         unsigned n = 0, wrong = 1, roots = 0, chords = 0;
