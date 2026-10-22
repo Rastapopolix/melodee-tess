@@ -1101,6 +1101,11 @@ static void draw_columns(void)
                     if (g->prog == GEN_CH_USER) {             /* USER: its LEN (the keys play its chords in) */
                         fmt_int(v3, (int32_t)gen_chord_ulen(g));
                         draw_column(3, "LEN", v3, "", VAL(3u), ((int32_t)gen_chord_ulen(g) - 1) * 1000 / 7, ICON_AUTO);
+                    } else {                                  /* the others: BREATH */
+                        uint32_t b = tessera.ch_breath[tr];
+                        fmt_int(v3, (int32_t)b);
+                        col_mods(PID_TESS(TX_CH_BREATH));
+                        draw_column(3, "BREATH", b ? v3 : "OFF", b ? "%" : "", VAL(3u), (int32_t)b * 10, ICON_AUTO);
                     }
                     return;
                 }

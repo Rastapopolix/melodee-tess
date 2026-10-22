@@ -109,7 +109,7 @@ static void help_find(uint32_t k)
         }
         if (ch_layer_on()) {                            /* (CHORD, OCT+ held: OCT, the track's CHRD and VOIC) */
             if (k < 3u) help.pid = (uint16_t)(k == 0u ? PID_TESS(TX_CH_OCT) : k == 1u ? PID_TRACK(P_CHRD) : PID_TRACK(P_VOIC));
-            else if (tessera_chord(tr)->prog == GEN_CH_USER) help.pid = (uint16_t)PID_TESS(TX_CH_ULEN);
+            else help.pid = (uint16_t)PID_TESS(tessera_chord(tr)->prog == GEN_CH_USER ? TX_CH_ULEN : TX_CH_BREATH);
             return;
         }
         if (gr_layer_on()) {                            /* (GRIDS, OCT+ held: KICK, SNR, HAT, TOMS) */
