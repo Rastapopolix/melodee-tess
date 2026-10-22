@@ -1012,8 +1012,10 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
     if (!slide_in)
         seq_release(t);
     for (i = 0; i < m; i++)
-        if (!((sk >> i) & 1u))
+        if (!((sk >> i) & 1u)) {
             trk_note_on(t, nn[i], vv[i]);
+            seq_sub_note(t, nn[i], vv[i]);              /* (SUB: the step's RATCH repeats it; else nothing) */
+        }
     if (slide_in)                                   /* release what is not held over */
         for (i = 0; i < t->seq_n; i++) {
             for (j = 0; j < m && nn[j] != t->seq_notes[i]; j++)
@@ -1109,8 +1111,12 @@ static void seq_grid_tick(track_t *t, uint32_t n)
                 seq_sub_arm(t, seq_sub_can(t) ? tessera_ratchet(tr_idx) : 1u, step_samples(t, period, t->seq_idx));
             } else {
                 step_t sv;                          /* (STEP EVOLVE: the step with its change, tessera.c) */
+                uint32_t hits;
                 s = tessera_step_vary(t, s, &sv);
+                hits = step_ratch(s);
+                if (hits > 1u) seq_sub_begin(t);    /* (SUB: the step's RATCH, x2..x8: its notes repeated) */
                 seq_step(t, s, step_gate(s) ? step_samples(t, period, t->seq_idx) : period, skip);
+                if (hits > 1u) seq_sub_arm(t, seq_sub_can(t) ? hits : 1u, step_samples(t, period, t->seq_idx));
                 if (tr_idx < TESSERA_TRACKS)
                     tessera.hit[tr_idx] = t->seq_n != 0;   /* (TWEAK 2's LOGIC on another track reads it) */
             }

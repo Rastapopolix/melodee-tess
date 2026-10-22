@@ -1,16 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess)
  * RATCH after Felucca's per-step RATCH (Leo Kuroshita, Hügelton Instruments; github.com/hugelton/Felucca, 1.4-1.6.1,
- * GPL-3.0-only): the idea and its x1..x4 in equal parts of a step, our own code */
+ * GPL-3.0-only): the idea and its x1..x4 in equal parts of a step (x8 ours), our own code */
 /* SUB, sub-step timing (Tessera; included by seq.c): a step's notes again within the step. RATCH plays them HITS times
- * in equal parts of the step, as Felucca's per-step RATCH x1..x4, each hit its share of the step's gate. A step records
+ * (x1..x8) in equal parts of the step, after Felucca's per-step RATCH, each hit its share of the step's gate. A step records
  * the notes it plays on its own voice (seq_sub_note), the sequencer arms the repeats after it (seq_sub_arm) and fires
  * them as the step goes on (seq_sub_tick, from seq_grid_tick). x1, or nothing recorded: nothing armed, the step plays
- * as before. Generator tracks for now (the TIMING page); STEP tracks' per-step RATCH and NUDGE come with their save
- * format. Not repeated: notes NOTE LENGTH holds (FIXED, HIT), BRANCHed and LINKed notes (another track's voice), and a
+ * as before. Generator tracks: the track's RATCH (the TIMING page); STEP tracks: each step's (step_ratch, its sheet).
+ * Not repeated: notes NOTE LENGTH holds (FIXED, HIT), BRANCHed and LINKed notes (another track's voice), and a
  * step that slides or ties into the next. In MIDI clock mode the positions are its musical units, as seq_pos's */
 #define SUB_NOTES (4u + NLANE)
-#define SUB_HITS_MAX 4u
+#define SUB_HITS_MAX 8u
 #define SUB_GATE_MIN 32u                                /* samples: a repeat always sounds */
 #ifndef SUB_NOTE_ON
 #define SUB_NOTE_ON trk_note_on                         /* (tests/hostsim.c: logged as a generator's notes) */
@@ -57,7 +57,7 @@ static int seq_sub_can(const track_t *t)
     return (seq_sub_rec & (1u << tr)) && seq_sub[tr].n && t->seq_n && !t->seq_hold;
 }
 
-/* After the step played: hits (1..4) in equal parts of span (the step's length, swing included); the first hit, which
+/* After the step played: hits (1..8) in equal parts of span (the step's length, swing included); the first hit, which
  * sounds already, gets its share of the gate too. Recording ends here */
 static void seq_sub_arm(track_t *t, uint32_t hits, uint32_t span)
 {

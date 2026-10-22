@@ -355,9 +355,12 @@ static int test_compact_history(void)
     {   /* step v2: RATCH and NUDGE (the sub byte) go through history too */
         step_t v = {{60}, 1, ST_NOTE, 0, 96, 0, 0, 0, 0}, w;
         step_snapshot_t snap;
-        step_set_ratch(&v, 3); step_set_nudge(&v, -5);
+        step_set_ratch(&v, 7); step_set_nudge(&v, -5);
         step_snapshot_put(&snap, &v); w = step_snapshot_get(&snap);
-        bad += check("history keeps RATCH and NUDGE", !memcmp(&v, &w, sizeof v) && step_ratch(&w) == 3u && step_nudge(&w) == -5);
+        bad += check("history keeps RATCH (x7: its high bit) and NUDGE", !memcmp(&v, &w, sizeof v) && step_ratch(&w) == 7u &&
+                     step_nudge(&w) == -5);
+        step_set_ratch(&v, 9); step_set_nudge(&v, 3);
+        bad += check("RATCH stops at x8, NUDGE keeps its bits apart", step_ratch(&v) == 8u && step_nudge(&v) == 3);
     }
     bad += check("all eight levels have fixed storage even for dense patterns",
                  sizeof step_history.state[0].step == NSTEP * 10u && sizeof undo_sram[0].step == NSTEP * 10u);
