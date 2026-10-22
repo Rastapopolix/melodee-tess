@@ -126,9 +126,24 @@ static uint32_t pattern_leds(uint32_t *dim, uint32_t *breath)
     *breath &= ~m;
     return m;
 }
+/* Finish a released key before reading a new press: both can arrive in one UI frame (else a quick change from one
+ * pattern to the next reads as a copy over it; from Melodee 1.4.5) */
+static void pattern_key_release(void)
+{
+    if (ui.pat_key && (!pattern_keys_on() || !(fm1_in.notes & (1u << PAT_KEY[ui.pat_key - 1u])))) {
+        if (!ui.pat_copy) {
+            uint32_t bank = ui.pat_key - 1u;
+            if (pattern_request(TSEL, bank)) ui_message("STOP SONG TO SWITCH");
+            else { char b[12] = "PATTERN "; b[8] = (char)('1' + bank); b[9] = 0; ui_message(b); }
+            ui.entry_open = 0; cursor_set(0); ui.force = 1;
+        }
+        ui.pat_key = ui.pat_copy = 0;
+    }
+}
 static void pattern_keys(uint32_t notes)
 {
     if (ui.pat_key && ui.pat_track != song.sel) ui.pat_key = ui.pat_copy = 0;
+    pattern_key_release();
     if (pattern_keys_on()) {
         for (uint32_t b = 0; b < NPAT; b++) if (notes & (1u << PAT_KEY[b])) {
             ui.seq_t0 |= 2u;
@@ -141,15 +156,7 @@ static void pattern_keys(uint32_t notes)
             }
         }
     }
-    if (ui.pat_key && (!pattern_keys_on() || !(fm1_in.notes & (1u << PAT_KEY[ui.pat_key - 1u])))) {
-        if (!ui.pat_copy) {
-            uint32_t bank = ui.pat_key - 1u;
-            if (pattern_request(TSEL, bank)) ui_message("STOP SONG TO SWITCH");
-            else { char b[12] = "PATTERN "; b[8] = (char)('1' + bank); b[9] = 0; ui_message(b); }
-            ui.entry_open = 0; cursor_set(0); ui.force = 1;
-        }
-        ui.pat_key = ui.pat_copy = 0;
-    }
+    pattern_key_release();
 }
 /* key k of track t as the keys play now (LIGHTS): bright while it sounds (pressed, or its note held on the track by
  * a key or MIDI), dim when it plays something (a kit's or the slices' own map: every key; QNT OFF: the notes in the

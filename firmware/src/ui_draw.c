@@ -735,6 +735,9 @@ static void draw_foot(void)
 #include "ui_patterns.c"                                /* SEQ > PATTERNS, SEQ > SONG */
 static void draw_columns(void)
 {
+    if (ui.home)                                        /* Stage: its knobs drop in when turned (ui_stage.c stage_knobs);
+                                                         * the page left (DRUM SOUND ..) draws none under them */
+        return;
     if(cur_page()->scope==SC_DRUM){
         char v[12];uint32_t sound=ui.drum_sound%drum_sound_count(TSEL);const int8_t *c=drum_patch[song.sel].c[sound];
         draw_column(0,"DRUM",drum_sound_name(TSEL,sound),"",VAL(0u),-1,ICON_AUTO);
@@ -756,8 +759,6 @@ static void draw_columns(void)
     uint32_t c;
     char val[12];
     const char *unit;
-    if (ui.home)                                        /* Stage: its knobs drop in when turned (ui_stage.c stage_knobs) */
-        return;
     if (cur_page()->scope == SC_TRK) {                 /* LEVEL PAN MUTE of the selected track */
         const track_t *t = TSEL;
         uint32_t lvl = trk_level(song.sel);

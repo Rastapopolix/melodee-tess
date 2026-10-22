@@ -5477,6 +5477,53 @@ static int test_boot_maintenance(void)
     return bad;
 }
 
+/* SEQ held: a pattern key let go and the next pressed between two UI frames switch patterns; neither is copied over
+ * the other (from Melodee 1.4.5) */
+static int test_pattern_key_handoff(void)
+{
+    int bad = 0;
+    ui_power_on(); stop_transport();
+    my_steps(TSEL); TSEL->step[0].note[0] = 48;
+    pattern_switch(TSEL, 2); my_steps(TSEL); TSEL->step[0].note[0] = 72;
+    pattern_switch(TSEL, 0);
+    go_home(); btn_down(B_SEQ); frame();
+    key_down(PAT_KEY[0]); frame();
+    key_up(PAT_KEY[0]); key_down(PAT_KEY[2]);           /* (one frame: the release and the next press) */
+    frame();
+    key_up(PAT_KEY[2]); frame();
+    btn_up(B_SEQ); frame();
+    bad += check("pattern key 1 let go as key 3 goes down: pattern 3 plays, kept as it was, pattern 1 too",
+                 TSEL->pattern == 2u && pattern_at(song.sel, 2)->step[0].note[0] == 72u &&
+                 pattern_at(song.sel, 0)->step[0].note[0] == 48u);
+    ui_power_on();
+    return bad;
+}
+
+/* Stage's knobs after DRUM SOUND (the page HOME keeps): Stage's cards alone, nothing sent while they rest
+ * (from Melodee 1.4.5) */
+static int test_stage_knobs_after_drum(void)
+{
+    int bad = 0;
+    uint32_t k;
+    uint64_t s0;
+    ui_power_on();
+    track_select(3);
+    set_engine_of(TSEL, ENGI_DRUM);
+    go_title("DRUM SOUND");
+    frame();
+    go_home();
+    frame(); frame();
+    turn(EN_K1, 1);
+    for (k = 0; k < ST_DROP + 2u; k++)
+        frame();
+    s0 = host_sent;
+    frames(160);
+    bad += check("Stage after DRUM SOUND: the knobs out, not redrawn over the page's cards each frame",
+                 stage.out && host_sent == s0);
+    ui_power_on();
+    return bad;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -5556,6 +5603,8 @@ int main(void)
     bad += test_bughunt_ui2();
     bad += test_piano_roll();
     bad += test_fm6_charts();
+    bad += test_pattern_key_handoff();
+    bad += test_stage_knobs_after_drum();
 
     if (getenv("UI_SCREEN_DIR")) chain_screens(getenv("UI_SCREEN_DIR"));
     printf(bad ? "ui: %d FAILED\n" : "ui: all passed\n", bad);
