@@ -1,5 +1,8 @@
 # Native CZ-1 tones
 
+(Tessera retired the CZ-1 engine on 2026-10-22: the firmware keeps stored tones until the new project format, but
+no longer plays, loads or edits them. This page describes the engine as it was.)
+
 The web editor accepts Casio `.syx` tone and concatenated bank files. Choose
 CZ-1 in Sound, import the file in **CZ-1 native patches**, select its tone and
 send it to the selected track. Direct Casio MIDI tone dump/read requests are supported too. Reading/exporting a native tone preserves its
