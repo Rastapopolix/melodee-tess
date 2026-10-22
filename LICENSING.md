@@ -9,7 +9,8 @@ bundled or ported parts keep their own licences; they are listed below, and thei
 texts are in `LICENSES/`.
 
 Melodee code and modifications: Copyright (C) 2026 Kerem Kilic (Ellic Studio)\
-Retained Felucca portions: Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+Retained Felucca portions: Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments\
+Tessera code and modifications (melodee-tess): Copyright (C) 2026 Theo Dainis
 
 Copyright notices follow the code's actual origin. Independently written Melodee files
 credit Kerem Kilic; mixed files also identify the retained Felucca portions. Unchanged

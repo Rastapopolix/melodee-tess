@@ -12,6 +12,7 @@
 **Tessera** is a generative firmware for the M-Vave FM-1. Each of the four tracks can play its own steps, an
 arpeggio, or one of twelve generators, and the pages around them evolve the phrases, build song forms, pass hits
 between tracks and modulate anything from anything. GPL-3.0-only. **Status: Experimental.**
+By **Theo Dainis** ([Rastapopolix](https://github.com/Rastapopolix)).
 
 Tessera grew out of Melodee (Tess), a fork of [Melodee](https://github.com/keremimo/melodee) by **keremimo**,
 itself built on *Felucca* by **Leo Kuroshita / Hügelton Instruments**. Releases up to 1.3.x were published as
@@ -114,7 +115,7 @@ See [BUILDING.md](BUILDING.md). The host tests run with `tests/run_tests.sh`; th
 
 ## Credits and licence
 
-GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved. Melodee is by keremimo,
+Tessera is by **Theo Dainis (Rastapopolix)**. GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved. Melodee is by keremimo,
 Felucca by Leo Kuroshita / Hügelton Instruments.
 
 The ATLAS generator uses the drum map of **Grids** by Émilie Gillet / Mutable Instruments. Several generators are
