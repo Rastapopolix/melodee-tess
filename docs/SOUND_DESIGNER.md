@@ -1,5 +1,9 @@
 # Sound designer
 
+(Written for Melodee before Tessera. Tessera's device build plays FM6, TRIO and DRUM: the CZ-1 and Prophet
+engines are retired, and SID and PHYS are out of device builds, so the parts about those engines describe them as
+they were.)
+
 Open **Sound designer** from the HOME hold menu, or from a sound page's sheet (OCT+ held).
 It is built from Melodee's own screens (docs/design): START is laid out like NEW SONG's key
 screen, FEATURES is a list page, and the shaping stages are the sound pages themselves.

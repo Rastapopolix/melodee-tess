@@ -736,7 +736,7 @@ Track PUT selects engine 15 (CZ-1), native tone marker 2, resets engine-specific
 neutral defaults, and preserves the track's musical/routing settings.
 Preset record version 8 preserves all native bytes in a 238-byte record. Earlier 192-byte banks and next’s v6/v7 CZ records remain readable.
 FUN13 projects (12352 bytes), FBKG pattern banks (27200 bytes) and TPLB templates preserve each track's native
-tone; older formats remain readable. See [native tones](../docs/CZ1_SYSEX.md).
+tone; older formats remain readable. (The CZ-1 engine is retired in Tessera.)
 
 DRUM now has one factory preset, **808 KIT** (index 0); KIT's stored value stays 4.
 Older custom KIT values render the 808. No 909 is included.
@@ -966,7 +966,7 @@ embedded factory or user patch by its complete record.
 
 The app boundary is 0x89000. Five native A/B pairs occupy 0x89000–0x92FFF.
 Normal OTA/loader paths reject mismatched older app extents before writing.
-See [prototype validation and release gates](../docs/PROPHET5_PROTOTYPE.md).
+(The Prophet engine is retired in Tessera.)
 
 ### Second-core diagnostic extension
 

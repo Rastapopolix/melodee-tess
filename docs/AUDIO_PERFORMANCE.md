@@ -1,5 +1,9 @@
 # Revision: shared workload budget
 
+(Written for Melodee before Tessera. Tessera's device build plays FM6, TRIO and DRUM: the CZ-1 and Prophet
+engines are retired, and SID and PHYS are out of device builds, so the parts about those engines describe them as
+they were.)
+
 The user rejected the initial fixed one-voice Prophet/FM6 and two-hit DRUM
 limits as musically unusable. They are superseded in the revised source. The
 old results below remain evidence for the earlier `audio3` package, not a
