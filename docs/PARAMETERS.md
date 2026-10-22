@@ -234,6 +234,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x25F | ANSWER SHIFT | 0 to 7 | 2 | Each answer is moved up or down by up to this many degrees of the scale, a new amount each time. 0 keeps it where you played it. OCT+ held on GEN, KNOB 2. |
 | 0x260 | ANSWER SPACE | 0 to 100 % | 25 | The rest before each answer: 0 answers straight away, 100 waits 4 bars. A bar without a key ends the phrase you play. OCT+ held on GEN, KNOB 3. |
 | 0x261 | ANSWER LEN | SHORT, MID, LONG | MID | With FADE at 100, the lengths of the four loops the notes play on, in steps: SHORT 5 7 11 13, MID 13 17 23 29, LONG 23 29 31 37. OCT+ held on GEN, KNOB 4. |
+| 0x262 | TIMING SHAPE | EVEN, ACCEL, DECEL | EVEN | Where a ratchet's hits fall in their step: EVEN in equal parts, ACCEL closer and closer (a roll that speeds up), DECEL further and further apart (a bounce). The track's, for its RATCH and for every step's Ratchet on a STEP track. |
 
 ## Mods
 

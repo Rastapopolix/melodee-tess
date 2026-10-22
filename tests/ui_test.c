@@ -483,14 +483,14 @@ static int test_phys_chrd_click(void)
 }
 static int test_gen_family(void)
 {
-    static const char STEP[] = "GEN EVOLVE NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
+    static const char STEP[] = "GEN EVOLVE TIMING NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
                       GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH TIMING ENERGY PATTERN TEMPO PATTERNS SONG";
     char got[128];
     int bad = 0, in_seq = 0, pattern_seq = 0;
     uint32_t k, n = 0;
     ui_power_on();
-    bad += check("SEQ in STEP: GEN EVOLVE (STEP EVOLVE) NOTES PATTERN TEMPO PATTERNS SONG, then GEN again",
-                 str_eq(seq_taps(got, sizeof got, 8), STEP));
+    bad += check("SEQ in STEP: GEN EVOLVE (STEP EVOLVE) TIMING (its SHAPE) NOTES PATTERN TEMPO PATTERNS SONG, then GEN again",
+                 str_eq(seq_taps(got, sizeof got, 9), STEP));
     if (!str_eq(got, STEP)) printf("    got: %s\n", got);
     press(B_ARP);
     n = !ui.home && str_eq(cur_page()->title, "ARP") && seqm_get(song.sel) == 1u && TSEL->p[P_AMODE];

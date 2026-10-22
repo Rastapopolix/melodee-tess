@@ -936,6 +936,8 @@ static void graph_timing(const track_t *t, uint16_t c)
     static const uint8_t HITS[8] = {1, 0, 1, 1, 0, 1, 0, 1};   /* an example rhythm */
     static const uint8_t SKIP[8] = {0, 0, 37, 74, 0, 11, 0, 90};   /* the % at which each step stops ratcheting */
     uint32_t tr = trk_index(t) % TESSERA_TRACKS, hits = (tessera.sub_ratch[tr] & 7u) + 1u, ch = tessera.sub_chance[tr], i, k;
+    uint32_t sh = tessera.sub_shape[tr] % SUB_SHAPES;
+    if (tessera.mode[tr] == TESS_ENG_OFF) { hits = 4u; ch = 100u; }   /* (a STEP track: x4 shows the SHAPE) */
     int32_t x0 = PANEL_X0 + 6, w = PANEL_W - 12, sw = w / 8, g = t->p[P_SGATE] ? t->p[P_SGATE] : 64;
     cv_rect(x0, 92, w, 1, T_RAISE);
     for (i = 0; i < 8u; i++) {
@@ -943,12 +945,15 @@ static void graph_timing(const track_t *t, uint16_t c)
         cv_rect(x, i % 4u ? 89 : 86, 1, i % 4u ? 3 : 6, T_RAISE);
         if (!HITS[i]) continue;
         uint32_t n = hits > 1u && SKIP[i] < ch ? hits : 1u;
-        int32_t part = sw / (int32_t)n, len = part * g / 128;
+        int32_t part = sw / (int32_t)n, len = part * g / 128;   /* (part, len: EVEN's; SHAPE moves the hits) */
         if (len < 2) len = 2;
         for (k = 0; k < n; k++) {
             int32_t dy = n > 4u ? 4 : 8, y = 30 + (int32_t)k * dy / 2;   /* (x5..x8: the steps between hits halved) */
-            cv_rect(x + (int32_t)k * part, 80, 2, 6, T_TEXT);   /* the hit */
-            cv_rrect(x + (int32_t)k * part, y, len - 1 > 2 ? len - 1 : 2, 40 - (int32_t)k * dy, 2, c, T_SURF);
+            int32_t hx = x + (int32_t)seq_sub_at((uint32_t)sw, k, n, sh);
+            int32_t room = (int32_t)seq_sub_at((uint32_t)sw, k + 1u, n, sh) - (int32_t)seq_sub_at((uint32_t)sw, k, n, sh);
+            int32_t l = len < room ? len : room;
+            cv_rect(hx, 80, 2, 6, T_TEXT);              /* the hit */
+            cv_rrect(hx, y, l - 1 > 2 ? l - 1 : 2, 40 - (int32_t)k * dy, 2, c, T_SURF);
         }
         if (n == 1u && hits > 1u)                       /* (CHANCE: this step plays once, its repeats marked) */
             for (k = 1; k < hits; k++)

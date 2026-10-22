@@ -155,6 +155,7 @@ static int test_tsp_record(void)
     step_set_ratch(&trk[0].step[5], 3); step_set_nudge(&trk[0].step[5], -6);
     trk[0].step[6] = trk[0].step[5]; step_set_ratch(&trk[0].step[6], 8);   /* (x8: RATCH's high bit) */
     song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
+    tessera_param_set(1, TX_SUB_SHAPE, SUB_DECEL); tessera_param_set(0, TX_SUB_SHAPE, SUB_ACCEL);   /* (the record's SUB part) */
     tessera.en_arc = 40u; tessera.en_rests = 60u;     /* (ENERGY: the block's project tail, TS18) */
     {
         cord_t c = {CS_LFO, 0, CD_CUTOFF, 1, 30, 0};
@@ -167,7 +168,8 @@ static int test_tsp_record(void)
                  step_ratch(&trk[0].step[5]) == 3u && step_nudge(&trk[0].step[5]) == -6 && trk[0].step[5].note[0] == 62u &&
                  step_ratch(&trk[0].step[6]) == 8u && step_nudge(&trk[0].step[6]) == -6 &&
                  tessera.mode[1] == TESS_ENG_EUCLID && cord_count() == 1u && cord_get(0)->amount == 30 &&
-                 tessera.en_arc == 40u && tessera.en_rests == 60u);
+                 tessera.en_arc == 40u && tessera.en_rests == 60u &&
+                 tessera.sub_shape[1] == SUB_DECEL && tessera.sub_shape[0] == SUB_ACCEL && tessera.sub_shape[2] == SUB_EVEN);
     ok = project_rename(0, "TSP TWO") == 0;
     memset(trk[0].step, 0, sizeof trk[0].step);
     project_load(0);
@@ -179,6 +181,11 @@ static int test_tsp_record(void)
     raw[tsp_seen.at[TSP_TESSERA] + 1u + TESSERA_PK_BYTES - 2u] = 101u;   /* (ARC past 100) */
     tsp_resum(raw);
     bad += check("TSP1: a Tessera block whose ENERGY tail is out of range is refused", ok && !tsp_valid(raw, len));
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok = len && tsp_valid(raw, len) && tsp_seen.at[TSP_SUB];
+    raw[tsp_seen.at[TSP_SUB] + 2u] = SUB_SHAPES;        /* (track 3's SHAPE past DECEL) */
+    tsp_resum(raw);
+    bad += check("TSP1: a SUB part with a SHAPE out of range is refused", ok && !tsp_valid(raw, len));
 
     reset();                                           /* the largest: every step of every pattern full, 1,024 notes */
     for (k = 0; k < NTRK; k++) {

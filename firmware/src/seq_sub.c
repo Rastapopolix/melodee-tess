@@ -11,13 +11,16 @@
  * step that slides or ties into the next. In MIDI clock mode the positions are its musical units, as seq_pos's */
 #define SUB_NOTES (4u + NLANE)
 #define SUB_HITS_MAX 8u
+enum { SUB_EVEN, SUB_ACCEL, SUB_DECEL, SUB_SHAPES };   /* SHAPE: where the hits fall (tessera.sub_shape) */
 #define SUB_GATE_MIN 32u                                /* samples: a repeat always sounds */
 #ifndef SUB_NOTE_ON
 #define SUB_NOTE_ON trk_note_on                         /* (tests/hostsim.c: logged as a generator's notes) */
 #endif
 typedef struct {
-    uint32_t next, every, gate;     /* seq_pos of the next repeat, the space between repeats, each hit's gate */
+    uint32_t next, span, gate;      /* seq_pos of the next repeat, the hits' span, each hit's gate at most */
+    int32_t start;                  /* the span's start into the step (below 0: before its line, NUDGE) */
     uint8_t left, n;                /* repeats still to come; the notes recorded */
+    uint8_t hits, k, shape;         /* the hits, the next one's number (1..), the track's SHAPE */
     uint8_t note[SUB_NOTES], vel[SUB_NOTES];
 } seq_sub_t;
 static seq_sub_t seq_sub[NTRK] __attribute__((section(".pool")));
@@ -77,6 +80,23 @@ static int seq_sub_can(const track_t *t)
     return (seq_sub_rec & (1u << tr)) && seq_sub[tr].n && t->seq_n && !t->seq_hold;
 }
 
+/* where hit k of n falls, samples into span: EVEN k equal parts (as ever), ACCEL 1 - (1 - k/n)^2 (closer and closer),
+ * DECEL (k/n)^2 (further apart). 32 bits: span * 64 stays below 2^32 for any step up to 4 bars at 20 BPM */
+static uint32_t seq_sub_at(uint32_t span, uint32_t k, uint32_t n, uint32_t shape)
+{
+    if (shape == SUB_ACCEL) return span * (n * n - (n - k) * (n - k)) / (n * n);
+    if (shape == SUB_DECEL) return span * (k * k) / (n * n);
+    return span / n * k;
+}
+static int32_t seq_sub_pos(const seq_sub_t *s, uint32_t k)   /* (hit k: into the step) */
+{
+    return s->start + (int32_t)seq_sub_at(s->span, k, s->hits, s->shape);
+}
+static uint32_t seq_sub_gap(const seq_sub_t *s, uint32_t k)   /* (from hit k to the next, or to the span's end) */
+{
+    return seq_sub_at(s->span, k + 1u, s->hits, s->shape) - seq_sub_at(s->span, k, s->hits, s->shape);
+}
+
 /* After the step played: hits (1..8) in equal parts of span (the step's length, swing included, from where its first hit
  * played: start samples into the step, below 0 before its line); the first hit, which sounds already, gets its share of
  * the gate too. Recording ends here */
@@ -88,14 +108,18 @@ static void seq_sub_arm(track_t *t, uint32_t hits, uint32_t span, int32_t start)
     seq_sub_rec &= (uint8_t)~(1u << tr);
     if (!can || hits < 2u) return;
     if (hits > SUB_HITS_MAX) hits = SUB_HITS_MAX;
-    s->every = span / hits;
-    s->gate = t->seq_off / hits;
-    if (s->gate > s->every) s->gate = s->every;
-    if (s->gate < SUB_GATE_MIN) s->gate = SUB_GATE_MIN;
-    s->next = start + (int32_t)s->every > 0 ? (uint32_t)(start + (int32_t)s->every) : 0u;   /* (from the step's start: a
-                                                         * block late is still in time) */
+    s->span = span;
+    s->start = start;
+    s->hits = (uint8_t)hits;
+    s->shape = tr < TESSERA_TRACKS && tessera.sub_shape[tr] < SUB_SHAPES ? tessera.sub_shape[tr] : (uint8_t)SUB_EVEN;
+    s->gate = t->seq_off / hits;                        /* (each hit's share, at most its gap: seq_sub_gap) */
+    if (s->gate > span / hits && s->shape == SUB_EVEN) s->gate = span / hits;
+    s->k = 1;
+    s->next = seq_sub_pos(s, 1) > 0 ? (uint32_t)seq_sub_pos(s, 1) : 0u;   /* (from the step's start: a block late is still
+                                                         * in time) */
     s->left = (uint8_t)(hits - 1u);
-    t->seq_off = s->gate;
+    t->seq_off = s->gate < seq_sub_gap(s, 0) ? s->gate : seq_sub_gap(s, 0);
+    if (t->seq_off < SUB_GATE_MIN) t->seq_off = SUB_GATE_MIN;
     seq_sub_armed |= (uint8_t)(1u << tr);
 }
 
@@ -112,8 +136,10 @@ static void seq_sub_tick(track_t *t, uint32_t cur_len)
             t->seq_notes[i] = s->note[i];
         }
         t->seq_n = s->n;
-        t->seq_off = s->gate;
-        s->next += s->every;
+        t->seq_off = s->gate < seq_sub_gap(s, s->k) ? s->gate : seq_sub_gap(s, s->k);
+        if (t->seq_off < SUB_GATE_MIN) t->seq_off = SUB_GATE_MIN;
+        s->k++;
+        s->next = seq_sub_pos(s, s->k) > 0 ? (uint32_t)seq_sub_pos(s, s->k) : 0u;
         s->left--;
     }
     if (!s->left) seq_sub_armed &= (uint8_t)~(1u << tr);
