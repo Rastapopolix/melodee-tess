@@ -238,6 +238,30 @@ static uint32_t seqm_get(uint32_t tr)
     tr %= NTRK;
     return tr < TESSERA_TRACKS && tessera.mode[tr] ? 1u + tessera.mode[tr] : trk[tr].p[P_AMODE] ? 1u : 0u;
 }
+/* the MODE knob's order (MODE values as above): STEP, ARP, CHORD first of the generators, then the rest as numbered.
+ * Only the knob and its arc: the mode numbers (saves, cords, MIDI, the editor) stay */
+static const uint8_t SEQM_ORDER[] = {0, 1, 1 + TESS_ENG_CHORD, 1 + TESS_ENG_TURING, 1 + TESS_ENG_EUCLID,
+                                     1 + TESS_ENG_MARKOV, 1 + TESS_ENG_MORPH, 1 + TESS_ENG_GRIDS, 1 + TESS_ENG_BOUNCE,
+                                     1 + TESS_ENG_AWAKE, 1 + TESS_ENG_POLY, 1 + TESS_ENG_QUAD, 1 + TESS_ENG_CONSTEL,
+                                     1 + TESS_ENG_SERIES, 1 + TESS_ENG_ANSWER};
+_Static_assert(sizeof SEQM_ORDER == TESS_ENG_COUNT + 1u, "SEQM_ORDER: every MODE once");
+static uint32_t seqm_pos(uint32_t m)                    /* a MODE value's place on the knob */
+{
+    for (uint32_t i = 0; i < sizeof SEQM_ORDER; i++)
+        if (SEQM_ORDER[i] == m) return i;
+    return 0;
+}
+static uint32_t gen_arc(uint32_t mode)                  /* a generator's arc on GEN's MODE column, 0..1000 */
+{
+    return (seqm_pos(1u + mode) - 1u) * 1000u / (TESS_ENG_COUNT - 1u);
+}
+static void seqm_set(uint32_t tr, int32_t v);
+static void seqm_step(uint32_t tr, int32_t steps)       /* the MODE knob: steps along SEQM_ORDER */
+{
+    int32_t i = (int32_t)seqm_pos(seqm_get(tr)) + steps;
+    i = i < 0 ? 0 : i > (int32_t)TESS_ENG_COUNT ? (int32_t)TESS_ENG_COUNT : i;
+    seqm_set(tr, SEQM_ORDER[i]);
+}
 static void seqm_set(uint32_t tr, int32_t v)
 {
     static uint8_t arp_last[NTRK];                      /* ARP's MODE before STEP or a generator turned it OFF */

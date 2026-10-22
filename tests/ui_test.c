@@ -566,12 +566,26 @@ static int test_gen_family(void)
     n = seqm_get(song.sel) == 1u && TSEL->p[P_AMODE] && tessera.mode[song.sel] == TESS_ENG_OFF;
     TSEL->p[P_AMODE] = 3;                         /* (UPDN: kept for ARP's MODE again) */
     turn(EN_K1, 1);
-    n &= tessera.mode[song.sel] == TESS_ENG_TURING && !TSEL->p[P_AMODE];
+    n &= tessera.mode[song.sel] == TESS_ENG_CHORD && !TSEL->p[P_AMODE];
+    turn(EN_K1, 1);
+    n &= tessera.mode[song.sel] == TESS_ENG_TURING;
+    turn(EN_K1, -1);
     turn(EN_K1, -1);
     n &= TSEL->p[P_AMODE] == 3 && tessera.mode[song.sel] == TESS_ENG_OFF;
     turn(EN_K1, -1);
-    bad += check("GEN: KNOB 1 is MODE: STEP, ARP (its MODE kept), TURING ..; STEP turns ARP off",
+    bad += check("GEN: KNOB 1 is MODE: STEP, ARP (its MODE kept), CHORD, TURING ..; STEP turns ARP off",
                  k == TESS_ENG_OFF && n && !TSEL->p[P_AMODE] && !seqm_get(song.sel));
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_SERIES);
+    turn(EN_K1, 1);
+    n = tessera.mode[song.sel] == TESS_ENG_ANSWER;
+    turn(EN_K1, 1);
+    n &= tessera.mode[song.sel] == TESS_ENG_ANSWER;
+    tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
+    turn(EN_K1, 20);
+    n &= tessera.mode[song.sel] == TESS_ENG_ANSWER;
+    turn(EN_K1, -20);
+    bad += check("GEN: MODE's knob ends at ANSWER (SERIES, then ANSWER) and turns back to STEP",
+                 n && !seqm_get(song.sel) && !TSEL->p[P_AMODE]);
     turn(EN_K1, 2);
     go_title("PATTERN");                          /* (a generator on: PATTERN is upstream's all the same) */
     k = tessera.mode[song.sel];
