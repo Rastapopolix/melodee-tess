@@ -748,6 +748,12 @@ static int32_t tess_scale_steps(const track_t *t, int32_t n, int32_t k);
 static int32_t tess_follow_source(uint32_t src, uint32_t tr);
 
 static void tess_clock_step_body(track_t *t, uint32_t tr);
+/* The key a generator's note moves up by before the snap: the generators write C minor (MARKOV adds ROOT itself), so
+ * ROOT on another note plays its whole scale, not C minor's notes snapped into it */
+static int32_t tess_key(const track_t *t, uint32_t tr)
+{
+    return tessera.mode[tr] == TESS_ENG_MARKOV ? 0 : (int32_t)(t->p[P_ROOT] % 12);
+}
 static uint32_t cord_smask[NTRK];                       /* (cord.c: the cords on Tessera settings, per track) */
 static void cord_step_begin(uint32_t tr);
 static void cord_step_end(uint32_t tr);
@@ -768,7 +774,7 @@ static void tess_quad_link(const track_t *t, uint32_t tr)
         gen_quad_step(&tessera.quad[to], &tessera.rnd[to], &out);
         tessera.cv[to] = out.cv;
         if (!out.gate) continue;
-        n = tessera_snap_note(v, out.note) + (int32_t)v->p[P_TRANS] + tessera.evolve[to].shift;
+        n = tessera_snap_note(v, out.note + tess_key(v, to)) + (int32_t)v->p[P_TRANS] + tessera.evolve[to].shift;
         n = n < 0 ? 0 : n > 127 ? 127 : n;
         tess_branch_on(v, (uint32_t)n, out.vel,
                        seq_div_samples((uint32_t)t->p[P_SDIV]) * (uint32_t)(t->p[P_SGATE] ? t->p[P_SGATE] : 64) / 128u);
@@ -1146,7 +1152,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
 
     if (should_trigger) {
         const tessera_evolve_t *tw2 = &tessera.evolve[tr];
-        int32_t base_note = (int32_t)note;
+        int32_t base_note = (int32_t)note + tess_key(t, tr);
         int following = 0;
         if (tw2->follow) {          /* harmony: the other track's pitch in this scale, SHIFT scale degrees away */
             int32_t src_note = tess_follow_source((uint32_t)tw2->follow - 1u, tr);
@@ -1173,7 +1179,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
             if (v->p[P_MUTE]) return;
             tess_branch_on(v, (uint32_t)final_note, vel, off);
             for (uint32_t i = 0; i < out.more_n && i < 2u; i++) {
-                int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
+                int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_key(t, tr) + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
                 m = m < 0 ? 0 : m > 127 ? 127 : m;
                 if (m != final_note) tess_branch_on(v, (uint32_t)m, vel, off);
             }
@@ -1186,7 +1192,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
             tess_cap(t, (uint32_t)final_note, vel, step);
             tessera.last_note[tr] = (uint8_t)final_note;
             for (uint32_t i = 0; i < out.more_n && i < 2u; i++) {
-                int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
+                int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_key(t, tr) + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
                 m = m < 0 ? 0 : m > 127 ? 127 : m;
                 if (m != final_note) { nl_on(t, tr, (uint32_t)m, vel, 1); tess_cap(t, (uint32_t)m, vel, step); }
             }
@@ -1199,7 +1205,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
         t->seq_notes[0] = (uint8_t)final_note;
         t->seq_n = 1;
         for (uint32_t i = 0; i < out.more_n && i < 2u; i++) {   /* (Bounce: balls hitting on the same step) */
-            int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
+            int32_t m = tessera_snap_note(t, (int32_t)out.more[i] + tess_key(t, tr) + tess_flourish(t, tr)) + (int32_t)t->p[P_TRANS] + tw2->shift;
             m = m < 0 ? 0 : m > 127 ? 127 : m;
             if (m == final_note) continue;
             trk_note_on(t, (uint32_t)m, vel);
@@ -1748,8 +1754,8 @@ static int32_t tess_follow_source(uint32_t src, uint32_t tr)
 /* The pitch Euclid plays on a step, as 0..14 (mirrors tessera_clock_step: 48 + (step*3)%12, snapped) */
 uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
 {
-    int32_t n = tessera_snap_note(t, 48 + (int32_t)gen_euclid_degree(tessera.euclid[trk_index(t) % TESSERA_TRACKS].pitch_seed, step));
-    n -= 45;
+    int32_t n = tessera_snap_note(t, 48 + (int32_t)(t->p[P_ROOT] % 12) + (int32_t)gen_euclid_degree(tessera.euclid[trk_index(t) % TESSERA_TRACKS].pitch_seed, step));
+    n -= 45 + (int32_t)(t->p[P_ROOT] % 12);   /* (the picture: the same height in every key) */
     if (n < 0) n = 0;
     if (n > 14) n = 14;
     return (uint32_t)n;
