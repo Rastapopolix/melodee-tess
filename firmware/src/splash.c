@@ -2,14 +2,16 @@
 /* The boot screen: Tessera's mark, a 3 x 3 mosaic of lapis tiles with one gold tessera, over TESSERA and a line.
  * While the firmware starts, the mosaic's bed shows (the nine places in the grout's colour); when it is ready,
  * splash_lay() sets the tiles from the middle outwards, one every SPL_STEP_MS, the gold one last with a press,
- * in the wait the boot already makes before the first frame. The mark's colours are fixed (it is the logo),
+ * in the wait the boot already makes before the first frame, then holds the finished mark a moment (SPL_HOLD_MS;
+ * a button or key pressed ends it sooner). The mark's colours are fixed (it is the logo),
  * the rest the palette's. Drawn with lcd_fill and draw_text_box only. */
 
 #define SPL_U 22                                /* a tile, px */
 #define SPL_G 4                                 /* the grout between two */
 #define SPL_CX 120
 #define SPL_CY 78                               /* the mosaic's centre */
-#define SPL_STEP_MS 40u
+#define SPL_STEP_MS 60u
+#define SPL_HOLD_MS 800u                        /* the finished mark held (a press ends it sooner) */
 #define SPL_GOLD 2u                             /* the gold tessera: top right */
 static const uint16_t SPL_LAPIS[9] = {RGB(44, 64, 120), RGB(58, 84, 150), 0, RGB(66, 96, 170), RGB(50, 74, 136),
                                       RGB(40, 60, 112), RGB(62, 90, 160), RGB(46, 68, 126), RGB(54, 80, 146)};
@@ -43,6 +45,17 @@ static void spl_wait(uint32_t ms)              /* (the boot's wait, the watchdog
     }
 }
 
+/* the finished mark held ms, the watchdog fed; a button or key pressed since (not one held from power-on) ends it */
+static void spl_hold(uint32_t ms)
+{
+    uint32_t held = fm1_in.buttons | fm1_in.notes;
+    while (ms--) {
+        fm1_delay_ms(1);
+        if (!(ms & 31u)) fm1_wdt_feed();
+        if ((fm1_in.buttons | fm1_in.notes) & ~held) return;
+    }
+}
+
 /* the tiles set, then at least `ms` gone in all (the boot's own wait); anim 0: the wait alone */
 static void splash_lay(uint32_t ms, int anim)
 {
@@ -59,6 +72,7 @@ static void splash_lay(uint32_t ms, int anim)
         spl_tile(SPL_GOLD, 0, SPL_GOLD_C);
         spl_wait(2u * SPL_STEP_MS);
         used += 4u * SPL_STEP_MS;
+        spl_hold(SPL_HOLD_MS);
     }
     if (used < ms)
         spl_wait(ms - used);
