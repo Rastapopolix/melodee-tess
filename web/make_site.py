@@ -6,6 +6,7 @@
   index.html                        the project page (web/home/index.html, the release filled in; the installer
                                     stays at webapp/installer/)
   media/gallery/, media/brand/      its pictures: assets/gallery (tests/gallery_render.c), assets/brand (tools/gen_brand.py)
+  media/about/                      the About photo (assets/about)
   firmware/melodee-tess-VER.fwsc    the package, both cores (+ LICENSE, LICENSING.md, LICENSES/: the
                                     packages hold JieLi SDK files under Apache-2.0, see LICENSING.md)
   firmware/melodee-tess-VER-1core.fwsc the same release built with MELODEE_DUAL_CORE=0, for FM-1s that crash
@@ -183,10 +184,11 @@ def main(pkg, single, version, out, nightly=None, installer_only=False, synth=No
         home = home.replace("@VERSION@", version).replace("@FWSC1@", name1).replace("@FWSC@", name)
         (out / "index.html").write_text(home, encoding="utf-8")
         for src, dest in ((HERE.parent / "assets/gallery", out / "media/gallery"),
-                          (HERE.parent / "assets/brand", out / "media/brand")):
+                          (HERE.parent / "assets/brand", out / "media/brand"),
+                          (HERE.parent / "assets/about", out / "media/about")):
             dest.mkdir(parents=True, exist_ok=True)
             for f in src.iterdir():
-                if f.suffix in (".png", ".svg"):
+                if f.suffix in (".png", ".svg", ".jpg"):
                     shutil.copy(f, dest / f.name)
     if sim and not installer_only:
         sim = Path(sim)
