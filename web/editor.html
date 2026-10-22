@@ -607,12 +607,13 @@ const parse = {
     if (o.patterns) o.chainRows = trailer[14] === 16 ? 16 : 0;
     o.cz = !!o.motionMax && [12,15,19].some(p=>trailer[p]===0x43 && trailer[p+1]===1 && (trailer[p+2]|trailer[p+3]<<7)===CZ.BYTES);
     o.czBanks=o.cz && [12,15,19].some(p=>trailer[p]===0x43 && trailer[p+4]===8 && trailer[p+5]===16)?8:0;
-    const np=trailer.findIndex((x,i)=>i>=25 && x===0x4e && trailer[i+1]===1);
+    const np=trailer.findIndex((x,i)=>i>=19 && x===0x4e && trailer[i+1]===1);   /* (after FM6's tag: the CZ-1's went 2026-10-22) */
     o.native=np>=0?{12:trailer[np+2]|trailer[np+3]<<7,15:trailer[np+4]|trailer[np+5]<<7}:null;
     o.namespace={general:o.nengines,12:o.nengines+1,15:o.nengines+2};
-    const pp=trailer.findIndex((x,i)=>i>=25&&x===0x35&&trailer[i+1]===1);
-    o.prophet=pp>=0&&trailer[pp+2]===19;
-    if(o.prophet){o.namespace={general:trailer[pp+3],12:trailer[pp+4],15:trailer[pp+5],19:trailer[pp+6]};o.native={...o.native,19:trailer[pp+7]|trailer[pp+8]<<7};}
+    const pp=trailer.findIndex((x,i)=>i>=19&&x===0x35&&trailer[i+1]===1);
+    o.prophet=pp>=0&&trailer[pp+2]===19;   /* (its engine 0: none, the PROPHET retired; its namespaces stay) */
+    if(pp>=0)o.namespace={general:trailer[pp+3],12:trailer[pp+4],15:trailer[pp+5],19:trailer[pp+6]};
+    if(o.prophet)o.native={...o.native,19:trailer[pp+7]|trailer[pp+8]<<7};
     return o;
   },
   [CMD.UI_STATE](a) {
@@ -1952,7 +1953,7 @@ function makeMockDevice(opt = {}) {
     E("MIDI", ["USB", "TRS"], 0), E("DRUM", ["OFF", ...Array.from({ length: 16 }, (_, i) => String(i + 1))], 10), E("ROUT", ["CH1-4", "SEL", "CH5-8", "CH9-12", "CH13-16"], 0), D("CPU", F.INT, 0, 0, 0),
     D("SLOT", F.INT, 1, 5, 1), E("BOOT", ["OFF", "A", "B", "C", "D"], 0), E("LOAD", NGO, 0), E("SAVE", NGO, 0),
     E("ENG", ["-", "-", "-", "SID", "-", "-", "TRIO", "-",
-      "-", "PHYS", "DRUM", "-", "FM6", "-", "-", "CZ-1", "-", "-", "-", "PROPHET"], 0), D("A4", F.INT, 400, 480, 440, null, "Hz"),
+      "-", "PHYS", "DRUM", "-", "FM6", "-", "-", "-", "-", "-", "-", "-"], 0), D("A4", F.INT, 400, 480, 440, null, "Hz"),
     E("CLRSQ", NGO, 0), E("INIT", NGO, 0),
     ...Array.from({length:3},()=>D("",F.INT,0,127,0)),
   ];
@@ -2054,14 +2055,10 @@ function makeMockDevice(opt = {}) {
         P("KUGO HARP", [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 127, 0], 0)] },
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
     {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},
-    {name:"CZ-1",titles:["CZ-1","TONE"],edit:[D("-",F.INT,0,7,0),D("-",F.INT,0,16,0),...Array(5).fill(NONE),D("TONE",F.INT,2,2,2)],
-      presets:[P("INIT TONE",[0,0,0,0,0,0,0,2],[0,70,127,60],0),   // + Casio's 64 CZ-1 preset tones: BANK A..D, PTCH 1..16
-        ...["BRASS 1","BRASS 2","BRASS 3","STRINGS 1","STRINGS 2","STRINGS 3","STRINGS 4","ORCHESTRA","ACO.GUITAR","JAZZ GUITAR","ELEC.GUITAR","SLAP BASS","SYNTH.BASS","ELEC.BASS 1","ELEC.BASS 2","HARP","BRASS 4","SAXOPHONE","CELLO","FLUTE","WHISTLE","HARMONICA","RECORDER","KOTO","PIANO 1","PIANO 2","PIANO 3","ELEC.PIANO","HONKY-TONK","FUNKY CLAV 1","FUNKY CLAV 2","HARPSICHORD","JAZZ ORGAN 1","JAZZ ORGAN 2","PIPE ORGAN 1","PIPE ORGAN 2","ACCORDION","VOICE 1","VOICE 2","VOICE 3","MUSIC BOX","VIBRAPHONE","XYLOPHONE","MARIMBA","MALLET LOG","AFRO PERC","BELLS","METALLIC","SYN STRINGS","FAT ENSEMBLE","SITAR","SYNTH.LEAD 1","SYNTH.LEAD 2","SYNTH.LEAD 3","SYNTH.LEAD 4","SWEEP 1","SYN DRUMS 1","SYN DRUMS 2","CONGA","STEEL DRUM","SWEEP 2","JET ROAR","MOTORCYCLE","TYPHOON"]
-          .map((n,k)=>P(n,[k>>4,(k&15)+1,0,0,0,0,0,2],[0,70,127,60],0,+"4445555533322223443344336666666666556555777773775534444533375555"[k]))]},
+    {name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]},   /* (15: the CZ-1, retired 2026-10-22) */
   ];
-  ENG.push(...Array.from({length:3},()=>({name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]})),
-    {name:"PROPHET",titles:["FILTER/TUNE","PW/MIX"],edit:[D("CUT",F.INT,-63,63,0),D("RES",F.INT,-63,63,0),D("TUNA",F.SEMI,-24,24,0),D("TUNB",F.SEMI,-24,24,0),D("PWA",F.INT,-63,63,0),D("PWB",F.INT,-63,63,0),D("MIXA",F.INT,-63,63,0),D("MIXB",F.INT,-63,63,0)],presets:[P("INIT PROPHET",Array(8).fill(0),[0,0,127,0],0),   // + Sequential's 200 v1.03 programs
-      ...P5_FACTORY.map((b)=>P(P5.name(b),Array(8).fill(0),[0,0,127,0],0))]});
+  ENG.push(...Array.from({length:6},()=>({name:"-",titles:["-","-"],edit:Array(8).fill(NONE),presets:[]})));   /* (19: the
+                                                     PROPHET, retired 2026-10-22; 20, 21 reserved) */
   const FM6_E = ENG.findIndex((e) => e.name === "FM6"), FM6_BANK = 0;
   /* the mock's demo sequences (the device powers on empty; it has no pattern library): absolute notes, 0 rest;
      flags 1 accent, 2 slide, 4 tie (holds the previous note). ACID, BEAT */
@@ -2173,10 +2170,11 @@ function makeMockDevice(opt = {}) {
     st.bank[slot] = snapshot(name);
     clearSteps(); st.p[29] = 16;
   });
-  /* the power-on sounds (engines.c TRK_DEF): FUNK BASS II, STRINGS, INIT SID, DRUM KIT (the reference build) */
-  [[1, FM6_E, 15], [2, 3, 0], [3, 10, 0], [0, 19, 4]].forEach(([i, e, p]) => { st.sel = i; setEngine(e); applyPreset(p); });
+  /* the power-on sounds (engines.c TRK_DEF): SID 26, STRINGS, INIT SID, DRUM KIT (the reference build; FUNK BASS II until
+     the PROPHET was retired, 2026-10-22) */
+  [[1, FM6_E, 15], [2, 3, 0], [3, 10, 0], [0, 3, 26]].forEach(([i, e, p]) => { st.sel = i; setEngine(e); applyPreset(p); });
   /* the device powers on with its sequencers empty; the mock starts as a little demo to look at: track 1 with
-     FUNK BASS II, track 4 with BEAT, pads left, lead right */
+     the power-on bass, track 4 with BEAT, pads left, lead right */
   st.sel = 3; loadDemo(1);
   st.sel = 0; loadDemo(0);
   st.tracks[1].p[39] = -24; st.tracks[2].p[39] = 20; st.tracks[2].p[0] = 92;
@@ -2334,7 +2332,8 @@ function makeMockDevice(opt = {}) {
           if(op===0){if(a.length!==4||a[3]<1||a[3]>16)rc=1;}
           else if(op===1){if(a.length!==3)rc=1;else if(!pool[index])rc=2;}
           else if(op===2){try{const raw=engine===19?P5.bytes(a.slice(3)):engine===15?CZ.bytes(a.slice(3)):a.slice(3);if(engine===12 && (raw.length!==128||raw.some(x=>x>127)))throw Error();pool[index]=raw.slice();}catch{rc=1;}}
-          else if(op===3||op===4){const tr=st.tracks[a[3]];if(a.length!==4 || !tr)rc=1;else if(op===3){if(tr.engine!==engine)rc=1;else pool[index]=(engine===19?tr.p5:engine===15?tr.cz:tr.fm6).slice();}else if(!pool[index])rc=1;else {const previous=tr.engine;tr.engine=engine;tr.user=index+1;tr.preset=0;if(previous!==engine||engine===19)for(let j=0;j<8;j++)tr.p[P_E0+j]=ENG[engine].edit[j].def;if(engine===19)tr.p5=pool[index].slice();else if(engine===15)tr.cz=pool[index].slice();else {tr.fm6=pool[index].slice();}}}
+          else if(op===3||op===4){const tr=st.tracks[a[3]];if(a.length!==4 || !tr || engine!==12)rc=1;   /* (FM6's only: the CZ-1 and PROPHET pools stay stored, their engines retired) */
+            else if(op===3){if(tr.engine!==engine)rc=1;else pool[index]=(engine===19?tr.p5:engine===15?tr.cz:tr.fm6).slice();}else if(!pool[index])rc=1;else {const previous=tr.engine;tr.engine=engine;tr.user=index+1;tr.preset=0;if(previous!==engine||engine===19)for(let j=0;j<8;j++)tr.p[P_E0+j]=ENG[engine].edit[j].def;if(engine===19)tr.p5=pool[index].slice();else if(engine===15)tr.cz=pool[index].slice();else {tr.fm6=pool[index].slice();}}}
           else if(op===5){if(a.length!==3)rc=1;else {pool[index]=null;st.favorites[{12:17,15:18,19:20}[engine]][index]=false;st.tracks.forEach(tr=>{if(tr.engine===engine&&tr.user===index+1)tr.user=0;});}}
           else if(op===6){if(!pool[index]||a.length<4||a.length>3+(engine===19?20:engine===12?10:16))rc=1;else if(engine===19)P5.setName(pool[index],String.fromCharCode(...a.slice(3)));else if(engine===15)CZ.setName(pool[index],String.fromCharCode(...a.slice(3)));else pool[index].splice(118,10,...Array.from(String.fromCharCode(...a.slice(3)).padEnd(10," "),x=>x.charCodeAt(0)));}
           else if(a.length!==3)rc=1;
@@ -2376,7 +2375,7 @@ function makeMockDevice(opt = {}) {
         if (!opt.legacy) b(NTRK);
         if (!opt.legacy && !opt.v3 && !opt.v5) {
           b(0);
-          if (st.uiCaps) { [0x55,1,st.uiCaps,0x4d,2,64,1,0x42,1,3,0x50,1,8,16].forEach(b); if (!opt.noFm6) [0x46,1,FM6.FACTORY_PK.length,FM6_BANK,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1].forEach(b); }
+          if (st.uiCaps) { [0x55,1,st.uiCaps,0x4d,2,64,1,0x42,1,3,0x50,1,8,16].forEach(b); if (!opt.noFm6) [0x46,1,FM6.FACTORY_PK.length,FM6_BANK,0x35,1,0,16,17,18,20,0,1,0x4e,1,64,0,0,1].forEach(b); }
         }
         break;
       case CMD.GET: case CMD.SET: {
