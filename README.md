@@ -114,5 +114,7 @@ Felucca by Leo Kuroshita / Hügelton Instruments.
 
 The GRIDS generator uses the drum map of **Grids** by Émilie Gillet / Mutable Instruments. Several generators are
 inspired by **norns** scripts (ideas only, no code copied): **QUAD** by initenere, **FALL** by ambalek's Fall,
-**CONSTELLATION** by timothy-taylor's Constellation, **AWAKE** by tehn's Awake and **SERIES** by nørgård. See
+**CONSTELLATION** by timothy-taylor's Constellation, **AWAKE** by tehn's Awake and **SERIES** by nørgård. The
+SLOTH and OCHD mod sources are inspired by **Triple Sloth** by Nonlinear Circuits (Andrew Fitch) and **ochd** by
+Instruō and DivKid. See
 [LICENSING.md](LICENSING.md) for every third-party part and its licence.

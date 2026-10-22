@@ -487,7 +487,8 @@ Tessera stands on other people's ideas and work:
 - **norns** scripts, as ideas restated in C (no code copied): **Awake** (tehn) for AWAKE, **Fall** (ambalek) for
   BOUNCE's FALL, **Constellation** (timothy-taylor) for CONSTELLATION, **initenere** for QUAD, and **nørgård** for
   SERIES.
-- **Turing Machine** (Music Thing Modular) for TURING; Nonlinearcircuits' **Sloth** and Instruō's **ochd** for
-  SLOTH and OCHD.
+- **Turing Machine** (Music Thing Modular) for TURING.
+- **Triple Sloth** by Nonlinear Circuits (Andrew Fitch), with J. C. Sprott's jerk system, for SLOTH; **ochd** by
+  Instruō and DivKid for OCHD (ideas only, no code copied).
 
 Every third-party part and its licence is listed in [LICENSING.md](LICENSING.md).
