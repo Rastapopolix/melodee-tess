@@ -158,7 +158,7 @@ static uint32_t stage_picture(int32_t *v)
 {
     const page_t *sp = stage_page();
     uint32_t hot = ui.hot_col & 3u, id = sp->id[hot], k;
-    if (!stage_knobs_out())
+    if (!stage.out)                                     /* (the frame's: the clock may pass ST_KNOB_MS while it draws) */
         return SP_NONE;
     if (sp->scope != SC_ENGINE)
         return SP_NONE;

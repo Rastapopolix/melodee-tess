@@ -161,7 +161,13 @@ static int clock_arp_and_boundaries(void)
     clock_packet(1,0xFC,502);
     bad+=check("selected-source Stop arms sync and stops locally started playback",!song.playing&&midi_sync_active==1u);
     transport_req=1;events_block(CTL);fm1_ms=1003;events_block(CTL);
-    bad+=check("after external transport claims playback, missing clocks still time out",!song.playing);
+    bad+=check("local PLAY after a master Stop runs internally while the master clock is silent",song.playing&&!midi_sync_active);
+    clock_packet(1,0xFA,1010);clock_to(1,1010,7);
+    bad+=check("the master's next Start claims sync again",song.playing&&midi_sync_active==1u&&trk[0].seq_idx==1u);
+    clock_packet(1,0xFC,1200);clock_to(1,1200,3);transport_req=1;events_block(CTL);
+    bad+=check("local PLAY follows a master clock that is still running",song.playing&&midi_sync_active==1u);
+    fm1_ms=1800;events_block(CTL);
+    bad+=check("a followed master clock that stops still times out",!song.playing);
     return bad;
 }
 /* ARP HOLD latched on an external clock: a Stop, a lost clock or a tap while stopped must not leave the arp note
@@ -208,6 +214,60 @@ static int arp_ext_stop_test(void)
     bad += check("internal clock: STOP leaves the free-running ARP note to its gate", trk[0].arp_note == 72 && gate_note(&trk[0], 72) && trk[0].arp_off == off - CTL);
     for (i = 0; i < 4000 && (!trk[0].arp_note || trk[0].arp_note == 72); i++) events_block(CTL);
     bad += check("internal clock: the ARP keeps stepping after STOP", trk[0].arp_note && trk[0].arp_note != 72 && trk[0].nheld == 1u);
+    return bad;
+}
+
+/* A stopped sync master must not turn a live arpeggiator into a single-note
+ * latch. Exercise both clock choices, real key/USB/UART input and every voice
+ * mode before transport, after Stop and after a lost clock. */
+static void arp_live_key(uint32_t source, uint32_t key, uint32_t on)
+{
+    if (!source) {
+        if (on) fm1_in.notes |= 1u << key;
+        else fm1_in.notes &= ~(1u << key);
+        events_block(CTL);
+    } else if (source == 1u) queued(on ? 0x90 : 0x80, 53u + key, on ? 100 : 0, source);
+    else {
+        um_byte(on ? 0x90 : 0x80); um_byte((uint8_t)(53u + key)); um_byte(on ? 100 : 0);
+        events_block(CTL);
+    }
+}
+static int arp_idle_live_test(void)
+{
+    int bad = 0;
+    for (uint32_t clock = 1; clock <= 2; clock++)
+        for (uint32_t source = 0; source < 3; source++)
+            for (uint32_t mode = V_POLY; mode <= V_UNISON; mode++)
+                for (uint32_t state = 0; state < 3; state++) {
+                    clock_setup(clock); track_t *t = &trk[0];
+                    t->p[P_VOICE] = (int16_t)mode; t->p[P_PRIO] = 0;
+                    t->p[P_AMODE] = 3; t->p[P_AHOLD] = 0; t->p[P_AOCT] = 1;
+                    t->p[P_ARATE] = 2; t->p[P_APROB] = 127; t->p[P_AGATE] = 100;
+                    if (state == 1) clock_packet(clock, 0xFC, 10);
+                    else if (state == 2) {
+                        clock_packet(clock, 0xFA, 10); clock_packet(clock, 0xF8, 10);
+                        fm1_ms = 600; events_block(CTL);
+                    }
+                    arp_live_key(source, 7, 1); arp_live_key(source, 11, 1);
+                    uint32_t heard = 0;
+                    for (uint32_t i = 0; i < 1000; i++) {
+                        events_block(CTL);
+                        if (gate_note(t, 60)) heard |= 1u;
+                        if (gate_note(t, 64)) heard |= 2u;
+                    }
+                    char label[100];
+                    snprintf(label, sizeof label, "idle ARP plays both held notes: clock %u input %u voice %u state %u", clock, source, mode, state);
+                    bad += check(label, !song.playing && t->nheld == 2u && heard == 3u && t->arp_idx > 1u);
+                    clock_packet(clock, 0xFA, 1000);
+                    uint32_t before = t->arp_idx;
+                    clock_to(clock, 1000, 7);
+                    bad += check("live ARP hands timing back to the running master", song.playing && midi_sync_active == clock && t->arp_idx > before);
+                    clock_packet(clock, 0xFC, 1150); before = t->arp_idx;
+                    for (uint32_t i = 0; i < 1000; i++) events_block(CTL);
+                    bad += check("master Stop restores local ARP timing for keys still held", !song.playing && t->arp_idx > before + 1u);
+                    arp_live_key(source, 7, 0); arp_live_key(source, 11, 0);
+                    bad += check("idle live ARP releases both keys without hanging ownership", !t->nheld && !t->arp_phys && !t->arp_note && !midi_owners[0]);
+                }
     return bad;
 }
 /* USB-MIDI back-pressure: full 64-byte bulk packets (16 events) faster than the audio ISR drains the ring are
@@ -357,7 +417,7 @@ static int drum_channel_test(void)
 int main(void)
 {
     int bad = controls_test() + sustain_test() + ownership_test() + clock_test(1) + clock_test(2) + clock_arp_and_boundaries() +
-              arp_ext_stop_test() + usb_burst_test() + routing_range_test() + drum_channel_test();
+              arp_ext_stop_test() + arp_idle_live_test() + usb_burst_test() + routing_range_test() + drum_channel_test();
     printf("%s\n", bad ? "MIDI CONTROL/CLOCK TEST FAILED" : "MIDI control/clock integration tests passed"); return bad != 0;
 }
 #endif
