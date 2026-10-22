@@ -794,17 +794,18 @@ static void graph_tweak2(const track_t *t, uint16_t c)
     }
 }
 
-/* ORGANIC page (LFO family): the track's SLOTH, its three circuits as dots on their lines (TORPOR, APATHY, INERTIA from
- * the top, -1 left, +1 right), and its OCHD, eight bars up or down from the middle, slowest left. Live: graph_sig
+/* ORGANIC page (LFO family): the track's TIDE, its three circuits as dots on their lines (TIDE 1, 2, 3 from the top,
+ * slowest first: organic_out 0, 2, 1; -1 left, +1 right), and its SWARM, eight bars up or down from the middle, slowest left. Live: graph_sig
  * redraws it as they move */
 static void mx_graph(uint16_t c);                       /* MATRIX (ui_matrix.c) */
 static uint32_t mx_sig(void);
 static void graph_organic(const track_t *t, uint16_t c)
 {
-    static const char *const NAME[3] = {"TOR", "APA", "INE"};
+    static const char *const NAME[3] = {"T1", "T2", "T3"};
+    static const uint8_t OUT[3] = {0, 2, 1};            /* (TIDE 2 is organic.c's third circuit, the 3 minute one) */
     uint32_t tr = trk_index(t) % TESSERA_TRACKS, i;
     for (i = 0; i < 3u; i++) {
-        int32_t y = 22 + (int32_t)i * 28, v = organic_out(tr, i);
+        int32_t y = 22 + (int32_t)i * 28, v = organic_out(tr, OUT[i]);
         cv_text(PANEL_X0, y - 5, &AF_X, NAME[i], T_MID);
         cv_rect(PANEL_X0 + 26, y, 84, 1, T_RAISE);
         cv_rect(PANEL_X0 + 67, y - 4, 1, 9, T_RAISE);

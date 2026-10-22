@@ -30,7 +30,7 @@ static void help_find(uint32_t k)
         {TX_SR_START, TX_SR_INTV, TX_SR_LOOP}, {TX_CH_PROG, TX_CH_BARS, TX_CH_HIT}};
     static const char *const CORD_TEXT[4] = {
         "What moves it: a track's LFO, envelope, velocity, key, random, controllers, its generator's gate, note "
-        "or CV, or DRIFT, a slow wander, or its SLOTH (TORPOR, APATHY, INERTIA) or OCHD 1-8 (LFO > ORGANIC). -- leaves "
+        "or CV, or DRIFT, a slow wander, or its TIDE 1-3 or SWARM 1-8 (LFO > ORGANIC). -- leaves "
         "the mod a fixed move. OCT+: BI swings both ways from the knob, UNI (+) only one way.",
         "Which of the 16 mods the other knobs edit.",
         "What it moves, on which track: the voices' pitch, cutoff, shape, gain, a sound setting, or a generator's.",
