@@ -77,8 +77,15 @@ static int gr_layer_on(void)
            cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_GRIDS &&
            ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
 }
-/* a generator's OCT+ layer is on (QUAD's, CONSTELLATION's, CHORD's or GRIDS'): no octave, no sheet */
-static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on() || ch_layer_on() || gr_layer_on(); }
+/* ANSWER on GEN with OCT+ held: the knobs are ORDER, SHIFT, SPACE and LEN (tessera.c tessera_answer_layer_knob) */
+static int an_layer_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && song.sel < TESSERA_TRACKS && cur_page()->fam == FAM_GEN &&
+           cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_ANSWER &&
+           ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
+}
+/* a generator's OCT+ layer is on (QUAD's, CONSTELLATION's, CHORD's, GRIDS' or ANSWER's): no octave, no sheet */
+static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on() || ch_layer_on() || gr_layer_on() || an_layer_on(); }
 /* QUAD's LINK as its card shows it: OFF, or "T" and the linked tracks ("T24") */
 static void quad_link_text(uint32_t m, char *b)
 {
@@ -524,6 +531,52 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
                 cv_rect(x0 + (int32_t)l * cw - 3, ly - 3, 1, 5, c);
             } else
                 for (int32_t x = x0 + 1; x < x0 + sw - 3; x += 6) cv_rect(x, ly, 3, 2, dim);
+        }
+    } else if (mode == TESS_ENG_ANSWER) {
+        /* the phrase on a staff of its steps: a note a dot at its height (the lowest to the highest played), lines
+         * joining them, the one playing ringed; under it what ANSWER does now: LISTENING, an answer of FADE's count
+         * (a dot an answer, the played ones dim), LOOPS, or PLAY KEYS. The dots dim as the answers fade */
+        const tessera_answer_t *a = tessera_answer(tr);
+        int32_t x0 = is_panel ? 18 : 13, sw = is_panel ? 204 : 216, top = is_panel ? 12 : y_base - 2;
+        int32_t sh = is_panel ? 60 : 24, px = -1, py = 0;
+        uint32_t n = a->n, span = n ? (uint32_t)a->at[n - 1u] + 1u : 1u, lo = 127, hi = 0, ph = tess_an.phase[tr];
+        uint32_t cnt = tessera_answer_count(tr), now = tess_an.slot[tr];
+        uint16_t dc = ph == TESS_AN_PLAY && cnt && tess_an.ans[tr] * 2u >= cnt ? dim : c;
+        char b[16];
+        if (span < 8u) span = 8u;
+        for (uint32_t i = 0; i < n; i++) {
+            lo = a->note[i] < lo ? a->note[i] : lo;
+            hi = a->note[i] > hi ? a->note[i] : hi;
+        }
+        if (hi < lo + 7u) hi = lo + 7u;
+        cv_rect(x0, top + sh + 3, sw, 1, dim);
+        for (int pass = 0; pass < 2; pass++)            /* (the lines first, the dots over them) */
+            for (uint32_t i = 0; i < n; i++) {
+                int32_t x = x0 + 4 + (int32_t)a->at[i] * (sw - 8) / (int32_t)(span - 1u);
+                int32_t y = top + sh - (int32_t)(a->note[i] - lo) * sh / (int32_t)(hi - lo);
+                if (!pass) {
+                    if (px >= 0) cv_line(px, py, x, y, dim);
+                    px = x, py = y;
+                    continue;
+                }
+                cv_rect(x - 2, y - 2, 5, 5, ph == TESS_AN_HEAR ? T_TEXT : dc);
+                if (song.playing && now == i + 1u && (ph == TESS_AN_PLAY || ph == TESS_AN_LOOP)) cv_ring(x, y, 9, T_TEXT);
+            }
+        if (is_panel) {
+            int32_t ly = top + sh + 14;
+            if (ph == TESS_AN_HEAR) {
+                str_cpy(b, "LISTENING", sizeof b);
+            } else if (!n || ph == TESS_AN_IDLE) {
+                str_cpy(b, "PLAY KEYS", sizeof b);
+            } else if (!cnt) {
+                str_cpy(b, "LOOPS", sizeof b);
+            } else {
+                str_cpy(b, "ANSWER ", sizeof b);
+                fmt_int(b + 7, (int32_t)(tess_an.ans[tr] + 1u));
+                for (uint32_t k = 0; k < cnt; k++)
+                    cv_rect(x0 + sw - (int32_t)(cnt - k) * 8, ly + 4, 5, 5, k < tess_an.ans[tr] ? dim : k == tess_an.ans[tr] ? T_TEXT : c);
+            }
+            cv_text(x0, ly, &AF_X, b, ph == TESS_AN_HEAR ? T_TEXT : c);
         }
     } else if (mode == TESS_ENG_CHORD) {
         /* the progression as a row of cards, a chord's name each, the one playing filled with a bar under it for how far

@@ -23,6 +23,7 @@ enum {
     TESS_ENG_CONSTEL,     /* a ship catches the stars of a scrolling sky into a loop (norns' Constellation) */
     TESS_ENG_SERIES,      /* Nørgård's infinity series (norns' nørgård) */
     TESS_ENG_CHORD,       /* the chord pad: a progression's chords in the track's scale (QNT CHRD: the others follow) */
+    TESS_ENG_ANSWER,      /* the keys' phrase answered with fading variations and echoes (after Zen-1; answer.c) */
     TESS_ENG_COUNT
 };
 /* CELLS (an elementary automaton, cut 2026-10-20 as too like the others) had 12 in blocks up to version 11: such a
@@ -42,6 +43,24 @@ typedef gen_quad_t   tessera_quad_t;
 typedef gen_constel_t tessera_constel_t;
 typedef gen_series_t tessera_series_t;
 typedef gen_chord_t  tessera_chord_t;
+
+/* ANSWER (answer.c): the notes played on the track's keys (up to 8) are its phrase; it answers it, after a gap, with
+ * variations (vary.c), echoes, each answer softer until it forgets. The saved part; what plays now is tess_an */
+#define TESS_AN_NOTES 8u
+#define TESS_AN_AT_MAX 63u                          /* a note's step in the phrase: 0..63 */
+enum { TESS_AN_ASPLAYED, TESS_AN_REVERSE, TESS_AN_SHUFFLE, TESS_AN_ORDERS };
+enum { TESS_AN_SHORT, TESS_AN_MID, TESS_AN_LONG, TESS_AN_LENS };   /* LEN: the four loops at the top of FADE */
+typedef struct {
+    uint8_t vary;          /* 0..100: how much an answer changes (0: as played) */
+    uint8_t echo;          /* 0..100: the chance a note comes back once more, softer */
+    uint8_t fade;          /* 0..100: answers before it forgets, 1 .. 16; 100 never: the four loops */
+    uint8_t order;         /* TESS_AN_*: the notes' order in an answer */
+    uint8_t shift;         /* 0..7: an answer moved up to this many scale degrees up or down (0: none) */
+    uint8_t space;         /* 0..100: the gap before each answer, 0 .. 4 bars */
+    uint8_t len;           /* TESS_AN_SHORT .. LONG: the loops' lengths in steps (5 7 11 13, 13 17 23 29, 23 29 31 37) */
+    uint8_t n;             /* the phrase's notes, 0..8 (0: nothing to answer yet) */
+    uint8_t note[TESS_AN_NOTES], vel[TESS_AN_NOTES], at[TESS_AN_NOTES];   /* each note, its velocity, its step */
+} tessera_answer_t;
 
 /* 5. Evolve (per track, engine-independent): phrase-level mutation.
  * LOCK has no storage of its own for Turing: it is 100 - turing.prob. */
@@ -115,6 +134,7 @@ typedef struct {
     tessera_constel_t constel[TESSERA_TRACKS];
     tessera_series_t series[TESSERA_TRACKS];
     tessera_chord_t  chord[TESSERA_TRACKS];
+    tessera_answer_t answer[TESSERA_TRACKS];
     uint16_t         chord_pc[TESSERA_TRACKS]; /* CHORD: the pitch classes of the chord it plays (bit 0 C), 0 none yet
                                                * (QNT CHRD's: tessera_chord_pcs; not saved) */
     tessera_evolve_t evolve[TESSERA_TRACKS];
@@ -159,6 +179,23 @@ typedef struct {
     uint8_t  mut[TESSERA_TRACKS][TESS_SV_STEPS];   /* each step's change (vary.c), 0 as written */
 } tessera_sv_t;
 extern tessera_sv_t tess_sv;
+/* ANSWER as it plays (answer.c; not saved, cleared by tessera_init). In .pool */
+enum { TESS_AN_IDLE, TESS_AN_HEAR, TESS_AN_GAP, TESS_AN_PLAY, TESS_AN_LOOP };
+#define TESS_AN_ECHOES 3u
+typedef struct {
+    uint8_t  phase[TESSERA_TRACKS];             /* TESS_AN_IDLE .. LOOP */
+    uint8_t  ans[TESSERA_TRACKS];               /* the answers played since the phrase (its FADE count) */
+    int8_t   shift[TESSERA_TRACKS];             /* this answer's SHIFT, scale degrees */
+    uint8_t  slot[TESSERA_TRACKS];              /* the phrase's note just played + 1, 0 none (the picture) */
+    uint16_t hclk[TESSERA_TRACKS];              /* listening: steps since the phrase's first note */
+    uint32_t cnt[TESSERA_TRACKS];               /* steps in this phase (listening: since the last note) */
+    uint32_t rnd[TESSERA_TRACKS];               /* its random stream (from the SEED at PLAY) */
+    uint8_t  mut[TESSERA_TRACKS][TESS_AN_NOTES];   /* each place's change (vary.c) */
+    uint8_t  ord[TESSERA_TRACKS][TESS_AN_NOTES];   /* the note each place plays (ORDER) */
+    uint8_t  e_note[TESSERA_TRACKS][TESS_AN_ECHOES], e_vel[TESSERA_TRACKS][TESS_AN_ECHOES];
+    uint8_t  e_left[TESSERA_TRACKS][TESS_AN_ECHOES];   /* steps until the echo plays, 0 none */
+} tessera_an_t;
+extern tessera_an_t tess_an;
 
 void tessera_init(void);
 void tessera_clock_step(track_t *t);
@@ -190,8 +227,9 @@ int energy_resting(void);                           /* 1 while the notes rest */
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 602u                       /* the saved state, version 18 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS,
+#define TESSERA_PK_BYTES 730u                       /* the saved state, version 19 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS,
                                                      * then the project's TESS_PK_TAIL) */
+#define TESSERA_PK_BYTES_V18 602u                   /* version 18 (before ANSWER) */
 #define TESSERA_PK_BYTES_V17 600u                   /* version 17 (before ENERGY's ARC and RESTS) */
 #define TESSERA_PK_BYTES_V16 596u                   /* version 16 (before CHORD's BREATH) */
 #define TESSERA_PK_BYTES_V15 588u                   /* version 15 (before SUB) */
@@ -211,10 +249,10 @@ const char *tessera_form_name(uint32_t form);
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..18) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..19) */
 int tessera_check(uint32_t ver, const uint8_t *in);        /* the same checks, nothing loaded: 1 it would load */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
-void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 17 */
+void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 19 */
 void tessera_reset(void);                           /* every track OFF, defaults */
 uint32_t tessera_ratchet(uint32_t tr);              /* SUB: the hits this step plays (1..4), its CHANCE drawn */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
@@ -250,6 +288,7 @@ enum {
     TX_SUB_RATCH, TX_SUB_CHANCE,
     TX_CH_BREATH,
     TX_EN_ARC, TX_EN_RESTS,                         /* (the project's: one value, whichever track) */
+    TX_AN_VARY, TX_AN_ECHO, TX_AN_FADE, TX_AN_ORDER, TX_AN_SHIFT, TX_AN_SPACE, TX_AN_LEN,
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
@@ -288,6 +327,10 @@ void tessera_chord_ulen_knob(int32_t s);                   /* OCT+ held on GEN i
 void tessera_chord_oct_knob(int32_t s);                    /* OCT+ held on GEN in CHORD, KNOB 1: OCT */
 void tessera_chord_breath_knob(int32_t s);                 /* OCT+ held on GEN in CHORD (not USER), KNOB 4: BREATH */
 const gen_series_t *tessera_series(uint32_t tr);
+const tessera_answer_t *tessera_answer(uint32_t tr);
+void tessera_answer_hear(track_t *t, uint32_t note, uint32_t vel);   /* seq.c: a key / MIDI note on the track */
+void tessera_answer_layer_knob(uint32_t k, int32_t s);  /* OCT+ held on GEN in ANSWER: ORDER, SHIFT, SPACE, LEN */
+uint32_t tessera_answer_count(uint32_t tr);             /* the answers FADE gives (1..16), 0: never forgets (loops) */
 const gen_chord_t *tessera_chord(uint32_t tr);
 uint32_t tessera_chord_pcs(void);     /* QNT CHRD: the chord the first CHORD track plays (pitch classes, bit 0 C), 0 none */
 uint32_t tessera_chord_snap(uint32_t pcs, int32_t n);   /* n moved to the nearest note of pcs (a tie: down), 0..127 */

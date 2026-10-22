@@ -659,6 +659,7 @@ static void input_on(track_t *t, uint32_t note, uint32_t vel)
     last_note = (uint8_t)note;
     live_note_on(t, note, vel);
     cap_on(t, note, vel);
+    tessera_answer_hear(t, note, vel);             /* (an ANSWER track: the note joins its phrase) */
     if (rec_on(t) && !t->p[P_AMODE])               /* (ARP on: arp_tick records its notes) */
         rec_note(t, note, vel);
     if (t->p[P_AMODE])

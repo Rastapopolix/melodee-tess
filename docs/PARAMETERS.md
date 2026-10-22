@@ -139,7 +139,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 | ID | Name | Range | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, ATLAS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CHORD | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; ATLAS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the other tracks follow them). |
+| 0x200 | GENERATOR MODE | STEP, TURING, EUCLID, MARKOV, MORPH, ATLAS, BOUNCE, AWAKE, POLY, QUAD, CONSTL, SERIES, CHORD, ANSWER | STEP | SEQ shows the pages of the MODE only. STEP plays the track's own steps; ARP the keys held, as an arpeggio (the ARP button opens it too); TURING, EUCLID, MARKOV and MORPH make its notes; ATLAS plays kick, snare, hat and toms (best on a DRUM track); BOUNCE plays where a ball hits the walls of its box; AWAKE adds two loops of its own lengths; POLY steps four notes on four rhythms; QUAD plays the track's row of a four by four grid the tracks share; CONSTL (CONSTELLATION) plays the stars of a passing sky as they cross a ship's crosshair; SERIES plays Per Norgard's infinity series; CHORD plays a progression's chords in the track's scale (QNT CHRD: the other tracks follow them). |
 | 0x201 | TURING LENGTH | 2 to 16 steps | 16 | How many steps the register loops over before it comes round again. |
 | 0x202 | TURING PROB | 0 to 100 % | 0 | The chance a step changes as it comes round: 0 locks the loop, 100 is new every pass. |
 | 0x203 | TURING SPAN | 1 to 3 oct | 2 | How many octaves the notes spread over. |
@@ -227,6 +227,13 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x258 | CHORD BREATH | 0 to 100 % | 0 | With HIT HOLD, the chord breathes: each voice is struck again, softer, on a slow cycle of its own (11 to 19 s), and the same chord again is tied over instead of struck (DRONE: one long chord). BREATH is the chance a voice above the lowest sits a cycle out, one at a time; 0 is off. OCT+ held on GEN, KNOB 4 (USER: its LEN there). |
 | 0x259 | ENERGY ARC | 0 to 100 % | 0 | The project's slow tide, the same for every track: over 3 to 6 minutes it swings from the tracks as set to sparse and back. At the sparse end the generator tracks leave out up to 70 % more of their hits and play up to 16 softer; ARC is how far it swings, 0 off. It is the cord source ENERGY too (to a filter, a send). |
 | 0x25A | ENERGY RESTS | 0 to 100 % | 0 | How often the music rests: 8 to 18 s with the generator tracks silent (a CHORD track's held chord and its BREATH go on), at 100 about every 4 minutes, near 0 about every 20, sooner while ARC's tide is sparse. 0 off. |
+| 0x25B | ANSWER VARY | 0 to 100 % | 30 | How much each answer changes the phrase you played: a note moved a degree or two, an octave, left out or swapped with the next. Each answer changes it a little more. 0 answers it as played. |
+| 0x25C | ANSWER ECHO | 0 to 100 % | 20 | The chance a note it plays comes back once more, at half its velocity, 3 to 8 steps later, one in four an octave up. 0 off. |
+| 0x25D | ANSWER FADE | 0 to 100 % | 33 | How long it remembers: 1 answer at 0 to 16 at 99, each softer than the last, then it rests until you play again. At 100 it never forgets: the notes play on as four loops of different lengths (LEN), so it never quite repeats. |
+| 0x25E | ANSWER ORDER | PLAYED, REVERSE, SHUFFLE | PLAYED | The order of the notes in an answer, over the rhythm you played: PLAYED, REVERSE or SHUFFLE (a new order each answer). OCT+ held on GEN, KNOB 1. |
+| 0x25F | ANSWER SHIFT | 0 to 7 | 2 | Each answer is moved up or down by up to this many degrees of the scale, a new amount each time. 0 keeps it where you played it. OCT+ held on GEN, KNOB 2. |
+| 0x260 | ANSWER SPACE | 0 to 100 % | 25 | The rest before each answer: 0 answers straight away, 100 waits 4 bars. A bar without a key ends the phrase you play. OCT+ held on GEN, KNOB 3. |
+| 0x261 | ANSWER LEN | SHORT, MID, LONG | MID | With FADE at 100, the lengths of the four loops the notes play on, in steps: SHORT 5 7 11 13, MID 13 17 23 29, LONG 23 29 31 37. OCT+ held on GEN, KNOB 4. |
 
 ## Mods
 
@@ -322,3 +329,4 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | AT SNR | the generator's step | Atlas' SNR: how much of its density the snare gets |
 | AT HAT | the generator's step | Atlas' HAT: how much of its density the hat gets |
 | AT TOMS | the generator's step | Atlas' TOMS: how many of the near misses play the tom |
+| AN VARY | the generator's step | Answer's VARY: how much each answer changes the phrase |

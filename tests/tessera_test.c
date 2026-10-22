@@ -205,6 +205,32 @@ static void s_key(void)                              /* E minor: the generators 
     sel(0);
     knob(tessera_knob, 2, 10);
 }
+/* ANSWER: track 1 in C major hears C D E G at bar 2 (a step apart) and answers; s_answer as it played (VARY, ECHO,
+ * SHIFT 0, no gap, FADE 14: three answers), s_answer_rev reversed, s_answer_loops on for ever as the four loops */
+static void s_answer_common(uint32_t vary, uint32_t echo, uint32_t fade, uint32_t order, uint32_t shift, uint32_t space)
+{
+    gen(0, TESS_ENG_ANSWER);
+    trk[0].p[P_SCALE] = 1;                            /* (MAJ) */
+    tessera_param_set(0, TX_AN_VARY, (int32_t)vary);
+    tessera_param_set(0, TX_AN_ECHO, (int32_t)echo);
+    tessera_param_set(0, TX_AN_FADE, (int32_t)fade);
+    tessera_param_set(0, TX_AN_ORDER, (int32_t)order);
+    tessera_param_set(0, TX_AN_SHIFT, (int32_t)shift);
+    tessera_param_set(0, TX_AN_SPACE, (int32_t)space);
+}
+static void s_answer(void) { s_answer_common(0, 0, 14, TESS_AN_ASPLAYED, 0, 0); }
+static void s_answer_rev(void) { s_answer_common(0, 0, 14, TESS_AN_REVERSE, 0, 0); }
+static void s_answer_loops(void)
+{
+    s_answer_common(60, 50, 100, TESS_AN_SHUFFLE, 2, 25);
+    tessera_param_set(0, TX_AN_LEN, TESS_AN_SHORT);
+}
+static void s_answer_bar(uint32_t bar)
+{
+    static const uint8_t KEYS[4] = {60, 62, 64, 67};
+    if (bar == 1u)
+        for (uint32_t i = 0; i < 4u; i++) tessera_answer_hear(&trk[0], KEYS[i], 100);
+}
 static void s_div_gate(void)
 {
     gen(0, TESS_ENG_MARKOV);
@@ -730,6 +756,9 @@ static const scen_t SCEN[] = {
     {"chord_walk_half_beat_dia7", 8, 0x1042u, s_chord_var, 0},
     {"chord_link_turing_markov", 8, 0x1043u, s_chord_link, 0},
     {"key_e_minor", 8, 0x1044u, s_key, 0},
+    {"answer_heard_fade3", 8, 0x1045u, s_answer, s_answer_bar},
+    {"answer_heard_reverse", 8, 0x1046u, s_answer_rev, s_answer_bar},
+    {"answer_loops_shuffle_echo", 8, 0x1047u, s_answer_loops, s_answer_bar},
     {"chord_form_ab_evolve", 8, 0x1044u, s_chord_form, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
@@ -887,6 +916,36 @@ static void key_run(char *res, size_t cap)
         n++;
     }
     snprintf(res, cap, "%u %u %u", n, out, heard);
+}
+
+/* ANSWER: scenario name's track 1 notes: "count, as expected (1), velocities falling (1), in C major (1)"; want: the
+ * notes it should play in order (0: any, then at least 40 and some in the last bar) */
+static void answer_run(const char *name, const uint8_t *want, uint32_t nwant, char *res, size_t cap)
+{
+    const scen_t *sc = 0;
+    uint32_t i, n = 0, same = 1, falling = 1, major = 1, lastv = 128;
+    for (i = 0; i < NSCEN; i++) if (!strcmp(SCEN[i].name, name)) sc = &SCEN[i];
+    scen_run(sc, 0, res, cap);
+    for (i = 0; i < tt_n; i++) {
+        if (tt_ev[i].tr != 0u) continue;
+        major &= (0xAB5u >> (tt_ev[i].note % 12u)) & 1u;
+        if (want) {
+            same &= n < nwant && tt_ev[i].note == want[n];
+            if (!(n % 4u)) {                          /* (an answer's first note: softer than the last's) */
+                falling &= tt_ev[i].vel < lastv;
+                lastv = tt_ev[i].vel;
+            }
+        }
+        n++;
+    }
+    if (want) {
+        same &= n == nwant;
+    } else {                                          /* (on for ever: 40 notes at least, some in the last bar) */
+        uint32_t late = 0;
+        for (i = 0; i < tt_n; i++) late += tt_ev[i].tr == 0u && tt_ev[i].blk >= tt_bar_blk[7];
+        same = n >= 40u && late > 0u;
+    }
+    snprintf(res, cap, "%u %u %u %u", n, same, falling, major);
 }
 
 /* track tr's notes from block blk on, at most cap (note | vel << 8) into out: the count */
@@ -2215,15 +2274,51 @@ static void pack_run(char *res, size_t cap)
         tessera_pack(b);
         tessera_reset();
         ok &= tessera_unpack(b) == 1 && tessera_param_get(1, TX_EN_ARC) == 40 && tessera_param_get(3, TX_EN_RESTS) == 100;
-        memcpy(v17, b, sizeof v17);
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)   /* (version 17: each track's first 150 bytes, no tail) */
+            memcpy(v17 + tr * (TESSERA_PK_BYTES_V17 / TESSERA_TRACKS), b + tr * (TESSERA_PK_BYTES / TESSERA_TRACKS),
+                   TESSERA_PK_BYTES_V17 / TESSERA_TRACKS);
         ok &= tessera_unpack_ver(17u, v17) == 1 && tessera_param_get(0, TX_EN_ARC) == 0 && tessera_param_get(0, TX_EN_RESTS) == 0;
-        ok &= tessera_pk_bytes(18u) == TESSERA_PK_BYTES && tessera_pk_bytes(17u) == TESSERA_PK_BYTES_V17;
+        ok &= tessera_pk_bytes(18u) == TESSERA_PK_BYTES_V18 && tessera_pk_bytes(17u) == TESSERA_PK_BYTES_V17;
         memcpy(c, b, sizeof c);
         c[TESSERA_PK_BYTES - 2u] = 101;
         ok &= tessera_unpack(c) == 0;
         memcpy(c, b, sizeof c);
         c[TESSERA_PK_BYTES - 1u] = 101;
         ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+    }
+    {   /* ANSWER (version 19): its settings and phrase round trip; a version 18 block loads with the defaults and nothing
+         * heard; ORDER 3, SHIFT 8, LEN 3, 9 notes, a note over 127 or a step over 63 refused */
+        const uint32_t n19 = TESSERA_PK_BYTES / TESSERA_TRACKS, n17 = TESSERA_PK_BYTES_V17 / TESSERA_TRACKS;
+        static uint8_t v18[TESSERA_PK_BYTES_V18];
+        static const uint8_t BAD[6][2] = {{3, 3}, {4, 8}, {6, 3}, {7, 9}, {8, 128}, {24, 64}};
+        tessera_reset();
+        gen(1, TESS_ENG_ANSWER);
+        tessera_param_set(1, TX_AN_VARY, 70);
+        tessera_param_set(1, TX_AN_FADE, 100);
+        tessera_param_set(1, TX_AN_ORDER, TESS_AN_SHUFFLE);
+        tessera_param_set(1, TX_AN_LEN, TESS_AN_LONG);
+        tessera_answer_hear(&trk[1], 57, 90);
+        tessera_answer_hear(&trk[1], 64, 70);
+        tessera_answer_hear(&trk[0], 50, 70);           /* (track 1 is no ANSWER track: not heard) */
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera.mode[1] == TESS_ENG_ANSWER && tessera_answer(1)->n == 2u &&
+              tessera_answer(1)->note[1] == 64u && tessera_answer(1)->vel[0] == 90u && tessera_answer(1)->at[1] == 1u &&
+              tessera_param_get(1, TX_AN_VARY) == 70 && tessera_param_get(1, TX_AN_FADE) == 100 &&
+              tessera_param_get(1, TX_AN_ORDER) == TESS_AN_SHUFFLE && tessera_param_get(1, TX_AN_LEN) == TESS_AN_LONG &&
+              tessera_answer(0)->n == 0u && tessera_answer_count(1) == 0u;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v18 + tr * n17, b + tr * n19, n17);
+        v18[TESSERA_TRACKS * n17] = 30;                 /* (ENERGY ARC, kept) */
+        v18[TESSERA_TRACKS * n17 + 1u] = 0;
+        ok &= tessera_unpack_ver(18u, v18) == 1 && tessera.mode[1] == TESS_ENG_ANSWER && tessera_answer(1)->n == 0u &&
+              tessera_param_get(1, TX_AN_VARY) == 30 && tessera_param_get(1, TX_AN_FADE) == 33 &&
+              tessera_param_get(0, TX_EN_ARC) == 30 && tessera_check(18u, v18) == 1 && tessera_check(19u, b) == 1;
+        for (uint32_t k = 0; k < 6u; k++) {
+            memcpy(c, b, sizeof c);
+            c[1u * n19 + n17 + BAD[k][0]] = BAD[k][1];
+            ok &= tessera_unpack(c) == 0 && tessera_check(19u, c) == 0;
+        }
         tessera_unpack(a);
     }
     {   /* CHORD USER: a key's note rounded down to the track's scale is the chord's root (D dorian: E ii, F# rounded to
@@ -2403,6 +2498,32 @@ int main(int argc, char **argv)
         }
         snprintf(line, sizeof line, "FOLLOW a STEP melody: all %u notes a third above it (in C major)", n2);
         bad += check(line, n2 > 16u && !wrong);
+    }
+    for (int which = 0; which < 3; which++) {   /* ANSWER, in a child as the scenarios */
+        static const uint8_t FWD[12] = {60, 62, 64, 67, 60, 62, 64, 67, 60, 62, 64, 67};
+        static const uint8_t REV[12] = {67, 64, 62, 60, 67, 64, 62, 60, 67, 64, 62, 60};
+        static const char *const NAME[3] = {"answer_heard_fade3", "answer_heard_reverse", "answer_loops_shuffle_echo"};
+        static const char *const WHAT[3] = {
+            "ANSWER: C D E G heard, three answers as played, each softer, then it forgets",
+            "ANSWER REVERSE: three answers G E D C, each softer, then it forgets",
+            "ANSWER at the top of FADE: the loops play on (VARY, SHIFT, SHUFFLE, ECHO), all in C major"};
+        unsigned n = 0, same = 0, falling = 0, major = 0;
+        pid_t pid;
+        int fd[2];
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                answer_run(NAME[which], which == 2 ? 0 : which ? REV : FWD, 12u, res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u %u %u %u", &n, &same, &falling, &major);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        snprintf(line, sizeof line, "%s (%u notes)", WHAT[which], n);
+        bad += check(line, same && falling && major);
     }
     {   /* ROOT: generators that write C minor play E minor's notes, every one of them, with ROOT on E */
         unsigned n = 0, outside = 1, heard = 0;
