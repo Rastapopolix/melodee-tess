@@ -7,7 +7,7 @@ static int32_t part_storage[CTL],mix_l[CTL],mix_r[CTL];
 static int32_t *part_buf=part_storage;
 static uint8_t fx_send_on;
 static uint32_t fx_extra_gain[FX_SLOTS-1u];
-static __attribute__((noinline,section(".audio_text"))) void mix_extra_sends(uint32_t n)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) void mix_extra_sends(uint32_t n)
 {
     for(uint32_t i=0;i<n;i++){
         int32_t l=mix_l[i]-fx_bus_sum_l[i],r=mix_r[i]-fx_bus_sum_r[i];

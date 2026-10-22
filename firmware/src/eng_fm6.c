@@ -697,7 +697,7 @@ static void fm6_legato(track_t *t, voice_t *v)
 static int fm6_done(track_t *t, voice_t *v) { return fm6_state(t, v)->quiet >= 2u; }
 
 /* a new Dexed block: key-up, the envelopes, pitch and gains (Dx7Note::compute), the routing */
-static __attribute__((noinline,section(".audio_text"))) void fm6_control_ram(track_t *t, voice_t *v, fm6_voice_t *s, const vmod_t *m, fm6_part_t *P, int32_t tune)
+static __attribute__((noinline,section(".audio_text"),aligned(16))) void fm6_control_ram(track_t *t, voice_t *v, fm6_voice_t *s, const vmod_t *m, fm6_part_t *P, int32_t tune)
 {
     uint32_t tr = (uint32_t)(t - trk) % NTRK, alg, k, dead = 1;
     const uint8_t *ed = fm6_ed(t);

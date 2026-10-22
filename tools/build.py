@@ -407,6 +407,15 @@ def check(img, syms, dis, rt):
             if (name == kernel or address) and not sym("_dsp_start") <= address < sym("_dsp_end"):
                 errors.append(f"{name} must remain in internal DSP RAM")
         notes.append("FM6: sample kernel and operator helpers in internal DSP RAM")
+    # The audio code copied to RAM (.audio_text) starts each C function on 16 bytes: placed by 2 bytes, its start
+    # moved with every edit before it, and FM6's control code ran slower off a word boundary (plucky voices glitched).
+    misaligned = [name for name in ("fm6_control_ram", "fx_slot_run", "fx_process_impl", "fx_chorus", "mix_extra_sends",
+                                    "fx_post_pan", "fx_active", "fx_slot_values", "fx_zero")
+                  if sym(name) and sym(name) % 16]
+    if misaligned:
+        errors.append(f"audio RAM functions off a 16-byte boundary: {', '.join(misaligned)}")
+    else:
+        notes.append(".audio_text: its C functions on 16-byte boundaries")
     for name in ("fm6_output", "fm6_dc_samples", "fm6_eg_go", "fm6_eg_step", "fm6_peg_go", "mix_mono_samples", "master_samples", "master_out"):
         address = sym(name)
         if address and not sym("_dsp_start") <= address < sym("_dsp_end"):
