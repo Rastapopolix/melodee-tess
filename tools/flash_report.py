@@ -25,13 +25,15 @@ import build  # noqa: E402
 XIP_LEN = 0x8C000                    # firmware/app.ld: XIP LENGTH
 FLASH_SECTIONS = (".text", ".ram_text", ".dsp_text", ".dsp_tables", ".data", ".audio_text")
 SYM = re.compile(r"^([0-9a-f]+)\s.{7}\s(\S+)\s+([0-9a-f]+)\s+(?:\.hidden\s+)?(\S+)$")
-HDR = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)")
+HDR = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]{8})\s+([0-9a-f]{8})")     # Idx Name Size VMA ...
 DEF = re.compile(r"^(?!\s)(?!#)(?!typedef\b)(?!return\b)[^;=(]*?\b([A-Za-z_]\w*)\s*(\(|\[|=)")
+ATTR = re.compile(r"__attribute__\s*\(\(.*?\)\)")
+CALL = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
 
 
 def definitions():
     """name -> source file (relative to the tree), from top-level definitions"""
-    where = {}
+    where, maybe = {}, {}
     roots = [SRC / "firmware" / "src", SRC / "firmware" / "hal", build.GEN, SRC / "firmware" / "src" / "x0x"]
     for root in roots:
         if not root.is_dir():
@@ -39,14 +41,24 @@ def definitions():
         for f in sorted([*root.glob("*.c"), *root.glob("*.h")]):
             rel = str(f.relative_to(SRC))
             for line in f.read_text(errors="replace").splitlines():
-                m = DEF.match(line)
+                m = DEF.match(ATTR.sub("", line))
                 if m and m.group(1) not in ("if", "for", "while", "switch", "sizeof"):
                     where.setdefault(m.group(1), rel)
+                elif line[:1].isalpha() and not line.rstrip().endswith(";"):
+                    for name in CALL.findall(line):     # macro-wrapped definitions: any name called on the line
+                        maybe.setdefault(name, rel)
+    for name, rel in maybe.items():
+        where.setdefault(name, rel)
     return where
 
 
 def base_name(name):
+    """f.123 -> f (a renamed static); f.TABLE (a static inside f) stays, and is matched to f's file"""
     return re.sub(r"\.\d+$", "", name.split(".llvm.")[0])
+
+
+def file_of(where, name):
+    return where.get(name) or where.get(name.split(".")[0], "")
 
 
 def main():
@@ -79,7 +91,7 @@ def main():
     per_file = defaultdict(int)
     per_file_n = defaultdict(int)
     for (s, name), size in per_sym.items():
-        f = where.get(name, "(not found in the source)")
+        f = file_of(where, name) or "(not found in the source)"
         per_file[f] += size
         per_file_n[f] += 1
 
@@ -90,18 +102,19 @@ def main():
     for s in FLASH_SECTIONS:
         if sect.get(s):
             out.append(f"| {s} | {sect[s]:,} | {per_sect_named[s]:,} | {sect[s] - per_sect_named[s]:,} |")
+    out += ["", "Every section (objdump -h):", "", "```", *[l.rstrip() for l in heads.splitlines() if HDR.match(l)], "```"]
     out += ["", "## By source file", "", "| File | Bytes | Symbols |", "| --- | ---: | ---: |"]
     for f, size in sorted(per_file.items(), key=lambda kv: -kv[1]):
         out.append(f"| {f} | {size:,} | {per_file_n[f]} |")
     out += ["", f"## The {a.top} biggest symbols", "", "| Symbol | Section | File | Bytes |",
             "| --- | --- | --- | ---: |"]
     for (s, name), size in sorted(per_sym.items(), key=lambda kv: -kv[1])[:a.top]:
-        out.append(f"| {name} | {s} | {where.get(name, '?')} | {size:,} |")
+        out.append(f"| {name} | {s} | {file_of(where, name) or '?'} | {size:,} |")
     print("\n".join(out))
     if a.csv:
         rows = sorted(per_sym.items(), key=lambda kv: -kv[1])
         Path(a.csv).write_text("section,symbol,file,bytes\n" + "".join(
-            f"{s},{name},{where.get(name, '')},{size}\n" for (s, name), size in rows))
+            f"{s},{name},{file_of(where, name)},{size}\n" for (s, name), size in rows))
 
 
 if __name__ == "__main__":
