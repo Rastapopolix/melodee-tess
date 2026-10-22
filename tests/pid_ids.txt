@@ -26,7 +26,7 @@
 0x017 ARP HOLD                 track 0..1 def 0
 0x018 ARP ORDER                track 0..1 def 0
 0x019 ROOT                     track 0..11 def 0
-0x01a SCALE                    track 0..69 def 0
+0x01a SCALE                    track 0..75 def 0
 0x01b QUANTIZE                 track 0..5 def 0
 0x01c TRANSPOSE                track -24..24 def 0
 0x01d PATTERN LENGTH           track 1..64 def 16

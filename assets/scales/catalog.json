@@ -601,5 +601,83 @@
     ],
     "description": "Idealised 24-EDO model; regional intonation varies.",
     "title": "Sikah"
+  },
+  {
+    "name": "IN",
+    "group": "Regional",
+    "cents": [
+      100,
+      500,
+      700,
+      800,
+      1200
+    ],
+    "description": "Japanese: the koto's mi fa la ti do (ZEN-1's IN).",
+    "title": "In (Miyako-bushi)"
+  },
+  {
+    "name": "YO",
+    "group": "Regional",
+    "cents": [
+      200,
+      500,
+      700,
+      900,
+      1200
+    ],
+    "description": "Japanese: the folk and gagaku pentatonic without semitones (ZEN-1's YO).",
+    "title": "Yo"
+  },
+  {
+    "name": "HIRA",
+    "group": "Regional",
+    "cents": [
+      200,
+      300,
+      700,
+      800,
+      1200
+    ],
+    "description": "Japanese: a koto tuning.",
+    "title": "Hirajoshi"
+  },
+  {
+    "name": "IWATO",
+    "group": "Regional",
+    "cents": [
+      100,
+      500,
+      600,
+      1000,
+      1200
+    ],
+    "description": "Japanese: In's darkest mode.",
+    "title": "Iwato"
+  },
+  {
+    "name": "KUMOI",
+    "group": "Regional",
+    "cents": [
+      200,
+      300,
+      700,
+      900,
+      1200
+    ],
+    "description": "Japanese: a koto tuning.",
+    "title": "Kumoi"
+  },
+  {
+    "name": "RYUKYU",
+    "group": "Regional",
+    "cents": [
+      400,
+      500,
+      700,
+      1100,
+      1200
+    ],
+    "description": "Okinawan: the sanshin's pentatonic.",
+    "title": "Ryukyu"
   }
 ]
