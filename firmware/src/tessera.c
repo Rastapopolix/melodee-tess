@@ -2458,6 +2458,7 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_GRD_PART4: return tessera.grids[tr].part4;
     case TX_SUB_RATCH: return tessera.sub_ratch[tr];
     case TX_SUB_CHANCE: return tessera.sub_chance[tr];
+    case TX_SUB_SHAPE: return tessera.sub_shape[tr];
     case TX_CH_BREATH: return tessera.ch_breath[tr];
     case TX_EN_ARC: return tessera.en_arc;              /* (the project's, whichever track) */
     case TX_EN_RESTS: return tessera.en_rests;
@@ -2607,6 +2608,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_GRD_PART4: tessera.grids[tr].part4 = (uint8_t)tess_clampi(v, 0, GEN_GRIDS_P4_N - 1); return;
     case TX_SUB_RATCH: tessera.sub_ratch[tr] = (uint8_t)tess_clampi(v, 0, SUB_HITS_MAX - 1); return;
     case TX_SUB_CHANCE: tessera.sub_chance[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_SUB_SHAPE: tessera.sub_shape[tr] = (uint8_t)tess_clampi(v, 0, SUB_SHAPES - 1); return;
     case TX_CH_BREATH: tessera.ch_breath[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_AN_VARY: tessera.answer[tr].vary = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_AN_ECHO: tessera.answer[tr].echo = (uint8_t)tess_clampi(v, 0, 100); return;

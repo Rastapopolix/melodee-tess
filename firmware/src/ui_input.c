@@ -890,10 +890,11 @@ static void edit_param(uint32_t slot, int32_t steps)
         ui.force = 1;
         return;
     }
-    if (pg->graph == GR_TIMING) {                   /* SUB: RATCH a step a turn, CHANCE as a percent (the others: none) */
-        if (slot < 2u && song.sel < TESSERA_TRACKS) {
-            uint32_t x = slot ? TX_SUB_CHANCE : TX_SUB_RATCH;
-            int32_t d = slot ? accel(EN_K1 + slot, steps, 100) : (steps > 0 ? 1 : steps < 0 ? -1 : 0);
+    if (pg->graph == GR_TIMING) {                   /* SUB: RATCH a step a turn, CHANCE as a percent, SHAPE a step a turn
+                                                     * (a STEP track: SHAPE only; its RATCH is each step's) */
+        if (slot < 3u && song.sel < TESSERA_TRACKS && (slot == 2u || tessera.mode[song.sel] != TESS_ENG_OFF)) {
+            uint32_t x = slot == 2u ? TX_SUB_SHAPE : slot ? TX_SUB_CHANCE : TX_SUB_RATCH;
+            int32_t d = slot == 1u ? accel(EN_K1 + slot, steps, 100) : (steps > 0 ? 1 : steps < 0 ? -1 : 0);
             tessera_param_set(song.sel, x, tessera_param_get(song.sel, x) + d);
         }
         ui.force = 1;

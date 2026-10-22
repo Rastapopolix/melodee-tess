@@ -32,6 +32,7 @@ static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
 static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_GRP4[] = {"TOM", "CLAP", "HATOP", "RIM", "BELL"};
 static const char *const TX_N_RATCH[] = {"x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"};
+static const char *const TX_N_SHAPE[] = {"EVEN", "ACCEL", "DECEL"};   /* (SUB_EVEN ..) */
 static const char *const TX_N_ANORDER[] = {"PLAYED", "REVERSE", "SHUFFLE"};   /* (TESS_AN_*) */
 static const char *const TX_N_ANLEN[] = {"SHORT", "MID", "LONG"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
@@ -133,6 +134,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_AN_SHIFT] = PD("SHIFT", F_INT, 0, 7, 2),
     [TX_AN_SPACE] = PD("SPACE", F_PCT, 0, 100, 25),
     [TX_AN_LEN] = PE("LEN", TX_N_ANLEN, 1),
+    [TX_SUB_SHAPE] = PE("SHAPE", TX_N_SHAPE, 0),
 };
 
 #if MELODEE_HELP_PACKED                          /* the texts stay here, tools/gen_help.py packs them */
@@ -494,6 +496,9 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                     "without a key ends the phrase you play. OCT+ held on GEN, KNOB 3."),
     X_(TX_AN_LEN, "ANSWER LEN", "With FADE at 100, the lengths of the four loops the notes play on, in steps: SHORT "
                                 "5 7 11 13, MID 13 17 23 29, LONG 23 29 31 37. OCT+ held on GEN, KNOB 4."),
+    X_(TX_SUB_SHAPE, "TIMING SHAPE", "Where a ratchet's hits fall in their step: EVEN in equal parts, ACCEL closer and "
+                                     "closer (a roll that speeds up), DECEL further and further apart (a bounce). The "
+                                     "track's, for its RATCH and for every step's Ratchet on a STEP track."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
