@@ -346,6 +346,7 @@ if core && [ $TABLES = 1 ]; then
         gen_test -O2 $FW
     t "PARAMETER IDS: every setting numbered, ranges, get/set, frozen against tests/pid_ids.txt" pid_test \
         -O1 $FW -- "$OUT/pid_test" tests/pid_ids.txt docs/PARAMETERS.md
+    t "HELP: the device's packed help texts expand to pid.c's (tools/gen_help.py)" help_pack_test -O1 $FW
     t "CORDS: the destination table, frozen against tests/cord_dests.txt" cord_test \
         -O1 $FW -- "$OUT/cord_test" tests/cord_dests.txt
     t "double-tap layers, SCREEN OFF, LFO 2 SYNC / TRIG / POL" layer_screen_test \
