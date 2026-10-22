@@ -32,6 +32,10 @@ class NightlySite(unittest.TestCase):
             slow = package(root / "slow.fwsc", "FM-1_900", 4)   # (the single-core nightly)
             site = root / "site"
             main(dual, single, "1.1.0", site)
+            home = (site / "index.html").read_text()   # the project page names the release and its packages
+            self.assertIn("Install 1.1.0", home)
+            self.assertIn("firmware/melodee-tess-1.1.0-1core.fwsc", home)
+            self.assertNotRegex(home, r"@[A-Z0-9]+@")
             editor = site / "webapp/editor/index.html"
             editor.write_text("existing published editor")
             # Exercise migration from the existing inline-only release metadata.

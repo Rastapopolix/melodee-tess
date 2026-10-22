@@ -3,7 +3,8 @@
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 """Make the site (GitHub Pages):
 
-  index.html                        the project page (web/home/index.html; the installer stays at webapp/installer/)
+  index.html                        the project page (web/home/index.html, the release filled in; the installer
+                                    stays at webapp/installer/)
   media/gallery/, media/brand/      its pictures: assets/gallery (tests/gallery_render.c), assets/brand (tools/gen_brand.py)
   firmware/melodee-tess-VER.fwsc    the package, both cores (+ LICENSE, LICENSING.md, LICENSES/: the
                                     packages hold JieLi SDK files under Apache-2.0, see LICENSING.md)
@@ -15,9 +16,10 @@
   webapp/synth-editor/              the synth-only branch's editor (publish_synth.py), kept as published
   webapp/installer/index.html       index_pkg.html, self-contained (fm1pkg.js, fm1ota.js, metadata inlined)
   webapp/editor/index.html          editor.html (+ fukiai.ttf, FUKIAI-LICENSE.txt)
+  webapp/sim/                       the web simulator (web/sim/build.sh: build/sim/), when given; else kept as published
   src/                              not touched
 
-  web/make_site.py build/melodee-tess-X.Y.fwsc build/melodee-tess-X.Y-1core.fwsc X.Y OUT_DIR
+  web/make_site.py build/melodee-tess-X.Y.fwsc build/melodee-tess-X.Y-1core.fwsc X.Y OUT_DIR [build/sim]
 
 The packages must be ones made by tools/fm1pkg_make.py (Melodee's own loader, no vendor files), from one
 release: their identity (FM-1_9xx, FM-1_9xxx from 0.10, FM-1_9xxxx for X.Y.Z) is read from them and must be
@@ -100,9 +102,10 @@ def channel(spec, label, stem, branch):
                    "builtAt": spec["builtAt"], "pkg": {k: "../../firmware/" + f[3] for k, f in files.items()}}
 
 
-def main(pkg, single, version, out, nightly=None, installer_only=False, synth=None):
+def main(pkg, single, version, out, nightly=None, installer_only=False, synth=None, sim=None):
     """synth: the synth-only firmware ({pkg: {dual, single}, version, commit, builtAt, web}: web, the synth-only
-    branch's web/ for its editor); None keeps what the site has"""
+    branch's web/ for its editor); None keeps what the site has. sim: web/sim/build.sh's output (build/sim); None
+    keeps what the site has"""
     pkg, single, out = Path(pkg), Path(single), Path(out)
     raw, product = check_package(pkg)
     raw1, product1 = check_package(single)
@@ -173,18 +176,31 @@ def main(pkg, single, version, out, nightly=None, installer_only=False, synth=No
         if not installer_only and (HERE / f).exists():
             shutil.copy(HERE / f, ed / f)
     if not installer_only:                          # the project page, its screens and the brand pictures
-        shutil.copy(HERE / "home" / "index.html", out / "index.html")
+        home = (HERE / "home" / "index.html").read_text(encoding="utf-8")
+        for mark in ("@VERSION@", "@FWSC@", "@FWSC1@"):
+            if mark not in home:
+                raise SystemExit(f"web/home/index.html has no {mark}; update make_site.py")
+        home = home.replace("@VERSION@", version).replace("@FWSC1@", name1).replace("@FWSC@", name)
+        (out / "index.html").write_text(home, encoding="utf-8")
         for src, dest in ((HERE.parent / "assets/gallery", out / "media/gallery"),
                           (HERE.parent / "assets/brand", out / "media/brand")):
             dest.mkdir(parents=True, exist_ok=True)
             for f in src.iterdir():
                 if f.suffix in (".png", ".svg"):
                     shutil.copy(f, dest / f.name)
+    if sim and not installer_only:
+        sim = Path(sim)
+        if not (sim / "melodee.wasm").exists():
+            raise SystemExit(f"{sim}: no melodee.wasm (web/sim/build.sh)")
+        dest = out / "webapp" / "sim"
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in ("index.html", "worklet.js", "melodee.wasm"):
+            shutil.copy(sim / f, dest / f)
     print(f"site: {out}: webapp/installer ({len(html)} B), webapp/editor, firmware/{name} ({len(raw)} B) and "
           f"{name1} ({len(raw1)} B), {product}" + (f"; synth {synth_meta['version']}" if synth_meta else ""))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
+    if len(sys.argv) not in (5, 6):
         sys.exit(__doc__)
-    main(*sys.argv[1:5])
+    main(*sys.argv[1:5], sim=sys.argv[5] if len(sys.argv) == 6 else None)
