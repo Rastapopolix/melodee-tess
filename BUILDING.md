@@ -1,4 +1,4 @@
-# Building Melodee
+# Building Tessera
 
 The build makes three files in `build/`:
 
@@ -212,7 +212,7 @@ To run the Python source instead, install Python 3.10 or later, PyUSB
   `sudo apt install libusb-1.0-0`). USB access may need a udev rule or `sudo`.
 - Windows: install a libusb-compatible driver such as WinUSB for **4c4a:8057 only**
   using Zadig, and supply `--libusb C:\path\to\libusb-1.0.dll` if discovery fails.
-  Do not replace the driver for the normal Melodee MIDI/audio device.
+  Do not replace the driver for the normal Tessera MIDI/audio device.
 
 The tool uses the unmodified `cpu/wl82/tools/wl82loader.bin` from the
 [JieLi AC79 SDK](https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK/tree/AC79NN_SDK_V1.2.1_2023-12-13/cpu/wl82/tools).
@@ -230,7 +230,7 @@ The corrected recovery tool also accepts the unmodified official M-VAVE V15
 `db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`.
 The recovery archives on the 1.3.1 release were corrected on 2026-10-13 to accept
 V15's metadata; download again if an older executable rejects it. Keep the backup:
-stock firmware may overwrite Melodee
+stock firmware may overwrite Tessera
 data after boot even though the recovery operation preserves it.
 
 ```sh
@@ -414,7 +414,7 @@ above 320 MHz (`isd_config_rule.c`, `CONFIG_OVERCLOCKING_ENABLE`, 396 MHz) sets
 DVDD 14 (1.35 V) and DCDC14 4 (1.45 V), and its notes say to raise them on chips
 that run low. One healthy unit ran both cores under an eight-voice Prophet chord
 without a misread down to SYSVDD 6 (1.11 V): the margin varies from chip to chip.
-Melodee now applies the stock supply setup in both core variants. The earlier
+Tessera now applies the stock supply setup in both core variants. The earlier
 CPU1 measurements do not establish behavior at that setup; hardware validation
 must check cold/soft boots, CPU1 shared-memory errors and loaded audio separately.
 
@@ -454,7 +454,7 @@ voltages or a guarantee that all instability is resolved.
 
 ### The boot clock
 
-Melodee runs at the clock the boot loader sets, 360 MHz, and never writes the PLL
+Tessera runs at the clock the boot loader sets, 360 MHz, and never writes the PLL
 (`hal/fm1_clock.h` only reads it). PR #27 by [johnskiller](https://github.com/johnskiller),
 with [charlesvestal](https://github.com/charlesvestal)'s register reads, found the SYS
 multiplier in PLL2_CON1 (0x119AC): the SPL's 268 means 24 MHz / 12 x 270 = 540 MHz, and

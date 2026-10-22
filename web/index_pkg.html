@@ -6,7 +6,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Melodee (tess)</title>
+<title>Tessera</title>
 <style>
   :root { --bg: #fff; --fg: #000; --dim: #777; }
   @media (prefers-color-scheme: dark) {
@@ -30,7 +30,7 @@
 <body>
 <main>
   <button class="lang" id="lang"></button>
-  <h1>Melodee (tess)</h1>
+  <h1>Tessera</h1>
   <p data-t="intro"></p>
   <p data-t="warn"></p>
   <p class="small" data-t="direct"></p>
@@ -76,7 +76,7 @@
   <p id="status"></p>
   <pre id="log"></pre>
   <p><a href="../editor/" style="color:inherit" data-t="editor"></a></p>
-  <p class="small">Melodee (tess) is a fork of Melodee by Theo Dainis, adding the Tessera note engines and project save. <a href="https://github.com/Rastapopolix/melodee-tess" target="_blank" rel="noopener" style="color:inherit">github.com/Rastapopolix/melodee-tess</a><br>
+  <p class="small">Tessera is firmware for the FM-1 by Theo Dainis, a fork of Melodee: it adds the Tessera generators and a project format of its own. <a href="https://github.com/Rastapopolix/melodee-tess" target="_blank" rel="noopener" style="color:inherit">github.com/Rastapopolix/melodee-tess</a><br>
     Melodee by Ellic Studio, based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener" style="color:inherit">Felucca</a>
     by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener" style="color:inherit">Hügelton Instruments</a>, with its CrispyZebra waveforms and Fukiai icons (MIT).<br>
     Font: Inter Tight (The Inter Project Authors, SIL OFL 1.1). Samples: Versilian Studios VSCO-2 Community Edition and VCSL (CC0 1.0).<br>
@@ -105,21 +105,21 @@ const TEXT = {
     direct: "USB ケーブルはパソコンに直接つないでください。Probe や Transporter などの機材は不要です。",
     brick: "起動保護付きファームウェアの更新が中断した場合は、電源を入れ直すか、OCT− だけを押しながら電源を入れてください。キーのライトが短く3回点滅したら更新モードです。USB を接続し直して、もう一度インストールしてください。以前のファームウェアや長い1回の点滅の場合は、USB 復旧手順を確認してください:",
     recoveryLink: "USB 復旧手順とダウンロード",
-    beta: "Melodee (tess) 1.0 は Melodee の実験的フォークです。不具合は github.com/Rastapopolix/melodee-tess へ知らせてください（本家には送らないでください）。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
+    beta: "Tessera は Melodee から生まれた実験的なファームウェアです。不具合は github.com/Rastapopolix/melodee-tess へ知らせてください（本家には送らないでください）。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
     back: "M-VAVEから公式FM-1 V15を取得し、未変更のFM-1.fwscを選んでください。ファイルはこのブラウザ内で検証し、サーバーへ送りません。",
     localTitle: "テストビルド（パソコンのファイル）", localFile: "テスト用ファームウェア（.fwsc）", localGo: "テストビルドをインストール",
-    localWhy: "テスト用の Melodee (tess) ビルドです。パソコンに保存した .fwsc（build/ や テストページのもの）を選んでください。tools/fm1pkg_make.py で作ったパッケージだけを受け付けます。ファイルはこのブラウザ内で確認し、サーバーへ送りません。テストビルドは未リリースで、正しく動かないことがあります。標準を選んでインストールするとリリース版に戻せます。",
+    localWhy: "テスト用の Tessera ビルドです。パソコンに保存した .fwsc（build/ や テストページのもの）を選んでください。tools/fm1pkg_make.py で作ったパッケージだけを受け付けます。ファイルはこのブラウザ内で確認し、サーバーへ送りません。テストビルドは未リリースで、正しく動かないことがあります。標準を選んでインストールするとリリース版に戻せます。",
     localValid: "テストビルドを確認しました: ", localError: "このファイルは使えません: ",
     localConfirm: "このテストビルドをインストールしますか？ リリース版ではなく、正しく動かないことがあります。\n",
     stockTitle: "公式V15に戻す", stockFile: "公式FM-1.fwsc", stockGo: "バックアップして公式V15へ戻す",
-    stockBackup: "現在の曲・保存曲・音色バンク・サンプル・設定を先に保存します。バックアップできない場合は、Melodeeを更新するか、データ消失を了承してバックアップを省略できます。復元はMelodeeを再インストールしてエディタから行います。",
-    stockSkipBackup: "バックアップを省略する（Melodeeの曲・音色・設定が失われる可能性があります）",
+    stockBackup: "現在の曲・保存曲・音色バンク・サンプル・設定を先に保存します。バックアップできない場合は、Tessera を更新するか、データ消失を了承してバックアップを省略できます。復元は Tessera を再インストールしてエディタから行います。",
+    stockSkipBackup: "バックアップを省略する（Tessera の曲・音色・設定が失われる可能性があります）",
     stockGoNoBackup: "バックアップせず公式V15へ戻す",
-    stockConfirmNoBackup: "バックアップを作成せず公式V15へ戻します。Melodeeの曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
+    stockConfirmNoBackup: "バックアップを作成せず公式V15へ戻します。Tessera の曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
     stockRecovery: "更新中断の再開：全体バックアップはすでにパソコンへ保存済み",
-    stockValid: "公式V15を確認しました", stockConfirm: "全体バックアップファイルをパソコンに保存できましたか？ 続けると公式V15へ戻します。Melodeeの曲は公式V15では開けません。",
+    stockValid: "公式V15を確認しました", stockConfirm: "全体バックアップファイルをパソコンに保存できましたか？ 続けると公式V15へ戻します。Tessera の曲は公式V15では開けません。",
     stockNeedBackup: "書き込みモードからはバックアップできません。保存済みバックアップがある場合は更新中断の再開にチェックするか、データ消失を了承してバックアップを省略してください。",
-    stockUnsupported: "このMelodeeは全体バックアップに未対応です。先に最新版をインストールするか、データ消失を了承して「バックアップを省略する」を選び、もう一度押してください。",
+    stockUnsupported: "このファームウェアは全体バックアップに未対応です。先に最新版をインストールするか、データ消失を了承して「バックアップを省略する」を選び、もう一度押してください。",
     backup: "全体バックアップ保存中 ", stockError: "公式ファイルを確認できません: ",
     nomidi: "このブラウザでは使えません。Chrome か Edge で開いてください。", loadfail: "読み込めませんでした: ",
     start: "開始します", verify: "確認中", loader: "書き込みモードに切り替え中", write: "書き込み中",
@@ -153,21 +153,21 @@ const TEXT = {
     direct: "Connect the USB cable directly to the computer. No probe or Transporter is needed.",
     brick: "If an update is interrupted on firmware with boot protection, switch the FM-1 on again (or hold OCT− alone while switching on). Three short key-light flashes mean update mode: reconnect USB and press Install again. Older firmware and one long flash need the USB recovery instructions:",
     recoveryLink: "USB recovery instructions and downloads",
-    beta: "Melodee (tess) 1.0 is an experimental fork of Melodee; please report problems at github.com/Rastapopolix/melodee-tess, not to upstream. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
+    beta: "Tessera is an experimental firmware grown out of Melodee; please report problems at github.com/Rastapopolix/melodee-tess, not to upstream. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
     back: "Get official FM-1 V15 from M-VAVE and select the unmodified FM-1.fwsc. The browser validates it locally; it is not sent to a server.",
     localTitle: "Test build from this computer", localFile: "Test firmware (.fwsc)", localGo: "Install test build",
-    localWhy: "For testing: pick a Melodee (tess) .fwsc saved on this computer, such as one from build/ or a test page. Only packages made by tools/fm1pkg_make.py are accepted. The browser checks the file locally; it is not sent to a server. Test builds are unreleased and may not work; choose Standard and install again to go back to the release.",
+    localWhy: "For testing: pick a Tessera .fwsc saved on this computer, such as one from build/ or a test page. Only packages made by tools/fm1pkg_make.py are accepted. The browser checks the file locally; it is not sent to a server. Test builds are unreleased and may not work; choose Standard and install again to go back to the release.",
     localValid: "Test build checked: ", localError: "Cannot use this file: ",
     localConfirm: "Install this test build? It is not a release and may not work.\n",
     stockTitle: "Return to official V15", stockFile: "Official FM-1.fwsc", stockGo: "Back up and return to official V15",
-    stockBackup: "Current music, saved music, sound banks, samples and settings are saved first. If backups are unavailable, update Melodee or choose to skip the backup and accept possible data loss. To restore an archive later, reinstall Melodee and use the editor.",
-    stockSkipBackup: "Skip backup (Melodee music, sounds and settings may be lost)",
+    stockBackup: "Current music, saved music, sound banks, samples and settings are saved first. If backups are unavailable, update Tessera or choose to skip the backup and accept possible data loss. To restore an archive later, reinstall Tessera and use the editor.",
+    stockSkipBackup: "Skip backup (Tessera music, sounds and settings may be lost)",
     stockGoNoBackup: "Return to official V15 without backup",
-    stockConfirmNoBackup: "Return to official V15 without creating a backup? Melodee music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
+    stockConfirmNoBackup: "Return to official V15 without creating a backup? Tessera music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
     stockRecovery: "Resume an interrupted update: I already saved a complete backup to this computer",
-    stockValid: "Official V15 verified", stockConfirm: "Has the complete backup file been saved to this computer? Continue to return to official V15. Official V15 cannot open Melodee music.",
+    stockValid: "Official V15 verified", stockConfirm: "Has the complete backup file been saved to this computer? Continue to return to official V15. Official V15 cannot open Tessera music.",
     stockNeedBackup: "An update loader cannot export a backup. Select resume if you already saved a complete backup, or choose Skip backup to continue and accept possible data loss.",
-    stockUnsupported: "This Melodee does not support complete backups. Install the current Melodee first, or select Skip backup to accept possible data loss and try again.",
+    stockUnsupported: "This firmware does not support complete backups. Install the current Tessera first, or select Skip backup to accept possible data loss and try again.",
     backup: "Saving complete backup ", stockError: "Cannot validate official firmware: ",
     nomidi: "This browser cannot do it. Open the page in Chrome or Edge.", loadfail: "Could not load: ",
     start: "Starting", verify: "Verifying", loader: "Switching to update mode", write: "Writing",
@@ -207,7 +207,7 @@ const selection = () => {     /* the release, or a channel ("nightly-dual": meta
   const kind = build(), dash = kind.indexOf("-");
   return dash < 0 ? {kind, channel: meta, key: kind} : {kind, channel: meta[kind.slice(0, dash)], key: kind.slice(dash + 1)};
 };
-const ready = () => { lastKey = "ready"; $("status").textContent = `Melodee (tess) ${selection().channel.version} (${t(build() + "Tag")})`; };
+const ready = () => { lastKey = "ready"; $("status").textContent = `Tessera ${selection().channel.version} (${t(build() + "Tag")})`; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
 const meta = /*META*/;
@@ -288,8 +288,8 @@ const hasLoader = (raw) => {
 function checkLocal(raw) {
   new Package(raw);
   const product = productOf(raw);
-  if (!/^FM-1_9\d{2,4}$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Melodee package`);
-  if (!hasLoader(raw)) throw new Error("no Melodee loader in it (only tools/fm1pkg_make.py packages)");
+  if (!/^FM-1_9\d{2,4}$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Tessera package`);
+  if (!hasLoader(raw)) throw new Error("no Tessera loader in it (only tools/fm1pkg_make.py packages)");
   return {image: logicalImage(raw), product};
 }
 $("local-file").addEventListener("change", async () => {
@@ -319,7 +319,7 @@ $("stock-file").addEventListener("change", async () => {
 });
 function saveArchive(archive) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], {type:"application/json"}));
-  const a = document.createElement("a"); a.href = url; a.download = `Melodee-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const a = document.createElement("a"); a.href = url; a.download = `Tessera-backup-${new Date().toISOString().slice(0,10)}.json`;
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function archiveInfo(a) {
