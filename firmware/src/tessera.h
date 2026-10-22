@@ -164,6 +164,9 @@ typedef struct {
     uint8_t          sub_chance[TESSERA_TRACKS]; /* 0..100: the chance a step ratchets (100: every step) */
     uint8_t          sub_shape[TESSERA_TRACKS];  /* SUB_EVEN / ACCEL / DECEL: where a ratchet's hits fall, any track's
                                                   * (STEP ones too); not in the packed block: the record's SUB part */
+    /* MIDI OUT (midi_out.c; GLO > MIDI OUT): each track's channel. 0 AUTO (ROUT, a drum track the DRUM channel, as
+     * before), 1..16 that channel, TESS_MIDI_OFF none; not in the packed block: the record's MIDI part */
+    uint8_t          midi_ch[TESSERA_TRACKS];
     /* CHORD's BREATH (HIT HOLD): its voices on slow cycles of their own, one now and then sitting out */
     uint8_t          ch_breath[TESSERA_TRACKS];  /* 0..100: 0 off (as before) */
     /* ENERGY (energy.c; the ENERGY page), the project's, not a track's: its slow tide and its rests */
@@ -292,8 +295,10 @@ enum {
     TX_EN_ARC, TX_EN_RESTS,                         /* (the project's: one value, whichever track) */
     TX_AN_VARY, TX_AN_ECHO, TX_AN_FADE, TX_AN_ORDER, TX_AN_SHIFT, TX_AN_SPACE, TX_AN_LEN,
     TX_SUB_SHAPE,                                   /* (0x262: SUB's SHAPE, any track's) */
+    TX_MIDI_CH,                                     /* (0x263: MIDI OUT's channel, any track's) */
     TX_COUNT
 };
+#define TESS_MIDI_OFF 17u                           /* TX_MIDI_CH: 0 AUTO, 1..16, 17 OFF */
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
 void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v); /* written as it is (cord.c, around a step) */
 void tessera_param_set(uint32_t tr, uint32_t x, int32_t v);  /* clamped, with what its knob does besides (a MODE

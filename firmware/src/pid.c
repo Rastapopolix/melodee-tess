@@ -33,6 +33,8 @@ static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_GRP4[] = {"TOM", "CLAP", "HATOP", "RIM", "BELL"};
 static const char *const TX_N_RATCH[] = {"x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"};
 static const char *const TX_N_SHAPE[] = {"EVEN", "ACCEL", "DECEL"};   /* (SUB_EVEN ..) */
+static const char *const TX_N_MIDICH[] = {"AUTO", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
+                                          "14", "15", "16", "OFF"};   /* (TESS_MIDI_OFF) */
 static const char *const TX_N_ANORDER[] = {"PLAYED", "REVERSE", "SHUFFLE"};   /* (TESS_AN_*) */
 static const char *const TX_N_ANLEN[] = {"SHORT", "MID", "LONG"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
@@ -135,6 +137,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_AN_SPACE] = PD("SPACE", F_PCT, 0, 100, 25),
     [TX_AN_LEN] = PE("LEN", TX_N_ANLEN, 1),
     [TX_SUB_SHAPE] = PE("SHAPE", TX_N_SHAPE, 0),
+    [TX_MIDI_CH] = PE("MIDI CH", TX_N_MIDICH, 0),
 };
 
 #if MELODEE_HELP_PACKED                          /* the texts stay here, tools/gen_help.py packs them */
@@ -500,6 +503,11 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_SUB_SHAPE, "TIMING SHAPE", "Where a ratchet's hits fall in their step: EVEN in equal parts, ACCEL closer and "
                                      "closer (a roll that speeds up), DECEL further and further apart (a bounce). The "
                                      "track's, for its RATCH and for every step's Ratchet on a STEP track."),
+    X_(TX_MIDI_CH, "MIDI OUT CHANNEL", "The MIDI channel this track's notes go out on over USB, so each track can play "
+                                       "its own instrument. AUTO follows SYSTEM's ROUT (CH1-4: tracks on 1 to 4), a drum "
+                                       "track the DRUM channel; OFF sends none of its notes. Saved with the project. "
+                                       "Which notes go out at all is the menu's MIDI OUT: KEYS, ALL or OFF. GLO > MIDI OUT, "
+                                       "a knob for each track."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

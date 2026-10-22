@@ -3229,8 +3229,27 @@ static int test_product_ux(void)
     bad += check("MIXER K3 is inert, never changes sequence length", TSEL->p[P_SLEN] == len && TSEL->p[P_RESERVED36] == send);
     press(B_GLO); ok = cur_page()->fam == FAM_GLO && str_eq(cur_page()->title, "GLOBAL");
     press(B_GLO); ok &= str_eq(cur_page()->title, "SYSTEM");
+    press(B_GLO); ok &= str_eq(cur_page()->title, "MIDI OUT");
     press(B_GLO); ok &= cur_page()->graph == GR_TRK;
-    bad += check("GLO cycles MIXER > GLOBAL > SYSTEM > MIXER", ok);
+    bad += check("GLO cycles MIXER > GLOBAL > SYSTEM > MIDI OUT > MIXER", ok);
+    go_title("MIDI OUT");                         /* KNOB k track k's MIDI OUT channel: AUTO, 1..16, OFF, a step a turn */
+    turn(EN_K2, 3);
+    turn(EN_K4, -1);
+    turn(EN_K1, 30);
+    ok = tessera.midi_ch[1] == 3u && tessera.midi_ch[3] == 0u && tessera.midi_ch[0] == TESS_MIDI_OFF &&
+         tessera.midi_ch[2] == 0u && song.sel == 0u;
+    turn(EN_K1, -30);
+    frame();
+    bad += check("GLO > MIDI OUT: KNOB 2 track 2's channel 3, KNOB 4 stays AUTO, KNOB 1 up to OFF and back to AUTO",
+                 ok && tessera.midi_ch[0] == 0u);
+    help_find(1);
+    {
+        char v[24];
+        help_value(pid_find(help.pid), v, sizeof v);
+        bad += check("  ARP held + KNOB 2: MIDI OUT CHANNEL's help, track 2's value (not the selected track's)",
+                     help.pid == PID_TESS(TX_MIDI_CH) && str_eq(v, "3"));
+    }
+    tessera.midi_ch[1] = 0;
     go_home(); hold(B_SEQ);
     bad += check("long SEQ goes directly to PATTERNS (the song under it) with no tap on release", cur_page()->graph == GR_PATGRID);
     turn(EN_SELECT, 1);
@@ -3816,10 +3835,12 @@ static int test_tempo_select(void)
     turn(EN_SELECT, 1);
     ok = song.g[G_BPM] == 120 && str_eq(cur_page()->title, "SYSTEM");
     turn(EN_SELECT, 1);
+    ok &= str_eq(cur_page()->title, "MIDI OUT");
+    turn(EN_SELECT, 1);
     ok &= str_eq(cur_page()->title, "GLOBAL");
     turn(EN_SELECT, -1);
-    bad += check("SELECT on GLO: GLOBAL -> SYSTEM -> GLOBAL (wraps), back the other way; the BPM untouched",
-                 ok && str_eq(cur_page()->title, "SYSTEM") && song.g[G_BPM] == 120);
+    bad += check("SELECT on GLO: GLOBAL -> SYSTEM -> MIDI OUT -> GLOBAL (wraps), back the other way; the BPM untouched",
+                 ok && str_eq(cur_page()->title, "MIDI OUT") && song.g[G_BPM] == 120);
     go_title("NOTES");
     cursor_set(4);
     turn(EN_SELECT, 1);

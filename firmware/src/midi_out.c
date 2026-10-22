@@ -3,8 +3,9 @@
 /* MIDI OUT over USB (usb.c midi_out_event): what the tracks play, each on its own channel, and the clock.
  * MIDI OUT (Settings): KEYS the notes played on the keys (as Melodee always sent them), ALL also the steps, the
  * ARP, recordings and every generator, OFF nothing. Only notes started inside the sequencer (seq_advance) are sent
- * as ALL's extra ones, so MIDI IN is never echoed back. A track's channel follows ROUT (CH1-4: 1..4, CH5-8: 5..8, ..;
- * SEL: 1..4), a drum track's the SYSTEM DRUM channel. Every note sent is remembered until its note-off went out, so
+ * as ALL's extra ones, so MIDI IN is never echoed back. A track's channel is its own (GLO > MIDI OUT, tessera.midi_ch:
+ * 1..16, or OFF: none of its notes), or AUTO: ROUT's (CH1-4: 1..4, CH5-8: 5..8, ..; SEL: 1..4), a drum track's the
+ * SYSTEM DRUM channel. Every note sent is remembered until its note-off went out, so
  * a STOP, a panic or a channel change never leaves a note hanging on the other side.
  * CLOCK OUT (Settings): 24 pulses a beat with START and STOP, while CLK is INT (an external clock is not sent on). */
 enum { MIDI_OUT_KEYS, MIDI_OUT_ALL, MIDI_OUT_OFF, MIDI_OUT_N };
@@ -15,9 +16,12 @@ static uint8_t midi_out_chan[NTRK];              /* the channel they went out on
 static uint8_t midi_out_clk_live;               /* CLOCK OUT sent START, not STOP yet */
 static uint32_t midi_out_clk;                    /* CLOCK OUT: 24 x the samples since the last pulse; ~0u: none yet */
 
+#define MIDI_OUT_NONE 16u                        /* midi_out_channel: the track's MIDI OUT is OFF */
 static uint32_t midi_out_channel(const track_t *t)
 {
-    uint32_t route = (uint32_t)song.g[G_ROUTE], first = route > 1u ? (route - 1u) * 4u : 0u;
+    uint32_t route = (uint32_t)song.g[G_ROUTE], first = route > 1u ? (route - 1u) * 4u : 0u, k = trk_index(t);
+    if (k < TESSERA_TRACKS && tessera.midi_ch[k])
+        return tessera.midi_ch[k] >= TESS_MIDI_OFF ? MIDI_OUT_NONE : tessera.midi_ch[k] - 1u;
     if (settings_drumch && drum_track(t))
         return settings_drumch - 1u;
     return (first + trk_index(t)) & 15u;
@@ -47,10 +51,12 @@ static void midi_out_note(const track_t *t, uint32_t note, uint32_t vel)
         *w &= ~bit;
         return;
     }
-    if (ch != midi_out_chan[k]) {                 /* ROUT or the drum channel changed: end the old channel's notes */
+    if (ch != midi_out_chan[k]) {                 /* the channel changed: end the old channel's notes */
         midi_out_flush(k);
         midi_out_chan[k] = (uint8_t)ch;
     }
+    if (ch == MIDI_OUT_NONE)                      /* (OFF: nothing held, so nothing to end later) */
+        return;
     if (*w & bit)                                 /* sounding already: it starts again */
         midi_out_send(ch, note, 0);
     midi_out_send(ch, note, vel > 127u ? 127u : vel);
