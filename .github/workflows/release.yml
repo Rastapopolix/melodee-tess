@@ -1,20 +1,19 @@
-name: Release firmware and recovery tools
+name: Release Tessera
 
+# A tag vX.Y[.Z][-suffix] on main: builds both firmware variants (dual core and MELODEE_DUAL_CORE=0), runs the full host
+# suite, checks the two packages as the site does (web/make_site.py: one identity, two distinct builds, Tessera's own
+# loader) and publishes a GitHub release with both packages, SHA256SUMS and the notes in docs/RELEASE_X.Y.md (a
+# suffix, as 2.0-rc1, is a prerelease). Run by hand (workflow_dispatch) it does all of that but the release: a dry run.
+# The site is not touched: GitHub Pages serves main's docs/, updated by a pull request (web/make_site.py into docs/,
+# with the simulator from web/sim/build.sh), as the test pages are.
 on:
   push:
-    branches: [next, release/recovery-v1.3.1]
-    paths:
-      - '.gitattributes'
-      - '.github/workflows/release.yml'
-      - 'tools/fm1_recover.py'
-      - 'tools/build_recovery.py'
-      - 'tools/prepare_release.py'
-      - 'tools/prepare_recovery_correction.py'
-      - 'assets/recovery/**'
-      - 'tests/recovery_test.py'
-      - 'tests/recovery_correction_test.py'
-    tags: ['v1.3.6']
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, X.Y[.Z][-suffix] (a dry run: nothing is published)'
+        required: true
 
 permissions:
   contents: read
@@ -22,16 +21,20 @@ permissions:
 jobs:
   firmware:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       JIELI_TOOLCHAIN: ${{ github.workspace }}/.nightly-deps/jieli/toolchain
       AC79_SDK: ${{ github.workspace }}/.nightly-deps/sdk
       PARALLEL: '2'
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -50,164 +53,60 @@ jobs:
             git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git "$AC79_SDK"
           fi
           test "$(git -C "$AC79_SDK" rev-parse HEAD)" = d179b4484759423312073f5fbb232501aa491047
-      - name: Build both firmware variants and run full host suite
+      - name: Version and release notes
         run: |
-          version=$(python tools/fm1_recover.py --version | awk '{print $NF}')
-          MELODEE_RAM_AUDIO=1 ./build.sh --release "$version"
-          cp "build/melodee-$version.fwsc" build/melodee.fwsc
+          v="${VERSION#v}"
+          echo "V=$v" >> "$GITHUB_ENV"
+          base="${v%%-*}"
+          test -f "docs/RELEASE_$base.md" || { echo "docs/RELEASE_$base.md is missing"; exit 1; }
+          echo "NOTES=docs/RELEASE_$base.md" >> "$GITHUB_ENV"
+      - name: Full host suite (on a development build)
+        run: |
+          ./build.sh
           tests/run_tests.sh
-          MELODEE_RAM_AUDIO=1 MELODEE_DUAL_CORE=0 ./build.sh --release "$version"
+      - name: Build both release variants
+        run: |
           mkdir -p build/release-assets
-          cp "build/release-$version/"*.fwsc "build/release-$version/"*-app.bin build/release-assets/
-          cp "build/release-$version-1core/"*.fwsc "build/release-$version-1core/"*-app.bin build/release-assets/
+          ./build.sh --release "$V" 2>&1 | tee dual.log
+          cp "build/melodee-tess-$V.fwsc" build/release-assets/
+          MELODEE_DUAL_CORE=0 ./build.sh --release "$V" 2>&1 | tee single.log
+          cp "build/melodee-tess-$V-1core.fwsc" build/release-assets/
+      - name: Check the packages as the site does, checksums
+        run: |
+          python web/make_site.py "build/release-assets/melodee-tess-$V.fwsc" \
+            "build/release-assets/melodee-tess-$V-1core.fwsc" "$V" build/site-check
+          (cd build/release-assets && sha256sum *.fwsc > SHA256SUMS && cat SHA256SUMS)
+          {
+            echo "### Tessera $V"
+            echo '```'
+            grep -h -E "audio working arena|^app |^package " dual.log single.log
+            cat build/release-assets/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
-          name: release-firmware
+          name: tessera-${{ env.V }}
           path: build/release-assets/*
 
-  recovery:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: windows-2022
-            target: windows-x64
-          - runner: macos-14
-            target: macos-arm64
-          - runner: macos-15-intel
-            target: macos-x64
-          - runner: ubuntu-22.04
-            target: linux-x64
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    env:
-      MACOSX_DEPLOYMENT_TARGET: '11.0'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install pinned bundler and USB dependencies
-        run: python -m pip install pyinstaller==6.22.3 pyusb==1.3.1
-      - name: Test recovery logic
-        run: |
-          python tests/recovery_test.py
-          python tests/recovery_correction_test.py
-      - name: Build and smoke-test native executable
-        run: python tools/build_recovery.py --target ${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: recovery-${{ matrix.target }}
-          path: build/recovery/${{ matrix.target }}/*.zip
-
   publish:
-    needs: [firmware, recovery]
+    needs: firmware
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
     permissions:
       contents: write
-      pages: write
-    concurrency:
-      group: ${{ github.ref == 'refs/heads/release/recovery-v1.3.1' && 'melodee-recovery-v1.3.1' || 'melodee-nightly-pages' }}
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
       - uses: actions/download-artifact@v4
         with:
           path: build/release-assets
           merge-multiple: true
-      - name: Validate release provenance and every archive checksum
-        run: |
-          version=$(python tools/fm1_recover.py --version | awk '{print $NF}')
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then test "$GITHUB_REF_NAME" = "v$version"; fi
-          python tools/prepare_release.py "$version" build/release-assets
-      - name: Publish complete release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/release-assets/* \
-            --verify-tag --title "Melodee ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE_1.3.6.md
-      - name: Prepare correction while preserving published firmware
-        if: github.ref == 'refs/heads/release/recovery-v1.3.1'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git fetch origin tag v1.3.1
-          gh release download v1.3.1 --dir build/published-release
-          python tools/prepare_recovery_correction.py 1.3.1 build/published-release \
-            build/release-assets build/recovery-correction
-      - name: Retain original release metadata
-        if: github.ref == 'refs/heads/release/recovery-v1.3.1'
-        uses: actions/upload-artifact@v4
-        with:
-          name: original-v1.3.1-release-metadata
-          path: |
-            build/published-release/BUILD_INFO.json
-            build/published-release/SHA256SUMS
-      - name: Publish corrected recovery tools
-        if: github.ref == 'refs/heads/release/recovery-v1.3.1'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload v1.3.1 build/recovery-correction/fm1-recover-*.zip --clobber
-          gh release upload v1.3.1 build/recovery-correction/BUILD_INFO.json \
-            build/recovery-correction/SHA256SUMS --clobber
-          gh release edit v1.3.1 --notes-file docs/RELEASE_1.3.1.md
-      - name: Verify public correction bytes and metadata
-        if: github.ref == 'refs/heads/release/recovery-v1.3.1'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release download v1.3.1 --dir build/verified-release
-          python tools/prepare_recovery_correction.py 1.3.1 build/verified-release \
-            build/release-assets build/verified-correction --verify-published
-      - uses: actions/checkout@v4
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          ref: gh-pages
-          path: .nightly-pages
-      - name: Publish stable installer while preserving nightly, release candidate and earlier releases
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version=${GITHUB_REF_NAME#v}
-          # The live site is next's (release candidate channel, version selector); this branch's make_site
-          # predates both and would delete their packages, so next's site tooling publishes this release,
-          # in next's order: stage the earlier stable releases, then make the site.
-          git fetch --no-tags --depth 1 origin next
-          git worktree add --detach .site-tools FETCH_HEAD
-          # Keep next's channel/version UI, with this release's updater and rescue instructions.
-          cp web/fm1ota.js .site-tools/web/fm1ota.js
-          python - <<'PY'
-          from pathlib import Path
-          import re
-          source = Path("web/index_pkg.html").read_text()
-          target = Path(".site-tools/web/index_pkg.html")
-          pattern = r"^    brick: .*$"
-          instructions = re.findall(pattern, source, re.M)
-          page = target.read_text()
-          if len(instructions) != 2 or len(re.findall(pattern, page, re.M)) != 2:
-              raise RuntimeError("Expected Japanese and English installer recovery instructions")
-          lines = iter(instructions)
-          target.write_text(re.sub(pattern, lambda _: next(lines), page, flags=re.M))
-          PY
-          python .site-tools/web/import_releases.py .nightly-pages --repo "$GITHUB_REPOSITORY"
-          python .site-tools/web/make_site.py "build/release-assets/melodee-$version.fwsc" \
-            "build/release-assets/melodee-$version-1core.fwsc" "$version" .nightly-pages
-          cd .nightly-pages
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .
-          if ! git diff --cached --quiet; then
-            git commit -m "release: publish Melodee $version"
-            git push origin HEAD:gh-pages
-          fi
-      - name: Request Pages rebuild
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds"
+          v="${GITHUB_REF_NAME#v}"
+          base="${v%%-*}"
+          pre=""
+          case "$v" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" build/release-assets/* --verify-tag $pre \
+            --title "Tessera $v" --notes-file "docs/RELEASE_$base.md"

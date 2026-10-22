@@ -166,17 +166,27 @@ Or, to install your own build from the web installer, make a local copy of the s
 (Web MIDI needs a secure context):
 
 ```
-# Build both variants from the same source; release outputs are kept separately.
-MELODEE_RAM_AUDIO=1 ./build.sh --release 1.3.6
-MELODEE_RAM_AUDIO=1 MELODEE_DUAL_CORE=0 ./build.sh --release 1.3.6
-python3 web/make_site.py build/release-1.3.6/melodee-1.3.6.fwsc \
-  build/release-1.3.6-1core/melodee-1.3.6-1core.fwsc 1.3.6 /tmp/melodee-site
-cd /tmp/melodee-site && python3 -m http.server 8000
-# open http://localhost:8000/webapp/installer/
+# Build both variants from the same source (copy the first away: the second build starts afresh).
+./build.sh --release 2.0 && cp build/melodee-tess-2.0.fwsc /tmp/
+MELODEE_DUAL_CORE=0 ./build.sh --release 2.0 && cp build/melodee-tess-2.0-1core.fwsc /tmp/
+web/sim/build.sh                                 # optional: the simulator (Emscripten)
+python3 web/make_site.py /tmp/melodee-tess-2.0.fwsc /tmp/melodee-tess-2.0-1core.fwsc 2.0 /tmp/tessera-site build/sim
+cd /tmp/tessera-site && python3 -m http.server 8000
+# open http://localhost:8000/ (the project page) or http://localhost:8000/webapp/installer/
 ```
 
 Installing firmware is at your own risk. If an install fails and the FM-1 no longer
 starts, identify its recovery mode using the steps below.
+
+### Releasing
+
+A tag `vX.Y[.Z]` on `main` runs `.github/workflows/release.yml`: both variants built, the full host suite, the two
+packages checked as the site checks them, and a GitHub release with both packages, `SHA256SUMS` and the notes in
+`docs/RELEASE_X.Y.md` (which must exist; a tag with a suffix, `v2.0-rc1`, makes a prerelease). Run by hand from the
+Actions tab with a version, it builds and checks without publishing.
+
+The site is GitHub Pages from `main`'s `docs/`: publish a release there with the `make_site.py` line above into
+`docs/` (the test pages go into `docs/test/VERSION/` the same way), in a pull request.
 
 ### Recover a black-screen FM-1
 
