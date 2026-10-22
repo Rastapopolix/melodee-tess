@@ -19,7 +19,7 @@ static uint8_t *logical;
 static size_t logical_len;
 static uint8_t rx[1024];                 /* one pending host frame (7-bit bytes) */
 static uint32_t rx_len, rx_full;
-static uint32_t now_ms, requests, ident_replies, mute_after = 0xFFFFFFFFu, bad_erase;
+static uint32_t now_ms, requests, ident_replies, mute_after = 0xFFFFFFFFu, bad_erase, erases;
 static int committed;
 static uint32_t maintenance_begins, maintenance_total, maintenance_done, maintenance_bad;
 static uint8_t maintenance_active, maintenance_failed, testing_cleanup;
@@ -116,6 +116,7 @@ static void ota_idle(void) { now_ms += 1; }
 static int ota_erase(uint32_t off)
 {
     if (off < 0xE0000u || off >= 0xE5000u || (off & 0xFFFu)) { bad_erase++; return -8; }
+    erases++;
     if(testing_cleanup && !maintenance_active)maintenance_bad++;
     if(cleanup_fail_after==0)return -8;
     if(cleanup_fail_after>0)cleanup_fail_after--;
@@ -170,7 +171,7 @@ static void reset_dev(void)
     memset(nor, 0xFF, sizeof nor);
     memcpy(nor, logical + 0x400, 0x4000);                 /* device flash head = package flash.bin head */
     rx_full = 0; requests = 0; ident_replies = 0; committed = 0; last_code = 0;
-    mute_after = 0xFFFFFFFFu; corrupt_at = NULL; bad_erase = 0;
+    mute_after = 0xFFFFFFFFu; corrupt_at = NULL; bad_erase = 0; erases = 0;
 }
 
 int main(int argc, char **argv)
@@ -201,13 +202,23 @@ int main(int argc, char **argv)
                      ota_msg[2] == 0x11 && !memcmp(ota_msg + 6, MELODEE_ID, sizeof MELODEE_ID - 1));
     }
 
-    {   /* A valid UFW entry with an older Melodee's smaller flash partition (0x89000). */
+    {   /* flash.bin's size in the UFW entry: an older Melodee's (0x89000) installs with its own loader; another
+         * board's (an SMK-37's 0x9D000) or a byte short of the FM-1's is refused (-15) before anything is erased */
+        static const uint32_t SZ[3] = {0x89000u, 0x9D000u, 0x93000u - 1u};
         uint8_t saved[0x400];memcpy(saved,logical,sizeof saved);uint8_t *h=logical;
-        uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
-        for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,0x89000u);ota_jl_enc(e,0x50);}
-        ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
-        reset_dev();rc=ota_session();bad+=check("an older Melodee partition (0x89000) still installs (its own loader)",rc==0&&committed);
-        memcpy(logical,saved,sizeof saved);
+        for (uint32_t z = 0; z < 3u; z++) {
+            uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
+            for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,SZ[z]);ota_jl_enc(e,0x50);}
+            ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
+            reset_dev();rc=ota_session();
+            if (!z)
+                bad+=check("an older Melodee partition (0x89000) still installs (its own loader)",rc==0&&committed);
+            else
+                bad+=check(z == 1u ? "another board's size (0x9D000): -15, nothing erased" :
+                                     "a byte short of 0x93000: -15, nothing erased",
+                           rc==-15&&!committed&&!erases&&area_erased());
+            memcpy(logical,saved,sizeof saved);
+        }
     }
     /* full session */
     reset_dev();

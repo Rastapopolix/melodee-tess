@@ -12,7 +12,9 @@
  *     then write the UPDATA_PARM record (flash 0xE4F00 + RAM 0x01C7FD88) and
  *     reset. The SPL runs the loader, which installs the package.
  * Nothing is committed before the host's "success"; any failure erases the
- * staging area and Melodee carries on.
+ * staging area and Melodee carries on. A package whose flash.bin is not an
+ * FM-1's size (another board's package) is refused in step 1, before anything
+ * is erased (-15).
  *
  * Portable core: the firmware (melodee.c) and the Mac test (ota_test.c)
  * supply these hooks:
@@ -27,6 +29,9 @@
 #define OTA_AREA 0x000E0000u                     /* staged loader, 5 x 4 KiB */
 #define OTA_AREA_LEN 0x5000u
 #define OTA_RES (OTA_AREA + OTA_AREA_LEN - 0x100u)  /* 0xE4F00 = 4K boundary - 256: SPL scan */
+#define OTA_FL_LEN 0x93000u                      /* flash.bin = [0, the PRCT end): the head and the FM-1's app area, the */
+                                                 /* size stock V15 and this firmware's loader write (ldr_core.c LDR_APP_HI) */
+#define OTA_FL_LEN_OLD 0x89000u                  /* an older Melodee's (2026-10-08..10): its own loader installs it */
 #define OTA_LDR_HCRC 0xEBAAu                     /* official update loader (usb_hid_ota.bin) */
 #define OTA_LDR_DCRC 0x5881u
 #define OTA_LDR_LEN 0x4DE1u
@@ -270,11 +275,12 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
     ota_show(1, 0);
     if ((rc = ota_ufw(hdr, &fl_off, &fl_len, &ota_off, &ota_len)) != 0)
         return rc;
-    /* Any partition installs here: the package's own loader decides (ldr_core.c: this Melodee's moves the
-     * Prophet banks up before its app area, 0x93000, is written; an older one's ends at 0x89000). */
-    (void)fl_len;
     if (!fl_off || !ota_off)
         return -3;
+    /* (Felucca 1.6.1) only a package whose flash.bin is an FM-1's: stock V15, this firmware or an older Melodee.
+     * Another board's package (an SMK-37's app area ends at 0x9D000) is refused here, before anything is erased */
+    if (fl_len != OTA_FL_LEN && fl_len != OTA_FL_LEN_OLD)
+        return -15;
     /* 2. which loader: the official one (known CRCs; it rewrites the whole flash.bin
      *    including the head) or Melodee's own (app area only, checks the chip key) */
     if (ota_read(ota_off, b, 512))
@@ -354,7 +360,8 @@ static int ota_session(void)
     ota_deadline = ota_now_ms() + 120000u;          /* step 1 normally takes ~5 s; a stalled host gives up after 2 min */
     rc = ota_stage();
     if (rc) {
-        ota_unstage();
+        if (rc != -15)                              /* (another board's package: nothing was staged or erased) */
+            ota_unstage();
         ota_show(9, rc);
         return rc;
     }

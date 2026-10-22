@@ -44,6 +44,7 @@ Melodee's additions and modifications are credited separately in the source file
 | Original Felucca portions retained in the firmware, tools, web pages and tests | GPL-3.0-only | Source notices; `LICENSE` |
 | The PHASE engine's waveforms: a C port of the oscillator of CrispyZebra (<https://github.com/hugelton/CrispyZebra>) | GPL-3.0 | `firmware/src/eng_phase.c` |
 | The panel picture | GPL-3.0-only | `docs/panel.jpg` |
+| Felucca 1.6.1's update package check (the update entry takes only a package whose flash.bin is an FM-1's size; another board's is refused before anything is erased), ported by hand | GPL-3.0-only | `firmware/src/ota.c`, `tests/ota_test.c`, `tests/ldr_test.c` |
 | The Fukiai icon font (<https://github.com/hugelton/Fukiai>): the web editor's icons (the firmware draws its own: `tools/gen_icons.py`, GPL-3.0-only; `tools/gen_aa_icons.py` still rasterises Fukiai for comparison) | MIT | `web/fukiai.ttf`, `LICENSES/MIT-Fukiai.txt`, `web/FUKIAI-LICENSE.txt` |
 
 ## Third-party material
