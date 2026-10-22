@@ -2899,8 +2899,14 @@ static int test_native_env_lfo(void)
     for (i = 0; i < NPAGES; i++)
         found |= PAGES[i].fam == FAM_ENV && page_visible(i);
     bad += check("..the track's ADSR and ENV DEST hidden", !found);
+    ui.fam_last[FAM_LFO] = 0;
     open_family(FAM_LFO);
-    bad += check("LFO on FM6: its LFO", str_eq(cur_page()->title, "FM LFO"));
+    bad += check("LFO on FM6: MODS first, as on any engine", str_eq(cur_page()->title, "MODS"));
+    for (i = 0; i < 8u && !str_eq(cur_page()->title, "FM LFO"); i++) open_family(FAM_LFO);
+    bad += check("..its own LFO after the family's pages (after LFO DEST), then round to MODS",
+                 str_eq(cur_page()->title, "FM LFO") && i == 6u && (open_family(FAM_LFO), str_eq(cur_page()->title, "MODS")));
+    open_family(FAM_LFO); go_home(); open_family(FAM_LFO);
+    bad += check("..from elsewhere: the LFO page last used", str_eq(cur_page()->title, "MATRIX"));
     go_home();
     set_engine_of(TSEL, 3);
     open_family(FAM_ENV);
@@ -3023,8 +3029,9 @@ static int test_popups(void)
                      cur_page()->fam != FAM_EDIT);
         press(B_EDIT); press(B_EDIT);
         press(B_LFO);
-        bad += check("..LFO from the map: FM6's LFO, the map closed", !smap.on && str_eq(cur_page()->title, "FM LFO"));
-        press(B_EDIT);
+        bad += check("..LFO from the map: an LFO page (FM6 too), the map closed", !smap.on && !ui.home &&
+                     (cur_page()->fam == FAM_LFO || str_prefix(cur_page()->title, "FM LFO")));
+        press(B_EDIT); press(B_EDIT);                   /* (EDIT, then the map: LFO's pages are not EDIT's) */
         o = smap.on;
         press(B_HOME);
         bad += check("..HOME from the map: HOME, the map closed", o && !smap.on && ui.home);

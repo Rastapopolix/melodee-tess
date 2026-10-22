@@ -206,8 +206,8 @@ static uint32_t layer_btn(void);
  * a SLICE track's (ui_slice.c) */
 static int list_gone(uint32_t i);                        /* ui_list.c: a page in another's list */
 /* ENV / LFO on the engines with envelopes and LFOs of their own (FM6: engine_t.ownenv, the track's
- * ADSR and ENV DEST do nothing there): their own pages (FAM_EDIT, by title). ENV: only those; LFO: those first, then
- * the track LFO's pages and MOD (the track LFO modulates any engine through LFO DEST and is the matrix's source) */
+ * ADSR and ENV DEST do nothing there): their own pages (FAM_EDIT, by title). ENV: only those; LFO: the family's pages
+ * as on any engine (MODS first: the track LFO modulates any engine and is the matrix's source), then the engine's */
 static const char *const *native_titles(uint32_t fam)
 {
     static const char *const FM_ENV[] = {"EG RATE", "EG LVL", "PITCH EG", "PITCH LV", 0};
@@ -528,16 +528,19 @@ static void page_scroll(int32_t dir)
     page_entered();
 }
 
-/* the pages a family's button visits, in order: ENV / LFO on an engine with its own (native_titles) its pages
- * first; n = 0: none */
+/* the pages a family's button visits, in order: on an engine with its own (native_titles) ENV its pages only, LFO
+ * the family's then its own; n = 0: none */
 static uint32_t fam_pages(uint32_t fam, uint8_t *pg)
 {
     uint32_t i, n = 0;
-    for (i = 0; i < NPAGES; i++)
+    for (i = 0; fam == FAM_ENV && i < NPAGES; i++)
         if (native_page(i, fam) && page_visible(i))
             pg[n++] = (uint8_t)i;
     for (i = 0; i < NPAGES; i++)
         if (PAGES[i].fam == fam && page_visible(i) && !native_page(i, fam))
+            pg[n++] = (uint8_t)i;
+    for (i = 0; fam == FAM_LFO && i < NPAGES; i++)
+        if (native_page(i, fam) && page_visible(i))
             pg[n++] = (uint8_t)i;
     return n;
 }
@@ -555,8 +558,9 @@ static void open_family(uint32_t fam)
         if (!n)
             return;
         ui.page = !ui.home && k < n ? pg[(k + 1u) % n]                 /* again: the next one; from elsewhere the */
-                  : native_page(ui.fam_last[fam], fam) && fam_has(fam, ui.fam_last[fam]) ? ui.fam_last[fam] : pg[0];
-                                                                        /* engine's page last used, else its first */
+                  : (fam == FAM_LFO || native_page(ui.fam_last[fam], fam)) && fam_has(fam, ui.fam_last[fam]) ? ui.fam_last[fam] : pg[0];
+                                                                        /* page last used (ENV: the engine's), else
+                                                                         * the first */
     } else if (!ui.home && in_fam(ui.page, fam)) {   /* same button again: next page */
         uint32_t n, i = ui.page;
         for (n = 0; n < NPAGES; n++) {
