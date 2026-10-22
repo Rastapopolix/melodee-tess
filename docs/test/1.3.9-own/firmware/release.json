@@ -1,0 +1,8 @@
+{
+  "version": "1.3.9-own",
+  "product": "FM-1_91039",
+  "pkg": {
+    "dual": "../../firmware/melodee-tess-1.3.9-own.fwsc",
+    "single": "../../firmware/melodee-tess-1.3.9-own-1core.fwsc"
+  }
+}
