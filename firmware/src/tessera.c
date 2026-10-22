@@ -15,6 +15,7 @@ static struct {
 } tess_br __attribute__((section(".pool")));
 
 #include "organic.c"                                 /* SLOTH and OCHD: each track's drifting sources (cords) */
+#include "energy.c"                                  /* ENERGY: the project's slow tide (ARC) and its RESTS */
 
 /* The knob handlers (main loop) change several fields the sequencer reads in the audio interrupt (an engine change
  * releases the old note then clears the gate; SEED rewrites a register, pitches, a state): each runs whole, with the interrupt
@@ -890,6 +891,11 @@ static void tess_grids_play(track_t *t, uint32_t tr, const gen_out_t *out)
             int32_t j = (int32_t)(tw->human / 5u), v = (int32_t)vel + (int32_t)gen_rnd(&tessera.rnd[tr], (uint32_t)(2 * j + 1)) - j;
             vel = (uint32_t)(v < 1 ? 1 : v > 127 ? 127 : v);
         }
+        {   /* ENERGY: a rest, the sparse tide (energy.c) */
+            uint8_t v8 = (uint8_t)vel;
+            if (!energy_hit(tr, &v8)) continue;
+            vel = v8;
+        }
         trk_note_on(t, gen_grids_note(&tessera.grids[tr], p), vel);
         seq_sub_note(t, gen_grids_note(&tessera.grids[tr], p), vel);   /* (SUB: RATCH repeats it) */
         tess_cap(t, gen_grids_note(&tessera.grids[tr], p), vel, off);
@@ -1133,6 +1139,7 @@ static void tess_clock_step_body(track_t *t, uint32_t tr)
             int32_t v = (int32_t)vel + (int32_t)gen_rnd(&tessera.rnd[tr], (uint32_t)(2 * j + 1)) - j;
             vel = (uint8_t)(v < 1 ? 1 : v > 127 ? 127 : v);
         }
+        if (should_trigger && !energy_hit(tr, &vel)) should_trigger = 0;   /* ENERGY: a rest, the sparse tide */
     }
     if (tessera.mode[tr] == TESS_ENG_MARKOV)
         tessera.markov[tr].last_hit = (uint8_t)(should_trigger != 0);   /* after LOCK's replay: what really sounds */
@@ -1770,7 +1777,9 @@ uint32_t tessera_euclid_pitch(const track_t *t, uint32_t step)
 #define TESS_PK_TRACK_V3 51u                         /* version 3: version 2's 47 bytes, then Grids (4) */
 #define TESS_PK_TRACK_V2 47u                         /* version 2: version 1's 45 bytes, then SEED (2) */
 #define TESS_PK_TRACK_V1 45u
-_Static_assert(TESSERA_PK_BYTES == TESSERA_TRACKS * TESS_PK_TRACK, "TESSERA_PK_BYTES (tessera.h)");
+#define TESS_PK_TAIL 2u                              /* version 18: after the tracks, the project's: ENERGY's ARC, RESTS */
+_Static_assert(TESSERA_PK_BYTES == TESSERA_TRACKS * TESS_PK_TRACK + TESS_PK_TAIL, "TESSERA_PK_BYTES (tessera.h)");
+_Static_assert(TESSERA_PK_BYTES_V17 == TESSERA_TRACKS * TESS_PK_TRACK, "TESSERA_PK_BYTES_V17 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V16 == TESSERA_TRACKS * TESS_PK_TRACK_V16, "TESSERA_PK_BYTES_V16 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V15 == TESSERA_TRACKS * TESS_PK_TRACK_V15, "TESSERA_PK_BYTES_V15 (tessera.h)");
 _Static_assert(TESSERA_PK_BYTES_V14== TESSERA_TRACKS * TESS_PK_TRACK_V14, "TESSERA_PK_BYTES_V14 (tessera.h)");
@@ -1926,6 +1935,7 @@ uint32_t tessera_pack(uint8_t *o)
         o = tess_put_v16(o, tr);
         o = tess_put_v17(o, tr);
     }
+    *o++ = tessera.en_arc; *o++ = tessera.en_rests;      /* (version 18's tail: the project's ENERGY) */
     return TESSERA_PK_BYTES;
 }
 
@@ -2237,7 +2247,7 @@ static void tess_v1_track(const uint8_t *in, uint8_t *out)
 }
 uint32_t tessera_pk_bytes(uint32_t ver)
 {
-    return ver == 17u ? TESSERA_PK_BYTES : ver == 16u ? TESSERA_PK_BYTES_V16 : ver == 15u ? TESSERA_PK_BYTES_V15 : ver == 14u ? TESSERA_PK_BYTES_V14 : ver == 13u ? TESSERA_PK_BYTES_V13 : ver == 12u ? TESSERA_PK_BYTES_V12 : ver == 11u ? TESSERA_PK_BYTES_V11 : ver == 10u ? TESSERA_PK_BYTES_V10 : ver == 9u ? TESSERA_PK_BYTES_V9 : ver == 8u ? TESSERA_PK_BYTES_V8 : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
+    return ver == 18u ? TESSERA_PK_BYTES : ver == 17u ? TESSERA_PK_BYTES_V17 : ver == 16u ? TESSERA_PK_BYTES_V16 : ver == 15u ? TESSERA_PK_BYTES_V15 : ver == 14u ? TESSERA_PK_BYTES_V14 : ver == 13u ? TESSERA_PK_BYTES_V13 : ver == 12u ? TESSERA_PK_BYTES_V12 : ver == 11u ? TESSERA_PK_BYTES_V11 : ver == 10u ? TESSERA_PK_BYTES_V10 : ver == 9u ? TESSERA_PK_BYTES_V9 : ver == 8u ? TESSERA_PK_BYTES_V8 : ver == 7u ? TESSERA_PK_BYTES_V7 : ver == 6u ? TESSERA_PK_BYTES_V6 : ver == 5u ? TESSERA_PK_BYTES_V5 : ver == 4u ? TESSERA_PK_BYTES_V4 : ver == 3u ? TESSERA_PK_BYTES_V3 :
            ver == 2u ? TESSERA_PK_BYTES_V2 : ver == 1u ? TESSERA_PK_BYTES_V1 : 0u;
 }
 /* A track record of version ver (1..16) -> version 16, a version at a time. out may not overlap in */
@@ -2272,12 +2282,16 @@ void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out)
 /* 1 = loaded; 0 = refused, `tessera` untouched */
 int tessera_unpack(const uint8_t *in)
 {
+    const uint8_t *tail = in + TESSERA_TRACKS * TESS_PK_TRACK;
     tessera_ensure_init();
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         if (!tess_pk_track(in + tr * TESS_PK_TRACK, tr, 0)) return 0;
+    if (tail[0] > 100u || tail[1] > 100u) return 0;
     tessera_init();                                      /* the playheads and counters: as at power-on */
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         tess_pk_track(in + tr * TESS_PK_TRACK, tr, 1);
+    tessera.en_arc = tail[0];
+    tessera.en_rests = tail[1];
     return 1;
 }
 /* a block of version ver (an older project's or backup's): as tessera_unpack, each track converted by
@@ -2287,9 +2301,10 @@ int tessera_unpack_ver(uint32_t ver, const uint8_t *in)
     uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
     uint32_t n = tessera_pk_bytes(ver) / TESSERA_TRACKS;
     if (!n) return 0;
-    if (ver == 17u) return tessera_unpack(in);
+    if (ver == 18u) return tessera_unpack(in);
     for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++)
         tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
+    b[TESSERA_TRACKS * TESS_PK_TRACK] = b[TESSERA_TRACKS * TESS_PK_TRACK + 1u] = 0;   /* (before 18: no ENERGY) */
     return tessera_unpack(b);
 }
 
@@ -2351,6 +2366,8 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_SUB_RATCH: return tessera.sub_ratch[tr];
     case TX_SUB_CHANCE: return tessera.sub_chance[tr];
     case TX_CH_BREATH: return tessera.ch_breath[tr];
+    case TX_EN_ARC: return tessera.en_arc;              /* (the project's, whichever track) */
+    case TX_EN_RESTS: return tessera.en_rests;
     case TX_BNC_SPEED: return tessera.bounce[tr].speed;
     case TX_BNC_ANGLE: return tessera.bounce[tr].angle;
     case TX_BNC_BALLS: return tessera.bounce[tr].balls;
@@ -2490,6 +2507,15 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_SUB_RATCH: tessera.sub_ratch[tr] = (uint8_t)tess_clampi(v, 0, SUB_HITS_MAX - 1); return;
     case TX_SUB_CHANCE: tessera.sub_chance[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_CH_BREATH: tessera.ch_breath[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_EN_ARC: tessera.en_arc = (uint8_t)tess_clampi(v, 0, 100); return;
+    case TX_EN_RESTS:
+        v = tess_clampi(v, 0, 100);
+        if (v && !tessera.en_rests) {
+            tessera.en_rests = (uint8_t)v;
+            energy_rests_on();                          /* (the next rest counted from now) */
+        }
+        tessera.en_rests = (uint8_t)v;
+        return;
     case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); eng = TESS_ENG_BOUNCE; break;
     case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); eng = TESS_ENG_BOUNCE; break;
     case TX_BNC_BALLS: tessera.bounce[tr].balls = (uint8_t)tess_clampi(v, 1, GEN_BOUNCE_FALL); eng = TESS_ENG_BOUNCE; break;

@@ -850,6 +850,21 @@ static void draw_columns(void)
         draw_column(3, "", "", "", T_DIM, -1, ICON_NONE);
         return;
     }
+    if (cur_page()->graph == GR_ENERGY) {                /* ENERGY (energy.c), the project's: ARC, RESTS, the tide now, a rest */
+        char w0[8], w1[8], w2[8], w3[8];
+        int32_t now = energy_now() * 100 / 32767;
+        uint32_t left = energy.rest_left / EN_BPS;
+        fmt_int(w0, tessera.en_arc);
+        fmt_int(w1, tessera.en_rests);
+        fmt_int(w2, now);
+        fmt_int(w3, (int32_t)left + 1);
+        draw_column(0, "ARC", w0, "%", VAL(0u), (int32_t)tessera.en_arc * 10, ICON_AUTO);
+        draw_column(1, "RESTS", w1, "%", VAL(1u), (int32_t)tessera.en_rests * 10, ICON_AUTO);
+        draw_column(2, "NOW", tessera.en_arc ? w2 : "--", tessera.en_arc ? "%" : "", T_DIM, -1, ICON_NONE);
+        draw_column(3, "REST", song.playing && energy_resting() ? w3 : "--", song.playing && energy_resting() ? "s" : "",
+                    T_DIM, -1, ICON_NONE);
+        return;
+    }
     if (cur_page()->graph == GR_TIMING) {                /* SUB (seq_sub.c): RATCH, its CHANCE (dim at x1) */
         uint32_t tr = song.sel % TESSERA_TRACKS, r = tessera.sub_ratch[tr], ch = tessera.sub_chance[tr];
         static const char *const RATCH[4] = {"x1", "x2", "x3", "x4"};

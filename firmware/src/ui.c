@@ -261,7 +261,7 @@ static int seqm_page_ok(uint32_t i)                     /* (the page shown stays
     uint32_t m = seqm_get(song.sel);
     if (!ui.home && ui.page == i) return 1;
     if (p->graph == GR_EVOLVE || p->graph == GR_FORM || p->graph == GR_TWEAK || p->graph == GR_TWEAK2 ||
-        p->graph == GR_NOTELEN || p->graph == GR_TIMING) return m >= 2u || (p->graph == GR_EVOLVE && !m);   /* (STEP: STEP EVOLVE) */
+        p->graph == GR_NOTELEN || p->graph == GR_TIMING || p->graph == GR_ENERGY) return m >= 2u || (p->graph == GR_EVOLVE && !m);   /* (STEP: STEP EVOLVE) */
     if (p->fam == FAM_ARP && (p->graph == GR_ARP || p->graph == GR_NONE)) return m == 1u;
     if (p->fam == FAM_SEQ && p->graph == GR_ROLL) return m < 2u;
     return 1;

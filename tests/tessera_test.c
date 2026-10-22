@@ -1037,6 +1037,98 @@ static void br_check(char *res, size_t cap)
     snprintf(res, cap, "%u", (unsigned)ok);
 }
 
+/* ------------------------------------------------------------ ENERGY --- */
+/* CHORD on track 0 (DRONE, HIT HOLD) and Euclid on track 1 at 120 BPM for 12 s; with rest, a rest from 2 s to 8 s.
+ * *before / *during / *after: track 1's note-ons before 2 s, in 2.5 .. 7.5 s, after 8.5 s; *held: track 0's voices
+ * gated at 5 s (in the rest) */
+static void en_play(int rest, uint32_t *before, uint32_t *during, uint32_t *after, uint32_t *held)
+{
+    uint32_t f, total = 12u * FS / CTL * CTL, i, at2 = 2u * FS / CTL, at5 = 5u * FS / CTL;
+    int32_t o[2 * CTL];
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (i = 0; i < NTRK; i++) tt_open[i] = -1;
+    tt_n = tt_blk = 0;
+    gen(0, TESS_ENG_CHORD);
+    tessera_param_set(0, TX_CH_PROG, GEN_CH_DRONE);
+    tessera_param_set(0, TX_CH_HIT, GEN_CH_HOLD);
+    gen(1, TESS_ENG_EUCLID);
+    tessera_param_set(0, TX_EN_RESTS, rest ? 50 : 0);
+    rng_state = 0x454Eu;
+    transport_req = 1;
+    *held = 0;
+    for (f = 0; f < total + 4u * CTL; f += CTL) {
+        if (f >= total) transport_req = 2;
+        if (rest && tt_blk == at2) energy.rest_left = 6u * EN_BPS;   /* (a rest now, 6 s) */
+        mix_block(o, CTL);
+        if (tt_blk == at5) *held = nl_gates(0);
+        tt_blk++;
+    }
+    *before = *during = *after = 0;
+    for (i = 0; i < tt_n; i++) {
+        uint32_t b = tt_ev[i].blk;
+        if (tt_ev[i].tr != 1u) continue;
+        if (b < at2) ++*before;
+        else if (b >= at2 + FS / CTL / 2u && b < at2 + 11u * FS / CTL / 2u) ++*during;
+        else if (b >= at2 + 13u * FS / CTL / 2u && b < total / CTL) ++*after;
+    }
+}
+/* "1": the tide (energy_tick alone): ARC 0 none; ARC 100 full a quarter turn in, sparse three quarters, a turn 3-6
+ * min, ARC 50 half as far; RESTS 100 over 40 min: rests of 8-18 s, 4 to 14 of them, none with RESTS 0; in play a rest
+ * leaves out Euclid's hits and keeps the CHORD drone sounding, the hits back after it */
+static void en_check(char *res, size_t cap)
+{
+    uint32_t ok = 1, i, n, rests = 0, shortest = ~0u, longest = 0, run = 0, b, d, a, h;
+    int32_t top, bottom;
+    tessera_reset();
+    song.playing = 1;
+    energy_play();
+    for (i = 0; i < 1000u; i++) energy_tick();
+    ok &= energy_now() == 0 && !energy_resting();        /* (ARC 0, RESTS 0) */
+    tessera_param_set(0, TX_EN_ARC, 100);
+    ok &= tessera_param_get(3, TX_EN_ARC) == 100;        /* (the project's: any track's view) */
+    energy_play();
+    n = energy.per;
+    ok &= n >= 180u * EN_BPS && n <= 360u * EN_BPS;
+    for (i = 0; i < n / 4u; i++) energy_tick();
+    top = energy_now();
+    for (; i < 3u * n / 4u; i++) energy_tick();
+    bottom = energy_now();
+    printf("energy: ARC 100, a turn of %u s: %d at a quarter, %d at three quarters\n", (unsigned)(n / EN_BPS), (int)top,
+           (int)bottom);
+    ok &= top > 32000 && bottom < -32000;
+    tessera_param_set(0, TX_EN_ARC, 50);
+    energy_tick();
+    ok &= energy_now() < -16000 && energy_now() > -16700;
+    tessera_param_set(0, TX_EN_ARC, 0);
+    tessera_param_set(0, TX_EN_RESTS, 100);
+    for (i = 0; i < 40u * 60u * EN_BPS; i++) {
+        energy_tick();
+        if (energy_resting()) run++;
+        else if (run) {
+            rests++;
+            shortest = run < shortest ? run : shortest;
+            longest = run > longest ? run : longest;
+            run = 0;
+        }
+    }
+    printf("energy: RESTS 100, 40 min: %u rests, %u .. %u s\n", (unsigned)rests, (unsigned)(shortest / EN_BPS),
+           (unsigned)(longest / EN_BPS));
+    ok &= rests >= 4u && rests <= 14u && shortest >= 8u * EN_BPS - 1u && longest <= 18u * EN_BPS + 1u;
+    tessera_param_set(0, TX_EN_RESTS, 0);
+    energy_tick();
+    ok &= !energy_resting();
+    song.playing = 0;
+    en_play(0, &b, &d, &a, &h);
+    printf("energy: no rest: Euclid %u, %u, %u notes; the drone %u voices\n", (unsigned)b, (unsigned)d, (unsigned)a, (unsigned)h);
+    ok &= b && d && a && h >= 3u;
+    en_play(1, &b, &d, &a, &h);
+    printf("energy: a rest: Euclid %u, %u, %u notes; the drone %u voices\n", (unsigned)b, (unsigned)d, (unsigned)a, (unsigned)h);
+    ok &= b && !d && a && h >= 3u;
+    snprintf(res, cap, "%u", (unsigned)ok);
+}
+
 /* ------------------------------------------------------------ NOTE LENGTH --- */
 /* note_len.c on Euclid 4 of 16 at 1/16, 120 BPM: a hit every quarter (689 blocks). "ok": each note's length (the
  * median of the second bar's) as its mode says: STEP the GATE (half a 16th, 86 blocks), FIXED 1/8 an eighth (345)
@@ -2085,6 +2177,27 @@ static void pack_run(char *res, size_t cap)
         ok &= tessera_unpack(c) == 0;
         tessera_unpack(a);
     }
+    {   /* ENERGY: ARC and RESTS (the project's tail) round trip; a version 17 block loads with them off; over 100 is
+         * refused */
+        static uint8_t v17[TESSERA_PK_BYTES_V17];
+        tessera_reset();
+        ok &= tessera_param_get(0, TX_EN_ARC) == 0 && tessera_param_get(0, TX_EN_RESTS) == 0;
+        tessera_param_set(2, TX_EN_ARC, 40);
+        tessera_param_set(0, TX_EN_RESTS, 300);         /* (kept to 100) */
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera_param_get(1, TX_EN_ARC) == 40 && tessera_param_get(3, TX_EN_RESTS) == 100;
+        memcpy(v17, b, sizeof v17);
+        ok &= tessera_unpack_ver(17u, v17) == 1 && tessera_param_get(0, TX_EN_ARC) == 0 && tessera_param_get(0, TX_EN_RESTS) == 0;
+        ok &= tessera_pk_bytes(18u) == TESSERA_PK_BYTES && tessera_pk_bytes(17u) == TESSERA_PK_BYTES_V17;
+        memcpy(c, b, sizeof c);
+        c[TESSERA_PK_BYTES - 2u] = 101;
+        ok &= tessera_unpack(c) == 0;
+        memcpy(c, b, sizeof c);
+        c[TESSERA_PK_BYTES - 1u] = 101;
+        ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+    }
     {   /* CHORD USER: a key's note rounded down to the track's scale is the chord's root (D dorian: E ii, F# rounded to
          * F iii, C vii, D I); the degrees and LEN round trip; a degree over 6 or a LEN of 0 or 9 is refused */
         const uint32_t n13 = TESSERA_PK_BYTES / TESSERA_TRACKS, n12 = TESSERA_PK_BYTES_V12 / TESSERA_TRACKS;
@@ -2384,6 +2497,27 @@ int main(int argc, char **argv)
         }
         bad += check("BREATH: the drone tied over, its voices breathing on their own slow cycles; 0 strikes it as before; "
                      "the same with the same SEED; STOP releases", ok);
+    }
+    {   /* ENERGY (energy.c) */
+        unsigned ok = 0;
+        pid_t pid;
+        int fd[2];
+        fflush(stdout);
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                en_check(res, sizeof res);
+                fflush(stdout);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &ok);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        bad += check("ENERGY: ARC's tide swings as far as it says over 3-6 min, RESTS of 8-18 s every few minutes; a rest "
+                     "leaves out the generators' hits and keeps CHORD's drone; 0 none", ok);
     }
     {   /* SLOTH, OCHD */
         unsigned fail = ~0u;
