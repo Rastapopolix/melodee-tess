@@ -193,7 +193,7 @@ static uint32_t help_wrap(const aafont_t *f, const char *text, uint16_t *at, uin
 static const char *help_text(void)
 {
     const pid_entry_t *e = help.pid != PID_NONE ? pid_find(help.pid) : 0;
-    return e ? e->help : help.text;
+    return e ? pid_help(e) : help.text;
 }
 static uint32_t help_count(uint32_t z)
 {
@@ -295,6 +295,6 @@ static void help_draw(void)
     if (!ui.force)
         return;
     help_value(e, val, sizeof val);
-    help_strip(0, 124, e ? e->name : help.name, val, e ? e->help : help.text);
-    help_strip(124, HELP_H - 124, e ? e->name : help.name, val, e ? e->help : help.text);
+    help_strip(0, 124, e ? e->name : help.name, val, e ? pid_help(e) : help.text);
+    help_strip(124, HELP_H - 124, e ? e->name : help.name, val, e ? pid_help(e) : help.text);
 }

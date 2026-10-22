@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-# Copyright (C) 2026 melodee-tess contributors
+# Copyright (C) 2026 Theo Dainis (melodee-tess)
 """Where the device image's flash goes: section sizes, the biggest symbols, and the totals per source file.
 
   tools/flash_report.py [build/melodee.elf] [--top N]
