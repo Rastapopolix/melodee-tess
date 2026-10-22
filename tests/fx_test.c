@@ -116,7 +116,8 @@ static void separate_sends(void)
         FILE *f=fopen(paths[k],"rb");assert(f);uint32_t n=fread(b,1,sizeof b,f);fclose(f);ui_power_on();
         if(k){assert(tmpl_take(b,n));template_load();}else{assert(proj_import(&proj_scratch,b,n));assert(!project_restore_runtime(&proj_scratch));}
         assert(!song.g[G_FXMODE] && TSEL->p[P_FXSEND]==81 && !TSEL->p[P_FXSEND2] && !TSEL->p[P_FXSEND3]);
-        assert(TSEL->p[P_E3]==clamp(42,track_desc(TSEL,P_E3)->min,track_desc(TSEL,P_E3)->max) && song.g[G_FXRETURN]==73 && song.g[G_MFXTYPE]==FX_REVERB);
+        /* (its track 1's engine retired since (2026-10-22): it loads with FM6's own values, not the fixture's 42) */
+        assert(TSEL->p[P_E3]==track_desc(TSEL,P_E3)->def && song.g[G_FXRETURN]==73 && song.g[G_MFXTYPE]==FX_REVERB);
     }
     ui_power_on();fx_bus_mix=0;song.g[G_FXMODE]=1;fx_bus_select();fx_send_on=1;
     memset(mix_l,0,sizeof mix_l);memset(mix_r,0,sizeof mix_r);

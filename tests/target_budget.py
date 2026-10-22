@@ -15,9 +15,9 @@ import os
 import re
 import sys
 
-FUNCS = ["phase_render", "sid_render", "cz_native_render", "cz_native_wave", "formant_render",
+FUNCS = ["sid_render", "formant_render",
          "trio_render", "trio_pass", "wheel_render", "wheel_block",
-         "phys_render", "drum_render", "noise_render", "fm6_render", "p5_samples", "p5_mod_samples", "px_modal_block", "px_modal_run", "px_memb_block",
+         "phys_render", "drum_render", "noise_render", "fm6_render", "px_modal_block", "px_modal_run", "px_memb_block",
          "px_string_excite", "px_string_run", "px_symp_run",
          "dr_bd", "dr_sd", "dr_tom", "dr_rs", "dr_cl", "dr_cp", "dr_ma", "dr_metal", "dr_cb", "dr_cy", "dr_hat", "dr8_run",   # drum_808.c
          "drum_source", "drum_limit", "drum_color", "dr_metal_tune",
@@ -41,12 +41,11 @@ EXTRACTED = {
     "dr8_run": ("dr8_run_into",),
     "fm6_render": ("fm6_run", "fm6_run_into", "fm6_output", "fm6_join"),
     "fm1_alnk0_irq": ("mix_block", "mix_part", "mix_prepare_batch", "audio_batch_flush", "mix_mono_samples", "master_samples", "master_out"),
-    "track_render_audio": ("fm6_dc_samples", "p5_dc_samples"),
+    "track_render_audio": ("fm6_dc_samples",),
 }
 KERNEL_NAMES = {n for names in EXTRACTED.values() for n in names}
-FEATURE_OPTIONAL = {"p5_samples", "p5_mod_samples",          # MELODEE_PROPHET=0 omits these
-                    "fm6_render", "cz_native_render", "cz_native_wave",   # and MELODEE_FM6=0, MELODEE_CZ=0 these
-                    "sid_render"}                                         # and MELODEE_SID=0 this
+FEATURE_OPTIONAL = {"fm6_render",                            # MELODEE_FM6=0 omits it
+                    "sid_render"}                            # and MELODEE_SID=0 this
 TOL = 0.10                      # exact (no noise): small edits pass, a grown render loop does not
 DIV_W = 8                       # a divide weighs 1 + 8 instructions
 NEST = 4                        # an instruction in a loop inside a loop weighs 4, two deep 16, ...

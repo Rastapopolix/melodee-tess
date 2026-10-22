@@ -51,7 +51,6 @@ static uint32_t midi_targets(uint32_t ch)
 static void midi_expression(track_t *t, const midi_channel_t *c)
 {
     int32_t range = ((int32_t)c->semis * 100 + c->cents) * 256 / 100;
-    if(t->eng_req==ENGI_PROPHET)range=(clamp(p5_patch_of(t)->raw[P5_BEND],0,11)+1)*256;
     if (drum_track(t))
         return;
     midi_bend_target[trk_index(t)] = (int32_t)c->bend * range / (c->bend < 0 ? 8192 : 8191);
@@ -243,26 +242,16 @@ static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint
     switch(cc){case 5:id=P_GLIDE;break;case 7:id=P_LEVEL;break;case 10:id=P_PAN;break;
     case 72:id=P_REL;break;case 73:id=P_ATK;break;case 75:id=P_DEC;break;
     case 74:case 71:{
-        static const uint8_t map[NENGINES]={0,0,0x30,0x56,0,0x07,0,0,0,0,0x30,0x34,0x30,0,0,0,0,0,0,0x12};
+        static const uint8_t map[NENGINES]={0,0,0x30,0x56,0,0x07,0,0,0,0,0x30,0x34,0x30};
         uint32_t macro=(map[t->eng_req%NENGINES]>>(cc==74?4:0))&15u;
-        if(macro)id=P_E0+macro-1u;else if(cc==74 && t->eng_req==ENGI_CZ)id=P_ED_FLT;
+        if(macro)id=P_E0+macro-1u;
         break; }default:return;}
     if((cc==72 || cc==73 || cc==75) && motion_native_tag(t)){   /* (the engine's own envelope: its motion too) */
         uint8_t old[MO_NATIVE_N];uint32_t f=motion_guard();
         motion_native_peek(t,old);
-        if(t->eng_req==ENGI_PROPHET){
-            p5_edit_value(t,cc==72?P5_RELEASE_AMP:cc==73?P5_ATTACK_AMP:P5_DECAY_AMP,value);
-        }else if(t->eng_req==ENGI_FM6){
-            uint8_t raw[FP_SIZE+1u];memcpy(raw,fm6_patch[trk_index(t)],sizeof raw);
-            for(uint32_t op=0;op<6;op++)raw[op*FP_OP+(cc==72?3:cc==73?0:1)]=(uint8_t)(99u-value*99u/127u);
-            fm6_put_patch(trk_index(t),raw,0);
-        }else{
-            uint32_t tr=trk_index(t);uint8_t raw[CZ_BYTES];
-            for(uint32_t line=0;line<2;line++) {
-                uint32_t stage=cc==72?(cz_patch[tr].raw[CZ_ENV_END[line][2]]&7u):cc==73?0:1;
-                if(cz_ed_put(tr,LCZ_EBASE(line,2)+stage,99u-value*99u/127u,raw))memcpy(cz_patch[tr].raw,raw,128u);
-            }
-        }
+        uint8_t raw[FP_SIZE+1u];memcpy(raw,fm6_patch[trk_index(t)],sizeof raw);   /* (FM6's: the only native one) */
+        for(uint32_t op=0;op<6;op++)raw[op*FP_OP+(cc==72?3:cc==73?0:1)]=(uint8_t)(99u-value*99u/127u);
+        fm6_put_patch(trk_index(t),raw,0);
         motion_native_edited(t,old);motion_unguard(f);return;
     }
     if(id>=P_COUNT)return;

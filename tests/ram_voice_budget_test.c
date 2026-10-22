@@ -18,7 +18,7 @@ static void fresh(void)
     memset(voice_kills_part,0,sizeof voice_kills_part);voice_kills=0;
     audio_worker_online=1;
     for(unsigned p=0;p<NPART;p++){
-        host_preset(&trk[p],HOST_SYNTH,0);
+        host_preset(&trk[p],HOST_SYNTH,HOST_PLAIN);
         trk[p].p[P_VOICE]=V_POLY;
     }
 }
@@ -34,13 +34,11 @@ int main(void)
     for(unsigned p=0;p<NPART;p++)assert(trk[p].v[lowest_held(&trk[p])].note==48u);
 
     fresh();
-    host_preset(&trk[0],ENGI_PROPHET,0);trk[0].p[P_VOICE]=V_POLY;
-    for(unsigned n=0;n<3u;n++)trk_note_on(&trk[0],48u+4u*n,100);
-    assert(voice_units(&trk[0])==2u && voices_busy()==6u);
-    for(unsigned p=1;p<NPART;p++)for(unsigned n=0;n<2u;n++)trk_note_on(&trk[p],48u+4u*n,100);
-    assert(voices_busy()==18u && !voice_kills_part[0]);
-    audio_worker_online=0;
-    assert(voice_budget()==16u && voice_units(&trk[0])==3u);
+    for(unsigned p=0;p<NPART;p++)for(unsigned n=0;n<2u;n++)trk_note_on(&trk[p],48u+4u*n,100);
+    trk_note_on(&trk[0],56,100);
+    assert(voices_busy()==18u && !voice_kills);
+    audio_worker_online=0;                       /* CPU1 retired: the budget falls back to one core's */
+    assert(voice_budget()==16u);
     trk_note_on(&trk[3],67,100);
     assert(voices_busy()<=16u && voice_kills);
     /* main.c clock_boot: the CPU1 budget follows the clock running (a 320 a soft reset kept); one core keeps 16 */

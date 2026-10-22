@@ -20,8 +20,7 @@ static const uint8_t CAT_ORDER[] = {CAT_BASS, CAT_LEAD, CAT_PAD, CAT_KEYS, CAT_O
 /* the factory presets' categories, a letter per preset in its engine's order; tests/ui_test.c checks each string's
  * length against its engine's preset count. An engine without one: cat_of_engine */
 static const char *const PRESET_CAT[NENGINES] = {
-#if MELODEE_LEGACY_EXTRAS                                /* (retired: PHASE VOICE NOISE) */
-    [2] = "RGSLEU",                                     /* PHASE: BRASS ORGAN STRING RESO BELL WIRE */
+#if MELODEE_LEGACY_EXTRAS                                /* (retired: VOICE NOISE) */
     [5] = "PLBF",                                       /* VOICE: CHOIR AAH, VOX LEAD, WOW BASS, WHISPER */
     [11] = "FFFF",                                      /* NOISE */
 #endif
@@ -37,10 +36,6 @@ static const char *const PRESET_CAT[NENGINES] = {
 #if MELODEE_PLAITS
     [21] = "OBPLKEBGUEE",                          /* MACRO (eng_macro.c MC_PRESETS) */
 #endif
-    [ENGI_CZ] = "ORRRSSSSSUUUBBBBURWSWWWWUKKKKKKKKGGGGGPPPEEEEEDEESSULLLLFDDDEFFFF",   /* INIT TONE, Casio's 64 */
-    [ENGI_PROPHET] =                                    /* INIT, Sequential's 200 */
-        "OOOKBPROOOGKLPWPOLOUUBEOEGFPOOBOEOOODDDEOOGKSGBPEPPLBROOOOPOKPKOFOSOOEPRODFLFOOEOULWOPBOLOPKFORGLPOBULROOSKOO"
-        "PSBUEFDEEEWEUOUEOOOOSERPUOBOOOBOFLGUGRLOOOBUFOOFEUFORSKKWKLGLGGKROGBGLKSLOOFOFOFLUUEFFEOFEPF",
 };
 static uint32_t cat_of_engine(uint32_t e) { return e == ENGI_DRUM ? CAT_DRUM : e == 11u ? CAT_FX : CAT_OTHER; }
 static uint32_t preset_cat(uint32_t e, uint32_t k)           /* factory preset k of engine e */
@@ -124,22 +119,20 @@ static uint32_t cat_guess(uint32_t e, const char *nm)
     return CAT_OTHER;
 }
 
-/* list entries: src is the engine of a factory preset, else USER_NATIVE_P5 / _FM / _CZ or USER_GENERAL; k the preset
- * or the slot. The slots' categories: a nibble each (0: not worked out yet), dropped when up_gen moves */
-#define BRW_P5 128u                                    /* (native_presets.c, prophet_user.c, core.h assert these) */
-#define BRW_FM 64u
-#define BRW_CZ 128u
-#define BRW_DYN (BRW_P5 + BRW_FM + BRW_CZ + UP_SLOTS)
+/* list entries: src is the engine of a factory preset, else USER_NATIVE_FM (FM6's own user sounds) or USER_GENERAL;
+ * k the preset or the slot. The slots' categories: a nibble each (0: not worked out yet), dropped when up_gen moves.
+ * (The CZ-1's and the Prophet's user banks are kept, not listed: their engines retired 2026-10-22) */
+#define BRW_FM 64u                                     /* (native_presets.c NATIVE_FM_SLOTS) */
+#define BRW_DYN (BRW_FM + UP_SLOTS)
 static uint8_t cat_dyn[BRW_DYN / 2u];
 static uint32_t cat_dyn_gen = 0xFFFFFFFFu;
 static int src_slot(uint32_t src)
 {
-    return src == USER_GENERAL || src == USER_NATIVE_P5 || src == USER_NATIVE_FM || src == USER_NATIVE_CZ;
+    return src == USER_GENERAL || src == USER_NATIVE_FM;
 }
 static uint32_t src_engine(uint32_t src, uint32_t k)       /* the engine that plays entry src, k */
 {
-    return src == USER_NATIVE_P5 ? ENGI_PROPHET : src == USER_NATIVE_FM ? ENGI_FM6 : src == USER_NATIVE_CZ ? ENGI_CZ :
-           src == USER_GENERAL ? up_engine(k) % NENGINES : src % NENGINES;
+    return src == USER_NATIVE_FM ? ENGI_FM6 : src == USER_GENERAL ? up_engine(k) % NENGINES : src % NENGINES;
 }
 static uint32_t entry_cat(uint32_t src, uint32_t k)
 {
@@ -147,8 +140,7 @@ static uint32_t entry_cat(uint32_t src, uint32_t k)
     char nm[16];
     if (!src_slot(src))
         return preset_cat(src % NENGINES, k);
-    i = src == USER_NATIVE_P5 ? k : src == USER_NATIVE_FM ? BRW_P5 + k : src == USER_NATIVE_CZ ? BRW_P5 + BRW_FM + k :
-        BRW_P5 + BRW_FM + BRW_CZ + k;
+    i = src == USER_NATIVE_FM ? k : BRW_FM + k;
     if (i >= BRW_DYN)
         return CAT_OTHER;
     if (cat_dyn_gen != up_gen) {
@@ -180,7 +172,7 @@ static void cur_entry(uint32_t *src, uint32_t *k)
 {
     uint32_t u = user_of(TSEL), e = TSEL->eng_req % NENGINES, np = ENGINES[e]->npresets;
     if (u < USER_NONE && TSEL->user_native) {
-        *src = e == ENGI_PROPHET ? USER_NATIVE_P5 : e == ENGI_FM6 ? USER_NATIVE_FM : USER_NATIVE_CZ;
+        *src = USER_NATIVE_FM;
         *k = u;
     } else if (u < UP_SLOTS) {
         *src = USER_GENERAL;
@@ -261,7 +253,7 @@ static uint32_t lseg_src(uint32_t seg)
     if (seg >= LSEG_USER)
         return USER_GENERAL;
     e = eng_vis(seg / 2u);
-    return !(seg & 1u) ? e : e == ENGI_PROPHET ? USER_NATIVE_P5 : e == ENGI_FM6 ? USER_NATIVE_FM : USER_NATIVE_CZ;
+    return !(seg & 1u) ? e : USER_NATIVE_FM;   /* (a native segment: FM6's; the others have none, native_limit) */
 }
 static uint32_t lseg_len(uint32_t seg)
 {

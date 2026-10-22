@@ -7,8 +7,8 @@
 #   SOUND=0 tests/run_tests.sh       everything but the sound tests
 #   SOUND=only tests/run_tests.sh    the sound tests alone
 # Sound tests: the regression suite, the DSP render and TRACKS, and every test of an engine's or an effect's rendered
-#   signal (native fp32, Prophet, SPEAKER, MOD, SLICER, the FX layer, REVERB, DELAY, MOD / SPREAD, CZ, SID,
-#   CZ-1 knobs, PHYS, DRUM, NOISE, FM6, the dual-core pairing). The rest (storage, UI, MIDI, USB, editor, web) always runs.
+#   signal (native fp32, SPEAKER, MOD, SLICER, the FX layer, REVERB, DELAY, MOD / SPREAD, SID, PHYS, DRUM, NOISE,
+#   FM6, the dual-core pairing). The rest (storage, UI, MIDI, USB, editor, web) always runs.
 # Each test (its compile and its runs) is a job; PARALLEL=n jobs run at once (default: the CPU count; 1: one by one).
 # A job's output goes to build/host/log/<n>.log and is printed in the order of this file as the jobs end; the
 # failures are listed again at the end. The cost gates count instructions, which the load leaves alone; the ns
@@ -91,7 +91,6 @@ OUT=build/host
 LOG=$OUT/log
 CC="${CC:-cc} -O1 -ffp-contract=off -Wall -Wno-unused-function"
 FW="-w -Ibuild/gen -Ifirmware/src"
-P5=build/prophet5/Prophet-5+10-Factory-Programs-ReadMe1.03
 SOUND=${SOUND:-1}
 PARALLEL=${PARALLEL:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}
 case $SOUND in 0 | 1 | only) ;; *) echo "SOUND=0, 1 or only"; exit 2 ;; esac
@@ -162,7 +161,7 @@ web_tests() {                                     # the editor mock's tables mus
             step "parameter and engine tables as JSON (for the editor mock test)" desc_json
     fi
     if command -v node >/dev/null 2>&1; then
-        step "web pages: editor protocol + native CZ patches, package builder, update protocol" node web/test_web.mjs
+        step "web pages: editor protocol, package builder, update protocol" node web/test_web.mjs
         step "web backup: capture, validation before writes, restore order" node web/test_backup.mjs
     else
         echo "== skip web tests (no node)"
@@ -192,18 +191,10 @@ ui_renders() {
 }
 dsp_tracks() {
     build hostsim hostsim -O2 $FW || return
-    step "DSP render (CZ-1 preset 0)" "$OUT/hostsim" 15 0 1 "$OUT/render.wav"
+    step "DSP render (FM6 INIT VOICE)" "$OUT/hostsim" 12 24 1 "$OUT/render.wav"
     mkdir -p build/tracks_demo
     step "TRACKS: 4-track pattern, live recording (lengths, swing), voice budget, engine switch, cost" \
-        env TRACKS=build/tracks_demo "$OUT/hostsim" 15 0 1 "$OUT/tracks.wav"
-}
-prophet() {
-    build prophet_test prophet_test -O2 $FW || return
-    step "Prophet native frames, five voices, filters, sync and Poly-Mod" "$OUT/prophet_test"
-    if [ -d "$P5" ]; then
-        step "Prophet factory-file playback and exact round trips" "$OUT/prophet_test" \
-            "$P5/P5_Factory_Programs_FACTORY_v1.03.syx" "$P5/P5_Factory_Programs_USER_v1.03.syx"
-    fi
+        env TRACKS=build/tracks_demo "$OUT/hostsim" 12 24 1 "$OUT/tracks.wav"
 }
 macro_tests() {                                  # MACRO (eng_macro.c): Plaits' C++ for this computer, then macro_test
     M=firmware/third_party/mi
@@ -246,8 +237,8 @@ sound && [ $TABLES = 1 ] && job dsp_tracks
 
 if core; then
     t "flash storage (A/B, torn writes)" storage_test
-    t "native FM6/CZ user presets, scrolling, migration and interrupted saves" fm6_preset_test -O1 $FW
-    t "Prophet native slots, atomic saves, projects, undo and performance" prophet_integration_test -O1 $FW
+    t "native FM6 user presets (CZ slots stored), scrolling, migration and interrupted saves" fm6_preset_test -O1 $FW
+    t "Prophet user bank (engine retired): native slots, atomic saves and favorites" prophet_integration_test -O1 $FW
     t "resource lifetimes, cache eviction, tails and capacity" resources_test -O2 $FW
     t "aligned libc: copy/clear bounds, ordering and float aliasing" libc_word_test -O2 -fstrict-aliasing
     t "audio worker: stalled jobs and wrapping deadlines" audio_worker_test
@@ -314,7 +305,6 @@ if core && [ $TABLES = 1 ]; then
     t "settings: PER5 records, palette ids and preference preservation" settings_test -O1 -w -Ibuild/gen
     t "UI: sounds keep steps, undo, recording, MIDI overflow, pending saves, panel recovery, drum grid, song chain, MONO gray" \
         ui_test -DMELODEE_USB_AUDIO=1 $FW
-    t "Prophet: all native tone knobs through the panel and sound engine" prophet_knob_test -O2 -DMELODEE_USB_AUDIO=1 $FW
     t "Sound designer: native recipes, dependencies, compare, discard and save" designer_test -O2 -DMELODEE_USB_AUDIO=1 $FW
     t "Sequencer: tied length/move/delete, eight-level undo/redo, MIDI step entry and playing-step recording" seq_edit_test \
         -DMELODEE_USB_AUDIO=1 $FW
@@ -359,21 +349,17 @@ if sound && [ $TABLES = 1 ]; then
         build/phys_demo build/drum_demo build/noise_demo build/fm6_demo
     t "regression: golden renders, health, voices, CPU budget" regress -O2 $FW -- \
         "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
-    t "PHYS: stability C-1..G9 over the parameter corners, worst-case cost against PHASE WIRE, demos" phys_test \
+    t "PHYS: stability C-1..G9 over the parameter corners, worst-case cost against FM6 DRAWBARS, demos" phys_test \
         -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW -- "$OUT/phys_test" build/phys_demo
-    t "paired FM6/Prophet voices: serial/concurrent sample equality and eight-voice allocation" dual_core_test \
+    t "paired FM6 voices: serial/concurrent sample equality, a worker retired mid-song" dual_core_test \
         -O2 $FW -pthread
     t "audio: 1296 ordered engine assignments, releases, controls and concurrent PCM parity" audio_matrix_test -O2 $FW -pthread
-    t "CZ-1: every knob changes a full tone; the dim ones leave INIT and factory tones bit for bit" cz1_knob_test -O2 $FW
-    t "native fp32: independent numerical references, exact pitch, quiet signals and fractional envelopes" synth_fpu_test \
+    t "native fp32: FM6 against an independent reference, exact pitch" synth_fpu_test \
         -O2 $FW
-    job prophet
     job macro_tests
     t "modulation matrix: off = bit-identical, the math, MIDI CC1 / CC11 / aftertouch, cost, demos" mod_test \
         -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW -- "$OUT/mod_test" build/mod_demo
     t "matrix S&H / SLEW / DEPTH, SPREAD: off = bit-identical, stereo sides and routing" mod_spread_test -O2 $FW
-    t "CZ: oscillator boundaries, native rate/target envelopes and independent lines" phase_test \
-        -DMELODEE_LEGACY_EXTRAS=1 -O2 $FW
     t "SID: oscillator/LFSR/register semantics, revisions and 32 factory presets" sid_test -O2 $FW
     job phys_ref
     t "DRUM: 808 instruments, velocity, hat choke, release, eight lanes and shared voice budget" drum_test -O2 $FW -- \

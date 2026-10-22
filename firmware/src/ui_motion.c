@@ -47,47 +47,21 @@ static int mo_value(uint32_t id, uint32_t step, int16_t *v)   /* the event at st
         }
     return 0;
 }
-/* a lane of the engine's own patch (motion.c MO_NATIVE + i): the Prophet's and FM6's values by their pages' names
- * (FM6's operators "OP3 OUT"), the CZ-1's tone bytes by what they belong to ("DCW 1 env") */
-static const param_desc_t MO_CZ_BYTE = {"TONE", F_INT, 0, 255, 0, 0, 0};
+/* a lane of the engine's own patch (motion.c MO_NATIVE + i): FM6's values by their pages' names (its operators
+ * "OP3 OUT") */
+static const param_desc_t MO_BYTE = {"TONE", F_INT, 0, 255, 0, 0, 0};
 static const param_desc_t *mo_desc(uint32_t id)         /* its range (and name) */
 {
     uint32_t i = (id&255u) - MO_NATIVE;
     if (!(id&256u))
         return param_desc_of(eng_idx(TSEL->eng_req), id);
-#if MELODEE_PROPHET
-    if (motion_native_tag(TSEL) == MO_TAG_P5 && i < NELEM(P5_PANEL) && P5_PANEL[i].label)
-        return &P5_PANEL[i];
-#endif
     if (motion_native_tag(TSEL) == MO_TAG_FM6)
-        return i < FP_PR1 ? &FM6_OPD[i % FP_OP] : i < FP_NAME ? &FM6_GD[i - FP_PR1] : &MO_CZ_BYTE;
-    return &MO_CZ_BYTE;
-}
-static void mo_cz_name(uint32_t i, char *b, uint32_t n, int brief)
-{
-    static const char *const PART[6] = {"Wave", "DCA key", "DCW key", "DCA", "DCW", "Pitch"};
-    static const uint8_t END[6] = {2, 4, 6, 23, 40, 57};   /* (a line's 57 bytes: its parts' ends) */
-    uint32_t line = i >= 71u, o = i - (line ? 71u : 14u), p;
-    char d[2] = {(char)('1' + line), 0};
-    if (i < 14u) {
-        str_cpy(b, i < 4u ? "Detune" : "Vibrato", n);
-        return;
-    }
-    for (p = 0; p < 5u && o >= END[p]; p++)
-        ;
-    str_cpy(b, PART[p], n);
-    str_cpy(b + str_len(b), brief ? "" : " ", n - str_len(b));
-    str_cpy(b + str_len(b), d, n - str_len(b));
-    if (p >= 3u && !brief)
-        str_cpy(b + str_len(b), " env", n - str_len(b));
+        return i < FP_PR1 ? &FM6_OPD[i % FP_OP] : i < FP_NAME ? &FM6_GD[i - FP_PR1] : &MO_BYTE;
+    return &MO_BYTE;
 }
 static void mo_name(uint32_t id, char *b, uint32_t n)   /* "Cutoff" */
 {
     uint32_t i = (id&255u) - MO_NATIVE;
-    if ((id&256u) && motion_native_tag(TSEL) == MO_TAG_CZ) {
-        mo_cz_name(i, b, n, 0);
-        return;
-    }
     if ((id&256u) && motion_native_tag(TSEL) == MO_TAG_FM6 && i < FP_PR1) {   /* "OP3 OUT" */
         str_cpy(b, "OP1 ", n);
         b[2] = (char)('6' - i / FP_OP);
@@ -172,13 +146,7 @@ static void mo_label(uint32_t id, char *b)              /* "CUTOFF" (too wide: t
         if (b[i] >= 'a' && b[i] <= 'z') b[i] = (char)(b[i] - 32);
     if (text_w(&AF_X, b) <= 40)
         return;
-    if ((id&256u) && motion_native_tag(TSEL) == MO_TAG_CZ) {   /* "DCW1" */
-        mo_cz_name((id&255u) - MO_NATIVE, b, 16, 1);
-        for (i = 0; b[i]; i++)
-            if (b[i] >= 'a' && b[i] <= 'z') b[i] = (char)(b[i] - 32);
-    } else {
-        str_cpy(b, mo_desc(id)->label, 16);
-    }
+    str_cpy(b, mo_desc(id)->label, 16);
 }
 static void motion_draw(void)
 {

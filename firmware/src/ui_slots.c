@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Slot pages (docs/design: mock/r6_popups PROJECT, README "Popups"): PROJECT, SAVE > USER, FM6 STORE and P5 STORE as
- * the list of their slots alone, no action chips. KNOB 1 / 2 the slot, OCT+ its sheet (the page's own actions: act_do
+/* Slot pages (docs/design: mock/r6_popups PROJECT, README "Popups"): PROJECT, SAVE > USER and FM6 STORE as the
+ * list of their slots alone, no action chips. KNOB 1 / 2 the slot, OCT+ its sheet (the page's own actions: act_do
  * in ui_input.c does them, as the chips did), OCT- Stage. The slot picked is a card: its name larger, a line about it,
  * PROJECT's Boot chip on the one power-on loads. PROJECT's last row, New song: OCT+ starts it. Included by ui_draw.c */
-enum { SK_NONE, SK_PROJECT, SK_USER, SK_FM6, SK_P5 };
+enum { SK_NONE, SK_PROJECT, SK_USER, SK_FM6 };
 #define SL_Y0 22                                        /* the rows from y 22: 22 px, the card 46 */
 #define SL_ROW 22
 #define SL_CARD 46
@@ -19,7 +19,7 @@ static uint32_t slot_kind(void)
         return SK_NONE;
     pg = cur_page();
     return pg->graph == GR_SLOTS ? SK_PROJECT : pg->graph == GR_USER ? SK_USER : pg->graph == GR_FMSTORE ? SK_FM6 :
-           pg->scope == SC_P5STORE ? SK_P5 : SK_NONE;
+           SK_NONE;
 }
 static uint32_t slot_count(uint32_t k) { return k == SK_PROJECT ? (uint32_t)PROJ_TMPL + 1u : user_limit(); }
 static uint32_t slot_cur(uint32_t k)                    /* the row picked */
@@ -27,8 +27,7 @@ static uint32_t slot_cur(uint32_t k)                    /* the row picked */
     switch (k) {
     case SK_PROJECT: return ui.proj_new ? (uint32_t)PROJ_TMPL : (uint32_t)song.g[G_SLOT] - 1u;
     case SK_USER: return ui.uslot % user_limit();
-    case SK_FM6: return fm6_bslot % user_limit();
-    default: return ((uint32_t)p5_store_slot - 1u) % user_limit();
+    default: return fm6_bslot % user_limit();
     }
 }
 static uint32_t slot_boot(void)                         /* the row power-on loads (+1), 0 none */

@@ -210,15 +210,13 @@ static int native_fm_import32(uint32_t first, const uint8_t *raw, uint32_t *save
 }
 static int native_load(uint32_t e,uint32_t k,uint32_t tr)
 {
-    if(tr>=NTRK || !native_used(e,k))return 1;
-    uint8_t loaded[CZ_BYTES];memcpy(loaded,native_raw(e,k),native_size(e));
+    if(tr>=NTRK || e!=ENGI_FM6 || !native_used(e,k))return 1;   /* (the CZ-1's and the Prophet's: kept, not played) */
+    uint8_t loaded[FM6_PACKED];memcpy(loaded,native_raw(e,k),native_size(e));
     track_t *t=&trk[tr];load_begin(t,UNDO_SOUND);panic_req|=(uint8_t)(1u<<tr);fm1_irq_off();
     uint32_t previous=t->eng_req;
     t->eng_req=(uint8_t)e;t->preset=0;t->user=(uint8_t)(k+1u);t->user_native=1;
-    if(previous!=e || e==ENGI_PROPHET)for(uint32_t j=0;j<8u;j++)t->p[P_E0+j]=ENGINES[e]->edit[j].def;
-    if(e==ENGI_FM6){uint8_t v[FP_SIZE+1u];fm6_unpack(loaded,v);fm6_set_patch(tr,v);}
-    else if(e==ENGI_PROPHET){memcpy(&p5_patch[tr],loaded,sizeof(p5_patch_t));p5_ready[tr]=1;p5_track_accept(t);}
-    else {memcpy(cz_patch[tr].raw,loaded,CZ_BYTES);t->p[P_E7]=CZ_NATIVE;cz_track_accept(t);}
+    if(previous!=e)for(uint32_t j=0;j<8u;j++)t->p[P_E0+j]=ENGINES[e]->edit[j].def;
+    {uint8_t v[FP_SIZE+1u];fm6_unpack(loaded,v);fm6_set_patch(tr,v);}
     fm1_irq_on();load_end(t);sync_reload=1;ui.force=1;return 0;
 }
 static int native_store(uint32_t e,uint32_t k,uint32_t tr,const char *name)

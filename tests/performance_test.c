@@ -12,7 +12,7 @@ static void assert_capture_poison(void){for(uint32_t i=0;i<CTL*NTRK;i++)assert(t
 static void setup(void)
 {
     memset(trk,0,sizeof trk);memset(&song,0,sizeof song);host_tracks_init();
-    for(uint32_t k=0;k<NTRK;k++){host_preset(&trk[k],HOST_SYNTH,0);trk[k].p[P_RESERVED34]=trk[k].p[P_RESERVED36]=trk[k].p[P_RESERVED33]=0;}
+    for(uint32_t k=0;k<NTRK;k++){host_preset(&trk[k],HOST_SYNTH,HOST_PLAIN);trk[k].p[P_RESERVED34]=trk[k].p[P_RESERVED36]=trk[k].p[P_RESERVED33]=0;}
     usb.up=usb.config=1;usb.suspended=0;ua_reset();ua_cap_channels=4;
 }
 static void capture_transitions(void)

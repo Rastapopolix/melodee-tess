@@ -49,8 +49,8 @@ static int16_t boot_cell;
 static const char *const N_MSRC[] = {"OFF", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H", "SLEW"};
 static const char *const N_MDST[] = {"OFF", "PITCH", "CUT", "SHP", "AMP", "PAN", "", "", "", "", "RATE",
                                      "VIB", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "DEPTH"};
-static const char *const N_ENGNAME[] = {"-", "-", MELODEE_LEGACY_EXTRAS ? "PHASE" : "-", "SID", "-", MELODEE_LEGACY_EXTRAS ? "VOICE" : "-", TRIO_ON ? "TRIO" : "-", MELODEE_LEGACY_EXTRAS ? "WHEEL" : "-", "-", PHYS_ON ? "PHYS" : "-",
-                                             "DRUM", MELODEE_LEGACY_EXTRAS ? "NOISE" : "-", "FM6", MELODEE_SLICE ? "SLICE" : "-", "-", "CZ-1", "-", "-", "-", "PROPHET"};
+static const char *const N_ENGNAME[] = {"-", "-", "-", "SID", "-", MELODEE_LEGACY_EXTRAS ? "VOICE" : "-", TRIO_ON ? "TRIO" : "-", MELODEE_LEGACY_EXTRAS ? "WHEEL" : "-", "-", PHYS_ON ? "PHYS" : "-",
+                                             "DRUM", MELODEE_LEGACY_EXTRAS ? "NOISE" : "-", "FM6", MELODEE_SLICE ? "SLICE" : "-", "-", "-", "-", "-", "-", "-"};   /* (15 CZ-1, 19 PROPHET: retired 2026-10-22) */
 
 #define PD(l, f, mn, mx, df) {l, f, mn, mx, df, 0, 0}
 #define PE(l, n, df) {l, F_ENUM, 0, (int16_t)(sizeof(n) / sizeof(n[0]) - 1), df, n, 0}
@@ -283,8 +283,6 @@ static const param_desc_t *track_desc(const track_t *t, uint32_t id)
         else if(type>=6u && type<=8u){fx_desc.label=type==6u?"TIME":"SIZE";fx_desc.fmt=F_PCT;}
         return &fx_desc;
     }
-    if (t->eng_req == 2u && id >= P_FM1_ATK && id <= P_FM4_LEVEL)
-        return &CZ_ED[id - P_FM1_ATK];
     if (id == P_MPCDEG) {                             /* a degree of the track's scale */
         static param_desc_t degree;
         degree = TP[P_MPCDEG];
@@ -303,8 +301,6 @@ static const param_desc_t *track_desc(const track_t *t, uint32_t id)
  * only; range and default are the same): what the editor protocol, user presets and projects use */
 static const param_desc_t *param_desc_of(uint32_t e, uint32_t id)
 {
-    if (e == 2u && id >= P_FM1_ATK && id <= P_FM4_LEVEL)
-        return &CZ_ED[id - P_FM1_ATK];
     return id >= P_E0 ? &ENGINES[e]->edit[id - P_E0] : &TP[id];
 }
 
@@ -440,7 +436,7 @@ static void param_format(const param_desc_t *d, int32_t v, char *val, const char
             /* The panel's compact card fits "13-16"; editor/picker names retain the CH prefix. */
             str_cpy(val, d->names[v] + (v == 1 ? 0 : 2), 6);
         } else
-            str_cpy(val, d->names==N_ENGNAME && v==ENGI_PROPHET ? "P5" : d->names[v < d->min ? d->min : v > d->max ? d->max : v], 6);
+            str_cpy(val, d->names[v < d->min ? d->min : v > d->max ? d->max : v], 6);
         if (d->unit)
             *unit = d->unit;
         break;
@@ -497,11 +493,10 @@ enum { FAM_HOME, FAM_ENV, FAM_LFO, FAM_SCL, FAM_EDIT, FAM_GLO, FAM_SAVE, FAM_ARP
        FAM_FX, FAM_COUNT };
 #define FAM_GEN FAM_ARP      /* Tessera: ARP's family holds the generators too (no new family: FAM_COUNT sized state) */
 enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK,   /* SC_TRK: the TRACKS page (ui_input.c tracks_edit) */
-       SC_FM6, SC_FMOP, SC_CZ, SC_CZ1, SC_P5, SC_P5STORE, SC_DRUM, SC_DRUMHIT };                         /* FM6: its patch, functions; operator fm6_opsel;
-                                                                  * CZ1: a native CZ-1 tone (cz_edit.h) */
+       SC_FM6, SC_FMOP, SC_DRUM, SC_DRUMHIT };          /* FM6: its patch, functions; operator fm6_opsel */
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
        GR_MOD, GR_PATS, GR_SONG, GR_MOTION, GR_CHORD, GR_SLICES,
-       GR_FMEG, GR_FMPEG, GR_FMSTORE, GR_CZTOOLS, GR_SCALE_PICKER, GR_DRUMHIT, GR_PATGRID, GR_EVOLVE, GR_FORM, GR_TWEAK,
+       GR_FMEG, GR_FMPEG, GR_FMSTORE, GR_SCALE_PICKER, GR_DRUMHIT, GR_PATGRID, GR_EVOLVE, GR_FORM, GR_TWEAK,
        GR_CORDS, GR_TWEAK2, GR_ORGANIC, GR_MATRIX, GR_NOTELEN, GR_TIMING }; /* NOTES shares GR_ROLL for steps and recorded events */
 
 typedef struct {
@@ -509,15 +504,6 @@ typedef struct {
     uint8_t fam, scope, graph;
     uint8_t id[4];               /* param ids; 0xFF = empty slot */
 } page_t;
-
-#include "cz_edit.h"
-#include "prophet_edit.h"
-#define CZ_ENV_PAGES(t, l, e) \
-    {t " R1-4", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_EBASE(l, e), LCZ_EBASE(l, e) + 1, LCZ_EBASE(l, e) + 2, LCZ_EBASE(l, e) + 3}}, \
-    {t " R5-8", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_EBASE(l, e) + 4, LCZ_EBASE(l, e) + 5, LCZ_EBASE(l, e) + 6, LCZ_EBASE(l, e) + 7}}, \
-    {t " L1-4", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_EBASE(l, e) + 8, LCZ_EBASE(l, e) + 9, LCZ_EBASE(l, e) + 10, LCZ_EBASE(l, e) + 11}}, \
-    {t " L5-8", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_EBASE(l, e) + 12, LCZ_EBASE(l, e) + 13, LCZ_EBASE(l, e) + 14, LCZ_EBASE(l, e) + 15}}, \
-    {t " POINT", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_EBASE(l, e) + 16, LCZ_EBASE(l, e) + 17, 0xFF, 0xFF}}
 
 #define G_TRK_SEND 0xFDu
 #define G_TRK_RECQ 0xFEu                                 /* a global page's column that is the selected track's P_RECQ */
@@ -551,22 +537,6 @@ static const page_t PAGES[] = {
     {"DRUM SOUND",FAM_EDIT,SC_DRUM,GR_NONE,{0,1,2,3}},
     {"DRUM MIX",FAM_EDIT,SC_DRUM,GR_NONE,{0,4,255,255}},
     /* FM6 only (page_visible): the patch as the DX7 has it, its operators (PRESETS picks one), the functions */
-    {"P5 STORE",FAM_EDIT,SC_P5STORE,GR_NONE,{0,1,2,3}},
-    {"P5 OSC A",FAM_EDIT,SC_P5,GR_NONE,{0,3,4,8}},
-    {"P5 OSC B",FAM_EDIT,SC_P5,GR_NONE,{1,2,9,12}},
-    {"P5 B WAVES",FAM_EDIT,SC_P5,GR_NONE,{5,6,7,11}},
-    {"P5 MIXER",FAM_EDIT,SC_P5,GR_NONE,{14,15,16,10}},
-    {"P5 FILTER",FAM_EDIT,SC_P5,GR_NONE,{17,18,19,20}},
-    {"P5 FLT ENV",FAM_EDIT,SC_P5,GR_NONE,{43,45,47,49}},
-    {"P5 AMP ENV",FAM_EDIT,SC_P5,GR_NONE,{44,46,48,50}},
-    {"P5 ENV MOD",FAM_EDIT,SC_P5,GR_NONE,{40,41,42,51}},
-    {"P5 POLYMOD",FAM_EDIT,SC_P5,GR_NONE,{32,33,34,35}},
-    {"P5 MOD FLT",FAM_EDIT,SC_P5,GR_NONE,{36,37,38,39}},
-    {"P5 LFO",FAM_EDIT,SC_P5,GR_NONE,{21,23,24,25}},
-    {"P5 WHEEL",FAM_EDIT,SC_P5,GR_NONE,{22,26,27,28}},
-    {"P5 WHEEL 2",FAM_EDIT,SC_P5,GR_NONE,{29,30,31,13}},
-    {"P5 UNISON",FAM_EDIT,SC_P5,GR_NONE,{52,53,54,87}},
-    {"P5 BEND",FAM_EDIT,SC_P5,GR_NONE,{86,255,255,255}},
     {"STORE", FAM_EDIT, SC_FM6, GR_FMSTORE, {0, 1, 2, 3}},   /* SLOT STORE SEND INIT (ui_input.c act_do) */
     {"ALGO", FAM_EDIT, SC_FM6, GR_NONE, {FP_ALG, FP_FB, FP_OKS, FP_TRNSP}},
     {"FREQ", FAM_EDIT, SC_FMOP, GR_NONE, {FP_FC, FP_FF, FP_DET, FP_MODE}},
@@ -584,24 +554,6 @@ static const page_t PAGES[] = {
     {"FM PORTA", FAM_EDIT, SC_FM6, GR_NONE, {FP_SIZE + FN_PMODE, FP_SIZE + FN_PTIME, FP_SIZE + FN_GLISS, FP_SIZE + FN_ENGINE}},
     {"FM WH/FT", FAM_EDIT, SC_FM6, GR_NONE, {FP_SIZE + FN_MWR, FP_SIZE + FN_MWA, FP_SIZE + FN_FCR, FP_SIZE + FN_FCA}},
     {"FM BR/AT", FAM_EDIT, SC_FM6, GR_NONE, {FP_SIZE + FN_BCR, FP_SIZE + FN_BCA, FP_SIZE + FN_ATR, FP_SIZE + FN_ATA}},
-    /* CZ-1 only (page_visible): the native tone, every panel value (cz_edit.h) */
-    {"CZ TOOLS", FAM_EDIT, SC_CZ1, GR_CZTOOLS, {0, 1, 2, 3}},   /* NAME 1>2 2>1 COMP (ui_input.c act_do) */
-    {"CZ LINE", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_LINE, LCZ_MOD, LCZ_OCT, 0xFF}},
-    {"CZ DETUNE", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_SIGN, LCZ_DOCT, LCZ_NOTE, LCZ_FINE}},
-    {"CZ VIBRATO", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_VWAVE, LCZ_VRATE, LCZ_VDEP, LCZ_VDELAY}},
-    {"CZ WINDOW", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_WIN(0), LCZ_WIN(1), 0xFF, 0xFF}},
-    {"CZ1 WAVE", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_LBASE(0) + LCZ_W1, LCZ_LBASE(0) + LCZ_W2, LCZ_LBASE(0) + LCZ_KW, LCZ_LBASE(0) + LCZ_KA}},
-    {"CZ1 TOUCH", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_LBASE(0) + LCZ_LEVEL, LCZ_LBASE(0) + LCZ_VP, LCZ_LBASE(0) + LCZ_VW, LCZ_LBASE(0) + LCZ_VA}},
-    CZ_ENV_PAGES("C1 PIT", 0, 0), CZ_ENV_PAGES("C1 WAV", 0, 1), CZ_ENV_PAGES("C1 AMP", 0, 2),
-    {"CZ2 WAVE", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_LBASE(1) + LCZ_W1, LCZ_LBASE(1) + LCZ_W2, LCZ_LBASE(1) + LCZ_KW, LCZ_LBASE(1) + LCZ_KA}},
-    {"CZ2 TOUCH", FAM_EDIT, SC_CZ1, GR_NONE, {LCZ_LBASE(1) + LCZ_LEVEL, LCZ_LBASE(1) + LCZ_VP, LCZ_LBASE(1) + LCZ_VW, LCZ_LBASE(1) + LCZ_VA}},
-    CZ_ENV_PAGES("C2 PIT", 1, 0), CZ_ENV_PAGES("C2 WAV", 1, 1), CZ_ENV_PAGES("C2 AMP", 1, 2),
-    /* PHASE: the retired FM4 storage fields hold split CZ envelopes. */
-    {"DCW1 ENV", FAM_EDIT, SC_CZ, GR_NONE, {P_FM1_ATK, P_FM1_DEC, P_FM1_SUS, P_FM1_REL}},
-    {"DCW2 ENV", FAM_EDIT, SC_CZ, GR_NONE, {P_FM2_ATK, P_FM2_DEC, P_FM2_SUS, P_FM2_REL}},
-    {"DCA2 ENV", FAM_EDIT, SC_CZ, GR_NONE, {P_FM3_ATK, P_FM3_DEC, P_FM3_SUS, P_FM3_REL}},
-    {"DCO ENV", FAM_EDIT, SC_CZ, GR_NONE, {P_FM4_ATK, P_FM4_DEC, P_FM4_SUS, P_FM4_REL}},
-    {"CZ LEVEL", FAM_EDIT, SC_CZ, GR_NONE, {P_FM1_LEVEL, P_FM2_LEVEL, P_FM3_LEVEL, P_FM4_LEVEL}},
     {"OP1 ENV", FAM_EDIT, SC_TRACK, GR_ADSR, {P_FM1_ATK, P_FM1_DEC, P_FM1_SUS, P_FM1_REL}},
     {"OP2 ENV", FAM_EDIT, SC_TRACK, GR_ADSR, {P_FM2_ATK, P_FM2_DEC, P_FM2_SUS, P_FM2_REL}},
     {"OP3 ENV", FAM_EDIT, SC_TRACK, GR_ADSR, {P_FM3_ATK, P_FM3_DEC, P_FM3_SUS, P_FM3_REL}},
@@ -702,31 +654,6 @@ static void fm6_page_put(const page_t *pg, uint32_t slot, int32_t val)
 static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **valp)
 {
     uint32_t id = pg->id[slot];
-    if(pg->scope==SC_P5 || pg->scope==SC_P5STORE){
-        if(!MELODEE_PROPHET){*valp=0;return 0;}   /* (Tessera: left out, core.h) */
-        if(id==255u || (pg->scope==SC_P5 && (id>=88u || !P5_PANEL[id].label))){*valp=0;return 0;}
-        p5_cell[slot&3u]=pg->scope==SC_P5STORE?(slot?0:p5_store_slot):p5_patch_of(TSEL)->raw[id]+(id==P5_BEND?1:0);
-        /* Sequential stores zero for the default five-voice unison count. */
-        if(pg->scope==SC_P5 && id==P5_UNISON_COUNT && !p5_cell[slot&3u])p5_cell[slot&3u]=5;
-        *valp=&p5_cell[slot&3u];
-        if(pg->scope==SC_P5 && p5_keyed_tune(TSEL,id)){
-            p5_cell[slot&3u]=(int16_t)(clamp(p5_patch_of(TSEL)->raw[id],0,96)/2-12);
-            return &P5_TUNE_DISPLAY[id];
-        }
-        return pg->scope==SC_P5STORE?&P5_STORE[slot&3u]:id==P5_BEND?&P5_BEND_DISPLAY:&P5_PANEL[id];
-    }
-    if (pg->scope == SC_CZ1 && !MELODEE_CZ) { *valp = 0; return 0; }   /* (Tessera: left out, core.h) */
-    if (pg->scope == SC_CZ1) {                           /* a copy of the tone's panel value (cz_ed_put writes it) */
-        *valp = 0;
-        if (id == 0xFFu || TSEL->eng_req != ENGI_CZ)
-            return 0;
-        if (pg->graph == GR_CZTOOLS) {
-            cz_ed_cell[slot & 3u] = 0;
-            *valp = &cz_ed_cell[slot & 3u];
-            return &CZ_ACTIONS[slot & 3u];
-        }
-        return cz_ed_desc(song.sel % NTRK, id, slot, valp);
-    }
     if ((pg->scope == SC_FM6 || pg->scope == SC_FMOP) && !MELODEE_FM6) { *valp = 0; return 0; }   /* (left out) */
     if (pg->scope == SC_FM6 || pg->scope == SC_FMOP)
         return fm6_page_desc(pg, slot, valp);
