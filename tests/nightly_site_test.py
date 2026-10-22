@@ -36,6 +36,7 @@ class NightlySite(unittest.TestCase):
             self.assertIn("Install 1.1.0", home)
             self.assertIn("firmware/melodee-tess-1.1.0-1core.fwsc", home)
             self.assertNotRegex(home, r"@[A-Z0-9]+@")
+            self.assertTrue((site / "media/about/setup.jpg").exists())   # the About photo
             editor = site / "webapp/editor/index.html"
             editor.write_text("existing published editor")
             # Exercise migration from the existing inline-only release metadata.

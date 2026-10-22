@@ -12,6 +12,7 @@
 **Tessera** is a generative firmware for the M-Vave FM-1. Each of the four tracks can play its own steps, an
 arpeggio, or one of twelve generators, and the pages around them evolve the phrases, build song forms, pass hits
 between tracks and modulate anything from anything. GPL-3.0-only. **Status: Experimental.**
+By **Theo Dainis** ([Rastapopolix](https://github.com/Rastapopolix)).
 
 Tessera grew out of Melodee (Tess), a fork of [Melodee](https://github.com/keremimo/melodee) by **keremimo**,
 itself built on *Felucca* by **Leo Kuroshita / Hügelton Instruments**. Releases up to 1.3.x were published as
@@ -112,9 +113,21 @@ See [BUILDING.md](BUILDING.md). The host tests run with `tests/run_tests.sh`; th
 
 ---
 
+## About me
+
+<p align="center"><img src="assets/about/setup.jpg" alt="Theo's studio: two Eurorack cases, Elektron boxes and other synths around a corner desk" width="100%"></p>
+
+I'm Theo Dainis, from New Zealand. I've been using and building synthesisers for the past 15 years, and I'm passionate about modular and open source. Elektron and Mutable Instruments are big influences on me. I love the DIY side: building things, and learning how music hardware works on the inside. Tessera is the sequencer I wanted on the FM-1: modular in a box, a small instrument that writes with you.
+
+### Built with Claude Code
+
+Tessera's code is written with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. I designed it, made the decisions, and test every release on my own FM-1 before it goes out. The source is open, so you can read every line and every change. Like any firmware, it comes with no warranty: save a **Complete backup** from the web editor before you flash.
+
+---
+
 ## Credits and licence
 
-GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved. Melodee is by keremimo,
+Tessera is by **Theo Dainis (Rastapopolix)**. GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved. Melodee is by keremimo,
 Felucca by Leo Kuroshita / Hügelton Instruments.
 
 The ATLAS generator uses the drum map of **Grids** by Émilie Gillet / Mutable Instruments. Several generators are

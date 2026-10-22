@@ -82,7 +82,7 @@ enum { MC_TEXT, MC_TITLE, MC_URL };
 typedef struct { const char *text; uint8_t kind; } menu_credit_t;
 static const menu_credit_t MENU_CREDITS[] = {
     {"TESSERA / THIS FIRMWARE", MC_TITLE},
-    {"Tessera by Rastapopolix (Theo Dainis): the generators, engines and project format; a fork of Melodee / GPL-3.0", MC_TEXT},
+    {"Tessera by Theo Dainis (Rastapopolix): the generators, engines and project format; a fork of Melodee / GPL-3.0", MC_TEXT},
     {"Thanks: Inputsignwave", MC_TEXT},
     {"A tessera is the small tile of a mosaic: short phrases set side by side into a larger form", MC_TEXT},
     {"https://github.com/Rastapopolix/melodee-tess", MC_URL},
@@ -184,7 +184,7 @@ static int32_t menu_document(int32_t y, int draw)
         x = cv_text(6, y + 62, &AF_M, MELODEE_VERSION, T_TEXT);
         cv_text(x + 8, y + 67, &AF_X, __DATE__, T_MID);
         draw_about_qr(158, y + 4);
-        cv_text(6, y + 94, &AF_S, "TESSERA by Rastapopolix", T_TEXT);
+        cv_text(6, y + 94, &AF_S, "TESSERA by Theo Dainis (Rastapopolix)", T_TEXT);
         cv_text(6, y + 112, &AF_S, "Thanks: Inputsignwave", T_SEC);
         cv_text(6, y + 130, &AF_S, "Based on MELODEE by Kerem Kilic", T_TEXT);
         cv_text(6, y + 148, &AF_S, "\xA9 2026 Kerem Kilic, Ellic Studio", T_SEC);

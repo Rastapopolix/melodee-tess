@@ -130,6 +130,10 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; backgro
        overflow-wrap: anywhere; }
 .note { margin-top: 28px; padding: 16px 20px; border: 1px solid var(--line); color: var(--mid); font-size: 16px; }
 .note b { color: var(--text); }
+.about { display: grid; grid-template-columns: 1.3fr 1fr; gap: var(--gap); align-items: start; }
+.about p { margin: 0; }
+.about .note { margin-top: 20px; }
+@media (max-width: 860px) { .about { grid-template-columns: 1fr; } }
 
 footer { border-top: 1px solid var(--line); padding: 36px 0 48px; color: var(--mid); font-size: 15px; }
 footer p { max-width: 52em; }
@@ -148,6 +152,7 @@ footer p { max-width: 52em; }
       <a class="opt" href="#generators">Generators</a>
       <a class="opt" href="#recipes">Recipes</a>
       <a href="#install">Install</a>
+      <a class="opt" href="#about">About</a>
       <a href="https://github.com/Rastapopolix/melodee-tess">GitHub</a>
     </div>
   </div>
@@ -282,11 +287,26 @@ footer p { max-width: 52em; }
       <a href="https://github.com/Rastapopolix/melodee-tess/blob/HEAD/docs/RECOVERY.md">recovery guide</a>.</div>
   </div>
 </section>
+<section id="about">
+  <div class="wrap">
+    <header>
+      <div class="kicker">About</div>
+      <h2>Who makes Tessera</h2>
+    </header>
+    <div class="about">
+      <div class="screen"><img src="media/about/setup.jpg" alt="Theo's studio: two Eurorack cases, Elektron boxes and other synths around a corner desk" loading="lazy" width="1200" height="695"></div>
+      <div>
+        <p>I'm Theo Dainis, from New Zealand. I've been using and building synthesisers for the past 15 years, and I'm passionate about modular and open source. Elektron and Mutable Instruments are big influences on me. I love the DIY side: building things, and learning how music hardware works on the inside. Tessera is the sequencer I wanted on the FM-1: modular in a box, a small instrument that writes with you.</p>
+        <div class="note"><b>Built with Claude Code.</b> Tessera's code is written with <a href="https://claude.com/claude-code">Claude Code</a>, Anthropic's AI coding tool. I designed it, made the decisions, and test every release on my own FM-1 before it goes out. The source is open, so you can read every line and every change. Like any firmware, it comes with no warranty: save a <b>Complete backup</b> from the <a href="webapp/editor/">web editor</a> before you flash.</div>
+      </div>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer>
   <div class="wrap">
-    <p>Tessera grew out of Melodee (Tess), a fork of <a href="https://github.com/keremimo/melodee">Melodee</a> by keremimo,
+    <p>Tessera is by Theo Dainis (Rastapopolix). It grew out of Melodee (Tess), a fork of <a href="https://github.com/keremimo/melodee">Melodee</a> by keremimo,
       itself built on Felucca by Leo Kuroshita / Hügelton Instruments. ATLAS uses the drum map of Grids by
       Émilie Gillet / Mutable Instruments; FALL, CONSTELLATION, QUAD, AWAKE and SERIES are inspired by the norns
       scripts Fall (ambalek), Constellation (timothy-taylor), initenere, Awake (tehn) and nørgård; TIDE and SWARM are inspired
