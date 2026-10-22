@@ -352,8 +352,15 @@ static int test_compact_history(void)
                     exact &= !memcmp(&s, &decoded, sizeof s);
                 }
     bad += check("compact history preserves every step byte for all control combinations", exact);
+    {   /* step v2: RATCH and NUDGE (the sub byte) go through history too */
+        step_t v = {{60}, 1, ST_NOTE, 0, 96, 0, 0, 0, 0}, w;
+        step_snapshot_t snap;
+        step_set_ratch(&v, 3); step_set_nudge(&v, -5);
+        step_snapshot_put(&snap, &v); w = step_snapshot_get(&snap);
+        bad += check("history keeps RATCH and NUDGE", !memcmp(&v, &w, sizeof v) && step_ratch(&w) == 3u && step_nudge(&w) == -5);
+    }
     bad += check("all eight levels have fixed storage even for dense patterns",
-                 sizeof step_history.state[0].step == NSTEP * 9u && sizeof undo_sram[0].step == NSTEP * 9u);
+                 sizeof step_history.state[0].step == NSTEP * 10u && sizeof undo_sram[0].step == NSTEP * 10u);
     track_t *t = edit_setup();
     for (uint32_t i = 0; i < NSTEP; i++) {
         put_note(t, i, 48u + i % 36u, 1);
