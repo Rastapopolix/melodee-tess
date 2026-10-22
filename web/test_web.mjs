@@ -31,7 +31,7 @@ const E = vm.runInNewContext(proto + `
 ;({ frame, unframe, parse, req, Link, parseWav, resample, normalize, takeSample, autoTrim, zoomView, rootFromName, buildSlot, makeMockDevice, CMD, SMP,
    UP, bank, nativeBank, capturePatch, auditionPatch, startWatch, libraryFile, readLibraryFile, paramKeys, patternFromSteps, stepsFromPattern, upName,
    mixer, parseNotes, parseHits, hitsText, gridFromSteps, LANE_NOTE, LANE_OF, readDevicePreferences, devicePresetRows, engineOrder, ENGINE_ORDER, aliasOf, fmtValue, FM6,
-   FM4, fromDigital, CZ, P5, P5_FACTORY, p5LibraryPatch, nativeImportTargets, scaleRows, SCALE_INFO, czLibraryPatch, czBankEncode, czBankDecode, czBankUpload, czBankRead, czLegacyTone })`,
+   FM4, fromDigital, nativeImportTargets, scaleRows, SCALE_INFO })`,
 { setTimeout, clearTimeout, setInterval, clearInterval, console });
 
 {
@@ -58,10 +58,11 @@ const E = vm.runInNewContext(proto + `
     "native motion: existing motion replies remain compatible");
 }
 
-/* (the PROPHET and CZ-1 engines, their editor protocol and the mock's: retired 2026-10-22) */
+/* (the PROPHET and CZ-1 engines, their editor protocol, panels and the mock's: retired 2026-10-22; fm1backup.js still
+   reads an older archive's Prophet banks, checked below) */
 
 async function prophetBackupTests(){
-  const B=await import("./fm1backup.js"),raw=new Uint8Array(3600),v=new DataView(raw.buffer);v.setUint32(0,0x31553550,true);v.setUint32(4,1<<23,true);v.setUint32(8,1<<23,true);raw.set(E.P5.init(),12+23*138);
+  const B=await import("./fm1backup.js"),raw=new Uint8Array(3600),v=new DataView(raw.buffer);v.setUint32(0,0x31553550,true);v.setUint32(4,1<<23,true);v.setUint32(8,1<<23,true);{const prog=new Uint8Array(138);prog[133]=133;prog[134]=50;prog[135]=3;raw.set(prog,12+23*138);}   /* (a program's wire bytes) */
   const file={format:"felucca-backup",version:1,objects:Array.from({length:28},(_,id)=>({id,size:0,crc:0,data:""}))};
   for(const id of [0,1]){const bytes=new Uint8Array(id===0?27752:604);file.objects[id]={id,size:bytes.length,crc:B.bkCrc(bytes),data:Buffer.from(bytes).toString("base64")};}
   const set=(bytes)=>file.objects[27]={id:27,size:bytes.length,crc:B.bkCrc(bytes),data:Buffer.from(bytes).toString("base64")};set(raw);
@@ -79,15 +80,15 @@ async function nativeTests() {
   const m=E.makeMockDevice(), inp=[...m.access.inputs.values()][0], out=[...m.access.outputs.values()][0];
   const link=new E.Link(d=>out.send(d),{timeout:500});inp.onmidimessage=e=>link.receive(e.data);const rq=(r,o)=>link.request(r,o);
   const info=E.parse[E.CMD.INFO](await rq(E.req.info()));
-  const cz=E.CZ.init(),fm=Array.from(E.FM6.INIT_PK);E.CZ.setName(cz,"FULL CZ NAME XY!");
-  ok((await E.nativeBank.list(rq,12)).total===64 && (await E.nativeBank.list(rq,15)).total===128,"native: independent 64 FM6 and 128 CZ preset lists");
-  await E.nativeBank.put(rq,12,63,{engine:12,fm6:fm});await E.nativeBank.put(rq,15,127,{engine:15,cz});
-  const a=await E.nativeBank.get(rq,info,12,63),b=await E.nativeBank.get(rq,info,15,127);
-  ok(eq(a.fm6,fm) && eq(b.cz,cz) && b.name==="FULL CZ NAME XY!","native: highest slots return exact native bytes and full CZ name");
-  ok(a.p.every(x=>x===null) && !a.pattern && !b.grid,"native: returned presets contain no Felucca effects or pattern");
+  const fm=Array.from(E.FM6.INIT_PK);
+  ok((await E.nativeBank.list(rq,12)).total===64 && info.native && !info.native[15] && !info.native[19],"native: 64 FM6 presets; no CZ-1 or Prophet pool");
+  await E.nativeBank.put(rq,12,63,{engine:12,fm6:fm});
+  const a=await E.nativeBank.get(rq,info,12,63);
+  ok(eq(a.fm6,fm),"native: the highest slot returns its exact DX7 bytes");
+  ok(a.p.every(x=>x===null) && !a.pattern && !a.grid,"native: returned presets contain no Felucca effects or pattern");
   await rq(E.req.set(0,34,77));await rq(E.req.set(0,13,12));const before=JSON.stringify(m.state.tracks[0].step);
   const refused=await E.nativeBank.load(rq,15,127,0);
-  ok(refused===1 && E.parse[E.CMD.DUMP](await rq(E.req.dump()),info).engine!==15,"native: a CZ tone stays stored, its load refused (the CZ-1 retired)");
+  ok(refused===1 && E.parse[E.CMD.DUMP](await rq(E.req.dump()),info).engine!==15,"native: a CZ-1 slot is refused (no such pool)");
   await E.nativeBank.load(rq,12,63,0);const sound=E.parse[E.CMD.DUMP](await rq(E.req.dump()),info);
   ok(sound.engine===12 && sound.p[34]===0 && sound.p[13]===12 && JSON.stringify(m.state.tracks[0].step)===before,"native: loading changes the voice and keeps modulation and steps without effects");
   await rq(E.req.set(0,info.pe0,3));await E.nativeBank.load(rq,12,63,0);
@@ -99,10 +100,10 @@ async function nativeTests() {
   const prefs=await E.readDevicePreferences(rq,info,names);const rows=E.devicePresetRows(info,names,prefs);
   ok(rows.some(r=>r.nativeEngine===12 && r.preset===63 && r.favorite),"native: normal preset browser includes FM6 user favorites");
   let writes=0;const counted=(...args)=>{writes++;return rq(...args);};
-  for(const [engine,pt] of [[12,{engine:15,cz}],[15,{engine:15,cz:cz.slice(0,128)}],[12,{engine:12,fm6:[...fm.slice(0,127),128]}]])try{await E.nativeBank.put(counted,engine,0,pt);}catch{}
+  for(const [engine,pt] of [[12,{engine:15,fm6:fm}],[12,{engine:12,fm6:fm.slice(0,127)}],[12,{engine:12,fm6:[...fm.slice(0,127),128]}]])try{await E.nativeBank.put(counted,engine,0,pt);}catch{}
   ok(!writes,"native: wrong collection and malformed tones are rejected before writing");
   await rq(E.req.preset(3, 0));ok(E.parse[E.CMD.NATIVE](await rq(E.req.native(12,7,0))).user===0,"native: choosing a factory preset clears native origin");
-  await E.nativeBank.erase(rq,15,127);ok(!(await E.nativeBank.get(rq,info,15,127)).used && !(await E.nativeBank.list(rq,15)).slots[127].used,"native: erase removes the slot from the scrollable collection");
+  await E.nativeBank.erase(rq,12,63);ok(!(await E.nativeBank.get(rq,info,12,63)).used && !(await E.nativeBank.list(rq,12)).slots[63].used,"native: erase removes the slot from the scrollable collection");
   link.close();m.stop();
 }
 await nativeTests();

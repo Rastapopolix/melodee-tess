@@ -109,8 +109,7 @@ def generate():
             [tools / "gen_ui_palettes.py", GEN / "ui_palettes.h"],
             [tools / "gen_tables.py", GEN / "melodee_tables.h"],
             [tools / "gen_help.py", GEN / "pid_help.h"],
-            [tools / "gen_fm6_patches.py", GEN / "melodee_fm6.h"],
-            [tools / "gen_prophet_factory.py", GEN / "melodee_prophet_factory.h", "--web", "check"]]   # (the web editor's copy)
+            [tools / "gen_fm6_patches.py", GEN / "melodee_fm6.h"]]
     procs = [subprocess.Popen([sys.executable, *map(str, c)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                               text=True) for c in cmds]
     failed = []
