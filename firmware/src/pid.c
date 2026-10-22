@@ -343,7 +343,8 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_TW_SHIFT, "TWEAK SHIFT", "Transposes the notes by semitones; while following, by scale steps from the "
                                    "followed note."),
     X_(TX_TW_DROP, "TWEAK DROP", "The chance a hit is left out, whatever the generator."),
-    X_(TX_TW_HUMAN, "TWEAK HUMAN", "Varies velocity and gate a little, as a player would."),
+    X_(TX_TW_HUMAN, "TWEAK HUMAN", "Varies velocity, gate and timing a little, as a player would: at 100 a note up to "
+                                   "20 ms behind the beat, never early; the same each time the piece plays."),
     X_(TX_TW_FOLLOW, "TWEAK FOLLOW", "Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own."),
     X_(TX_GRD_X, "ATLAS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
     X_(TX_GRD_Y, "ATLAS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),

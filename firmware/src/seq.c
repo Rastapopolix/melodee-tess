@@ -1061,6 +1061,8 @@ static void seq_grid_tick(track_t *t, uint32_t n)
     seq_sub_tick(t, step_samples(t, period, t->seq_idx));   /* (SUB: this step's repeats due, before the next step) */
     if (trk_index(t) >= TESSERA_TRACKS || tessera.mode[trk_index(t)] == TESS_ENG_OFF)
         seq_nudge_tick(t, period, step_samples(t, period, t->seq_idx), len);   /* (NUDGE: a held step, the next early) */
+    else
+        seq_gen_tick(t, step_samples(t, period, t->seq_idx));   /* (HUMAN: a generator step a moment late) */
     for (;;) {
         uint32_t cur_len = step_samples(t, period, t->seq_idx);
         if (t->seq_pos < cur_len && t->seq_pos != 0x7FFFFFFFu + n)
@@ -1109,9 +1111,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             }
             uint32_t tr_idx = trk_index(t);
             if (tr_idx < TESSERA_TRACKS && tessera.mode[tr_idx] != TESS_ENG_OFF) {
-                seq_sub_begin(t);                   /* (SUB: the notes it plays recorded, its RATCH armed) */
-                tessera_clock_step(t);
-                seq_sub_arm(t, seq_sub_can(t) ? tessera_ratchet(tr_idx) : 1u, step_samples(t, period, t->seq_idx), 0);
+                seq_gen_step(t, tr_idx, step_samples(t, period, t->seq_idx));   /* (now, or HUMAN's moment late) */
             } else {
                 step_t sv;                          /* (STEP EVOLVE: the step with its change, tessera.c; not again for a
                                                      * step NUDGE played early) */

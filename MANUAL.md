@@ -302,7 +302,7 @@ are reached. Changing MODE or ROLL starts the form again at A.
 |---|---|---|
 | 1 | **SHIFT** (±24) | Transposes by semitones; while following, by scale steps from the followed note. |
 | 2 | **DROP** (0–100 %) | The chance a hit is left out, whatever the generator. |
-| 3 | **HUMAN** (0–100 %) | Varies velocity and gate a little, as a player would. |
+| 3 | **HUMAN** (0–100 %) | Varies velocity, gate and timing a little, as a player would: at 100 a note lands up to 20 ms behind the beat (never early), the same each time the piece plays. |
 | 4 | **FOLLOW** | OFF, or T1 to T4: plays that track's pitch, SHIFT away, in this track's scale. STEP tracks can be followed too. The followed track is drawn in its own colour. |
 
 On an ATLAS track only DROP and HUMAN apply: SHIFT, FOLLOW and FLRSH would change which drum plays.

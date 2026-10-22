@@ -1102,10 +1102,36 @@ static uint32_t sub_nudge_play(int32_t nudge, uint32_t ratch, uint32_t shape, ui
     for (f = 0; f < 4u; f++) mix_block(o, CTL);
     return n;
 }
+/* Euclid on track 0 for two bars at 1/16 (a step 172 blocks) with TWEAK HUMAN human: each note's block into blk[], up to
+ * max; returns how many */
+static uint32_t sub_human_play(uint32_t human, uint32_t *blk, uint32_t max)
+{
+    uint32_t f, total, i, n = 0;
+    int32_t o[2 * CTL];
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (i = 0; i < NTRK; i++) tt_open[i] = -1;
+    tt_n = tt_blk = 0;
+    gen(0, TESS_ENG_EUCLID);
+    tessera_param_set(0, TX_TW_HUMAN, (int32_t)human);
+    rng_state = 0x4855u;
+    total = 2u * 4u * seq_beat_samples();
+    transport_req = 1;
+    for (f = 0; f < total + 4u * CTL; f += CTL) {
+        if (f >= total) transport_req = 2;
+        mix_block(o, CTL);
+        tt_blk++;
+    }
+    for (i = 0; i < tt_n && n < max; i++)
+        if (tt_ev[i].tr == 0 && tt_ev[i].blk < total / CTL) blk[n++] = tt_ev[i].blk;
+    return n;
+}
 /* "1": RATCH x1..x4 and x8 play 8 16 24 32 and 64 notes in two bars, its hits 172 / hits blocks apart; CHANCE 0 none
  * ratchet, 50 some, the same ones again; NOTE LENGTH FIXED's held notes play once; Grids' parts all repeat; nothing held
  * after STOP. A STEP track's per-step RATCH: x4 and x8 repeat each of its 8 notes 3 and 7 times, a drum hit's too; its
- * NUDGE moves a step 4/16 late or early, a ratchet with it; SHAPE ACCEL / DECEL place a x4's hits as it says */
+ * NUDGE moves a step 4/16 late or early, a ratchet with it; SHAPE ACCEL / DECEL place a x4's hits as it says;
+ * HUMAN 100 plays a generator's notes 0..20 ms late */
 static int sub_near(uint32_t got, uint32_t want) { return got + 2u >= want && got <= want + 2u; }
 static void sub_check(char *res, size_t cap)
 {
@@ -1138,6 +1164,18 @@ static void sub_check(char *res, size_t cap)
                    n > 1u ? (unsigned)at[1] : 0u);
             ok &= n == RT[k] && sub_near(at[0], WANT[k][0]) && (n < 2u || sub_near(at[1], WANT[k][1]));
         }
+    }
+    {   /* HUMAN: the same notes, each 0..20 ms (28 blocks) behind its line, some late, none early; the same again */
+        uint32_t a[16], b[16], c[16], na = sub_human_play(0, a, 16), nb = sub_human_play(100, b, 16), nc, k, late = 0, most = 0;
+        nc = sub_human_play(100, c, 16);
+        ok &= na == nb && nb == nc && na > 0u;
+        for (k = 0; k < na && k < nb; k++) {
+            ok &= b[k] >= a[k] && b[k] - a[k] <= 28u && b[k] == c[k];
+            late += b[k] > a[k];
+            if (b[k] - a[k] > most) most = b[k] - a[k];
+        }
+        printf("sub: HUMAN 100: %u notes, %u late, at most %u blocks\n", (unsigned)nb, (unsigned)late, (unsigned)most);
+        ok &= late > 0u;
     }
     {   /* SHAPE, x4 on step 4 (its line at 689, the step 172 blocks): ACCEL 7/16 12/16 15/16 of it, DECEL 1/16 4/16 9/16 */
         uint32_t at[4], k, s;
