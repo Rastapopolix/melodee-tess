@@ -916,6 +916,70 @@ static void roll_wait_check(char *res, size_t cap)
     snprintf(res, cap, "%u %u", same, n[0] + n[1]);
 }
 
+/* ------------------------------------------------------------ SUB --- */
+/* seq_sub.c on track 0 for two bars at 1/16, 120 BPM (a step 172 blocks): mode (Euclid 4 of 16, a hit a quarter, or
+ * Grids) with RATCH, CHANCE and NOTE LENGTH as given. Returns the notes track 0 played; *gap the shortest space
+ * between two of them in blocks (Grids' parts on one block: 0); *held its voices still gated after the STOP */
+static uint32_t nl_gates(uint32_t tr);
+static uint32_t sub_play(uint32_t mode, uint32_t ratch, uint32_t chance, uint32_t nl, uint32_t *gap, uint32_t *held)
+{
+    uint32_t f, total, i, n = 0, last = 0;
+    int32_t o[2 * CTL];
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (i = 0; i < NTRK; i++) tt_open[i] = -1;
+    tt_n = tt_blk = 0;
+    gen(0, mode);
+    tessera_param_set(0, TX_SUB_RATCH, (int32_t)ratch);
+    tessera_param_set(0, TX_SUB_CHANCE, (int32_t)chance);
+    tessera_param_set(0, TX_NL_MODE, (int32_t)nl);
+    rng_state = 0x5355u;
+    total = 2u * 4u * seq_beat_samples();
+    transport_req = 1;
+    for (f = 0; f < total + 4u * CTL; f += CTL) {
+        if (f >= total) transport_req = 2;
+        mix_block(o, CTL);
+        tt_blk++;
+    }
+    *gap = ~0u;
+    for (i = 0; i < tt_n; i++)
+        if (tt_ev[i].tr == 0 && tt_ev[i].blk < total / CTL) {   /* (the two bars: not the step on the STOP's block) */
+            if (n && tt_ev[i].blk - last < *gap) *gap = tt_ev[i].blk - last;
+            last = tt_ev[i].blk;
+            n++;
+        }
+    *held = nl_gates(0);
+    return n;
+}
+/* "1": RATCH x1..x4 plays 8 16 24 32 notes in two bars, its hits 172 / hits blocks apart; CHANCE 0 none ratchet, 50
+ * some, the same ones again; NOTE LENGTH FIXED's held notes play once; Grids' parts all repeat; nothing held after STOP */
+static int sub_near(uint32_t got, uint32_t want) { return got + 2u >= want && got <= want + 2u; }
+static void sub_check(char *res, size_t cap)
+{
+    static const uint16_t WANT[4][2] = {{8, 689}, {16, 86}, {24, 57}, {32, 43}};
+    uint32_t ok = 1, gap, held, n, m, k;
+    for (k = 0; k < 4u; k++) {
+        n = sub_play(TESS_ENG_EUCLID, k, 100, NL_STEP, &gap, &held);
+        printf("sub: RATCH x%u: %u notes, %u blocks apart, %u held\n", (unsigned)k + 1u, (unsigned)n, (unsigned)gap,
+               (unsigned)held);
+        ok &= n == WANT[k][0] && sub_near(gap, WANT[k][1]) && !held;
+    }
+    n = sub_play(TESS_ENG_EUCLID, 3, 0, NL_STEP, &gap, &held);
+    ok &= n == 8u && !held;
+    n = sub_play(TESS_ENG_EUCLID, 3, 50, NL_STEP, &gap, &held);
+    m = sub_play(TESS_ENG_EUCLID, 3, 50, NL_STEP, &gap, &held);
+    printf("sub: x4 CHANCE 50: %u notes, again %u\n", (unsigned)n, (unsigned)m);
+    ok &= n > 8u && n < 32u && n == m && !held;
+    n = sub_play(TESS_ENG_EUCLID, 3, 100, NL_FIXED, &gap, &held);
+    ok &= n == 8u && !held;
+    n = sub_play(TESS_ENG_GRIDS, 0, 100, NL_STEP, &gap, &held);
+    m = sub_play(TESS_ENG_GRIDS, 1, 100, NL_STEP, &gap, &held);
+    printf("sub: GRIDS x1 %u notes, x2 %u\n", (unsigned)n, (unsigned)m);
+    ok &= n && m == 2u * n && !held;
+    snprintf(res, cap, "%u", (unsigned)ok);
+}
+
 /* ------------------------------------------------------------ NOTE LENGTH --- */
 /* note_len.c on Euclid 4 of 16 at 1/16, 120 BPM: a hit every quarter (689 blocks). "ok": each note's length (the
  * median of the second bar's) as its mode says: STEP the GATE (half a 16th, 86 blocks), FIXED 1/8 an eighth (345)
@@ -1922,6 +1986,30 @@ static void pack_run(char *res, size_t cap)
         ok &= gen_grids_note(&g, GEN_GRIDS_TOM) == 39u && gen_grids_note(&g, 0) == 36u;
         tessera_unpack(a);
     }
+    {   /* SUB: RATCH and CHANCE round trip (a fresh track x1 at 100); a version 15 block plays x1 at 100; RATCH past x4
+         * or CHANCE over 100 is refused */
+        static uint8_t v15[TESSERA_PK_BYTES_V15];
+        const uint32_t n16 = TESSERA_PK_BYTES / TESSERA_TRACKS, n15 = TESSERA_PK_BYTES_V15 / TESSERA_TRACKS;
+        tessera_reset();
+        ok &= tessera_param_get(0, TX_SUB_RATCH) == 0 && tessera_param_get(0, TX_SUB_CHANCE) == 100;
+        tessera_param_set(2, TX_SUB_RATCH, 2);
+        tessera_param_set(2, TX_SUB_CHANCE, 40);
+        tessera_param_set(3, TX_SUB_RATCH, 9);          /* (kept to x4) */
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera_param_get(2, TX_SUB_RATCH) == 2 && tessera_param_get(2, TX_SUB_CHANCE) == 40 &&
+              tessera_param_get(3, TX_SUB_RATCH) == 3 && tessera_param_get(1, TX_SUB_RATCH) == 0;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v15 + tr * n15, b + tr * n16, n15);
+        ok &= tessera_unpack_ver(15u, v15) == 1 && tessera_param_get(2, TX_SUB_RATCH) == 0 &&
+              tessera_param_get(2, TX_SUB_CHANCE) == 100;
+        memcpy(c, b, sizeof c);
+        c[2u * n16 + n15] = SUB_HITS_MAX;
+        ok &= tessera_unpack(c) == 0;
+        memcpy(c, b, sizeof c);
+        c[2u * n16 + n15 + 1u] = 101;
+        ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+    }
     {   /* CHORD USER: a key's note rounded down to the track's scale is the chord's root (D dorian: E ii, F# rounded to
          * F iii, C vii, D I); the degrees and LEN round trip; a degree over 6 or a LEN of 0 or 9 is refused */
         const uint32_t n13 = TESSERA_PK_BYTES / TESSERA_TRACKS, n12 = TESSERA_PK_BYTES_V12 / TESSERA_TRACKS;
@@ -2179,6 +2267,27 @@ int main(int argc, char **argv)
         }
         bad += check("NOTE LENGTH: STEP the GATE, FIXED its LEN, HIT to the next hit, KEYS held at once; STOP, MUTE, "
                      "STEP again release", ok);
+    }
+    {   /* SUB (seq_sub.c) */
+        unsigned ok = 0;
+        pid_t pid;
+        int fd[2];
+        fflush(stdout);
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                sub_check(res, sizeof res);
+                fflush(stdout);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &ok);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        bad += check("SUB: RATCH x1..x4 in equal parts of the step, CHANCE tossed on the SEED, NOTE LENGTH's held notes "
+                     "once, Grids' parts repeated; STOP releases", ok);
     }
     {   /* SLOTH, OCHD */
         unsigned fail = ~0u;

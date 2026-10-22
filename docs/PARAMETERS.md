@@ -222,6 +222,8 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x253 | STEP EVOLVE EVERY | OFF, 1, 2, 4, 8, 16 | 1 | A STEP track's EVOLVE page: bars between rounds of changes; OFF plays the steps as written. |
 | 0x254 | STEP EVOLVE AMOUNT | 0 to 100 % | 0 | A STEP track's EVOLVE page: how many steps play a change, 100 half of them: a note moved by a degree or two or an octave, a step dropped, two notes swapped, a ghost note in a rest. 0 plays the steps as written; the steps themselves never change until REC held keeps the changes. |
 | 0x255 | GRIDS PART4 | TOM, CLAP, HATOP, RIM, BELL | TOM | The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black key (as on the drum grid: CP OH TM RS CB). |
+| 0x256 | TIMING RATCH | x1, x2, x3, x4 | x1 | Plays each step's notes 1 to 4 times in equal parts of the step, a ratchet; x1 plays them once, as written. Each hit gets its share of the step's GATE. Notes NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once. |
+| 0x257 | TIMING CHANCE | 0 to 100 % | 100 | How often a step ratchets: 100 every step, 0 none. The toss replays with the track's SEED. |
 
 ## Mods
 

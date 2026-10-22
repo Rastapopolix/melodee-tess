@@ -820,9 +820,11 @@ static __attribute__((noinline)) void audition_tick(uint32_t n)
     if(audition_active) { if(n>=audition_left)audition_stop(); else audition_left-=n; }
 }
 /* -------------------------------------------------------- sequencer --- */
+static void seq_sub_clear(void);                    /* (seq_sub.c, below) */
 static void seq_start(void)
 {
     tessera_ensure_init();
+    seq_sub_clear();
     organic_play();                                 /* (SLOTH and OCHD from each track's SEED: a piece replays) */
     cin_left = 0; /* MIDI Start also cancels a pending local count-in. */
     uint32_t i;
@@ -865,6 +867,7 @@ static void seq_release(track_t *t)
 }
 
 #include "seq_erase.c"
+#include "seq_sub.c"                               /* SUB: a step's notes again within it (RATCH) */
 
 /* Map a quantized onset back to the compact tempo-relative event format. The
  * inverse swung pair calculation is constant-time, even at a 64-step boundary. */
@@ -952,6 +955,7 @@ static void seq_stop(void)
         seq_release(&trk[i]);
         trk[i].rh_n = 0;                           /* a recorded note held over the stop: as far as it got */
     }
+    seq_sub_clear();
     chain_stop();
     for (i = 0; i < NTRK; i++) if (trk[i].pattern_next < NPAT) pattern_switch(&trk[i], trk[i].pattern_next);
     motion_end();
@@ -1050,6 +1054,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
         *was = period;
     }
     t->seq_pos += n;
+    seq_sub_tick(t, step_samples(t, period, t->seq_idx));   /* (SUB: this step's repeats due, before the next step) */
     for (;;) {
         uint32_t cur_len = step_samples(t, period, t->seq_idx);
         if (t->seq_pos < cur_len && t->seq_pos != 0x7FFFFFFFu + n)
@@ -1098,7 +1103,9 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             }
             uint32_t tr_idx = trk_index(t);
             if (tr_idx < TESSERA_TRACKS && tessera.mode[tr_idx] != TESS_ENG_OFF) {
+                seq_sub_begin(t);                   /* (SUB: the notes it plays recorded, its RATCH armed) */
                 tessera_clock_step(t);
+                seq_sub_arm(t, seq_sub_can(t) ? tessera_ratchet(tr_idx) : 1u, step_samples(t, period, t->seq_idx));
             } else {
                 step_t sv;                          /* (STEP EVOLVE: the step with its change, tessera.c) */
                 s = tessera_step_vary(t, s, &sv);

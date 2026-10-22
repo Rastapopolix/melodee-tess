@@ -874,6 +874,34 @@ static void graph_notelen(const track_t *t, uint16_t c)
     }
 }
 
+/* TIMING page (SUB, seq_sub.c): a bar of 8 steps, an example rhythm's hits on them; each hit's step split into RATCH's
+ * hits, each its share of the GATE. CHANCE below 100: the steps that would not ratchet this time, a hit each, dimmer
+ * hits marking the ones skipped (the picture's choice is fixed, not the track's toss) */
+static void graph_timing(const track_t *t, uint16_t c)
+{
+    static const uint8_t HITS[8] = {1, 0, 1, 1, 0, 1, 0, 1};   /* an example rhythm */
+    static const uint8_t SKIP[8] = {0, 0, 37, 74, 0, 11, 0, 90};   /* the % at which each step stops ratcheting */
+    uint32_t tr = trk_index(t) % TESSERA_TRACKS, hits = (tessera.sub_ratch[tr] & 3u) + 1u, ch = tessera.sub_chance[tr], i, k;
+    int32_t x0 = PANEL_X0 + 6, w = PANEL_W - 12, sw = w / 8, g = t->p[P_SGATE] ? t->p[P_SGATE] : 64;
+    cv_rect(x0, 92, w, 1, T_RAISE);
+    for (i = 0; i < 8u; i++) {
+        int32_t x = x0 + (int32_t)i * sw;
+        cv_rect(x, i % 4u ? 89 : 86, 1, i % 4u ? 3 : 6, T_RAISE);
+        if (!HITS[i]) continue;
+        uint32_t n = hits > 1u && SKIP[i] < ch ? hits : 1u;
+        int32_t part = sw / (int32_t)n, len = part * g / 128;
+        if (len < 2) len = 2;
+        for (k = 0; k < n; k++) {
+            int32_t y = 30 + (int32_t)k * 4;
+            cv_rect(x + (int32_t)k * part, 80, 2, 6, T_TEXT);   /* the hit */
+            cv_rrect(x + (int32_t)k * part, y, len - 1 > 2 ? len - 1 : 2, 40 - (int32_t)k * 8, 2, c, T_SURF);
+        }
+        if (n == 1u && hits > 1u)                       /* (CHANCE: this step plays once, its repeats marked) */
+            for (k = 1; k < hits; k++)
+                cv_rect(x + (int32_t)k * (sw / (int32_t)hits), 80, 2, 6, T_RAISE);
+    }
+}
+
 static void graph_steps(const track_t *t, uint16_t c)
 {
     uint32_t tr = trk_index(t);
@@ -1559,6 +1587,9 @@ static uint32_t graph_sig(int play)
         const tessera_evolve_t *ev = &tessera.evolve[trk_index(t)];
         h ^= ((uint32_t)(uint8_t)ev->shift | (uint32_t)ev->drop << 8 | (uint32_t)ev->human << 16 | (uint32_t)ev->follow << 24) * 2246822519u;
     }
+    if (pg->graph == GR_TIMING && trk_index(t) < TESSERA_TRACKS)    /* (SUB lives in tessera) */
+        h ^= ((uint32_t)tessera.sub_ratch[trk_index(t)] | (uint32_t)tessera.sub_chance[trk_index(t)] << 8 |
+              (uint32_t)t->p[P_SGATE] << 16) * 2246822519u;
     if (pg->graph == GR_NOTELEN && trk_index(t) < TESSERA_TRACKS)   /* (NOTE LENGTH lives in tessera, DIV in the song) */
         h ^= ((uint32_t)tessera.nl_mode[trk_index(t)] | (uint32_t)tessera.nl_len[trk_index(t)] << 8 |
               (uint32_t)tessera.nl_keys[trk_index(t)] << 16 | (uint32_t)tessera.mode[trk_index(t)] << 24 ^
@@ -1867,6 +1898,9 @@ static void draw_graph(void)
             break;
         case GR_NOTELEN:
             graph_notelen(t, c);
+            break;
+        case GR_TIMING:
+            graph_timing(t, c);
             break;
         case GR_MATRIX:
             mx_graph(c);

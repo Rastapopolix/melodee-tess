@@ -31,6 +31,7 @@ static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO"
 static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
 static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_GRP4[] = {"TOM", "CLAP", "HATOP", "RIM", "BELL"};
+static const char *const TX_N_RATCH[] = {"x1", "x2", "x3", "x4"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
@@ -118,6 +119,8 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_SV_EVERY] = {"EVERY", F_ENUM, 0, 5, 1, TX_N_EVERY, "bar"},
     [TX_SV_AMOUNT] = PD("AMOUNT", F_PCT, 0, 100, 0),
     [TX_GRD_PART4] = PE("PART4", TX_N_GRP4, 0),
+    [TX_SUB_RATCH] = PE("RATCH", TX_N_RATCH, 0),
+    [TX_SUB_CHANCE] = PD("CHANCE", F_PCT, 0, 100, 100),
 };
 
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
@@ -438,6 +441,11 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_GRD_PART4, "GRIDS PART4", "The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM "
                                     "lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black "
                                     "key (as on the drum grid: CP OH TM RS CB)."),
+    X_(TX_SUB_RATCH, "TIMING RATCH", "Plays each step's notes 1 to 4 times in equal parts of the step, a ratchet; x1 "
+                                     "plays them once, as written. Each hit gets its share of the step's GATE. Notes "
+                                     "NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once."),
+    X_(TX_SUB_CHANCE, "TIMING CHANCE", "How often a step ratchets: 100 every step, 0 none. The toss replays with the "
+                                       "track's SEED."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

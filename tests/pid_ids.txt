@@ -204,3 +204,5 @@
 0x253 STEP EVOLVE EVERY        track 0..5 def 1
 0x254 STEP EVOLVE AMOUNT       track 0..100 def 0
 0x255 GRIDS PART4              track 0..4 def 0
+0x256 TIMING RATCH             track 0..3 def 0
+0x257 TIMING CHANCE            track 0..100 def 100
