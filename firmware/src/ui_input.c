@@ -1022,24 +1022,6 @@ static void edit_param(uint32_t slot, int32_t steps)
                                     : enum_order(d) ? enum_turn(d, *vp, steps)
                                     : enum_step(d, *vp, clamp(*vp + accel(EN_K1 + slot, steps, desc_range(d)), d->min, d->max));
     *vp = (int16_t)v;
-    if(pg->scope==SC_P5){
-        uint8_t old[MO_NATIVE_N];uint32_t f=motion_guard();
-        motion_native_peek(TSEL,old);p5_edit_value(TSEL,pg->id[slot],p5_panel_raw(TSEL,pg->id[slot],v));native_motion(old);
-        motion_unguard(f);return;
-    }
-    if(pg->scope==SC_P5STORE){p5_store_slot=(int16_t)v;return;}
-    if (pg->scope == SC_CZ1) {                           /* (a copy of the tone's value: written back there) */
-        uint8_t raw[CZ_BYTES], old[MO_NATIVE_N];
-        uint32_t tr = song.sel % NTRK, f = motion_guard();
-        motion_native_peek(TSEL, old);
-        if (cz_ed_put(tr, pg->id[slot], (uint32_t)v, raw)) {
-            if (!momentary.active) cz_compare_take(tr);
-            memcpy(cz_patch[tr].raw, raw, 128u);
-            native_motion(old);
-        }
-        motion_unguard(f);
-        return;
-    }
     if (pg->scope == SC_FM6 || pg->scope == SC_FMOP) {   /* (a copy of FM6's value: written back there) */
         uint8_t old[MO_NATIVE_N];
         uint32_t f = motion_guard();
@@ -1072,34 +1054,6 @@ static void edit_param(uint32_t slot, int32_t steps)
         scale_share(TSEL);
 }
 
-/* CZ TOOLS 1 > 2 / 2 > 1: line src's wave, window, key follow, level, velocity and envelopes over the other
- * line (Casio's 57-byte line block); MOD stays line 1's. Undoable as a sound load */
-static void cz_line_copy(track_t *t, uint32_t src)
-{
-    uint8_t *b = cz_patch[trk_index(t)].raw;
-    uint32_t s = src ? 71u : 14u, d = src ? 14u : 71u, mod = b[d + 1u] & 0x38u;
-    cz_compare_take(trk_index(t));
-    load_begin(t, UNDO_SOUND);
-    fm1_irq_off();
-    memcpy(b + d, b + s, 57u);
-    b[d + 1u] = (uint8_t)((b[d + 1u] & ~0x38u) | mod);
-    fm1_irq_on();
-    load_end(t);
-}
-
-/* CZ TOOLS COMP: the tone before the first edit and the edited one change places; 0 = nothing edited */
-static int cz_compare_swap(uint32_t tr)
-{
-    cz_patch_t x = cz_patch[tr % NTRK];
-    if (cz_compare_tr != tr % NTRK + 1u)
-        return 0;
-    fm1_irq_off();
-    cz_patch[tr % NTRK] = cz_compare;
-    fm1_irq_on();
-    cz_compare = x;
-    return 1;
-}
-
 /* OCT+ on an action page: the picked action. A load stays picked (browse and load again); the others
  * are dropped once done. Flash writes only while stopped; over the user's data: the dialog */
 static void act_do(void)
@@ -1107,28 +1061,6 @@ static void act_do(void)
     uint32_t c = act_col(), id, k = (uint32_t)song.g[G_SLOT] - 1u;
     if (!c--)
         return;
-    if(cur_page()->scope==SC_P5STORE){
-        uint32_t slot=(uint32_t)p5_store_slot-1u;
-        if(c==1u){if(transport_busy())ui_message("STOP TO SAVE");else if(native_used(ENGI_PROPHET,slot))confirm_open(CF_OVR_USER,slot);else name_open(NK_USER_SAVE,slot);}
-        else if(c==2u)p5_send(song.sel);
-        else {load_begin(TSEL,UNDO_SOUND);panic_req|=1u<<song.sel;fm1_irq_off();p5_patch_init(p5_patch_of(TSEL));p5_track_accept(TSEL);fm1_irq_on();load_end(TSEL);ui_message("PROPHET INIT");}
-        ui.act=0;return;
-    }
-    if (cur_page()->graph == GR_CZTOOLS) {               /* CZ-1: NAME, copy a line over the other, COMPARE */
-        uint32_t tr = song.sel % NTRK;
-        if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
-        if (c == 0u) {
-            name_open(NK_CZ_NAME, tr);
-        } else if (c < 3u) {
-            cz_line_copy(TSEL, c == 1u ? 0u : 1u);
-            ui_message(c == 1u ? "LINE 1 > 2" : "LINE 2 > 1");
-        } else {
-            ui_message(cz_compare_swap(tr) ? "COMPARE / EDIT" : "NO EDITS");
-        }
-        ui.act = 0;
-        ui.force = 1;
-        return;
-    }
     if (cur_page()->graph == GR_SONG) {
         if (song.playing || seq_counting() || chain_busy()) transport_req = 2;
         else chain_play_ui();
@@ -1802,7 +1734,7 @@ static int bulk_jog(int32_t delta)
     if(!bulk.on||bulk.on==2u){bulk.anchor=(uint16_t)cur;bulk.engine=(uint8_t)library_engine();bulk.track=song.sel;bulk.pattern=TSEL->pattern;bulk.generation=TSEL->pattern_gen;}
     bulk.on=1;uint32_t limit=slots?user_limit():step_pattern_len(TSEL);
     uint32_t to=(uint32_t)clamp((int32_t)cur+delta,0,(int32_t)limit-1);
-    if(slots==SK_FM6)fm6_bslot=(uint8_t)to;else if(slots==SK_P5)p5_store_slot=(uint16_t)(to+1u);else if(slots)ui.uslot=(uint8_t)to;else cursor_set((int32_t)to);
+    if(slots==SK_FM6)fm6_bslot=(uint8_t)to;else if(slots)ui.uslot=(uint8_t)to;else cursor_set((int32_t)to);
     bulk.end=(uint16_t)to;ui.bulk_hold=0;oct_eat|=2u;ui.oct_t0|=2u;ui.force=1;ui_message(slots?"PRESETS SELECTED":"Moving..");return 1;
 }
 static void notes_bulk_copy(void){note_copy_arm();}

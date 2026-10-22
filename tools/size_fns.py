@@ -56,7 +56,7 @@ def size_names():
     # Playback, live capture and erase functions retain the normal optimization.
     names = {"recording_restore_note", "recording_copy", "recording_reindex",
              "drum909_init", "drum909_set", "drum_note_on", "voice_start",
-             "audio_batch_push", "mix_prepare_batch", "fm6_sync", "cz_native_block"}
+             "audio_batch_push", "mix_prepare_batch", "fm6_sync"}
     for f in SIZE_FILES:
         names.update(n for n in definitions((SRC / f).read_text()) if not n.endswith("_irq"))   # (ISRs stay as they are)
     return names

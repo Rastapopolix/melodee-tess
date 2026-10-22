@@ -4,9 +4,7 @@
  * sounds at power-on. */
 #include "dsp.c"
 #include "audio_batch.h"
-#include "eng_prophet_test.c"   /* (always: what the rest names; MELODEE_PROPHET 0: nothing reaches it, core.h) */
-#include "eng_phase.c"
-#include "eng_cz.c"
+#include "cz_p5_store.c"        /* CZ-1's and the Prophet's patches and factory sounds, kept for the stores */
 #include "eng_sid.c"
 #include "eng_formant.c"
 #include "eng_trio.c"
@@ -42,22 +40,12 @@ static const engine_t ENG_RETIRED = {         /* 13 without MELODEE_SLICE: reser
 static uint32_t eng_state_size(uint32_t e)
 {
     switch (e) {
-#if MELODEE_PROPHET
-    case ENGI_PROPHET: return sizeof(p5_part_t);
-#if MELODEE_PROPHET_PROTOTYPE
-    case 0: return sizeof(p5_part_t);
-#endif
-#endif
 #if PHYS_ON
     case ENGI_PHYS: return sizeof(phys_slot_t) * PHYS_POLY;
 #endif
 #if MELODEE_LEGACY_EXTRAS
     case 7: return sizeof(drw_part_t);
 #endif
-#if MELODEE_LEGACY_EXTRAS
-    case 2:                                         /* (PHASE: CZ-1's core) */
-#endif
-    case ENGI_CZ: return sizeof(cz_part_t);
     case 3: return sizeof(sid_part_t);              /* SID (eng_sid.c) */
 #if MELODEE_PLAITS
     case ENGI_MACRO: return mc_bytes();             /* MACRO: Plaits' voice and its working memory (eng_macro.c) */
@@ -86,26 +74,16 @@ static drum_lane_t *drum_kit_part(uint32_t part) { return resource_get(RES_ENGIN
 static dsk_part_t *dsk_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(dsk_part_t)); }
 static drw_part_t *drw_of(const track_t *t) { return resource_get(RES_ENGINE0 + (uint32_t)(t - trk), sizeof(drw_part_t)); }
 static fm6_part_t *fm6_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(fm6_part_t)); }
-static cz_part_t *cz_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(cz_part_t)); }
 static sid_part_t *sid_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(sid_part_t)); }
-static p5_part_t *p5_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(p5_part_t)); }
 #if MELODEE_SLICE
 static int16_t (*slc_rbuf(uint32_t part))[SLC_RB] { return resource_get(RES_ENGINE0 + part % NPART, sizeof(slc_rb_t)); }
 #endif
 
 /* the editor protocol, user presets and projects store these indices: append, never reorder */
 static const engine_t *const ENGINES[NENGINES] = {
-#if MELODEE_PROPHET_PROTOTYPE
-    &ENG_P5_TEST,                /* test firmware only: RAM patches, NEVER persist */
-#else
     &ENG_RETIRED,                /* 0: retired ANALOG; stored ID reserved */
-#endif
     &ENG_RETIRED,                /* 1: retired DIGITAL; stored ID reserved */
-#if MELODEE_LEGACY_EXTRAS
-    &ENG_PHASE,                  /* 2 */
-#else
-    &ENG_RETIRED,                /* 2: retired PHASE; stored ID reserved (its core: CZ-1's) */
-#endif
+    &ENG_RETIRED,                /* 2: retired PHASE; stored ID reserved (its core was CZ-1's) */
 #if MELODEE_SID
     &ENG_SID,                    /* 3: SID replaces LOFI without reusing a stored ID */
 #else
@@ -150,17 +128,9 @@ static const engine_t *const ENGINES[NENGINES] = {
     &ENG_RETIRED,             /* 13: reserved (MELODEE_SLICE=0 builds without SLICE) */
 #endif
     &ENG_RETIRED,                /* 14: retired OBXF; stored index reserved */
-#if MELODEE_CZ
-    &ENG_CZ,                     /* 15: native Casio CZ-1 */
-#else
-    &ENG_RETIRED,                /* 15: CZ-1 left out of the build; stored ID reserved */
-#endif
+    &ENG_RETIRED,                /* 15: retired CZ-1 (2026-10-22); stored ID reserved, its tones kept (cz_p5_store.c) */
     &ENG_RETIRED, &ENG_RETIRED, &ENG_RETIRED, /* 16..18 reserved */
-#if MELODEE_PROPHET
-    &ENG_P5_TEST,                /* 19: Prophet (ANALOG's ID 0 stays reserved) */
-#else
-    &ENG_RETIRED,                /* 19: Prophet left out of the build; stored ID reserved */
-#endif
+    &ENG_RETIRED,                /* 19: retired Prophet (2026-10-22); stored ID reserved, its programs kept */
     &ENG_RETIRED,                /* 20: reserved (USER_NATIVE_P5, the browser's Prophet user bank) */
 #if MELODEE_PLAITS
     &ENG_MACRO,                  /* 21: MACRO, Plaits' synthesis (Tessera) */
@@ -193,20 +163,14 @@ static const preset_t *eng_preset(const engine_t *e, uint32_t k)
  * engine indices, never a retired one. The indices stay as they are (the
  * stores and the protocol hold them); only this table orders them */
 static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
-#if MELODEE_PROPHET
-    ENGI_PROPHET,                /* Prophet replaces ANALOG in new-sound browsing */
-#endif
 #if MELODEE_FM6
     12,                          /* FM6 */
 #endif
 #if MELODEE_LEGACY_EXTRAS
-    2, ENGI_CZ, 3, 5,             /* PHASE CZ-1 SID VOICE */
+    3, 5,                        /* SID VOICE */
     6, 7, 9,
     11,                          /* NOISE */
 #else
-#if MELODEE_CZ
-    ENGI_CZ,                     /* CZ-1 */
-#endif
 #if MELODEE_SID
     3,                           /* SID */
 #endif
@@ -230,10 +194,8 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
  * Never relabel retired records FM6. */
 static int eng_extra_retired(uint32_t e)
 {
-#if !MELODEE_PROPHET_PROTOTYPE
     if (e == ENGI_ANALOG) return 1;
-#endif
-    return e == ENGI_DIGITAL || (!MELODEE_LEGACY_EXTRAS && (e == 2u || e == 5u || (e == 6u && !MELODEE_TRIO) || e == 7u || e == 11u));
+    return e == ENGI_DIGITAL || e == 2u || (!MELODEE_LEGACY_EXTRAS && (e == 5u || (e == 6u && !MELODEE_TRIO) || e == 7u || e == 11u));
 }
 /* the engines one can pick, in ENGINE_ORDER: eng_ok(e), the n-th of them
  * eng_vis(n), e's place among them eng_rank(e), the next / previous one eng_step(e, dir) (wraps) */
@@ -263,8 +225,8 @@ static uint32_t eng_step(uint32_t e, int32_t dir)
 
 /* The start for testing the generators on the device (Theo 2026-10-15): track 1 PHYS DRONE STRING (2026-10-19; was
  * CZ-1 VIBRAPHONE), and the project at power-on and NEW (melodee_init, project_new_blank) at 85 BPM, the melodic parts
- * in minor pentatonic. 0: Melodee's
- * (track 1 PROPHET FUNK BASS II, the parameters' defaults), which the host tests are written for (hostsim.c) */
+ * in minor pentatonic. 0: Melodee's (the parameters' defaults; track 1 SID BELL RING, PROPHET FUNK BASS II until the
+ * Prophet was retired 2026-10-22), which the host tests are written for (hostsim.c) */
 #ifndef TRK_START_TESS
 #define TRK_START_TESS 1
 #endif
@@ -272,10 +234,6 @@ static uint32_t eng_step(uint32_t e, int32_t dir)
 static const uint8_t TRK_DEF[NPART][2] = {
 #if TRK_START_TESS && MELODEE_PHYS
     {ENGI_PHYS, 7},                                 /* PHYS DRONE STRING (Theo 2026-10-19) */
-#elif TRK_START_TESS && MELODEE_CZ
-    {ENGI_CZ, 42},                                  /* CZ-1 VIBRAPHONE */
-#elif !TRK_START_TESS && MELODEE_PROPHET
-    {ENGI_PROPHET, 4},                              /* PROPHET FUNK BASS II (was ANALOG ACID) */
 #elif MELODEE_SID
     {ENGI_SID, 26},                                 /* (without it: SID BELL RING) */
 #else

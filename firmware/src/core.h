@@ -36,15 +36,14 @@
 #undef MELODEE_SLICE
 #endif
 #define MELODEE_SLICE 0
-#ifndef P5_OVERSAMPLE
-#define P5_OVERSAMPLE 1 /* prototype: benchmark base rate before enabling optional 2x */
-#endif
 #ifndef MELODEE_LEGACY_EXTRAS
-#define MELODEE_LEGACY_EXTRAS 0 /* reference tests only: retired TRIO, WHEEL and PHYS; PHASE, VOICE and NOISE (retired
-                                 * 2026-10-10: the flash for the redesign; CZ-1 keeps PHASE's phase-distortion core) */
+#define MELODEE_LEGACY_EXTRAS 0 /* reference tests only: retired TRIO, WHEEL and PHYS; VOICE and NOISE (retired
+                                 * 2026-10-10: the flash for the redesign; PHASE with the CZ-1, 2026-10-22) */
 #endif
 /* Tessera (phase 4, tessera-notes/docs/design/phase4/PLAN.md): an engine left out of the build (0) is never offered; its stored ID
  * stays reserved and a project's track of it loads SID's INIT (project.c). Its code goes where nothing reaches it */
+/* CZ-1 and PROPHET: retired as engines 2026-10-22 (their IDs stay reserved); MELODEE_CZ / MELODEE_PROPHET keep their
+ * stored tones, factory sounds and banks (cz_p5_store.c, cz_bank.c, prophet_user.c) until the own project format */
 #ifndef MELODEE_PROPHET
 #define MELODEE_PROPHET 1
 #endif
@@ -67,7 +66,7 @@
 #ifndef MELODEE_PLAITS
 #define MELODEE_PLAITS 0         /* MACRO (eng_macro.c): Plaits' synthesis, C++ (build.py); the prototype: off by default */
 #endif
-#define ENG_BUILT(e) ((e) == 3u ? MELODEE_SID : (e) == 9u ? PHYS_ON : (e) == 12u ? MELODEE_FM6 : (e) == 15u ? MELODEE_CZ : (e) == 19u ? MELODEE_PROPHET : \
+#define ENG_BUILT(e) ((e) == 3u ? MELODEE_SID : (e) == 9u ? PHYS_ON : (e) == 12u ? MELODEE_FM6 : (e) == 15u || (e) == 19u ? 0 : \
                       (e) == 21u ? MELODEE_PLAITS : 1)   /* SID PHYS FM6 CZ-1 PROPHET MACRO (PHYS: left out, not retired,
                                                    * since 2026-10-21: its tracks load FM's first voice) */
 #define TRIO_ON (MELODEE_TRIO || MELODEE_LEGACY_EXTRAS)
@@ -87,7 +86,7 @@
 #define USER_NONE 256u
 #define ENGI_ANALOG 0u           /* retired in 1.2: never selectable (eng_ok), its stored sounds play silent */
 #define ENGI_DIGITAL 1u          /* retired: never selectable (eng_ok), its stored sounds play silent */
-#define NENG_SHOWN (NENGINES - 9u - !MELODEE_SLICE - (MELODEE_LEGACY_EXTRAS ? 0u : 6u - MELODEE_TRIO - MELODEE_PHYS) - !MELODEE_SID - !MELODEE_FM6 - !MELODEE_CZ - !MELODEE_PROPHET - \
+#define NENG_SHOWN (NENGINES - 11u - !MELODEE_SLICE - (MELODEE_LEGACY_EXTRAS ? 1u : 6u - MELODEE_TRIO - MELODEE_PHYS) - !MELODEE_SID - !MELODEE_FM6 - \
                     !MELODEE_PLAITS)   /* the engines one can pick: PRESETS, the EDIT
                                                 * layer, the editor, in the display order of engines.c ENGINE_ORDER */
 #define ENGI_SLICE 13u           /* reserved without MELODEE_SLICE: never selectable (eng_ok) */

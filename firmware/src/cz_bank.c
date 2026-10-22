@@ -60,7 +60,7 @@ static int cz_bank_get(uint32_t bank,uint32_t slot,uint8_t *raw)
     cz_bank_t *b=cz_bank_load(bank);if(!b || slot>=16 || !((b->used>>slot)&1u))return 1;
     memcpy(raw,b->tone[slot].raw,CZ_BYTES);return 0;
 }
-static void cz_bank_boot(void){cz_bank_cached=255;cz_user_bank_read=cz_bank_get;}
+static void cz_bank_boot(void){cz_bank_cached=255;}
 static void cz_bank_import(uint32_t k,const uint8_t *raw,uint32_t len)
 {
 #if !MELODEE_FLASH
@@ -69,18 +69,4 @@ static void cz_bank_import(uint32_t k,const uint8_t *raw,uint32_t len)
     (void)raw;(void)len;
 #endif
     cz_bank_cached=255;
-    for(uint32_t t=0;t<NTRK;t++)if(trk[t].eng_req==ENGI_CZ && (uint32_t)trk[t].p[P_E0]==k && trk[t].p[P_E1])cz_user_pick[t]=65535u;
-}
-
-static void cz_bank_poll(void)
-{
-    for(uint32_t k=0;k<NTRK;k++){
-        track_t *t=&trk[k];uint32_t pick=(uint32_t)t->p[P_E0]*17u+(uint32_t)t->p[P_E1];
-        if(t->eng_req!=ENGI_CZ || cz_user_pick[k]==pick)continue;
-        uint8_t raw[CZ_BYTES];int ok=1;
-        if(!t->p[P_E1])cz_patch_init(raw);
-        else ok=cz_user_bank_read && !cz_user_bank_read((uint32_t)t->p[P_E0],(uint32_t)t->p[P_E1]-1u,raw);
-        if(ok){fm1_irq_off();memcpy(cz_patch[k].raw,raw,CZ_BYTES);panic_req|=(uint8_t)(1u<<k);fm1_irq_on();cz_compare_drop(k);}
-        cz_user_pick[k]=(uint16_t)pick;
-    }
 }

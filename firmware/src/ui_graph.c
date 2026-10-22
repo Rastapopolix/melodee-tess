@@ -1610,8 +1610,7 @@ static uint32_t graph_signature(void) { return graph_sig(1); }
 /* 4-letter engine tags of the preset list */
 static const char *eng_abbr(const char *name)
 {
-    static const char *const A[][2] = {{"PROPHET", "P5"},
-                                       {"PHASE", "PHAS"}, {"CZ-1", "CZ-1"}, {"SID", "SID"},
+    static const char *const A[][2] = {{"SID", "SID"},
                                        {"SAMPLE", "SMPL"}, {"VOICE", "VOCL"}, {"TRIO", "TRIO"}, {"WHEEL", "WHEL"},
                                        {"GRAIN", "GRAN"}, {"PHYS", "PHYS"}, {"DRUM", "DRUM"},
                                        {"NOISE", "NOIS"}, {"FM6", "FM6"}, {"SLICE", "SLCE"}};
@@ -1657,12 +1656,12 @@ static void panel_note(const char *a, const char *b, const char *c)
 /* preset browser: the global list (every engine), the current one selected; tag DIM, name TEXT,
  * favourites starred (the accent), the selected row's suggested pattern at its right */
 
-/* a list entry's tag and name, as the browser shows them: "P5" "It's a Proph", "F012" (native), "U07" (user preset) */
+/* a list entry's tag and name, as the browser shows them: "FM6" "SOFT PAD", "F012" (native), "U07" (user preset) */
 static void entry_label(uint32_t e, uint32_t k, char *tag, char *nm)
 {
-    if (e == USER_NATIVE_P5 || e == USER_NATIVE_FM || e == USER_NATIVE_CZ) {
+    if (e == USER_NATIVE_FM) {
         uint32_t eng = src_engine(e, k);
-        tag[0] = eng == ENGI_PROPHET ? 'P' : eng == ENGI_FM6 ? 'F' : 'Z';
+        tag[0] = 'F';
         tag[1] = (char)('0' + (k + 1u) / 100u);
         tag[2] = (char)('0' + (k + 1u) / 10u % 10u);
         tag[3] = (char)('0' + (k + 1u) % 10u);
@@ -1675,10 +1674,6 @@ static void entry_label(uint32_t e, uint32_t k, char *tag, char *nm)
         str_cpy(tag, eng_abbr(ENGINES[e % NENGINES]->name), 6);
         str_cpy(nm, eng_preset(ENGINES[e % NENGINES], k)->name, 13);
     }
-}
-static void p5_short_name(const track_t *t,char *out,uint32_t size)
-{
-    char full[P5_NAME_LEN+1u];p5_patch_name(full,p5_patch_of((track_t *)t));str_cpy(out,full,size);
 }
 /* MIXER page: four SURF columns, one under each card: the circled numeral (filled and in the accent:
  * the selected track) with a REC / ARM / MUTE badge (P_MUTE, KNOB 1), the sound's short name (a MUTE badge
@@ -1754,8 +1749,7 @@ static void trk_short_name(uint32_t c, char *b)      /* the track's sound, b hol
 {
     const track_t *t = &trk[c];
     const engine_t *e = ENGINES[t->eng_req % NENGINES];
-    if(t->eng_req==ENGI_PROPHET)p5_short_name(t,b,13);
-    else if(user_of(t)<USER_NONE && t->user_native)native_name(t->eng_req,user_of(t),b);
+    if(user_of(t)<USER_NONE && t->user_native)native_name(t->eng_req,user_of(t),b);
     else if (user_of(t) < UP_SLOTS)up_name(user_of(t), b);
     else if (e->npresets)
         str_cpy(b, eng_preset(e, t->preset % e->npresets)->name, 13);

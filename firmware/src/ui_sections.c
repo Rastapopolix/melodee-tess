@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* An engine's EDIT pages in sections (docs/design README "Sound pages, fast", mock/r7_sound_nav): Prophet's Osc,
- * Mixer, Filter ..; FM6's Algo, OP1 .. OP6 (the operator pages, once per operator: fm6_opsel), Pitch, LFO, Ctrl; CZ-1's
- * Line, Line 1, Pitch 1 ..; Store and Tools last. PRESETS jumps a section (to the page last used in it), SELECT turns
+/* An engine's EDIT pages in sections (docs/design README "Sound pages, fast", mock/r7_sound_nav): FM6's Algo,
+ * OP1 .. OP6 (the operator pages, once per operator: fm6_opsel), Pitch, LFO, Ctrl; Store last. PRESETS jumps a section (to the page last used in it), SELECT turns
  * the pages (on across the sections, as ever); the sections as tabs under the header, a section's pages as the
  * header's dots. EDIT pressed on an EDIT page: the map, a row a section, a tile a page (KNOB 1 across, KNOB 2 down,
  * OCT+ opens, OCT- or EDIT closes). EDIT held: the sections on the white keys (ui_layer.c).
@@ -9,13 +8,7 @@
 #define SEC_MAX 16
 #define SEC_TAB_H 16                                    /* the tabs: rows 18 .. 33 */
 static const struct { const char *prefix, *name; } SEC_RULE[] = {   /* a page's section by its title (first match) */
-    {"P5 OSC", "Osc"}, {"P5 B WAVES", "Osc"}, {"P5 MIXER", "Mixer"}, {"P5 FILTER", "Filter"}, {"P5 FLT ENV", "Filter"},
-    {"P5 AMP", "Amp"}, {"P5 ENV MOD", "Mod"}, {"P5 POLYMOD", "Mod"}, {"P5 MOD FLT", "Mod"}, {"P5 LFO", "LFO"},
-    {"P5 WHEEL", "Wheel"}, {"P5 UNISON", "Voice"}, {"P5 BEND", "Voice"}, {"P5 STORE", "Store"},
-    {"STORE", "Store"}, {"ALGO", "Algo"}, {"PITCH", "Pitch"}, {"FM LFO", "LFO"}, {"FM ", "Ctrl"},
-    {"CZ TOOLS", "Tools"}, {"CZ1 ", "Line 1"}, {"C1 PIT", "Pitch 1"}, {"C1 WAV", "Wave 1"}, {"C1 AMP", "Amp 1"},
-    {"CZ2 ", "Line 2"}, {"C2 PIT", "Pitch 2"}, {"C2 WAV", "Wave 2"}, {"C2 AMP", "Amp 2"}, {"CZ ", "Line"},
-    {"DCW", "Env"}, {"DCA", "Env"}, {"DCO", "Env"}, {"CZ LEVEL", "Env"}, {"OP", "Env"},
+    {"STORE", "Store"}, {"ALGO", "Algo"}, {"PITCH", "Pitch"}, {"FM LFO", "LFO"}, {"FM ", "Ctrl"}, {"OP", "Env"},
     {"DRUM", "Drum"}, {"LANES", "Lanes"}, {"VOICE", "Voice"}, {"EDIT", "Sound"}};
 static const char *const SEC_OP[6] = {"OP1", "OP2", "OP3", "OP4", "OP5", "OP6"};
 static struct {
