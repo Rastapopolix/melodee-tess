@@ -497,7 +497,7 @@ enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK,   /* SC_TRK: the TRACKS 
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
        GR_MOD, GR_PATS, GR_SONG, GR_MOTION, GR_CHORD, GR_SLICES,
        GR_FMEG, GR_FMPEG, GR_FMSTORE, GR_SCALE_PICKER, GR_DRUMHIT, GR_PATGRID, GR_EVOLVE, GR_FORM, GR_TWEAK,
-       GR_CORDS, GR_TWEAK2, GR_ORGANIC, GR_MATRIX, GR_NOTELEN, GR_TIMING }; /* NOTES shares GR_ROLL for steps and recorded events */
+       GR_CORDS, GR_TWEAK2, GR_ORGANIC, GR_MATRIX, GR_NOTELEN, GR_TIMING, GR_ENERGY }; /* NOTES shares GR_ROLL for steps and recorded events */
 
 typedef struct {
     const char *title;
@@ -580,6 +580,7 @@ static const page_t PAGES[] = {
     {"LENGTH", FAM_GEN, SC_TRACK, GR_NOTELEN, {0xFF, 0xFF, 0xFF, P_SGATE}},   /* Tessera: NOTE LENGTH's MODE LEN KEYS
                                                                              * (tessera_len_knob), STEP's GATE */
     {"TIMING", FAM_GEN, SC_TRACK, GR_TIMING, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: SUB's RATCH CHANCE (seq_sub.c) */
+    {"ENERGY", FAM_GEN, SC_TRACK, GR_ENERGY, {0xFF, 0xFF, 0xFF, 0xFF}},   /* Tessera: the project's ARC RESTS (energy.c) */
     {"ARP", FAM_GEN, SC_TRACK, GR_ARP, {P_AMODE, P_ARATE, P_AOCT, P_AGATE}},
     {"ARP 2", FAM_GEN, SC_TRACK, GR_NONE, {P_ASWING, P_APROB, P_AHOLD, P_AORDER}},
     {"NOTES", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},

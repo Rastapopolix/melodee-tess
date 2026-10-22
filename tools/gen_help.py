@@ -5,7 +5,7 @@
 
   tools/gen_help.py OUT.h
 
-pid.c stays the source: this reads its T_ / G_ / X_ entries (and the text macros defined among them) in order and
+pid.c stays the source: this reads its T_ / G_ / X_ / XP_ entries (and the text macros defined among them) in order and
 writes OUT.h with the texts byte-pair coded: every byte from PID_HELP_LO up stands for two bytes (either of which
 may be a code again), the codes chosen most frequent pair first while one is left. Texts that are equal are kept
 once. The help gesture expands one text at a time (pid_help_unpack.h); the device build leaves the plain texts
@@ -75,7 +75,7 @@ def texts():
     macros, out, i = {}, [], body.index("{") + 1
     for m in re.finditer(r"^#define\s+(\w+)\s+(.*)$", body, re.M):
         macros[m.group(1)] = strings(m.group(2), macros)
-    for m in re.finditer(r"\b([TGX])_\(", body):
+    for m in re.finditer(r"\b(XP|[TGX])_\(", body):
         if body[:m.start()].rfind("#define") > body[:m.start()].rfind("\n"):
             continue
         a, _ = args_of(body, m.end() - 1)

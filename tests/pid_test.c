@@ -86,7 +86,8 @@ static int reference(FILE *f)
             "TIDE's fastest chaotic circuit, about 1 min a turn", "TIDE's middle chaotic circuit, about 3 min a turn",
             "a free LFO, 64 s a turn (ORGANIC page, RATE 50)", "a free LFO, 40 s a turn", "a free LFO, 25 s a turn",
             "a free LFO, 15.6 s a turn", "a free LFO, 9.8 s a turn", "a free LFO, 6.1 s a turn", "a free LFO, 3.8 s a turn",
-            "a free LFO, 2.4 s a turn"};
+            "a free LFO, 2.4 s a turn",
+            "the project's slow tide (ENERGY ARC), every track's the same: -100 % sparse .. 100 % full"};
         fprintf(f, "\n## Mods\n\nA mod (the MODS page, under LFO) moves a destination on any track by a source on any "
                    "track: by its AMOUNT (-100 to 100 %%, at a full source the destination's whole range; PITCH: an octave) "
                    "plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, TIDE, SWARM) swings both ways "

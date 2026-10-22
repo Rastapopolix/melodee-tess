@@ -826,6 +826,7 @@ static void seq_start(void)
     tessera_ensure_init();
     seq_sub_clear();
     organic_play();                                 /* (SLOTH and OCHD from each track's SEED: a piece replays) */
+    energy_play();                                  /* (ENERGY's tide and rests too) */
     cin_left = 0; /* MIDI Start also cancels a pending local count-in. */
     uint32_t i;
     seq_erase_request = 0;

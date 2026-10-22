@@ -498,9 +498,12 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
  * (no room in it). A slot's block is valid only while its tag equals the project record's hash (proj_saved_hash):
  * any other write to the slot (an archive, a failed or interrupted save) loads the project with Tessera OFF. */
 #if MELODEE_FLASH
-#define TESS_OBJ_MAGIC 0x37315354u                    /* "TS17": blocks of version 17 (CHORD's BREATH) */
+#define TESS_OBJ_MAGIC 0x38315354u                    /* "TS18": blocks of version 18 (ENERGY's ARC, RESTS) */
 #define TESS_SLOT_BYTES (4u + TESSERA_PK_BYTES)
 #define TESS_OBJ_BYTES (4u + 4u * TESS_SLOT_BYTES)
+#define TESS_OBJ_MAGIC_V17 0x37315354u                /* "TS17": version 17 (CHORD's BREATH), read and converted */
+#define TESS_SLOT_BYTES_V17 (4u + TESSERA_PK_BYTES_V17)
+#define TESS_OBJ_BYTES_V17 (4u + 4u * TESS_SLOT_BYTES_V17)
 #define TESS_OBJ_MAGIC_V16 0x36315354u                /* "TS16": version 16 (SUB's RATCH), read and converted */
 #define TESS_SLOT_BYTES_V16 (4u + TESSERA_PK_BYTES_V16)
 #define TESS_OBJ_BYTES_V16 (4u + 4u * TESS_SLOT_BYTES_V16)
@@ -555,6 +558,7 @@ static int proj_write_slot(uint32_t slot, const uint8_t *raw, uint32_t len)
 #define TESS_CRD_SLOT (4u + CORD_PK_BYTES)
 #define TESS_CRD_BYTES (4u + 4u * TESS_CRD_SLOT)
 #define TESS_OBJ_BYTES_CRD (TESS_OBJ_BYTES + TESS_CRD_BYTES)
+#define TESS_OBJ_BYTES_V17_CRD (TESS_OBJ_BYTES_V17 + TESS_CRD_BYTES)
 #define TESS_OBJ_BYTES_V16_CRD (TESS_OBJ_BYTES_V16 + TESS_CRD_BYTES)
 #define TESS_OBJ_BYTES_V15_CRD (TESS_OBJ_BYTES_V15 + TESS_CRD_BYTES)
 #define TESS_OBJ_BYTES_V14_CRD (TESS_OBJ_BYTES_V14 + TESS_CRD_BYTES)
@@ -589,8 +593,10 @@ static tess_form_t tess_obj_form(const uint8_t *raw, uint32_t len)
     uint32_t got, cm = TESS_CRD_MAGIC;
     if (len < 4u) return f;
     memcpy(&got, raw, 4);
-    if (len == TESS_OBJ_BYTES_CRD) { f.ver = 17; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES, 4); }
-    else if (len == TESS_OBJ_BYTES) f.ver = 17;
+    if (len == TESS_OBJ_BYTES_CRD) { f.ver = 18; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES, 4); }
+    else if (len == TESS_OBJ_BYTES) f.ver = 18;
+    else if (len == TESS_OBJ_BYTES_V17_CRD) { f.ver = 17; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V17, 4); }
+    else if (len == TESS_OBJ_BYTES_V17) f.ver = 17;
     else if (len == TESS_OBJ_BYTES_V16_CRD) { f.ver = 16; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V16, 4); }
     else if (len == TESS_OBJ_BYTES_V16) f.ver = 16;
     else if (len == TESS_OBJ_BYTES_V15_CRD) { f.ver = 15; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V15, 4); }
@@ -622,7 +628,7 @@ static tess_form_t tess_obj_form(const uint8_t *raw, uint32_t len)
     else if (len == TESS_OBJ_BYTES_V2_CRD) { f.ver = 2; f.crd = 1; memcpy(&cm, raw + TESS_OBJ_BYTES_V2, 4); }
     else if (len == TESS_OBJ_BYTES_V2) f.ver = 2;
     else if (len == TESS_OBJ_BYTES_V1) f.ver = 1;
-    if (!f.ver || got != (f.ver == 17 ? TESS_OBJ_MAGIC : f.ver == 16 ? TESS_OBJ_MAGIC_V16 : f.ver == 15 ? TESS_OBJ_MAGIC_V15 : f.ver == 14 ? TESS_OBJ_MAGIC_V14 : f.ver == 13 ? TESS_OBJ_MAGIC_V13 : f.ver == 12 ? TESS_OBJ_MAGIC_V12 : f.ver == 11 ? TESS_OBJ_MAGIC_V11 : f.ver == 10 ? TESS_OBJ_MAGIC_V10 : f.ver == 9 ? TESS_OBJ_MAGIC_V9 : f.ver == 8 ? TESS_OBJ_MAGIC_V8 : f.ver == 7 ? TESS_OBJ_MAGIC_V7 : f.ver == 6 ? TESS_OBJ_MAGIC_V6 : f.ver == 5 ? TESS_OBJ_MAGIC_V5 : f.ver == 4 ? TESS_OBJ_MAGIC_V4 : f.ver == 3 ? TESS_OBJ_MAGIC_V3 : f.ver == 2 ? TESS_OBJ_MAGIC_V2 :
+    if (!f.ver || got != (f.ver == 18 ? TESS_OBJ_MAGIC : f.ver == 17 ? TESS_OBJ_MAGIC_V17 : f.ver == 16 ? TESS_OBJ_MAGIC_V16 : f.ver == 15 ? TESS_OBJ_MAGIC_V15 : f.ver == 14 ? TESS_OBJ_MAGIC_V14 : f.ver == 13 ? TESS_OBJ_MAGIC_V13 : f.ver == 12 ? TESS_OBJ_MAGIC_V12 : f.ver == 11 ? TESS_OBJ_MAGIC_V11 : f.ver == 10 ? TESS_OBJ_MAGIC_V10 : f.ver == 9 ? TESS_OBJ_MAGIC_V9 : f.ver == 8 ? TESS_OBJ_MAGIC_V8 : f.ver == 7 ? TESS_OBJ_MAGIC_V7 : f.ver == 6 ? TESS_OBJ_MAGIC_V6 : f.ver == 5 ? TESS_OBJ_MAGIC_V5 : f.ver == 4 ? TESS_OBJ_MAGIC_V4 : f.ver == 3 ? TESS_OBJ_MAGIC_V3 : f.ver == 2 ? TESS_OBJ_MAGIC_V2 :
                           TESS_OBJ_MAGIC_V1) ||
         cm != TESS_CRD_MAGIC)
         f.ver = 0;
@@ -630,14 +636,14 @@ static tess_form_t tess_obj_form(const uint8_t *raw, uint32_t len)
 }
 static uint32_t tess_slot_bytes(uint32_t ver) { return 4u + tessera_pk_bytes(ver); }
 
-/* tess_blob holding an object of form f (as stored, at its start) -> version 17 with the cords' part, in place: each
+/* tess_blob holding an object of form f (as stored, at its start) -> version 18 with the cords' part, in place: each
  * slot's tag kept, each track converted (tessera_track_up); the cords moved after the longer blocks,
  * or none. The cords up first, then the blocks from the end down, so nothing is overwritten before it is read
  * (everything moves up) */
 static void tess_obj_upgrade(tess_form_t f)
 {
     uint32_t m = TESS_OBJ_MAGIC, sb = tess_slot_bytes(f.ver), pk = sb - 4u;
-    if (f.ver == 17) {                                /* (nothing moves) */
+    if (f.ver == 18) {                                /* (nothing moves) */
         if (!f.crd) tess_crd_empty();
         return;
     }
@@ -651,6 +657,7 @@ static void tess_obj_upgrade(tess_form_t f)
             tessera_track_up(f.ver, src + 4u + (uint32_t)tr * (pk / TESSERA_TRACKS), rec);
             memcpy(dst + 4u + (uint32_t)tr * sizeof rec, rec, sizeof rec);
         }
+        dst[4u + TESSERA_PK_BYTES - 2u] = dst[4u + TESSERA_PK_BYTES - 1u] = 0;   /* (version 18's tail: ENERGY off) */
         {
             uint32_t tg;                              /* (slot 0: the same place) */
             memcpy(&tg, src, 4);

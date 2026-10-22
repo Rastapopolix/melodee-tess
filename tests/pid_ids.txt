@@ -207,3 +207,5 @@
 0x256 TIMING RATCH             track 0..3 def 0
 0x257 TIMING CHANCE            track 0..100 def 100
 0x258 CHORD BREATH             track 0..100 def 0
+0x259 ENERGY ARC               global 0..100 def 0
+0x25a ENERGY RESTS             global 0..100 def 0
