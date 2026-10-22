@@ -46,11 +46,17 @@ void energy_play(void)                                /* seq.c seq_start: from t
     en_turn();
     en_rest_draw();
 }
+/* ph of per as 0..n-1 (n up to 65536, ph < per), in 32 bits: the device has no 64-bit divide */
+static uint32_t en_frac(uint32_t ph, uint32_t per, uint32_t n)
+{
+    while (per >= 65536u) { ph >>= 1; per >>= 1; }
+    return per ? ph * n / per : 0u;
+}
 /* a turn's sine, Q15, from blocks into it (a parabola a half: within 6 % of a sine, for a tide plenty) */
 static int32_t en_sin(uint32_t ph, uint32_t per)
 {
-    uint32_t x = (uint32_t)((uint64_t)ph * 65536u / per), h = x & 32767u;   /* (a half: 0..32767) */
-    int32_t v = (int32_t)((uint64_t)h * (32768u - h) >> 13);                 /* 4 h (1 - h), Q15 */
+    uint32_t x = en_frac(ph, per, 65536u), h = x & 32767u;                  /* (a half: 0..32767) */
+    int32_t v = (int32_t)(h * (32768u - h) >> 13);                          /* 4 h (1 - h), Q15 */
     v = v > 32767 ? 32767 : v;
     return x & 32768u ? -v : v;
 }

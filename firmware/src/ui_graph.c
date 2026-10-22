@@ -908,14 +908,13 @@ static void graph_timing(const track_t *t, uint16_t c)
 static void graph_energy(uint16_t c)
 {
     int32_t x0 = PANEL_X0 + 6, w = PANEL_W - 12, i, a = tessera.en_arc, at;
-    uint32_t per = energy.per ? energy.per : 1u;
     cv_rect(x0, 50, w, 1, T_RAISE);
     cv_rect(x0, 46, 1, 9, T_RAISE);
     for (i = 0; i < w; i += 2) {
         int32_t y = 50 - en_sin((uint32_t)i, (uint32_t)w) * a / 100 * 36 / 32767;
         cv_rect(x0 + i, y, 2, 2, a ? T_MID : T_RAISE);
     }
-    at = (int32_t)((uint64_t)energy.ph * (uint32_t)w / per);
+    at = (int32_t)en_frac(energy.ph, energy.per, (uint32_t)w);
     if (a && song.playing)
         cv_rrect(x0 + at - 3, 50 - energy_now() * 36 / 32767 - 3, 7, 7, 3, c, T_SURF);
     if (song.playing && energy_resting()) {
@@ -1618,7 +1617,7 @@ static uint32_t graph_sig(int play)
               (uint32_t)song.g[G_BPM]) * 2246822519u;
     if (pg->graph == GR_ENERGY)                      /* (it moves: the tide, a rest; the settings) */
         h ^= ((uint32_t)tessera.en_arc | (uint32_t)tessera.en_rests << 8 | (uint32_t)song.playing << 16) * 2246822519u ^
-             (uint32_t)(energy_now() >> 9) * 31u ^ (energy.rest_left / EN_BPS) * 7919u ^ (uint32_t)((uint64_t)energy.ph * 110u / (energy.per ? energy.per : 1u)) * 104729u;
+             (uint32_t)(energy_now() >> 9) * 31u ^ (energy.rest_left / EN_BPS) * 7919u ^ en_frac(energy.ph, energy.per, 110u) * 104729u;
     if (pg->graph == GR_MATRIX)                      /* (it moves with the mods: ui_matrix.c) */
         h ^= mx_sig() * 2246822519u;
     if (pg->graph == GR_ORGANIC)                     /* (it moves: a step a few pixels apart) */
