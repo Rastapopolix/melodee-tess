@@ -679,5 +679,18 @@
     ],
     "description": "Okinawan: the sanshin's pentatonic.",
     "title": "Ryukyu"
+  },
+  {
+    "name": "MINYO",
+    "group": "Regional",
+    "cents": [
+      300,
+      500,
+      700,
+      1000,
+      1200
+    ],
+    "description": "Japanese: the folk-song (min'yo) pentatonic, la do re mi sol (ZEN-1's MIN'YO); at these 12-tone pitches the same notes as MPEN.",
+    "title": "Min'yo"
   }
 ]
