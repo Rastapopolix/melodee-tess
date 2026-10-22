@@ -36,9 +36,10 @@ const E = vm.runInNewContext(proto + `
 
 {
   const d = {min: 0, max: E.SCALE_INFO.length - 1, names: E.SCALE_INFO.map(r => r.name)};
-  ok(E.scaleRows(d).length === 70, "scale picker: every supported scale available");
+  ok(E.scaleRows(d).length === 76, "scale picker: every supported scale available");
   ok(E.scaleRows(d, "Equal divisions").length === 24, "scale picker: family filtering");
   ok(E.scaleRows(d, "All scales", "quarter-comma")[0]?.name === "MT-1/4", "scale picker: readable names searchable");
+  ok(E.scaleRows(d, "Regional", "hirajoshi")[0]?.name === "HIRA" && E.scaleRows(d, "Regional").length === 11, "scale picker: the Japanese scales (In, Yo, Hirajoshi, Iwato, Kumoi, Ryukyu) under Regional");
   ok(E.scaleRows(d, "All scales", "53EDO")[0]?.count === 53, "scale picker: short names and note counts searchable");
   ok(E.scaleRows(d, "Favorites", "", ["BP-JI", "24EDO"]).map(r => r.name).join() === "24EDO,BP-JI", "scale picker: favorites retain catalogue IDs");
   ok(E.scaleRows(d, "Favorites").length === 0 && E.scaleRows(d, "All scales", "missing scale").length === 0, "scale picker: empty favorites and search");
