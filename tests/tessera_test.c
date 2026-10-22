@@ -1039,8 +1039,72 @@ static uint32_t sub_play(uint32_t mode, uint32_t ratch, uint32_t chance, uint32_
     *held = nl_gates(0);
     return n;
 }
-/* "1": RATCH x1..x4 plays 8 16 24 32 notes in two bars, its hits 172 / hits blocks apart; CHANCE 0 none ratchet, 50
- * some, the same ones again; NOTE LENGTH FIXED's held notes play once; Grids' parts all repeat; nothing held after STOP */
+/* a STEP track (no generator) for two bars at 1/16, 120 BPM: a note (or, hit != 0, that drum lane's hit) on every fourth
+ * step, each step's RATCH ratch. Returns the repeats it played (seq_sub.c: SUB_NOTE_ON, the steps' own first hits are
+ * not logged here); *gap the shortest space between two, in blocks; *held its voices gated after the STOP */
+static uint32_t sub_step_play(uint32_t ratch, uint32_t hit, uint32_t *gap, uint32_t *held)
+{
+    uint32_t f, total, i, n = 0, last = 0;
+    int32_t o[2 * CTL];
+    const uint8_t note = 60;
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (i = 0; i < NTRK; i++) tt_open[i] = -1;
+    tt_n = tt_blk = 0;
+    trk[0].p[P_SDIV] = 2;                               /* 1/16 */
+    for (i = 0; i < 16u; i += 4u) {
+        put_step(&trk[0], i, hit ? 0u : 1u, &note, ST_NOTE, 0);
+        if (hit) trk[0].step[i].hit = (uint8_t)hit;
+        step_set_ratch(&trk[0].step[i], ratch);
+    }
+    total = 2u * 4u * seq_beat_samples();
+    transport_req = 1;
+    for (f = 0; f < total + 4u * CTL; f += CTL) {
+        if (f >= total) transport_req = 2;
+        mix_block(o, CTL);
+        tt_blk++;
+    }
+    *gap = ~0u;
+    for (i = 0; i < tt_n; i++)
+        if (tt_ev[i].tr == 0 && tt_ev[i].blk < total / CTL) {
+            if (n && tt_ev[i].blk - last < *gap) *gap = tt_ev[i].blk - last;
+            last = tt_ev[i].blk;
+            n++;
+        }
+    *held = nl_gates(0);
+    return n;
+}
+/* a STEP track's note on step 4 only (1/16, 120 BPM: a step 172 blocks, step 4's line at 689), its NUDGE nudge and
+ * RATCH ratch: the blocks its voices started at in the first bar, into at[] (up to 4); returns how many */
+static uint32_t sub_nudge_play(int32_t nudge, uint32_t ratch, uint32_t *at)
+{
+    uint32_t f, bar, n = 0, a0;
+    int32_t o[2 * CTL];
+    const uint8_t note = 60;
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    trk[0].p[P_SDIV] = 2;
+    put_step(&trk[0], 4, 1, &note, ST_NOTE, 0);
+    step_set_nudge(&trk[0].step[4], nudge);
+    step_set_ratch(&trk[0].step[4], ratch);
+    bar = 4u * seq_beat_samples() / CTL;
+    transport_req = 1;
+    a0 = vage;
+    for (f = 0; f < bar; f++) {
+        mix_block(o, CTL);
+        if (started_since(&trk[0], a0) && n < 4u) at[n++] = f;
+        a0 = vage;
+    }
+    transport_req = 2;
+    for (f = 0; f < 4u; f++) mix_block(o, CTL);
+    return n;
+}
+/* "1": RATCH x1..x4 and x8 play 8 16 24 32 and 64 notes in two bars, its hits 172 / hits blocks apart; CHANCE 0 none
+ * ratchet, 50 some, the same ones again; NOTE LENGTH FIXED's held notes play once; Grids' parts all repeat; nothing held
+ * after STOP. A STEP track's per-step RATCH: x4 and x8 repeat each of its 8 notes 3 and 7 times, a drum hit's too; its
+ * NUDGE moves a step 4/16 late or early, a ratchet with it */
 static int sub_near(uint32_t got, uint32_t want) { return got + 2u >= want && got <= want + 2u; }
 static void sub_check(char *res, size_t cap)
 {
@@ -1051,6 +1115,28 @@ static void sub_check(char *res, size_t cap)
         printf("sub: RATCH x%u: %u notes, %u blocks apart, %u held\n", (unsigned)k + 1u, (unsigned)n, (unsigned)gap,
                (unsigned)held);
         ok &= n == WANT[k][0] && sub_near(gap, WANT[k][1]) && !held;
+    }
+    n = sub_play(TESS_ENG_EUCLID, 7, 100, NL_STEP, &gap, &held);
+    printf("sub: RATCH x8: %u notes, %u blocks apart, %u held\n", (unsigned)n, (unsigned)gap, (unsigned)held);
+    ok &= n == 64u && sub_near(gap, 21) && !held;
+    n = sub_step_play(1, 0, &gap, &held);
+    m = sub_step_play(4, 0, &gap, &held);
+    printf("sub: STEP track x1 %u repeats, x4 %u (%u blocks apart)\n", (unsigned)n, (unsigned)m, (unsigned)gap);
+    ok &= n == 0u && m == 24u && sub_near(gap, 43) && !held;
+    n = sub_step_play(8, 0, &gap, &held);
+    m = sub_step_play(8, 1u << 2, &gap, &held);         /* (a lane's hit, no note) */
+    printf("sub: STEP track x8 %u repeats, a drum hit's %u (%u blocks apart)\n", (unsigned)n, (unsigned)m, (unsigned)gap);
+    ok &= n == 56u && m == 56u && sub_near(gap, 21) && !held;
+    {   /* NUDGE: 4/16 of a step (43 blocks) late or early; with x2, the repeat half of what is left of the step on */
+        uint32_t at[4], k;
+        static const int32_t NG[5] = {0, 4, -4, 4, -4};
+        static const uint32_t RT[5] = {1, 1, 1, 2, 2}, WANT[5][2] = {{689, 0}, {732, 0}, {646, 0}, {732, 797}, {646, 732}};
+        for (k = 0; k < 5u; k++) {
+            n = sub_nudge_play(NG[k], RT[k], at);
+            printf("sub: NUDGE %+d x%u: %u start(s), at %u %u\n", (int)NG[k], (unsigned)RT[k], (unsigned)n, (unsigned)at[0],
+                   n > 1u ? (unsigned)at[1] : 0u);
+            ok &= n == RT[k] && sub_near(at[0], WANT[k][0]) && (n < 2u || sub_near(at[1], WANT[k][1]));
+        }
     }
     n = sub_play(TESS_ENG_EUCLID, 3, 0, NL_STEP, &gap, &held);
     ok &= n == 8u && !held;
@@ -2222,7 +2308,7 @@ static void pack_run(char *res, size_t cap)
         ok &= gen_grids_note(&g, GEN_GRIDS_TOM) == 39u && gen_grids_note(&g, 0) == 36u;
         tessera_unpack(a);
     }
-    {   /* SUB: RATCH and CHANCE round trip (a fresh track x1 at 100); a version 15 block plays x1 at 100; RATCH past x4
+    {   /* SUB: RATCH and CHANCE round trip (a fresh track x1 at 100); a version 15 block plays x1 at 100; RATCH past x8
          * or CHANCE over 100 is refused */
         static uint8_t v15[TESSERA_PK_BYTES_V15];
         const uint32_t n16 = TESSERA_PK_BYTES / TESSERA_TRACKS, n15 = TESSERA_PK_BYTES_V15 / TESSERA_TRACKS;
@@ -2230,11 +2316,11 @@ static void pack_run(char *res, size_t cap)
         ok &= tessera_param_get(0, TX_SUB_RATCH) == 0 && tessera_param_get(0, TX_SUB_CHANCE) == 100;
         tessera_param_set(2, TX_SUB_RATCH, 2);
         tessera_param_set(2, TX_SUB_CHANCE, 40);
-        tessera_param_set(3, TX_SUB_RATCH, 9);          /* (kept to x4) */
+        tessera_param_set(3, TX_SUB_RATCH, 9);          /* (kept to x8) */
         tessera_pack(b);
         tessera_reset();
         ok &= tessera_unpack(b) == 1 && tessera_param_get(2, TX_SUB_RATCH) == 2 && tessera_param_get(2, TX_SUB_CHANCE) == 40 &&
-              tessera_param_get(3, TX_SUB_RATCH) == 3 && tessera_param_get(1, TX_SUB_RATCH) == 0;
+              tessera_param_get(3, TX_SUB_RATCH) == 7 && tessera_param_get(1, TX_SUB_RATCH) == 0;
         for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v15 + tr * n15, b + tr * n16, n15);
         ok &= tessera_unpack_ver(15u, v15) == 1 && tessera_param_get(2, TX_SUB_RATCH) == 0 &&
               tessera_param_get(2, TX_SUB_CHANCE) == 100;
@@ -2642,8 +2728,8 @@ int main(int argc, char **argv)
             close(fd[0]);
             waitpid(pid, 0, 0);
         }
-        bad += check("SUB: RATCH x1..x4 in equal parts of the step, CHANCE tossed on the SEED, NOTE LENGTH's held notes "
-                     "once, Grids' parts repeated; STOP releases", ok);
+        bad += check("SUB: RATCH x1..x8 in equal parts of the step, CHANCE tossed on the SEED, NOTE LENGTH's held notes "
+                     "once, Grids' parts repeated, STEP tracks' per-step RATCH and NUDGE; STOP releases", ok);
     }
     {   /* BREATH (CHORD) */
         unsigned ok = 0;

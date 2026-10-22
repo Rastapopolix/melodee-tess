@@ -31,7 +31,7 @@ static const char *const TX_N_CHPROG[] = {"POP", "50S", "2-5-1", "CIRCLE", "TWO"
 static const char *const TX_N_CHBARS[] = {"1/2", "1", "2", "4"};
 static const char *const TX_N_CHHIT[] = {"HOLD", "BEAT", "STEP"};
 static const char *const TX_N_GRP4[] = {"TOM", "CLAP", "HATOP", "RIM", "BELL"};
-static const char *const TX_N_RATCH[] = {"x1", "x2", "x3", "x4"};
+static const char *const TX_N_RATCH[] = {"x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"};
 static const char *const TX_N_ANORDER[] = {"PLAYED", "REVERSE", "SHUFFLE"};   /* (TESS_AN_*) */
 static const char *const TX_N_ANLEN[] = {"SHORT", "MID", "LONG"};
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
@@ -461,7 +461,7 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_GRD_PART4, "ATLAS PART4", "The fourth part's sound: TOM, CLAP, HATOP (the open hat), RIM or BELL, the DRUM "
                                     "lanes besides the kick, snare and closed hat. Hold OCT+ on GEN and press its black "
                                     "key (as on the drum grid: CP OH TM RS CB)."),
-    X_(TX_SUB_RATCH, "TIMING RATCH", "Plays each step's notes 1 to 4 times in equal parts of the step, a ratchet; x1 "
+    X_(TX_SUB_RATCH, "TIMING RATCH", "Plays each step's notes 1 to 8 times in equal parts of the step, a ratchet; x1 "
                                      "plays them once, as written. Each hit gets its share of the step's GATE. Notes "
                                      "NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once."),
     X_(TX_SUB_CHANCE, "TIMING CHANCE", "How often a step ratchets: 100 every step, 0 none. The toss replays with the "

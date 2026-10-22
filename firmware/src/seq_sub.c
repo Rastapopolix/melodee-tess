@@ -1,16 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Theo Dainis (melodee-tess)
  * RATCH after Felucca's per-step RATCH (Leo Kuroshita, Hügelton Instruments; github.com/hugelton/Felucca, 1.4-1.6.1,
- * GPL-3.0-only): the idea and its x1..x4 in equal parts of a step, our own code */
+ * GPL-3.0-only): the idea and its x1..x4 in equal parts of a step (x8 ours), our own code */
 /* SUB, sub-step timing (Tessera; included by seq.c): a step's notes again within the step. RATCH plays them HITS times
- * in equal parts of the step, as Felucca's per-step RATCH x1..x4, each hit its share of the step's gate. A step records
+ * (x1..x8) in equal parts of the step, after Felucca's per-step RATCH, each hit its share of the step's gate. A step records
  * the notes it plays on its own voice (seq_sub_note), the sequencer arms the repeats after it (seq_sub_arm) and fires
  * them as the step goes on (seq_sub_tick, from seq_grid_tick). x1, or nothing recorded: nothing armed, the step plays
- * as before. Generator tracks for now (the TIMING page); STEP tracks' per-step RATCH and NUDGE come with their save
- * format. Not repeated: notes NOTE LENGTH holds (FIXED, HIT), BRANCHed and LINKed notes (another track's voice), and a
+ * as before. Generator tracks: the track's RATCH (the TIMING page); STEP tracks: each step's (step_ratch, its sheet).
+ * Not repeated: notes NOTE LENGTH holds (FIXED, HIT), BRANCHed and LINKed notes (another track's voice), and a
  * step that slides or ties into the next. In MIDI clock mode the positions are its musical units, as seq_pos's */
 #define SUB_NOTES (4u + NLANE)
-#define SUB_HITS_MAX 4u
+#define SUB_HITS_MAX 8u
 #define SUB_GATE_MIN 32u                                /* samples: a repeat always sounds */
 #ifndef SUB_NOTE_ON
 #define SUB_NOTE_ON trk_note_on                         /* (tests/hostsim.c: logged as a generator's notes) */
@@ -23,9 +23,20 @@ typedef struct {
 static seq_sub_t seq_sub[NTRK] __attribute__((section(".pool")));
 static uint8_t seq_sub_rec;         /* bit per track: its step is recording into seq_sub[] (the pool is not cleared at boot) */
 static uint8_t seq_sub_armed;       /* bit per track: repeats to come */
+/* NUDGE (STEP tracks): a step's notes NUDGE 16ths of a step late (> 0: held on its line, played as the step goes on) or
+ * early (< 0: played near the end of the step before; its own line then plays nothing). Not across a pattern's or a
+ * song's turn, nor while recording: there the next step is not certain yet, so it plays on its line */
+static struct {
+    step_t s;                       /* the step held (its change applied, STEP EVOLVE) */
+    uint32_t at, span, period, skip; /* held: where it plays, into its step; the step's length; seq_step's period, skip */
+    uint32_t lead;                  /* early: how far before its line it played */
+    uint8_t hits;                   /* its RATCH */
+} seq_nudge[NTRK] __attribute__((section(".pool")));
+static uint8_t seq_nudge_due;       /* bit per track: a step held, to play at seq_nudge[].at */
+static uint8_t seq_nudge_early;     /* bit per track: the next step played already */
 
-/* PLAY, STOP: nothing recorded or armed on any track */
-static void seq_sub_clear(void) { seq_sub_rec = seq_sub_armed = 0; }
+/* PLAY, STOP: nothing recorded, armed or held on any track */
+static void seq_sub_clear(void) { seq_sub_rec = seq_sub_armed = seq_nudge_due = seq_nudge_early = 0; }
 
 /* A step starts: what it plays is recorded from here, the last step's repeats are dropped */
 static void seq_sub_begin(const track_t *t)
@@ -57,9 +68,10 @@ static int seq_sub_can(const track_t *t)
     return (seq_sub_rec & (1u << tr)) && seq_sub[tr].n && t->seq_n && !t->seq_hold;
 }
 
-/* After the step played: hits (1..4) in equal parts of span (the step's length, swing included); the first hit, which
- * sounds already, gets its share of the gate too. Recording ends here */
-static void seq_sub_arm(track_t *t, uint32_t hits, uint32_t span)
+/* After the step played: hits (1..8) in equal parts of span (the step's length, swing included, from where its first hit
+ * played: start samples into the step, below 0 before its line); the first hit, which sounds already, gets its share of
+ * the gate too. Recording ends here */
+static void seq_sub_arm(track_t *t, uint32_t hits, uint32_t span, int32_t start)
 {
     uint32_t tr = trk_index(t);
     seq_sub_t *s = &seq_sub[tr];
@@ -71,7 +83,8 @@ static void seq_sub_arm(track_t *t, uint32_t hits, uint32_t span)
     s->gate = t->seq_off / hits;
     if (s->gate > s->every) s->gate = s->every;
     if (s->gate < SUB_GATE_MIN) s->gate = SUB_GATE_MIN;
-    s->next = s->every;                                 /* (from the step's start, its 0: a block late is still in time) */
+    s->next = start + (int32_t)s->every > 0 ? (uint32_t)(start + (int32_t)s->every) : 0u;   /* (from the step's start: a
+                                                         * block late is still in time) */
     s->left = (uint8_t)(hits - 1u);
     t->seq_off = s->gate;
     seq_sub_armed |= (uint8_t)(1u << tr);
@@ -95,4 +108,72 @@ static void seq_sub_tick(track_t *t, uint32_t cur_len)
         s->left--;
     }
     if (!s->left) seq_sub_armed &= (uint8_t)~(1u << tr);
+}
+
+/* ---- NUDGE: a STEP track's steps off their lines */
+static void seq_step(track_t *t, const step_t *s, uint32_t period, uint32_t skip);   /* (seq.c) */
+/* a STEP track's step s plays now, at samples into its span (0: on its line), its RATCH armed */
+static void seq_sub_play(track_t *t, const step_t *s, uint32_t period, uint32_t span, uint32_t skip, uint32_t at)
+{
+    uint32_t hits = step_ratch(s);
+    if (hits > 1u) seq_sub_begin(t);
+    seq_step(t, s, period, skip);
+    if (hits > 1u) seq_sub_arm(t, seq_sub_can(t) ? hits : 1u, span - at, (int32_t)at);
+}
+/* the step on its line (seq_grid_tick): played now, or held for its NUDGE (> 0), or, played early already (< 0), its
+ * RATCH armed from where it played */
+static void seq_nudge_step(track_t *t, const step_t *s, uint32_t period, uint32_t span, uint32_t skip)
+{
+    uint32_t tr = trk_index(t);
+    int32_t ng = step_nudge(s);
+    if (seq_nudge_early & (1u << tr)) {
+        seq_nudge_early &= (uint8_t)~(1u << tr);
+        if (seq_nudge[tr].hits > 1u)
+            seq_sub_arm(t, seq_sub_can(t) ? seq_nudge[tr].hits : 1u, span, -(int32_t)seq_nudge[tr].lead);
+        return;
+    }
+    seq_nudge_due &= (uint8_t)~(1u << tr);
+    if (ng <= 0) {
+        seq_sub_play(t, s, period, span, skip, 0);
+        return;
+    }
+    seq_nudge[tr].s = *s;
+    seq_nudge[tr].at = span * (uint32_t)ng / 16u;
+    seq_nudge[tr].span = span;
+    seq_nudge[tr].period = period;
+    seq_nudge[tr].skip = skip;
+    seq_nudge_due |= (uint8_t)(1u << tr);
+}
+/* As a STEP track's step goes on (cur_len its length, len the pattern's): a held step plays when its place comes; the
+ * next step plays early when its NUDGE (< 0) brings it into this one */
+static void seq_nudge_tick(track_t *t, uint32_t period, uint32_t cur_len, uint32_t len)
+{
+    uint32_t tr = trk_index(t), ni, next_len, lead;
+    const step_t *s;
+    if ((seq_nudge_due & (1u << tr)) && t->seq_pos >= seq_nudge[tr].at && t->seq_pos < cur_len) {
+        seq_nudge_due &= (uint8_t)~(1u << tr);
+        seq_sub_play(t, &seq_nudge[tr].s, seq_nudge[tr].period, seq_nudge[tr].span, seq_nudge[tr].skip, seq_nudge[tr].at);
+    }
+    if ((seq_nudge_early & (1u << tr)) || t->seq_pos >= cur_len || chain.running || song.rec || seq_erase_active(t))
+        return;
+    ni = (t->seq_idx + 1u) % (len ? len : 1u);
+    if (!ni && t->pattern_next < NPAT) return;         /* (the next pattern's first step: on its line) */
+    s = &seq_steps(t)[ni];
+    if (step_nudge(s) >= 0) return;
+    next_len = step_samples(t, period, ni);
+    lead = next_len * (uint32_t)-step_nudge(s) / 16u;
+    if (t->seq_pos + lead < cur_len) return;
+    {   /* its turn: played as if on its line (seq_idx, STEP EVOLVE's change), its RATCH armed on the line */
+        step_t sv;
+        uint16_t was = t->seq_idx;
+        t->seq_idx = (uint16_t)ni;
+        s = tessera_step_vary(t, s, &sv);
+        seq_nudge[tr].s = *s;
+        seq_nudge[tr].hits = (uint8_t)step_ratch(s);
+        seq_nudge[tr].lead = cur_len - t->seq_pos;
+        if (seq_nudge[tr].hits > 1u) seq_sub_begin(t);
+        seq_step(t, &seq_nudge[tr].s, step_gate(s) ? next_len : period, 0);
+        t->seq_idx = was;
+        seq_nudge_early |= (uint8_t)(1u << tr);
+    }
 }

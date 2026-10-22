@@ -160,7 +160,7 @@ typedef struct {
     uint8_t          sv_every[TESSERA_TRACKS];  /* 0 OFF, 1..5: 1 2 4 8 16 bars between rounds of changes */
     uint8_t          sv_amount[TESSERA_TRACKS]; /* 0..100: changes a round, 1 a quarter; 0 none (as written) */
     /* SUB (the TIMING page; seq.c seq_sub.c): a generator's notes again within their step */
-    uint8_t          sub_ratch[TESSERA_TRACKS];  /* 0..3: RATCH x1..x4, the hits a step (0 x1: as before) */
+    uint8_t          sub_ratch[TESSERA_TRACKS];  /* 0..7: RATCH x1..x8, the hits a step (0 x1: as before) */
     uint8_t          sub_chance[TESSERA_TRACKS]; /* 0..100: the chance a step ratchets (100: every step) */
     /* CHORD's BREATH (HIT HOLD): its voices on slow cycles of their own, one now and then sitting out */
     uint8_t          ch_breath[TESSERA_TRACKS];  /* 0..100: 0 off (as before) */
@@ -254,7 +254,7 @@ int tessera_check(uint32_t ver, const uint8_t *in);        /* the same checks, n
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
 void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 19 */
 void tessera_reset(void);                           /* every track OFF, defaults */
-uint32_t tessera_ratchet(uint32_t tr);              /* SUB: the hits this step plays (1..4), its CHANCE drawn */
+uint32_t tessera_ratchet(uint32_t tr);              /* SUB: the hits this step plays (1..8), its CHANCE drawn */
 /* Tessera's parameters by number (pid.h: PID_TESS(x)). FROZEN: cords and saved projects keep these numbers, so an id
  * never changes meaning; new ones go at the end, a retired one stays as a gap. Ranges and help: pid.c TX_DESC */
 enum {

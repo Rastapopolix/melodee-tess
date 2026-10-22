@@ -44,8 +44,10 @@ and **RYUKYU**, as 12-tone pitches.
 * **ENERGY** page (SEQ, after TIMING), the project's slow shape after Zen-1's conductor: **ARC** swings the
   generators between full and sparse over 3 to 6 minutes; **RESTS** lets them fall silent for 8 to 18 s now and then,
   while a CHORD drone holds. Both 0 by default. ENERGY is also a mod source.
-* **TIMING** page (after LENGTH): **RATCH** x1 to x4 plays a generator's step 2 to 4 times, as often as **CHANCE**
+* **TIMING** page (after LENGTH): **RATCH** x1 to x8 plays a generator's step 2 to 8 times, as often as **CHANCE**
   says.
+* **Ratchet and Nudge per step** on a STEP track: OCT+ on a note (or a drum hit) opens its sheet, where **Ratchet**
+  plays the step x1 to x8 in equal parts and **Nudge** moves it up to 8/16 of a step early or 7/16 late.
 * **STEP EVOLVE**: on a STEP track, EVOLVE varies your written steps as they play; hold REC to keep the changes.
 * **Print**: hold REC on a generator track to put its last bars into STEP and play on from there.
 * **ATLAS** (was GRIDS): KICK, SNR and HAT each take their own share of DENSITY, and **TOMS** adds a fourth part from

@@ -153,6 +153,7 @@ static int test_tsp_record(void)
     reset();
     trk[0].step[5] = (step_t){{62}, 1, ST_NOTE, 0, 90, 0, 0, 0, 0};
     step_set_ratch(&trk[0].step[5], 3); step_set_nudge(&trk[0].step[5], -6);
+    trk[0].step[6] = trk[0].step[5]; step_set_ratch(&trk[0].step[6], 8);   /* (x8: RATCH's high bit) */
     song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
     tessera.en_arc = 40u; tessera.en_rests = 60u;     /* (ENERGY: the block's project tail, TS18) */
     {
@@ -164,6 +165,7 @@ static int test_tsp_record(void)
     project_load(0);
     bad += check("TSP1: a step's RATCH and NUDGE, the generators and a cord come back with the slot", ok &&
                  step_ratch(&trk[0].step[5]) == 3u && step_nudge(&trk[0].step[5]) == -6 && trk[0].step[5].note[0] == 62u &&
+                 step_ratch(&trk[0].step[6]) == 8u && step_nudge(&trk[0].step[6]) == -6 &&
                  tessera.mode[1] == TESS_ENG_EUCLID && cord_count() == 1u && cord_get(0)->amount == 30 &&
                  tessera.en_arc == 40u && tessera.en_rests == 60u);
     ok = project_rename(0, "TSP TWO") == 0;

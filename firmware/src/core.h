@@ -356,15 +356,17 @@ typedef struct {                 /* acid-style step: up to 4 notes (POLY), time,
     uint8_t hit;                 /* bit l: lane l hits (its GM note, on any engine): the DRUM grid */
     uint8_t acc;                 /* hit != 0: lane accents; hit == 0: recorded gate, 1..255 of a step (0 legacy) */
     uint8_t probability;         /* 0 = legacy 100%; 1..100 = percent, 101 = silent */
-    uint8_t sub;                 /* SUB (Tessera): bits 0..1 RATCH - 1 (x1..x4), 2..5 NUDGE in 16ths of the step,
-                                  * -8..+7 (two's complement); 6..7 spare. 0: once, on the step (every older step) */
+    uint8_t sub;                 /* SUB (Tessera): bits 0..1 and 6 RATCH - 1 (x1..x8; bit 6 its high bit, x5..x8),
+                                  * 2..5 NUDGE in 16ths of the step, -8..+7 (two's complement); 7 spare. 0: once, on the
+                                  * step (every older step) */
 } step_t;
 _Static_assert(sizeof(step_t) == 12u, "step v2 (docs/design/PROJECT_FORMAT.md in tessera-notes)");
-static uint32_t step_ratch(const step_t *s) { return (s->sub & 3u) + 1u; }   /* the hits, 1..4 */
+static uint32_t step_ratch(const step_t *s) { return ((s->sub & 3u) | (s->sub >> 4 & 4u)) + 1u; }   /* the hits, 1..8 */
 static int32_t step_nudge(const step_t *s) { return (int32_t)((s->sub >> 2) & 15u ^ 8u) - 8; }
 static void step_set_ratch(step_t *s, uint32_t hits)
 {
-    s->sub = (uint8_t)((s->sub & ~3u) | (hits < 1u ? 0u : hits > 4u ? 3u : hits - 1u));
+    uint32_t r = hits < 1u ? 0u : hits > 8u ? 7u : hits - 1u;
+    s->sub = (uint8_t)((s->sub & ~0x43u) | (r & 3u) | (r & 4u) << 4);
 }
 static void step_set_nudge(step_t *s, int32_t v)
 {
