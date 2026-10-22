@@ -357,10 +357,10 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                           "step before."),
     X_(TX_TW_COND, "TWEAK COND", "The bars a hit may play in, counted from PLAY (with FORM on, from the section's "
                                  "start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest."),
-    X_(TX_ORG_SPEED, "SLOTH SPEED", "How fast the track's SLOTH drifts (mods: TORPOR, APATHY, INERTIA): 50 is about 17, "
-                                    "1 and 3 minutes a turn; each 12.5 more twice as fast."),
-    X_(TX_ORG_RATE, "OCHD RATE", "How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for "
-                                 "OCHD 8; each 12.5 more twice as fast."),
+    X_(TX_ORG_SPEED, "TIDE SPEED", "How fast the track's TIDE drifts (mods: TIDE 1, 2, 3, three slow chaotic circuits): "
+                                   "50 is about 17, 3 and 1 minutes a turn; each 12.5 more twice as fast."),
+    X_(TX_ORG_RATE, "SWARM RATE", "How fast the track's eight SWARM LFOs run: 50 is 64 s for SWARM 1 down to 2.4 s "
+                                  "for SWARM 8; each 12.5 more twice as fast."),
     X_(TX_QD_DIR, "QUAD DIRECTION", "How the track's playhead moves along its row of the grid: forward, back, back and "
                                     "forth, at random; HOLD rests on its own steps and moves only when a LINK moves it."),
     X_(TX_QD_PROB, "QUAD PROB", "The chance each of the row's notes plays: 100 every one, lower leaves gaps."),

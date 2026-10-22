@@ -183,8 +183,8 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x229 | TWEAK LOGIC | OFF, AND, OR, XOR, NOT | OFF | Combines the hits with track WITH's: AND plays only when both hit, OR when either does, XOR when one does, NOT only when the other rests; OFF is its own. |
 | 0x22A | TWEAK LOGIC WITH | OFF, T1, T2, T3, T4 | OFF | The track LOGIC reads: a lower track's hit on this step, a higher one's on the step before. |
 | 0x22B | TWEAK COND | OFF, 1:2, 2:2, 1:4, 2:4, 3:4, 4:4, 1:8, 8:8, FIRST, !FIRST | OFF | The bars a hit may play in, counted from PLAY (with FORM on, from the section's start): 1:4 is the first bar of every four; FIRST only the first, !FIRST the rest. |
-| 0x22C | SLOTH SPEED | 0 to 100 | 50 | How fast the track's SLOTH drifts (mods: TORPOR, APATHY, INERTIA): 50 is about 17, 1 and 3 minutes a turn; each 12.5 more twice as fast. |
-| 0x22D | OCHD RATE | 0 to 100 | 50 | How fast the track's eight OCHD LFOs run: 50 is 64 s for OCHD 1 down to 2.4 s for OCHD 8; each 12.5 more twice as fast. |
+| 0x22C | TIDE SPEED | 0 to 100 | 50 | How fast the track's TIDE drifts (mods: TIDE 1, 2, 3, three slow chaotic circuits): 50 is about 17, 3 and 1 minutes a turn; each 12.5 more twice as fast. |
+| 0x22D | SWARM RATE | 0 to 100 | 50 | How fast the track's eight SWARM LFOs run: 50 is 64 s for SWARM 1 down to 2.4 s for SWARM 8; each 12.5 more twice as fast. |
 | 0x22E | QUAD DIRECTION | FWD, BACK, PEND, RAND, HOLD | FWD | How the track's playhead moves along its row of the grid: forward, back, back and forth, at random; HOLD rests on its own steps and moves only when a LINK moves it. |
 | 0x22F | QUAD PROB | 0 to 100 % | 100 | The chance each of the row's notes plays: 100 every one, lower leaves gaps. |
 | 0x230 | QUAD LINK | OFF, T1, T2, T12, T3, T13, T23, T123, T4, T14, T24, T124, T34, T134, T234, T1234 | OFF | Other QUAD tracks this one's steps also move on, one, two or all three, each played for this step's gate: slow tracks pulled along by a fast one, or HOLD tracks played only by this one. |
@@ -225,7 +225,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 
 ## Mods
 
-A mod (the MODS page, under LFO) moves a destination on any track by a source on any track: by its AMOUNT (-100 to 100 %, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, SLOTH, OCHD) swings both ways from the knob; OCT+ on MODS makes a mod UNI, the source folded to 0 to 1, so it moves one way only, as ENV does. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track follow each note, as a chord's; elsewhere the latest note. Room for 32, 16 in use. They are the project's, saved with it. Melodee's MOD page is gone: the four routes a project or a sound was saved with become mods on their track, the same move (a sound's go when another sound is loaded on the track, unless one was edited).
+A mod (the MODS page, under LFO) moves a destination on any track by a source on any track: by its AMOUNT (-100 to 100 %, at a full source the destination's whole range; PITCH: an octave) plus its OFFSET. A bipolar source (LFO at POL BI, KEY, RAND, S&H, SLEW, NOTE, DRIFT, TIDE, SWARM) swings both ways from the knob; OCT+ on MODS makes a mod UNI, the source folded to 0 to 1, so it moves one way only, as ENV does. ENV, VEL, KEY and RAND on a voice destination (PITCH, CUTOFF, SHAPE, GAIN) of their own track follow each note, as a chord's; elsewhere the latest note. Room for 32, 16 in use. They are the project's, saved with it. Melodee's MOD page is gone: the four routes a project or a sound was saved with become mods on their track, the same move (a sound's go when another sound is loaded on the track, unless one was edited).
 
 | Source | |
 | --- | --- |
@@ -243,17 +243,17 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | NOTE | the generator's last note (C4 = 0) |
 | CV | the generator's CV: Turing its register as a number, Euclid and Morph a ramp over their cycle, Markov the degree it moved to |
 | DRIFT | a slow wander of the track's own, a new point every 12 s or so, eased between |
-| TORPOR | SLOTH's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50) |
-| APATHY | SLOTH's fastest chaotic circuit, about 1 min a turn |
-| INERTIA | SLOTH's middle chaotic circuit, about 3 min a turn |
-| OCHD 1 | a free LFO, 64 s a turn (ORGANIC page, RATE 50) |
-| OCHD 2 | a free LFO, 40 s a turn |
-| OCHD 3 | a free LFO, 25 s a turn |
-| OCHD 4 | a free LFO, 15.6 s a turn |
-| OCHD 5 | a free LFO, 9.8 s a turn |
-| OCHD 6 | a free LFO, 6.1 s a turn |
-| OCHD 7 | a free LFO, 3.8 s a turn |
-| OCHD 8 | a free LFO, 2.4 s a turn |
+| TIDE 1 | TIDE's slowest chaotic circuit, about 17 min a turn (ORGANIC page, SPEED 50) |
+| TIDE 3 | TIDE's fastest chaotic circuit, about 1 min a turn |
+| TIDE 2 | TIDE's middle chaotic circuit, about 3 min a turn |
+| SWARM 1 | a free LFO, 64 s a turn (ORGANIC page, RATE 50) |
+| SWARM 2 | a free LFO, 40 s a turn |
+| SWARM 3 | a free LFO, 25 s a turn |
+| SWARM 4 | a free LFO, 15.6 s a turn |
+| SWARM 5 | a free LFO, 9.8 s a turn |
+| SWARM 6 | a free LFO, 6.1 s a turn |
+| SWARM 7 | a free LFO, 3.8 s a turn |
+| SWARM 8 | a free LFO, 2.4 s a turn |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |

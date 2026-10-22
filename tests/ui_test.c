@@ -1173,8 +1173,8 @@ static int test_organic(void)
                  (help_find(1), help.pid == PID_TESS(TX_ORG_RATE)));
     {
         cord_t c = {CS_TORPOR, 1, CD_CUTOFF, 0, 50, 0};
-        bad += check("a mod from T2 TORPOR: taken, named TORPOR", cord_set(0, &c) && str_eq(cord_src_name(CS_TORPOR), "TORPOR") &&
-                     str_eq(cord_src_name(CS_OCHD8), "OCHD 8"));
+        bad += check("a mod from T2 TIDE 1 (CS_TORPOR): taken, named TIDE 1", cord_set(0, &c) && str_eq(cord_src_name(CS_TORPOR), "TIDE 1") &&
+                     str_eq(cord_src_name(CS_OCHD8), "SWARM 8"));
         cord_clear();
     }
     song.sel = 0;
