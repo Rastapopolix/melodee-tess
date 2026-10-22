@@ -1,3 +1,6 @@
+Only the templates remain (`tplf.bin`, `tplg.bin`, `tplh.bin`): the FUN16..18 projects and FBKK banks beside
+them were deleted with FUN20 (own project format, step 3b; projects are TSP1 records now, no converter).
+
 These binary fixtures were written by unmodified firmware at commit
 `590e7cd2af42b7b35efb8e6aa01f72ba57155185`, using its real `proj_pack`,
 `bank_pack` and `template_save` paths. They freeze the pre-FX FUN16, FBKK

@@ -76,7 +76,7 @@ static void reset(void)
     memset(&sx_import,0,sizeof sx_import);memset(&bulk,0,sizeof bulk);resource_release(RES_NOTE_HISTORY);note_transaction_ptr=0;fm6_rx_ready=0;
     memset(&ed_w, 0, sizeof ed_w); memset(&ui, 0, sizeof ui);
     memset(&favorites, 0, sizeof favorites); memset(&settings, 0, sizeof settings); settings_init();
-    memset(proj_slot, 0, sizeof proj_slot); up_cache_reset(); native_cache_reset();
+    memset(proj_bank_len, 0, sizeof proj_bank_len); up_cache_reset(); native_cache_reset();
     memset(&um, 0, sizeof um);
     host_progress = 1; host_erases = host_writes = host_wire_n = 0;
     transport_req = panic_req = 0; sx_ready = sx_collect = sx_busy = 0;
@@ -290,7 +290,8 @@ static int malformed_saves(void)
 {
     static const uint8_t slot[] = {1, 4}, name[] = {0, 'X', 0, 'Y'};
     const uint8_t save[] = {1, 0};
-    project_store_t old;
+    static uint8_t old[TSP_MAX];
+    uint32_t oldlen;
     int bad = 0;
     reset();
     bad += check("PROJECT refuses an invalid slot instead of wrapping to slot 0",
@@ -298,10 +299,10 @@ static int malformed_saves(void)
     bad += check("UP_STORE rejects bytes after its name terminator without saving",
                  request(ED_UP_STORE, name, sizeof name) == 8u && host_wire[6] == 1 && !up_used(0));
     bad += check("a successful PROJECT save confirms its slot", request(ED_PROJECT, save, sizeof save) == 9u && project_used(0));
-    old = proj_slot[0];
+    oldlen = proj_bank_len[0]; memcpy(old, proj_bank_slot[0], oldlen);
     TSEL->p[P_LEVEL] = 21; song.playing = 1; host_progress = 0;
     bad += check("PROJECT never confirms an old used slot when STOP timed out",
-                 !request(ED_PROJECT, save, sizeof save) && !memcmp(&old, &proj_slot[0], sizeof old));
+                 !request(ED_PROJECT, save, sizeof save) && proj_bank_len[0] == oldlen && !memcmp(old, proj_bank_slot[0], oldlen));
     return bad;
 }
 
@@ -414,14 +415,14 @@ static int bank_protocol(void)
 
 static int native_protocol(void)
 {
-    int bad=0;reset();cz_init();uint8_t a[3+2*CZ_BYTES],fm[FM6_PACKED],cz[CZ_BYTES];
-    fm6_factory(5,fm);cz_patch_init(cz);memcpy(cz+128,"SIXTEEN CHAR CZ! ",16);
+    int bad=0;reset();uint8_t a[3+2*144u],fm[FM6_PACKED],cz[144u];
+    fm6_factory(5,fm);memset(cz,0,sizeof cz);memcpy(cz+128,"SIXTEEN CHAR CZ! ",16);
     a[0]=ENGI_FM6;a[1]=2;a[2]=63;memcpy(a+3,fm,sizeof fm);request(ED_NATIVE,a,3+sizeof fm);
     bad+=check("NATIVE saves F064 independently of general user records",!host_wire[8] && native_used(ENGI_FM6,63) && !up_used(63));
     a[1]=1;uint32_t n=request(ED_NATIVE,a,3);
     bad+=check("NATIVE GET returns exact DX7 VMEM bytes",n==138 && !host_wire[8] && !memcmp(host_wire+9,fm,sizeof fm));
     a[0]=ENGI_CZ;a[1]=2;a[2]=127;
-    for(uint32_t j=0;j<CZ_BYTES;j++){a[3+2*j]=cz[j]&15;a[4+2*j]=cz[j]>>4;}
+    for(uint32_t j=0;j<144u;j++){a[3+2*j]=cz[j]&15;a[4+2*j]=cz[j]>>4;}
     request(ED_NATIVE,a,sizeof a);
     bad+=check("NATIVE refuses a CZ-1 tone (its pool retired)",host_wire[8]==1 && !native_used(ENGI_CZ,127));
     a[1]=0;a[2]=0;a[3]=16;request(ED_NATIVE,a,4);

@@ -154,7 +154,6 @@ static void melodee_init(void)
     song.g[G_BPM] = TRK_DEF_BPM;
     undo_depth++;                             /* (no undo copy of the power-on loads) */
     fm6_init();                               /* every track's FM6 patch: the init voice */
-    cz_init();
     for (i = 0; i < NTRK; i++) {
         track_t *t = &trk[i];
         track_defaults(t);

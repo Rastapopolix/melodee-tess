@@ -156,7 +156,7 @@ static void ui_power_on(void)
     recent_n = 0;
     undo_clear();
     memset(pat_last, 0, sizeof pat_last);
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     up_cache_reset(); native_cache_reset();
     for (i = 0; i < G_COUNT; i++)
         song.g[i] = GP[i].def;
@@ -270,15 +270,15 @@ static void sheet_do(const char *label)
         turn(EN_K1, -1);
     press(B_OCTUP);
 }
+/* a slot's stored project (its TSP1 record, decoded into proj_scratch) */
+static int stored(uint32_t slot) { return proj_bank_len[slot] && tsp_valid(proj_bank_slot[slot], proj_bank_len[slot]); }
 static int16_t stored_param(uint32_t slot, uint32_t track, uint32_t id)
 {
-    project_t p;
-    return proj_import(&p, &proj_slot[slot], sizeof proj_slot[slot]) ? p.t[track].p[id] : -32768;
+    return stored(slot) ? proj_scratch.t[track].p[id] : -32768;
 }
 static uint8_t stored_note(uint32_t slot, uint32_t track, uint32_t step)
 {
-    project_t p;
-    return proj_import(&p, &proj_slot[slot], sizeof proj_slot[slot]) ? p.t[track].step[step].note[0] : 0;
+    return stored(slot) ? proj_scratch.t[track].step[step].note[0] : 0;
 }
 static int msg_is(const char *s) { return ui.msg_t && str_eq(ui.msg, s); }
 static void my_steps(track_t *t)                  /* "recorded" steps */
@@ -3715,7 +3715,7 @@ static int test_boot_template(void)
     const char *u;
     ui_power_on();
     stop_transport();
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     memset(&tmpl, 0, sizeof tmpl);
     settings_boot = 0;
     go_title("PROJECT");
@@ -3780,7 +3780,7 @@ static int test_boot_template(void)
     }
     settings_boot = 0;
     memset(&tmpl, 0, sizeof tmpl);
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     return bad;
 }
 
@@ -3811,7 +3811,7 @@ static int test_tempo_select(void)
     turn(EN_K1, 4);
     turn(EN_K2, 10);
     ok = song.g[G_BPM] == 124 && song.g[G_SWING] == 10 && cur_page()->fam == FAM_SEQ;
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     project_save(2);
     song.g[G_BPM] = 90;
@@ -3819,7 +3819,7 @@ static int test_tempo_select(void)
     project_load(2);
     bad += check("SEQ > TEMPO: BPM and SWG, saved and loaded with the project", ok && song.g[G_BPM] == 124 &&
                  song.g[G_SWING] == 10);
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     return bad;
 }
@@ -3852,7 +3852,7 @@ static int test_quick_save(void)
     int bad = 0, i;
     ui_power_on();
     stop_transport();
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     project_save(1);
     trk[0].p[P_LEVEL] = 55;
@@ -3879,7 +3879,7 @@ static int test_quick_save(void)
     btn_up(B_REC); btn_up(B_SAVE); frame();
     bad += check("  a new project: PROJECT on a free slot (A), SAVE picked", !ui.home && cur_page()->graph == GR_SLOTS &&
                  song.g[G_SLOT] == 1 && ui.act == 4u && msg_is("NEW PROJECT: PICK SLOT"));
-    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_len, 0, sizeof proj_bank_len);
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     return bad;
 }
@@ -5312,7 +5312,7 @@ static int test_capture(void)
         turn(EN_K1, 1);
         for (i = 0; i < 200u; i++) frame();
         bad += check("  .. and any touch starts the rest again", stored_param(1, 0, P_LEVEL) == 77);
-        memset(proj_slot, 0, sizeof proj_slot);
+        memset(proj_bank_len, 0, sizeof proj_bank_len);
         memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     }
     ui_power_on();
