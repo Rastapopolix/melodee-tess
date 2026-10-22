@@ -916,7 +916,7 @@ static void graph_energy(uint16_t c)
     }
     at = (int32_t)en_frac(energy.ph, energy.per, (uint32_t)w);
     if (a && song.playing)
-        cv_rrect(x0 + at - 3, 50 - energy_now() * 36 / 32767 - 3, 7, 7, 3, c, T_SURF);
+        cv_ball(x0 + at, 50 - energy_now() * 36 / 32767, 7, c);
     if (song.playing && energy_resting()) {
         int32_t len = (int32_t)(energy.rest_left / EN_BPS) * w / 18;
         cv_rrect(x0, 6, len < 4 ? 4 : len > w ? w : len, 6, 3, c, T_SURF);
