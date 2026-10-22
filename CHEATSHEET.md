@@ -141,5 +141,6 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 
 | Do this | And this happens |
 |---|---|
+| **OCT-** alone while switching on | The update loader (three key-light flashes), to reinstall from the web installer |
 | **OCT-** + **OCT+** while switching on | HARDWARE CALIBRATION: teach each button and knob |
 | **OCT-** + **OCT+** held 5 s | Update mode (UBOOT); a countdown from 2 s, let go to cancel |
