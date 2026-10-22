@@ -26,10 +26,10 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 
 | Tap (again: the next page) | Pages |
 |---|---|
-| **SEQ** | GEN, then the MODE's pages. STEP: EVOLVE, NOTES. ARP: ARP, ARP 2, NOTES. A generator: EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, TIMING, ENERGY. All: PATTERN, TEMPO, PATTERNS, SONG |
+| **SEQ** | GEN, then the MODE's pages. STEP: EVOLVE, TIMING, NOTES. ARP: ARP, ARP 2, NOTES. A generator: EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, TIMING, ENERGY. All: PATTERN, TEMPO, PATTERNS, SONG |
 | **SEQ** held | PATTERNS |
 | **ARP** | STEP track: switches it to ARP, the ARP page (again: ARP 2). Generator track: GEN ("ARP: MODE ON GEN") |
-| **LFO** | MODS, MATRIX, LFO, LFO 2, ORGANIC, LFO DEST; on FM6 then FM LFO, FM LFO 2 |
+| **LFO** | MODS, MATRIX, LFO, LFO 2, ORGANIC, LFO DEST; on FM6 then FM LFO |
 | **ENV** | ENV, ENV DEST; on FM6 instead EG RATE, EG LVL, PITCH EG, PITCH LV |
 | **SCL** | SCALES, SCL, CHORD |
 | **EDIT** | The sound's EDIT pages |
@@ -74,7 +74,7 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 | **ENV** + SELECT or KNOB 1 | The cursor's note longer / shorter |
 | **SCL** + SELECT or KNOB 1 | Moves the note (ties, chord and velocity with it) |
 | **EDIT** tapped | Deletes the note and its ties |
-| **OCT+** | The note's sheet (length, velocity...) |
+| **OCT+** | The note's sheet (length, velocity, chance, ratchet x1–x8, nudge ±/16...) |
 | **OCT+** + SELECT, KNOB 1 or 2 | Selects a run of notes; let go: the Selected notes sheet (move, copy, quantize, delete) |
 | **OCT-** | Clears the selection |
 | **PRESETS** | Zooms the notes |
@@ -89,7 +89,7 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 | D#5 / F#5 | Page down / up (patterns over 16 steps) |
 | KNOB 1 to 4 | STEP, LANE, HIT, ACC |
 | **EDIT** | Clears the cursor step |
-| **OCT+** | The hit's sheet (accent, chance...) |
+| **OCT+** | The hit's sheet (accent, chance, ratchet, nudge) |
 
 ## Patterns
 

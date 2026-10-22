@@ -48,7 +48,7 @@ page's four settings sit along the top of the screen in the same order.
 | **HOME** | The home page: four tracks, their sounds and knobs | The menu |
 | **SEQ** | GEN, then the pages of the track's MODE | PATTERNS (the song under it) |
 | **ARP** | ARP's MODE and its page (again: ARP 2) | The help card for any knob you turn |
-| **LFO** | MODS, MATRIX, LFO, LFO 2, ORGANIC, LFO DEST | |
+| **LFO** | MODS, MATRIX, LFO, LFO 2, ORGANIC, LFO DEST (an FM6 track: then FM LFO) | |
 | **ENV** | ENV, ENV DEST | |
 | **SCL** | SCALES, SCL, CHORD | |
 | **EDIT** | The sound's EDIT pages; on an EDIT page, the map | With OCT- / OCT+: undo / redo |
@@ -108,8 +108,9 @@ Tessera 2.0 has three engines on the device:
 <p align="center"><img src="assets/gallery/edit_fm6.png" alt="FM6 ALGO page" width="240"> <img src="assets/gallery/fm6_eg.png" alt="FM6 operator envelope" width="240"> <img src="assets/gallery/drum.png" alt="DRUM steps" width="240"></p>
 
 **SID** and **PHYS** are no longer in the device build, and neither are CZ-1 and Prophet. A track saved with SID
-loads FM6's INIT; one saved with PHYS loads FM6's first voice. DRUM's SID KIT stays. FM6 presets have releases that
-ring out, so short sequenced notes are not cut off.
+loads FM6's INIT; one saved with PHYS loads FM6's first voice. DRUM's SID KIT stays. FM6 and TRIO presets have
+releases that ring out, so short sequenced notes are not cut off. The slow pads (GLASS PAD, SOFT PAD, DEEP PAD, PAD,
+STRINGS) swell in slowly: they speak on long notes and drones, and stay quiet on short steps.
 
 **PRESETS** (SAVE) browses the sounds. Its LIST knob picks ALL, the favourites, RECENT or a category, and it starts
 on ALL at power-on.
@@ -122,16 +123,16 @@ Tap **SEQ** for **GEN**, where **KNOB 1, MODE** picks what the selected track pl
 
 - **STEP**: the step sequencer.
 - **ARP**: the arpeggiator over the keys held (the ARP button gets here too).
-- One of twelve generators: **TURING**, **EUCLID**, **MARKOV**, **MORPH**, **ATLAS**, **BOUNCE**, **AWAKE**,
-  **POLY**, **QUAD**, **CONSTL** (Constellation), **SERIES** or **CHORD**.
+- One of thirteen generators: **TURING**, **EUCLID**, **MARKOV**, **MORPH**, **ATLAS**, **BOUNCE**, **AWAKE**,
+  **POLY**, **QUAD**, **CONSTL** (Constellation), **SERIES**, **CHORD** or **ANSWER**.
 
 SEQ then shows only that mode's pages:
 
 | MODE | SEQ's pages |
 |---|---|
-| **STEP** | GEN, EVOLVE (STEP EVOLVE), NOTES, PATTERN, TEMPO, PATTERNS, SONG |
+| **STEP** | GEN, EVOLVE (STEP EVOLVE), TIMING (its SHAPE), NOTES, PATTERN, TEMPO, PATTERNS, SONG |
 | **ARP** | GEN, ARP, ARP 2, NOTES, PATTERN, TEMPO, PATTERNS, SONG |
-| a generator | GEN, EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, PATTERN, TEMPO, PATTERNS, SONG |
+| a generator | GEN, EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, TIMING, ENERGY, PATTERN, TEMPO, PATTERNS, SONG |
 
 MOTION and DRUM HIT appear as in upstream. With STEP, GEN's KNOB 2 to 4 are DIVISION, SWING and GATE. The
 generators run at the track's DIV (PATTERN page) and play in the track's scale (SCL). Choosing STEP or a
@@ -160,6 +161,7 @@ generator is also a mod source: its **GATE**, its **NOTE** and a **CV** (see [MO
 | **CONSTL** | Y (0–14) | DENS (0–100 %) | SPEED | After timothy-taylor's norns script Constellation: a ship flies through a sky of stars; the stars that cross its crosshair play. Y is the crosshair's height (where the melody sits), DENS how many stars, SPEED how fast the sky passes (the straight note values, slow to fast). More on the [OCT+ layer](#constellation-lock-len-fill-size). |
 | **SERIES** | START (0–127) | INTV (1–7) | LOOP (OFF, 1–16) | Per Nørgård's infinity series (after the norns script nørgård): a melody alike at every scale. START picks where it begins, INTV how many scale degrees a step of the series is, LOOP repeats that many steps (OFF never repeats). |
 | **CHORD** | PROG | BARS (½, 1, 2, 4) | HIT | A progression's chords in the track's scale: POP (I V vi IV), 50S, 2-5-1, CIRCLE, TWO, DRONE, WALK (four chords from the seed) or USER (your own). HIT: HOLD (once, held), BEAT or STEP. See [Harmony](#harmony-chord-and-qnt-chrd). |
+| **ANSWER** | VARY (0–100 %) | ECHO (0–100 %) | FADE (0–100) | After Zen-1's call and response (the idea only): play a phrase on the track's keys (or MIDI IN), up to 8 notes, and a bar without a key ends it. ANSWER plays it back, after a rest, as answers that change a little more each time (VARY: a note moved a degree or two, an octave, left out or swapped), each softer than the last. ECHO repeats some notes once more at half the velocity. FADE is how many answers it gives (1 at 0, 16 at 99) before it rests until you play again; at 100 it never forgets and plays on as four loops of different lengths. Its OCT+ layer: ORDER (PLAYED, REVERSE, SHUFFLE), SHIFT (each answer moved up to this many scale degrees), SPACE (the rest before an answer, up to 4 bars) and LEN (the loops' lengths at FADE 100). |
 
 <table>
 <tr>
@@ -182,7 +184,8 @@ generator is also a mod source: its **GATE**, its **NOTE** and a **CV** (see [MO
 </tr>
 <tr>
 <td align="center"><img src="assets/gallery/gen_chord.png" alt="CHORD" width="200"><br><b>CHORD</b></td>
-<td></td><td></td><td></td>
+<td align="center"><img src="assets/gallery/gen_answer.png" alt="ANSWER" width="200"><br><b>ANSWER</b></td>
+<td></td><td></td>
 </tr>
 </table>
 
@@ -336,6 +339,53 @@ How long a generator holds its notes.
 | 4 | **GATE** | The track's step gate, as on PATTERN. |
 
 <p align="center"><img src="assets/gallery/gen_length.png" alt="LENGTH" width="240"></p>
+
+---
+
+## TIMING
+
+Ratchets: a step's notes played again within the step.
+
+| Knob | Setting | What it does |
+|---|---|---|
+| 1 | **RATCH** (x1–x8) | How many times a generator's step plays, in its own step: x1 once, as written, up to x8. |
+| 2 | **CHANCE** (0–100 %) | How often a step ratchets: 100 every step, below that some play once. The tosses replay with the seed. |
+| 3 | **SHAPE** | Where the hits fall: **EVEN** in equal parts, **ACCEL** closer and closer (a roll that speeds up), **DECEL** further and further apart (a bounce). |
+
+On a STEP track TIMING holds SHAPE alone: each step has its own Ratchet (below).
+
+<p align="center"><img src="assets/gallery/gen_timing.png" alt="TIMING, x4 ACCEL" width="240"></p>
+
+### A step's Ratchet and Nudge
+
+On a STEP track's NOTES page, **OCT+** on a note opens its sheet (on the drum grid, OCT+ on a hit). Besides Length,
+Velocity and Chance it holds:
+
+- **Ratchet** (x1–x8): the step plays that many times in its own step, placed by TIMING's SHAPE.
+- **Nudge** (−8/16 to +7/16): the step plays that many sixteenths of a step late or early. An early step plays near
+  the end of the step before, and across the loop too, but not across a pattern change or a song's turn, nor while
+  recording: there it plays on its line.
+
+<p align="center"><img src="assets/gallery/sheet_note.png" alt="A note's sheet, Ratchet x3 and Nudge +2/16" width="240"></p>
+
+---
+
+## ENERGY
+
+The project's slow shape over minutes, the same for every track (after Zen-1's conductor, the idea only). Both are
+off at 0.
+
+| Knob | Setting | What it does |
+|---|---|---|
+| 1 | **ARC** (0–100 %) | A slow tide, 3 to 6 minutes a turn: from the tracks as set to sparse and back. At the sparse end the generator tracks leave out up to 70 % more of their hits and play softer. ARC is how far it swings. |
+| 2 | **RESTS** (0–100 %) | How often the music rests: 8 to 18 s with the generator tracks silent (a CHORD track's held chord goes on), about every 4 minutes at 100, every 20 near 0, sooner while the tide is sparse. |
+| 3 | **NOW** | Where the tide is while playing: +100 full, −100 sparse. |
+| 4 | **REST** | The seconds left of a rest. |
+
+PLAY starts the tide from the project's seeds, so a piece plays the same each time. ENERGY is also a cord source in
+MODS: send it to a filter or a send and the sound follows the tide too.
+
+<p align="center"><img src="assets/gallery/gen_energy.png" alt="ENERGY" width="240"></p>
 
 ---
 

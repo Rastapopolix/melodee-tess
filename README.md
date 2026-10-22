@@ -90,6 +90,11 @@ patches and tips.
 <td align="center" valign="top"><img src="assets/gallery/help.png" alt="Help card" width="240"><br><b>Help card</b><br><sub>Hold ARP and turn a knob.</sub></td>
 </tr>
 <tr>
+<td align="center" valign="top"><img src="assets/gallery/gen_answer.png" alt="ANSWER" width="240"><br><b>ANSWER</b><br><sub>Play a phrase; it answers, changing a little each time.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_timing.png" alt="TIMING" width="240"><br><b>TIMING</b><br><sub>Ratchets x1 to x8, EVEN, ACCEL or DECEL.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_energy.png" alt="ENERGY" width="240"><br><b>ENERGY</b><br><sub>A slow tide over minutes, and rests.</sub></td>
+</tr>
+<tr>
 <td align="center" valign="top"><img src="assets/gallery/edit_fm6.png" alt="FM6" width="240"><br><b>FM6</b><br><sub>Six-operator FM.</sub></td>
 <td align="center" valign="top"><img src="assets/gallery/edit_trio.png" alt="TRIO" width="240"><br><b>TRIO</b><br><sub>Three oscillators.</sub></td>
 <td align="center" valign="top"><img src="assets/gallery/drum.png" alt="DRUM" width="240"><br><b>DRUM</b><br><sub>808, 909 and SID kits.</sub></td>
