@@ -81,7 +81,7 @@ static int edits_and_store(void)
     project_capture(&proj_scratch);project_store_t wire;project_t decoded;
     int ok=proj_pack(&wire,&proj_scratch) && proj_import(&decoded,&wire,sizeof wire);
     bad+=check("project roundtrip keeps sound settings, instrument, pitch and length",ok && decoded.drum[0].c[D9_BD][0]==5 && decoded.drum[0].c[D9_LT][3]==19 && decoded.recording[0].note==36 && decoded.recording[0].pitch==7 && decoded.recording[0].length);
-    bad+=check("new bank schema fits existing atomic flash copies",BANK_STORE_SIZE<=27904u && bank_pack(proj_wire_u.raw,&proj_scratch,1) && bank_valid(proj_wire_u.raw,BANK_STORE_SIZE));
+    bad+=check("the record fits a project copy and reads back",TSP_MAX<=38368u && tsp_pack(proj_wire_u.raw,&proj_scratch,1) && tsp_valid(proj_wire_u.raw,tsp_len(proj_wire_u.raw)));
     TSEL->engine=ENGI_DRUM;TSEL->eng_req=ENGI_DRUM;song.playing=0;
     bad+=check("general drum preset stores its own sound controls",up_store(0,"OWN 909")==3 && (memset(drum_patch,0,sizeof drum_patch),!up_load(0)) && drum_patch[0].c[D9_BD][0]==5 && drum_patch[0].c[D9_LT][3]==19);
     template_save();memset(drum_patch,0,sizeof drum_patch);template_load();

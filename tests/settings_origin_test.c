@@ -148,36 +148,34 @@ static int test_interrupted_cleanup(void)
 static int test_incompatible_projects(void)
 {
     int bad = 0;
-    static uint8_t bank[BANK_STORE_SIZE], saved[BANK_STORE_SIZE];
+    static uint8_t bank[TSP_MAX], saved[TSP_MAX];
     for (uint32_t kind = 0; kind < 4u; kind++) {
         fixture(); settings_init(); settings_boot = 1;
         persist_t prefs = {0}; settings_export(&prefs); st_save(OBJ_SETTINGS, &prefs, sizeof prefs);
-        project_capture(&proj_scratch); bank_pack(bank, &proj_scratch, 1);
-        uint8_t *project = bank + 8u;
-        uint32_t magic;
-        if (kind == 0) {                         /* upstream Felucca bank magic, not Melodee FBKK */
-            magic = 0x394B4246u; memcpy(bank, &magic, 4);
-        } else if (kind == 1) {                  /* an older Felucca project inside a matching container */
-            magic = 0x46554E38u; memcpy(project, &magic, 4);
-        } else if (kind == 2) {                  /* fork reuses FUN16 with a different parameter layout */
-            magic = 0x46554E43u; memcpy(project, &magic, 4); project[66] = 90;
-        } else {                                /* a matching header must not remap an alien engine */
-            project[68u + P_COUNT] = 255;
+        project_capture(&proj_scratch);
+        uint32_t len = tsp_pack(bank, &proj_scratch, 1), magic;
+        tsp_valid(bank, len);
+        if (kind == 0) {                         /* Melodee's FBKK magic: a record of before */
+            magic = 0x4B4B4246u; memcpy(bank, &magic, 4);
+        } else if (kind == 1) {                  /* a length that is not the record's own */
+            uint32_t l2 = len + 4u; memcpy(bank + 4, &l2, 4);
+        } else if (kind == 2) {                  /* a part version this build does not read */
+            bank[tsp_seen.at[TSP_STEPS] - 3u] = 2; tsp_resum(bank);
+        } else {                                /* a matching record must not remap an alien engine */
+            bank[tsp_seen.at[TSP_TRACKS] + 1u] = 255; tsp_resum(bank);
         }
-        uint32_t hash = proj_hash(project, PROJ_STORE_SIZE - 4u);
-        memcpy(project + PROJ_STORE_SIZE - 4u, &hash, 4); bank_checksum(bank);
-        st_save(OBJ_SLOT(0), bank, sizeof bank);
+        st_save(OBJ_SLOT(0), bank, len);
         uint32_t crc = music_crc(), before = erases;
         persist_boot();
         int ok = !project_used(0) && project_old(0) && project_free_slot() != 0 && erases == before;
         trk[0].p[P_LEVEL] = 71;
         bootguard.failed = 0; project_boot();
-        ok &= trk[0].p[P_LEVEL] == 71 && st_load(OBJ_SLOT(0), saved, sizeof saved) == sizeof saved &&
-            !memcmp(saved, bank, sizeof bank) && music_crc() == crc;
+        ok &= trk[0].p[P_LEVEL] == 71 && st_load(OBJ_SLOT(0), saved, sizeof saved) == (int)len &&
+            !memcmp(saved, bank, len) && music_crc() == crc;
         bad += check("incompatible project with valid CRC is quarantined before BOOT load", ok);
     }
-    fixture(); project_capture(&proj_scratch); bank_pack(bank, &proj_scratch, 1);
-    st_save(OBJ_SLOT(0), bank, sizeof bank); persist_boot();
+    fixture(); project_capture(&proj_scratch);
+    st_save(OBJ_SLOT(0), bank, tsp_pack(bank, &proj_scratch, 1)); persist_boot();
     bad += check("valid current Melodee projects remain available after settings reset", project_used(0) && !project_old(0));
     return bad;
 }

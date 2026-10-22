@@ -367,13 +367,14 @@ static int test_compact_history(void)
         t->step[i].vel = (uint8_t)(30u + i);
     }
     project_capture(&proj_scratch);
-    uint32_t sum = proj_scratch.sum;
     bad += check("decoded project borrows canvas with a separate archive buffer",
                  (void *)&proj_scratch == (void *)cv_primary && (void *)proj_wire_u.raw != (void *)cv_primary);
-    bad += check("dense project packs while decoded and serialized scratch coexist", bank_pack(proj_wire_u.raw, &proj_scratch, 1));
+    uint32_t len = tsp_pack(proj_wire_u.raw, &proj_scratch, 1), h = len ? proj_hash(proj_wire_u.raw, len) : 0u;
+    bad += check("dense project packs while decoded and serialized scratch coexist", len != 0u);
     cv_begin(240, 124, RGB(10, 20, 30));
-    bad += check("screen drawing cannot damage a pending archive; decoding reacquires scratch",
-                 bank_valid(proj_wire_u.raw, BANK_STORE_SIZE) && proj_scratch.sum == sum);
+    int same = tsp_valid(proj_wire_u.raw, len) && proj_hash(proj_wire_u.raw, len) == h;
+    for (uint32_t i = 0; i < NSTEP; i++) same &= proj_scratch.t[t - trk].step[i].vel == 30u + i;
+    bad += check("screen drawing cannot damage a pending archive; decoding reacquires scratch", same);
     return bad;
 }
 

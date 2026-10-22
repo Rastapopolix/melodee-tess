@@ -2292,6 +2292,20 @@ int tessera_unpack_ver(uint32_t ver, const uint8_t *in)
         tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
     return tessera_unpack(b);
 }
+/* the same checks as tessera_unpack_ver, nothing loaded (project.c reads a record before it replaces anything): 1 a
+ * block it would load */
+int tessera_check(uint32_t ver, const uint8_t *in)
+{
+    uint8_t b[TESSERA_PK_BYTES];                        /* (main loop: on the stack) */
+    uint32_t n = tessera_pk_bytes(ver) / TESSERA_TRACKS, tr;
+    if (!n) return 0;
+    for (tr = 0; tr < TESSERA_TRACKS; tr++)
+        tessera_track_up(ver, in + tr * n, b + tr * TESS_PK_TRACK);
+    tessera_ensure_init();
+    for (tr = 0; tr < TESSERA_TRACKS; tr++)
+        if (!tess_pk_track(b + tr * TESS_PK_TRACK, tr, 0)) return 0;
+    return 1;
+}
 
 /* every track back to OFF and its settings to their defaults (a project load starts from this) */
 static void cord_reset(void);                           /* (cord.c) */

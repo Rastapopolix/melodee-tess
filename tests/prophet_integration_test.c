@@ -65,6 +65,6 @@ int main(int argc,char **argv)
     trk_note_on(t,60,100);p5_tick(t,2);live=p5_patch_of(t);live->raw[P5_BEND]=11;p5_tick(t,1);
     bad+=check("editing bend range updates a held bend without another MIDI message",midi_bend_target[0]==12*256);
     panic_req|=1u;events_block(CTL);
-    if(argc>1){FILE *f=fopen(argv[1],"rb");static uint8_t old[27200];int ok=f&&fread(old,1,sizeof old,f)==sizeof old;if(f)fclose(f);bad+=check("real pre-Prophet runtime imports with legacy engine identities intact",ok&&bank_valid(old,sizeof old)&&proj_scratch.t[0].engine==old[8+68+92]);}
+    if(argc>1){FILE *f=fopen(argv[1],"rb");static uint8_t old[27200];int ok=f&&fread(old,1,sizeof old,f)==sizeof old;if(f)fclose(f);bad+=check("real pre-Prophet runtime imports with legacy engine identities intact",ok&&proj_import(&proj_scratch,old+8u,(int)PROJ_STORE_SIZE)&&proj_scratch.t[0].engine==old[8+68+92]);}
     printf("Prophet integration: %d failure(s)\n",bad);return !!bad;
 }

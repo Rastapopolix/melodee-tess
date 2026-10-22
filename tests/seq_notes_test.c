@@ -3,6 +3,21 @@
 #define RECORDING_NO_MAIN 1
 #include "recording_test.c"
 
+/* A loaded project's timed notes come back compacted and grouped by track and pattern (the record keeps live notes
+ * only), so these look a note up by what it is, not where it was */
+static uint32_t rec_alive(void)
+{
+    uint32_t n = 0;
+    for (uint32_t i = 0; i < RECORD_MAX; i++) n += recording[i].vel != 0;
+    return n;
+}
+static int rec_has(const recorded_note_t *r)
+{
+    for (uint32_t i = 0; i < RECORD_MAX; i++)
+        if (recording[i].vel && recording[i].on == r->on && recording[i].note == r->note && recording[i].owner == r->owner &&
+            recording[i].step == r->step) return 1;
+    return 0;
+}
 static int selection_and_delete(void)
 {
     raw_begin(); track_t *t = &trk[0];
@@ -44,9 +59,9 @@ static int selection_and_delete(void)
     press(B_OCTUP); fm1_in.buttons &= ~(1u<<panel.btn[B_EDIT]); frame();
     bad += check("EDIT plus OCT+ redoes one deletion without deleting its successor",!recording[2].vel&&recording[3].vel);
     project_capture(&proj_scratch);
-    int packed=bank_pack(proj_wire_u.raw,&proj_scratch,1);
-    project_restore_runtime(&proj_scratch); if(packed) bank_restore(proj_wire_u.raw);
-    bad += check("one-hit deletion survives project save/load",packed&&!recording[2].vel&&recording[0].vel&&recording[1].vel&&recording[3].vel);
+    int packed=(int)tsp_pack(proj_wire_u.raw,&proj_scratch,1) && tsp_valid(proj_wire_u.raw,tsp_len(proj_wire_u.raw));
+    project_restore_runtime(&proj_scratch); if(packed)tsp_restore(proj_wire_u.raw);
+    bad += check("one-hit deletion survives project save/load",packed&&rec_alive()==3&&!rec_has(&saved[2])&&rec_has(&saved[0])&&rec_has(&saved[3]));
     return bad;
 }
 
@@ -231,7 +246,7 @@ static int property_edits_and_mixed_patterns(void)
     bad+=check("MIDI can add a manual note in free space beside a recorded take",t->step[4].n==1&&t->step[4].note[0]==72&&!(t->step[4].flags&SF_RECORDED)&&recording[0].vel==100&&recording[1].vel==70);
     cursor_set(5);turn(EN_K1,-1);int manual=ui.cursor==4&&notes_manual_start(t)==4;turn(EN_K1,-3);
     bad+=check("the same KNOB 1 jog reaches manual and recorded notes",manual&&ui.cursor==1&&notes_selected(t)==2);
-    project_capture(&proj_scratch);int packed=bank_pack(proj_wire_u.raw,&proj_scratch,1);project_restore_runtime(&proj_scratch);if(packed)bank_restore(proj_wire_u.raw);
+    project_capture(&proj_scratch);int packed=(int)tsp_pack(proj_wire_u.raw,&proj_scratch,1) && tsp_valid(proj_wire_u.raw,tsp_len(proj_wire_u.raw));project_restore_runtime(&proj_scratch);if(packed)tsp_restore(proj_wire_u.raw);
     bad+=check("property edits and mixed note types survive save/load",packed&&recording[1].vel==70&&t->step[4].note[0]==72&&recording_active(t,0)&&recording_active(t,1));
     raw_replay();seq_advance(600);bad+=check("neighbouring recorded pitch still plays after editing and reload",gate_note(t,60));seq_advance(1200);bad+=check("edited recorded note still plays on its original timeline",gate_note(t,64));seq_stop();
     return bad;
@@ -345,9 +360,9 @@ static int live_erase_raw(void)
     seq_advance(6144);
     bad+=check("the next interval erases its own recorded hit and leaves later event bytes intact",!recording[1].vel&&!step_on(&t->step[1])&&!memcmp(&untouched,&recording[2],sizeof untouched));
     erase_up();seq_stop();song.rec=0;frame();
-    project_capture(&proj_scratch);int packed=bank_pack(proj_wire_u.raw,&proj_scratch,1);
-    project_restore_runtime(&proj_scratch);if(packed)bank_restore(proj_wire_u.raw);
-    bad+=check("an erased recording pass survives save/load without resurrecting hits",packed&&!recording[0].vel&&!recording[1].vel&&recording[2].vel&&!step_history_apply(0));
+    project_capture(&proj_scratch);int packed=(int)tsp_pack(proj_wire_u.raw,&proj_scratch,1) && tsp_valid(proj_wire_u.raw,tsp_len(proj_wire_u.raw));
+    project_restore_runtime(&proj_scratch);if(packed)tsp_restore(proj_wire_u.raw);
+    bad+=check("an erased recording pass survives save/load without resurrecting hits",packed&&rec_alive()==1&&rec_has(&untouched)&&!step_history_apply(0));
 
     raw_begin();t=TSEL;seq_advance(100);input_on(t,60,100);seq_advance(4u*6144u);input_off(t,60);seq_stop();song.rec=0;
     go_page(GR_ROLL);raw_replay();seq_advance(2u*6144u);song.rec=1;frame();erase_down();seq_advance(1);
@@ -495,8 +510,8 @@ static int bulk_and_pattern_clears(void)
     seq_advance(4000);clean&=!gate_note(t,60)&&!gate_note(t,64);
     seq_advance(3u*6144u-4000u);clean&=!gate_note(t,77);
     bad+=check("playback after clearing sounds only the newly recorded long note",clean);
-    seq_stop();project_capture(&proj_scratch);int packed=bank_pack(proj_wire_u.raw,&proj_scratch,1);
-    project_restore_runtime(&proj_scratch);if(packed)bank_restore(proj_wire_u.raw);
+    seq_stop();project_capture(&proj_scratch);int packed=(int)tsp_pack(proj_wire_u.raw,&proj_scratch,1) && tsp_valid(proj_wire_u.raw,tsp_len(proj_wire_u.raw));
+    project_restore_runtime(&proj_scratch);if(packed)tsp_restore(proj_wire_u.raw);
     count=0;only=1;for(uint32_t i=recording_head[recording_owner(t)];i<RECORD_MAX;i=recording_next[i]){count++;only&=recording[i].note==77;}
     bad+=check("cleared events stay deleted through project save/load",packed&&count==1&&only);
 
