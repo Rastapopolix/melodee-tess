@@ -27,7 +27,7 @@ static const char *const PRESET_CAT[NENGINES] = {
 #endif
     [3] = "OLBBBBBBLLLLLLLLPSPPGGKKUUERFFFF",          /* SID */
 #if TRIO_ON
-    [6] = "BLLEP",                                      /* TRIO: FAT BASS, ARP LEAD, SYNC LEAD, RING BELL, CHIP CHOIR */
+    [6] = "BLLEPPSPPBLWFRPP",                           /* TRIO: FAT BASS .. CHIP CHOIR, then the warm set (WARM PAD .. SWEEP PAD) */
 #endif
 #if PHYS_ON
     [9] = "EKUSKDDSU",                                  /* PHYS: BELL TREE, MARIMBA, PLUCK, BOWED METAL, KALIMBA, HAND DRUM, TOMS, DRONE STRING, HARP */
