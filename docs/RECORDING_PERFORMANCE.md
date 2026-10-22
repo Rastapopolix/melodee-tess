@@ -1,5 +1,9 @@
 # Recording and performance controls
 
+(Written for Melodee before Tessera. Tessera's device build plays FM6, TRIO and DRUM: the CZ-1 and Prophet
+engines are retired, and SID and PHYS are out of device builds, so the parts about those engines describe them as
+they were.)
+
 REC taps arm or disarm the selected track. They leave the transport alone.
 PLAY starts/stops playback. A track armed before PLAY records from the first
 step. While stopped and armed, playing the first key or MIDI note also starts

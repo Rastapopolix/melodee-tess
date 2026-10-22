@@ -1,5 +1,9 @@
 # Storage savings plan
 
+(Written for Melodee before Tessera. Tessera's device build plays FM6, TRIO and DRUM: the CZ-1 and Prophet
+engines are retired, and SID and PHYS are out of device builds, so the parts about those engines describe them as
+they were.)
+
 Status, 2026-10-11: the full storage savings update, legacy reader and engine removal, shared bank cache,
 and protection for unreadable records are part of **Melodee 1.2.0**. Merge the complete feature history into
 `next`; there is no separate bridge release or 2.0 release for this work. Started from `next` 2598876.
