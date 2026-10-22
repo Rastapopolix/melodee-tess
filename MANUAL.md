@@ -9,8 +9,9 @@ pages around them evolve the phrases, build song forms, pass hits between tracks
 anything.
 
 This manual covers what Tessera adds and changes. The step sequencer, the effects and the song pages work as in
-upstream Melodee. For recipes and tips, see **[RECIPES.md](RECIPES.md)**. Every setting, with its range and
-default, is listed in [docs/PARAMETERS.md](docs/PARAMETERS.md).
+upstream Melodee. For recipes and tips, see **[RECIPES.md](RECIPES.md)**; every button and combination on one
+sheet, **[CHEATSHEET.md](CHEATSHEET.md)** (and [a printable PDF](docs/cheatsheet/tessera-cheatsheet.pdf)). Every
+setting, with its range and default, is listed in [docs/PARAMETERS.md](docs/PARAMETERS.md).
 
 Page and knob names are the ones on the screen. KNOB 1 to KNOB 4 are the four knobs from left to right, and each
 page's four settings sit along the top of the screen in the same order.
