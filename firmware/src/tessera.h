@@ -144,6 +144,9 @@ typedef struct {
     uint8_t          sub_chance[TESSERA_TRACKS]; /* 0..100: the chance a step ratchets (100: every step) */
     /* CHORD's BREATH (HIT HOLD): its voices on slow cycles of their own, one now and then sitting out */
     uint8_t          ch_breath[TESSERA_TRACKS];  /* 0..100: 0 off (as before) */
+    /* ENERGY (energy.c; the ENERGY page), the project's, not a track's: its slow tide and its rests */
+    uint8_t          en_arc;                     /* 0..100: how far the tide swings, 0 off */
+    uint8_t          en_rests;                   /* 0..100: how often the notes rest, 0 off */
 } tessera_state_t;
 
 extern tessera_state_t tessera;
@@ -181,10 +184,15 @@ void tessera_len_knob(uint32_t k, int32_t s);       /* LENGTH page: MODE LEN KEY
 void tessera_len_tick(track_t *t, uint32_t n);      /* seq.c, each block: FIXED's held notes end on time */
 void tessera_len_stop(track_t *t);                  /* the held notes end now (panic, a pattern change) */
 void organic_play(void);                            /* seq.c, PLAY: SLOTH and OCHD from each track's SEED */
+void energy_play(void);                             /* seq.c, PLAY: ENERGY's tide and rests from the SEEDs (energy.c) */
+int32_t energy_now(void);                           /* the tide now, Q15 -32767 sparse .. 32767 full (cord source) */
+int energy_resting(void);                           /* 1 while the notes rest */
 const char *tessera_cond_name(uint32_t cond);
 uint32_t tessera_form_get(uint32_t tr, uint8_t seq[4], uint32_t *pos);   /* returns the form's length, 0 = OFF */
 const char *tessera_form_name(uint32_t form);
-#define TESSERA_PK_BYTES 600u                       /* the saved state, version 17 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS) */
+#define TESSERA_PK_BYTES 602u                       /* the saved state, version 18 (tessera.c: TESS_PK_TRACK x TESSERA_TRACKS,
+                                                     * then the project's TESS_PK_TAIL) */
+#define TESSERA_PK_BYTES_V17 600u                   /* version 17 (before ENERGY's ARC and RESTS) */
 #define TESSERA_PK_BYTES_V16 596u                   /* version 16 (before CHORD's BREATH) */
 #define TESSERA_PK_BYTES_V15 588u                   /* version 15 (before SUB) */
 #define TESSERA_PK_BYTES_V14 584u                   /* version 14 (before Grids' PART4) */
@@ -203,8 +211,8 @@ const char *tessera_form_name(uint32_t form);
 #define TESSERA_PK_BYTES_V1 180u                    /* version 1 (before SEED) */
 uint32_t tessera_pack(uint8_t *out);                /* live state -> TESSERA_PK_BYTES */
 int tessera_unpack(const uint8_t *in);              /* 1 loaded; 0 refused (range check), nothing changed */
-int tessera_unpack_ver(uint32_t ver, const uint8_t *in);
-int tessera_check(uint32_t ver, const uint8_t *in);   /* the same checks, nothing loaded: 1 it would load */   /* the same for a block of version ver (1..17) */
+int tessera_unpack_ver(uint32_t ver, const uint8_t *in);   /* the same for a block of version ver (1..18) */
+int tessera_check(uint32_t ver, const uint8_t *in);        /* the same checks, nothing loaded: 1 it would load */
 uint32_t tessera_pk_bytes(uint32_t ver);            /* a version's block length, 0 none */
 void tessera_track_up(uint32_t ver, const uint8_t *in, uint8_t *out);   /* one track's record, version ver -> 17 */
 void tessera_reset(void);                           /* every track OFF, defaults */
@@ -241,6 +249,7 @@ enum {
     TX_GRD_PART4,
     TX_SUB_RATCH, TX_SUB_CHANCE,
     TX_CH_BREATH,
+    TX_EN_ARC, TX_EN_RESTS,                         /* (the project's: one value, whichever track) */
     TX_COUNT
 };
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */

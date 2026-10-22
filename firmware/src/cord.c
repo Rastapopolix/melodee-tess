@@ -88,7 +88,7 @@ _Static_assert(CS_LFO == MS_LFO && CS_SLEW == MS_SLEW && CS_EXPR == MS_EXPR, "CS
 static const char *const CORD_SRC_NAME[CS_N] = {"--", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H",
                                                 "SLEW", "GATE", "NOTE", "CV", "DRIFT", "TIDE 1", "TIDE 3",
                                                 "TIDE 2", "SWARM 1", "SWARM 2", "SWARM 3", "SWARM 4", "SWARM 5", "SWARM 6",
-                                                "SWARM 7", "SWARM 8"};   /* (TIDE by speed: CS_TORPOR 1, CS_INERTIA 2, CS_APATHY 3) */
+                                                "SWARM 7", "SWARM 8", "ENERGY"};   /* (TIDE by speed: CS_TORPOR 1, CS_INERTIA 2, CS_APATHY 3) */
 const char *cord_src_name(uint32_t code) { return code < CS_N ? CORD_SRC_NAME[code] : 0; }
 
 /* DRIFT: each track's slow wander, -1..1: a point every 2^14 audio blocks (11.9 s), the way between them eased
@@ -98,6 +98,7 @@ void cord_tick(void)
 {
     cord_blocks++;
     organic_tick();                                     /* (tessera.c, organic.c) */
+    energy_tick();                                      /* (tessera.c, energy.c) */
 }
 static int32_t cord_point(uint32_t k)
 {
@@ -133,6 +134,8 @@ static int32_t cord_src(uint32_t s, uint32_t tr)
         return tr < TESSERA_TRACKS && tessera.mode[tr] != TESS_ENG_OFF ? tessera.cv[tr] : 0;
     if (s == CS_DRIFT)
         return cord_drift(tr % NTRK);
+    if (s == CS_ENERGY)
+        return energy_now();
     if (s >= CS_TORPOR)
         return organic_out(tr, s - CS_TORPOR);
     if (s == CS_LFO)

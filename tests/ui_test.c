@@ -484,7 +484,7 @@ static int test_phys_chrd_click(void)
 static int test_gen_family(void)
 {
     static const char STEP[] = "GEN EVOLVE NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
-                      GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH TIMING PATTERN TEMPO PATTERNS SONG";
+                      GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH TIMING ENERGY PATTERN TEMPO PATTERNS SONG";
     char got[128];
     int bad = 0, in_seq = 0, pattern_seq = 0;
     uint32_t k, n = 0;
@@ -502,7 +502,7 @@ static int test_gen_family(void)
     bad += check("SEQ in ARP: back to ARP (its last page), ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN", str_eq(seq_taps(got, sizeof got, 9), ARP));
     if (!str_eq(got, ARP)) printf("    got: %s\n", got);
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);
-    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH TIMING PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 11), GEN));
+    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH TIMING ENERGY PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 12), GEN));
     if (!str_eq(got, GEN)) printf("    got: %s\n", got);
     go_title("EVOLVE");
     press(B_ARP);
@@ -538,6 +538,17 @@ static int test_gen_family(void)
         turn(EN_K1, -1);
         bad += check("TIMING: back to x1, kept there", tessera.sub_ratch[tr] == 0u);
         tessera_param_set(tr, TX_SUB_CHANCE, 100);
+    }
+    go_title("ENERGY");                           /* ENERGY, the project's: KNOB 1 ARC, KNOB 2 RESTS; 3 and 4 nothing */
+    {
+        turn(EN_K1, 3);
+        turn(EN_K2, 5);
+        turn(EN_K3, 2);
+        turn(EN_K4, -2);
+        bad += check("ENERGY: ARC and RESTS turned up from 0 (the project's, whichever track), KNOB 3 and 4 nothing",
+                     tessera.en_arc > 0u && tessera.en_rests > tessera.en_arc && str_eq(cur_page()->title, "ENERGY"));
+        tessera_param_set(0, TX_EN_ARC, 0);
+        tessera_param_set(0, TX_EN_RESTS, 0);
     }
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
     TSEL->p[P_AMODE] = 0;

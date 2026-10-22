@@ -122,16 +122,20 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_SUB_RATCH] = PE("RATCH", TX_N_RATCH, 0),
     [TX_SUB_CHANCE] = PD("CHANCE", F_PCT, 0, 100, 100),
     [TX_CH_BREATH] = PD("BREATH", F_PCT, 0, 100, 0),
+    [TX_EN_ARC] = PD("ARC", F_PCT, 0, 100, 0),
+    [TX_EN_RESTS] = PD("RESTS", F_PCT, 0, 100, 0),
 };
 
 #if MELODEE_HELP_PACKED                          /* the texts stay here, tools/gen_help.py packs them */
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n}
 #define G_(g, f, n, h) {PID_GLOBAL(g), f, n}
 #define X_(x, n, h) {PID_TESS(x), PID_F_TRACK, n}
+#define XP_(x, n, h) {PID_TESS(x), 0, n}               /* (a Tessera setting of the project's, not a track's) */
 #else
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
 #define G_(g, f, n, h) {PID_GLOBAL(g), f, n, h}
 #define X_(x, n, h) {PID_TESS(x), PID_F_TRACK, n, h}
+#define XP_(x, n, h) {PID_TESS(x), 0, n, h}
 #endif
 
 static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks it) */
@@ -458,12 +462,20 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                      "instead of struck (DRONE: one long chord). BREATH is the chance a voice above "
                                      "the lowest sits a cycle out, one at a time; 0 is off. OCT+ held on GEN, KNOB 4 "
                                      "(USER: its LEN there)."),
+    XP_(TX_EN_ARC, "ENERGY ARC", "The project's slow tide, the same for every track: over 3 to 6 minutes it swings from "
+                                 "the tracks as set to sparse and back. At the sparse end the generator tracks leave "
+                                 "out up to 70 % more of their hits and play up to 16 softer; ARC is how far it "
+                                 "swings, 0 off. It is the cord source ENERGY too (to a filter, a send)."),
+    XP_(TX_EN_RESTS, "ENERGY RESTS", "How often the music rests: 8 to 18 s with the generator tracks silent (a CHORD "
+                                     "track's held chord and its BREATH go on), at 100 about every 4 minutes, near 0 "
+                                     "about every 20, sooner while ARC's tide is sparse. 0 off."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
 #undef T_
 #undef G_
 #undef X_
+#undef XP_
 
 #if MELODEE_HELP_PACKED
 #include "pid_help_unpack.h"

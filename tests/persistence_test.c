@@ -154,6 +154,7 @@ static int test_tsp_record(void)
     trk[0].step[5] = (step_t){{62}, 1, ST_NOTE, 0, 90, 0, 0, 0, 0};
     step_set_ratch(&trk[0].step[5], 3); step_set_nudge(&trk[0].step[5], -6);
     song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
+    tessera.en_arc = 40u; tessera.en_rests = 60u;     /* (ENERGY: the block's project tail, TS18) */
     {
         cord_t c = {CS_LFO, 0, CD_CUTOFF, 1, 30, 0};
         cord_set(0, &c);
@@ -163,12 +164,19 @@ static int test_tsp_record(void)
     project_load(0);
     bad += check("TSP1: a step's RATCH and NUDGE, the generators and a cord come back with the slot", ok &&
                  step_ratch(&trk[0].step[5]) == 3u && step_nudge(&trk[0].step[5]) == -6 && trk[0].step[5].note[0] == 62u &&
-                 tessera.mode[1] == TESS_ENG_EUCLID && cord_count() == 1u && cord_get(0)->amount == 30);
+                 tessera.mode[1] == TESS_ENG_EUCLID && cord_count() == 1u && cord_get(0)->amount == 30 &&
+                 tessera.en_arc == 40u && tessera.en_rests == 60u);
     ok = project_rename(0, "TSP TWO") == 0;
     memset(trk[0].step, 0, sizeof trk[0].step);
     project_load(0);
     bad += check("TSP1: a rename keeps the music and the generators", ok && project_name(0, name) && !strcmp(name, "TSP TWO") &&
                  step_ratch(&trk[0].step[5]) == 3u && tessera.mode[1] == TESS_ENG_EUCLID);
+    project_capture(&proj_scratch);
+    len = tsp_pack(raw, &proj_scratch, 1);             /* (with the generators: the TESSERA part) */
+    ok = len && tsp_valid(raw, len) && tsp_seen.at[TSP_TESSERA];
+    raw[tsp_seen.at[TSP_TESSERA] + 1u + TESSERA_PK_BYTES - 2u] = 101u;   /* (ARC past 100) */
+    tsp_resum(raw);
+    bad += check("TSP1: a Tessera block whose ENERGY tail is out of range is refused", ok && !tsp_valid(raw, len));
 
     reset();                                           /* the largest: every step of every pattern full, 1,024 notes */
     for (k = 0; k < NTRK; k++) {

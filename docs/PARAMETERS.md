@@ -225,6 +225,8 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x256 | TIMING RATCH | x1, x2, x3, x4 | x1 | Plays each step's notes 1 to 4 times in equal parts of the step, a ratchet; x1 plays them once, as written. Each hit gets its share of the step's GATE. Notes NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once. |
 | 0x257 | TIMING CHANCE | 0 to 100 % | 100 | How often a step ratchets: 100 every step, 0 none. The toss replays with the track's SEED. |
 | 0x258 | CHORD BREATH | 0 to 100 % | 0 | With HIT HOLD, the chord breathes: each voice is struck again, softer, on a slow cycle of its own (11 to 19 s), and the same chord again is tied over instead of struck (DRONE: one long chord). BREATH is the chance a voice above the lowest sits a cycle out, one at a time; 0 is off. OCT+ held on GEN, KNOB 4 (USER: its LEN there). |
+| 0x259 | ENERGY ARC | 0 to 100 % | 0 | The project's slow tide, the same for every track: over 3 to 6 minutes it swings from the tracks as set to sparse and back. At the sparse end the generator tracks leave out up to 70 % more of their hits and play up to 16 softer; ARC is how far it swings, 0 off. It is the cord source ENERGY too (to a filter, a send). |
+| 0x25A | ENERGY RESTS | 0 to 100 % | 0 | How often the music rests: 8 to 18 s with the generator tracks silent (a CHORD track's held chord and its BREATH go on), at 100 about every 4 minutes, near 0 about every 20, sooner while ARC's tide is sparse. 0 off. |
 
 ## Mods
 
@@ -257,6 +259,7 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | SWARM 6 | a free LFO, 6.1 s a turn |
 | SWARM 7 | a free LFO, 3.8 s a turn |
 | SWARM 8 | a free LFO, 2.4 s a turn |
+| ENERGY | the project's slow tide (ENERGY ARC), every track's the same: -100 % sparse .. 100 % full |
 
 | Destination | Moved at | What it moves |
 | --- | --- | --- |
