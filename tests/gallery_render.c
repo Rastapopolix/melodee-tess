@@ -1,15 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The README's Visual Reference Gallery and the manual's pictures: the real drawing code (tests/ui_render.c's scenes)
  * in the device build's engine set (FM6, TRIO, DRUM: no SID, PHYS, CZ-1 or Prophet), the default palette (SMALTI),
- * as PPM in OUTDIR/ppm (240 x 240; the PNGs in assets/gallery are these 2x, nearest).
- *   cc -O1 -w -DMELODEE_USB_AUDIO=1 -DMELODEE_SID=0 -DMELODEE_PHYS=0 -DMELODEE_CZ=0 -DMELODEE_PROPHET=0 \
+ * as PPM in OUTDIR/ppm (240 x 240; the PNGs in assets/gallery are these 2x, nearest: tools/gallery_png.py).
+ *   cc -O1 -w -DMELODEE_USB_AUDIO=1 -DMELODEE_SID=0 -DMELODEE_PHYS=0 '-DMELODEE_VERSION="v2.0"' \
  *      -Ibuild/gen -Ifirmware/src -Itests -o build/gallery_render tests/gallery_render.c -lm
  *   mkdir -p build/gallery/ppm && build/gallery_render build/gallery
  * (README.md, MANUAL.md and the project page show these as assets/gallery/<name>.png) */
 #define UI_RENDER_NO_MAIN 1
 #include "ui_render.c"
 
-enum { G_SCENE, G_TRIO, G_MODE_STEP, G_MODE_ARP, G_FORM };   /* (ARP: the same page, MODE Arp) */
+enum { G_SCENE, G_TRIO, G_MODE_STEP, G_MODE_ARP, G_FORM, G_TIMING, G_SHEET };   /* (ARP: the same page, MODE Arp;
+                                                                                 * TIMING: x4 ACCEL; SHEET: x3, +2/16) */
 typedef struct { const char *name; int kind; int scene; } gshot_t;
 static const gshot_t SHOTS[] = {
     {"home", G_SCENE, S_HOME}, {"seq_mode", G_MODE_STEP, 0},
@@ -29,6 +30,8 @@ static const gshot_t SHOTS[] = {
     {"help", G_SCENE, S_HELP_ZOOM},
     {"edit_fm6", G_SCENE, S_FM6_ALG5}, {"fm6_eg", G_SCENE, S_FM6_EG}, {"edit_trio", G_TRIO, 0},
     {"drum", G_SCENE, S_DRUM}, {"patterns", G_SCENE, S_PATGRID}, {"mixer", G_SCENE, S_MIXER},
+    {"gen_timing", G_TIMING, 0}, {"gen_energy", G_SCENE, S_GEN_ENERGY}, {"gen_answer", G_SCENE, S_GEN_ANSWER},
+    {"sheet_note", G_SHEET, 0}, {"about", G_SCENE, S_ABOUT},
 };
 
 int main(int argc, char **argv)
@@ -47,6 +50,16 @@ int main(int argc, char **argv)
         } else if (g->kind == G_FORM) {                 /* FORM: TURING's track, its sections */
             setup(S_GEN_TURING);
             go_title("FORM");
+        } else if (g->kind == G_SHEET) {                /* a note's sheet: its step ratcheted x3, nudged +2/16, Ratchet's row */
+            setup(S_REF_SHEET_NOTE);
+            step_set_ratch(&TSEL->step[4], 3);
+            step_set_nudge(&TSEL->step[4], 2);
+            pop.sel = 3;
+        } else if (g->kind == G_TIMING) {               /* TIMING: RATCH x4, every step, SHAPE ACCEL */
+            setup(S_GEN_TIMING);
+            tessera_param_set(0, TX_SUB_RATCH, 3);
+            tessera_param_set(0, TX_SUB_CHANCE, 100);
+            tessera_param_set(0, TX_SUB_SHAPE, SUB_ACCEL);
         } else { setup(S_HOME); eng(6u); go_title("EDIT 1"); }   /* TRIO */
         pal(UI_DEFAULT_INDEX);
         draw(g->kind == G_SCENE ? g->scene : -1);

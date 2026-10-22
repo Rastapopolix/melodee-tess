@@ -49,6 +49,10 @@ and **RYUKYU**, as 12-tone pitches.
   holds SHAPE alone, for every step's Ratchet.
 * **Ratchet and Nudge per step** on a STEP track: OCT+ on a note (or a drum hit) opens its sheet, where **Ratchet**
   plays the step x1 to x8 in equal parts and **Nudge** moves it up to 8/16 of a step early or 7/16 late.
+* **ANSWER** generator (after Zen-1's call and response): play a phrase on the keys and it answers with variations
+  that change a little more each time and fade (VARY, ECHO, FADE; OCT+: ORDER, SHIFT, SPACE, LEN).
+* **HUMAN** (TWEAK) now moves timing too: a generator's step lands up to 20 ms behind the beat at 100, never early,
+  the same each time the piece plays.
 * **STEP EVOLVE**: on a STEP track, EVOLVE varies your written steps as they play; hold REC to keep the changes.
 * **Print**: hold REC on a generator track to put its last bars into STEP and play on from there.
 * **ATLAS** (was GRIDS): KICK, SNR and HAT each take their own share of DENSITY, and **TOMS** adds a fourth part from
@@ -58,6 +62,10 @@ and **RYUKYU**, as 12-tone pitches.
 * **OCT+ layers** on GEN for ATLAS, CHORD, QUAD and CONSTELLATION: hold OCT+ for a second set of knobs.
 * **FOLLOW** draws the followed track in its own colour, and can follow STEP tracks.
 * **MENU > LIGHTS AUTO**: the panel goes dark 30 s after the last touch and wakes on the first, for long ambient sets.
+* **LFO on an FM6 track** opens MODS first, as on every engine; FM6's own FM LFO page comes after the others.
+* **Tessera** on ABOUT, the installer and the editor; the power-on mosaic now holds a moment (a button skips it).
+* Six TRIO presets (FAT BASS, SUB BASS, ARP LEAD, SOFT LEAD, ANALOG BRASS, BREATH FLUTE) release with a short fade
+  instead of stopping dead on short steps.
 * Tracks stay on the beat after a DIV or tempo change.
 
 ### 🏷️ New names
