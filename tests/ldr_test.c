@@ -240,13 +240,19 @@ int main(int argc, char **argv)
         bad += check("marker must erase before changing any body byte",rc==-12 && !memcmp(before,nor+LDR_APP_LO,sizeof before));
         marker_erase_stuck=0;
     }
-    {   /* A valid UFW entry with an older, smaller flash partition (0x89000). */
+    {   /* A valid UFW entry with an older, smaller flash partition (0x89000), or another board's (an SMK-37's
+         * 0x9D000, Felucca 1.6.1): refused before erasing anything. */
+        static const uint32_t SZ[2] = {0x89000u, 0x9D000u};
         uint8_t saved[0x400];memcpy(saved,logical,sizeof saved);uint8_t *h=logical;
-        uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
-        for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,0x89000u);ota_jl_enc(e,0x50);}
-        ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
-        erases=0;rc=ldr_session();bad+=check("older smaller partition refused before erasing anything",rc==-3&&!erases&&!memcmp(nor+0x93000,current_banks,sizeof current_banks));
-        memcpy(logical,saved,sizeof saved);
+        for (uint32_t z = 0; z < 2u; z++) {
+            uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
+            for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,SZ[z]);ota_jl_enc(e,0x50);}
+            ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
+            erases=0;rc=ldr_session();bad+=check(z ? "another board's partition (0x9D000) refused before erasing anything" :
+                                                     "older smaller partition refused before erasing anything",
+                                                 rc==-3&&!erases&&!memcmp(nor+0x93000,current_banks,sizeof current_banks));
+            memcpy(logical,saved,sizeof saved);
+        }
     }
     printf("%s\n", bad ? "LOADER TEST FAILED" : "loader test passed");
     return bad != 0;
