@@ -49,6 +49,7 @@ PHASES, PHASES_L = 2, 2                # horizontal phases per glyph (aa_raster.
 # faces stored Huffman-coded (--huff): M and L. S, the most drawn and the least compressible (-15 %), stays
 # 2 px per byte, so the labels draw at full speed
 HUFF = [("M", "L")]
+SHARED = {}                            # (C type, values) -> the first face's array of them (gen_aa_font emit)
 # L draws "Melodee", the UPDATE MODE countdown digit, the HOME notes / chord roots, the calibration's control names
 # (panel.c B_NAME / E_NAME), NAME's name and NEW SONG's key (R6): every letter, the digits and the name's signs; the
 # space as its range and the rest as extras (ui_test.c checks that every L string is covered)
@@ -260,15 +261,18 @@ def emit(face, tracking, gamma, kern_min):
     for off, adv, bx, by, bw, bh in table:
         lines.append(f"    {{{off}, {adv}, {bx}, {by}, {bw}, {bh}}},")
     lines.append("};")
-    if km:
-        lines.append(ar.c_array(f"AF_{name}_KL", "uint8_t", kl, 24))
-        lines.append(ar.c_array(f"AF_{name}_KR", "uint8_t", kr, 24))
-        lines.append(ar.c_array(f"AF_{name}_KM", "int8_t", km, 24))
-    ex = ", ".join(str(CODE.get(c, c)) for c in extras) or "0"
-    lines.append(f"static const uint8_t AF_{name}_EX[{max(1, len(extras))}] = {{{ex}}};")
-    kt = (f"AF_{name}_KL, AF_{name}_KR, AF_{name}_KM") if km else "0, 0, 0"
+    def shared(part, ctype, vals):
+        """the array's name: a face's table equal to an earlier face's is that one (no second copy in flash)"""
+        key = (ctype, tuple(vals))
+        if key not in SHARED:
+            SHARED[key] = f"AF_{name}_{part}"
+            lines.append(ar.c_array(SHARED[key], ctype, list(vals), 24))
+        return SHARED[key]
+    kt = (f"{shared('KL', 'uint8_t', kl)}, {shared('KR', 'uint8_t', kr)}, {shared('KM', 'int8_t', km)}") if km \
+        else "0, 0, 0"
+    ext = shared("EX", "uint8_t", [CODE.get(c, c) for c in extras] or [0])
     lines.append(f"static const aafont_t AF_{name} = {{{r['h']}, {r['asc']}, {first}, {last}, {len(extras)}, "
-                 f"{len(cols) if km else 0}, AF_{name}_G, AF_{name}_DATA, {kt}, AF_{name}_EX, {psh}, "
+                 f"{len(cols) if km else 0}, AF_{name}_G, AF_{name}_DATA, {kt}, {ext}, {psh}, "
                  f"{'AF_%s_HC' % name if hc else '0'}}};")
     kbytes = 2 * len(chars) + len(km) if km else 0
     cost = {"data": len(data) + len(hc), "glyph_table": 8 * len(table), "kern": kbytes, "extras": len(extras),

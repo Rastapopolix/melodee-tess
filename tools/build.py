@@ -108,6 +108,7 @@ def generate():
             [tools / "gen_aa_keycaps.py", GEN / "ui_keycaps.h"],
             [tools / "gen_ui_palettes.py", GEN / "ui_palettes.h"],
             [tools / "gen_tables.py", GEN / "melodee_tables.h"],
+            [tools / "gen_help.py", GEN / "pid_help.h"],
             [tools / "gen_fm6_patches.py", GEN / "melodee_fm6.h"],
             [tools / "gen_cz1_factory.py", GEN / "melodee_cz1.h"],
             [tools / "gen_prophet_factory.py", GEN / "melodee_prophet_factory.h", "--web", "check"]]
@@ -271,10 +272,11 @@ def build_plaits(flags):
 def build_app(stub):
     subprocess.run([sys.executable, SRC / "tools/gen_909_tables.py", GEN / "x0x_drum_tables.h"], check=True)
     flags = [*CFLAGS, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
+    os.environ.setdefault("MELODEE_HELP_PACKED", "1")   # melodee-tess: the help texts byte-pair coded (tools/gen_help.py)
     for flag, v in (("MELODEE_FM6", "1"), ("MELODEE_SID", "0"), ("MELODEE_PHYS", "0"), ("MELODEE_CZ", "0"), ("MELODEE_PROPHET", "0"), ("MELODEE_PLAITS", "0")):
         os.environ.setdefault(flag, v)   # melodee-tess: FM back, SID and PHYS out (2026-10-21), CZ-1, Prophet and MACRO out, TRIO in; set =1 / =0
                                          # to build the old set (the host tests keep all engines: firmware/src/core.h)
-    for flag in ("MELODEE_FLASH", "MELODEE_OTA", "MELODEE_OTA_DRYRUN", "MELODEE_OTA_RAMONLY", "MELODEE_CDC",
+    for flag in ("MELODEE_HELP_PACKED", "MELODEE_FLASH", "MELODEE_OTA", "MELODEE_OTA_DRYRUN", "MELODEE_OTA_RAMONLY", "MELODEE_CDC",
                  "MELODEE_UART", "MELODEE_USB_AUDIO", "MELODEE_ICONS", "MELODEE_PROPHET_PROTOTYPE", "MELODEE_PROPHET", "MELODEE_FM6", "MELODEE_SID", "MELODEE_CZ", "MELODEE_PLAITS", "MELODEE_TRIO", "MELODEE_PHYS",
                  "MELODEE_BENCH_SILENT", "MELODEE_FX_PROFILE", "MELODEE_AUDIO_PROFILE", "MELODEE_BATCH_AUDIO", "MELODEE_ADMISSION", "MELODEE_AUDIO_BENCH", "MELODEE_DUAL_CORE", "MELODEE_CACHE_RAM", "MELODEE_CORE1_TEST", "MELODEE_RAM_AUDIO", "MELODEE_HW_EQ"):
         v = os.environ.get(flag)    # unset: the default in firmware/src/melodee.c

@@ -980,6 +980,63 @@ static void sub_check(char *res, size_t cap)
     snprintf(res, cap, "%u", (unsigned)ok);
 }
 
+/* ------------------------------------------------------------ BREATH --- */
+/* CHORD on track 0, DRONE (I alone) 4 bars a chord, HIT HOLD, at 120 BPM (a chord 8 s) for 64 s with BREATH as given.
+ * Returns the blocks on which the whole chord was struck (3 or more notes at once); *fewest the fewest note-ons of a
+ * voice (the triad's three notes); *held its voices still gated after the STOP */
+static uint32_t br_play(uint32_t breath, uint32_t *fewest, uint32_t *held)
+{
+    uint32_t f, total, i, j, strikes = 0, cnt[3] = {0, 0, 0};
+    uint8_t notes[3] = {0, 0, 0};
+    int32_t o[2 * CTL];
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (i = 0; i < NTRK; i++) tt_open[i] = -1;
+    tt_n = tt_blk = 0;
+    gen(0, TESS_ENG_CHORD);
+    tessera_param_set(0, TX_CH_PROG, GEN_CH_DRONE);
+    tessera_param_set(0, TX_CH_BARS, 3);
+    tessera_param_set(0, TX_CH_HIT, GEN_CH_HOLD);
+    tessera_param_set(0, TX_CH_BREATH, (int32_t)breath);
+    rng_state = 0x4252u;
+    total = 64u * FS / CTL * CTL;
+    transport_req = 1;
+    for (f = 0; f < total + 4u * CTL; f += CTL) {
+        if (f >= total) transport_req = 2;
+        mix_block(o, CTL);
+        tt_blk++;
+    }
+    for (i = 0, j = 0; i < tt_n && j < 3u; i++)          /* the triad: the first three notes */
+        if (!tt_ev[i].tr) notes[j++] = tt_ev[i].note;
+    for (i = 0; i < tt_n; i++) {
+        uint32_t same = 0, k;
+        if (tt_ev[i].tr) continue;
+        for (k = 0; k < tt_n; k++) same += !tt_ev[k].tr && tt_ev[k].blk == tt_ev[i].blk;
+        if (same >= 3u && (!i || tt_ev[i - 1u].blk != tt_ev[i].blk)) strikes++;
+        for (k = 0; k < 3u; k++) cnt[k] += tt_ev[i].note == notes[k];
+    }
+    *fewest = cnt[0] < cnt[1] ? (cnt[0] < cnt[2] ? cnt[0] : cnt[2]) : (cnt[1] < cnt[2] ? cnt[1] : cnt[2]);
+    *held = nl_gates(0);
+    return strikes;
+}
+/* "1": BREATH 0 strikes the drone every 8 s; BREATH 60 strikes it once and ties it over, each voice
+ * breathing again on its own (at least twice in 64 s, at most every 11 s), the same again with the same SEED;
+ * nothing held after STOP */
+static void br_check(char *res, size_t cap)
+{
+    uint32_t ok = 1, fewest, held, n, m, f2, h2;
+    n = br_play(0, &fewest, &held);
+    printf("breath: 0: %u strikes, a voice %u note-ons, %u held\n", (unsigned)n, (unsigned)fewest, (unsigned)held);
+    ok &= n >= 8u && fewest == n && !held;               /* (8 s apart: 0 .. 64 s) */
+    n = br_play(60, &fewest, &held);
+    m = br_play(60, &f2, &h2);
+    printf("breath: 60: %u strikes, a voice at least %u note-ons, %u held; again %u, %u\n", (unsigned)n,
+           (unsigned)fewest, (unsigned)held, (unsigned)m, (unsigned)f2);
+    ok &= n == 1u && fewest >= 3u && fewest <= 1u + 64u / 11u + 1u && !held && m == n && f2 == fewest && !h2;
+    snprintf(res, cap, "%u", (unsigned)ok);
+}
+
 /* ------------------------------------------------------------ NOTE LENGTH --- */
 /* note_len.c on Euclid 4 of 16 at 1/16, 120 BPM: a hit every quarter (689 blocks). "ok": each note's length (the
  * median of the second bar's) as its mode says: STEP the GATE (half a 16th, 86 blocks), FIXED 1/8 an eighth (345)
@@ -2010,6 +2067,24 @@ static void pack_run(char *res, size_t cap)
         ok &= tessera_unpack(c) == 0;
         tessera_unpack(a);
     }
+    {   /* CHORD BREATH: round trip (a fresh track 0); a version 16 block loads with it off; over 100 is refused */
+        static uint8_t v16[TESSERA_PK_BYTES_V16];
+        const uint32_t n17 = TESSERA_PK_BYTES / TESSERA_TRACKS, n16 = TESSERA_PK_BYTES_V16 / TESSERA_TRACKS;
+        tessera_reset();
+        ok &= tessera_param_get(1, TX_CH_BREATH) == 0;
+        tessera_param_set(1, TX_CH_BREATH, 70);
+        tessera_param_set(2, TX_CH_BREATH, 300);        /* (kept to 100) */
+        tessera_pack(b);
+        tessera_reset();
+        ok &= tessera_unpack(b) == 1 && tessera_param_get(1, TX_CH_BREATH) == 70 && tessera_param_get(2, TX_CH_BREATH) == 100 &&
+              tessera_param_get(0, TX_CH_BREATH) == 0;
+        for (uint32_t tr = 0; tr < TESSERA_TRACKS; tr++) memcpy(v16 + tr * n16, b + tr * n17, n16);
+        ok &= tessera_unpack_ver(16u, v16) == 1 && tessera_param_get(1, TX_CH_BREATH) == 0;
+        memcpy(c, b, sizeof c);
+        c[1u * n17 + n16] = 101;
+        ok &= tessera_unpack(c) == 0;
+        tessera_unpack(a);
+    }
     {   /* CHORD USER: a key's note rounded down to the track's scale is the chord's root (D dorian: E ii, F# rounded to
          * F iii, C vii, D I); the degrees and LEN round trip; a degree over 6 or a LEN of 0 or 9 is refused */
         const uint32_t n13 = TESSERA_PK_BYTES / TESSERA_TRACKS, n12 = TESSERA_PK_BYTES_V12 / TESSERA_TRACKS;
@@ -2288,6 +2363,27 @@ int main(int argc, char **argv)
         }
         bad += check("SUB: RATCH x1..x4 in equal parts of the step, CHANCE tossed on the SEED, NOTE LENGTH's held notes "
                      "once, Grids' parts repeated; STOP releases", ok);
+    }
+    {   /* BREATH (CHORD) */
+        unsigned ok = 0;
+        pid_t pid;
+        int fd[2];
+        fflush(stdout);
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                br_check(res, sizeof res);
+                fflush(stdout);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u", &ok);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        bad += check("BREATH: the drone tied over, its voices breathing on their own slow cycles; 0 strikes it as before; "
+                     "the same with the same SEED; STOP releases", ok);
     }
     {   /* SLOTH, OCHD */
         unsigned fail = ~0u;

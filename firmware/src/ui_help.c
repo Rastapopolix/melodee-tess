@@ -109,7 +109,7 @@ static void help_find(uint32_t k)
         }
         if (ch_layer_on()) {                            /* (CHORD, OCT+ held: OCT, the track's CHRD and VOIC) */
             if (k < 3u) help.pid = (uint16_t)(k == 0u ? PID_TESS(TX_CH_OCT) : k == 1u ? PID_TRACK(P_CHRD) : PID_TRACK(P_VOIC));
-            else if (tessera_chord(tr)->prog == GEN_CH_USER) help.pid = (uint16_t)PID_TESS(TX_CH_ULEN);
+            else help.pid = (uint16_t)PID_TESS(tessera_chord(tr)->prog == GEN_CH_USER ? TX_CH_ULEN : TX_CH_BREATH);
             return;
         }
         if (gr_layer_on()) {                            /* (GRIDS, OCT+ held: KICK, SNR, HAT, TOMS) */
@@ -193,7 +193,7 @@ static uint32_t help_wrap(const aafont_t *f, const char *text, uint16_t *at, uin
 static const char *help_text(void)
 {
     const pid_entry_t *e = help.pid != PID_NONE ? pid_find(help.pid) : 0;
-    return e ? e->help : help.text;
+    return e ? pid_help(e) : help.text;
 }
 static uint32_t help_count(uint32_t z)
 {
@@ -295,6 +295,6 @@ static void help_draw(void)
     if (!ui.force)
         return;
     help_value(e, val, sizeof val);
-    help_strip(0, 124, e ? e->name : help.name, val, e ? e->help : help.text);
-    help_strip(124, HELP_H - 124, e ? e->name : help.name, val, e ? e->help : help.text);
+    help_strip(0, 124, e ? e->name : help.name, val, e ? pid_help(e) : help.text);
+    help_strip(124, HELP_H - 124, e ? e->name : help.name, val, e ? pid_help(e) : help.text);
 }

@@ -121,11 +121,18 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_GRD_PART4] = PE("PART4", TX_N_GRP4, 0),
     [TX_SUB_RATCH] = PE("RATCH", TX_N_RATCH, 0),
     [TX_SUB_CHANCE] = PD("CHANCE", F_PCT, 0, 100, 100),
+    [TX_CH_BREATH] = PD("BREATH", F_PCT, 0, 100, 0),
 };
 
+#if MELODEE_HELP_PACKED                          /* the texts stay here, tools/gen_help.py packs them */
+#define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n}
+#define G_(g, f, n, h) {PID_GLOBAL(g), f, n}
+#define X_(x, n, h) {PID_TESS(x), PID_F_TRACK, n}
+#else
 #define T_(p, n, h) {PID_TRACK(p), PID_F_TRACK, n, h}
 #define G_(g, f, n, h) {PID_GLOBAL(g), f, n, h}
 #define X_(x, n, h) {PID_TESS(x), PID_F_TRACK, n, h}
+#endif
 
 static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks it) */
     T_(P_LEVEL, "LEVEL", "The track's volume in the mix."),
@@ -446,12 +453,34 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                      "NOTE LENGTH holds (FIXED, HIT) and BRANCHed ones play once."),
     X_(TX_SUB_CHANCE, "TIMING CHANCE", "How often a step ratchets: 100 every step, 0 none. The toss replays with the "
                                        "track's SEED."),
+    X_(TX_CH_BREATH, "CHORD BREATH", "With HIT HOLD, the chord breathes: each voice is struck again, softer, on a "
+                                     "slow cycle of its own (11 to 19 s), and the same chord again is tied over "
+                                     "instead of struck (DRONE: one long chord). BREATH is the chance a voice above "
+                                     "the lowest sits a cycle out, one at a time; 0 is off. OCT+ held on GEN, KNOB 4 "
+                                     "(USER: its LEN there)."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };
 #undef T_
 #undef G_
 #undef X_
+
+#if MELODEE_HELP_PACKED
+#include "pid_help_unpack.h"
+_Static_assert(NELEM(PIDS) == PID_HELP_N, "build/gen/pid_help.h is another pid.c's (tools/gen_help.py)");
+const char *pid_help(const pid_entry_t *e)
+{
+    static char text[PID_HELP_MAX + 1] __attribute__((section(".pool")));
+    static const pid_entry_t *last;
+    if (e != last) {
+        pid_help_unpack((uint32_t)(e - PIDS), text);
+        last = e;
+    }
+    return text;
+}
+#else
+const char *pid_help(const pid_entry_t *e) { return e->help; }
+#endif
 
 uint32_t pid_count(void) { return NELEM(PIDS); }
 const pid_entry_t *pid_at(uint32_t i) { return i < NELEM(PIDS) ? &PIDS[i] : 0; }
