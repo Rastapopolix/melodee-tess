@@ -6,7 +6,7 @@ PLAY and leave it, then open the pages named below to see what is moving and tur
 | File | Name on the FM-1 | What it shows |
 |---|---|---|
 | `still-tide.tsp` | STILL TIDE | Ambient: CHORD DRONE with BREATH, ENERGY's ARC and RESTS, FM6 and TRIO pads, FALL |
-| `mosaic.tsp` | MOSAIC | A minor-key song: eight chords played in as CHORD USER, an EUCLID bass that FOLLOWs the root, a TURING hook in FORM, ATLAS on the 808 |
+| `mosaic.tsp` | MOSAIC | A kirtan from below: a breathing fifth drone, a chanting choir on TURING, hand bells on POLY, ATLAS pounding on the 808, ENERGY's arc |
 | `koto-garden.tsp` | KOTO GARDEN | ZEN-1's and FuMi-1's FM voices in HIRA: QUAD across two tracks, SERIES, POLY |
 
 They are made by the firmware's own code (`tests/demo_projects.c`), which saves each one to a slot, reads it back
@@ -49,18 +49,17 @@ YO on D, 72 BPM. Made to run for an hour.
 
 ## MOSAIC (slot C)
 
-C minor, 90 BPM: a song on a progression of eight chords, one a bar.
+C phrygian (the Indian Bhairavi), 92 BPM: a chant that goes round and round over a drone, dark and devotional at once.
 
-- **T1 TRIO STRING MACH**, CHORD with PROG **USER**: Cm7, Abmaj7, Ebmaj7, Bb7, Cm7, Fm7, Abmaj7, Gm7, played in with
-  OCT+ held on GEN (the keys C, A♭, E♭, B♭, C, F, A♭, G). BARS 1, HIT HOLD, CHRD DIA7. **SCL > QNT CHRD** is on, so
-  the other tracks land on the chord playing.
-- **T2 TRIO FAT BASS**, EUCLID 5 of 16, ROT 2, with TWEAK **FOLLOW T1**: it plays the chord's root, SHIFT −7 (an
-  octave down in the scale's degrees).
-- **T3 FM6 KUGO HARP**, TURING LEN 8, PROB 6: a hook that barely changes, bent onto each chord. **FORM ABAC** of 4
-  bars gives it a contrasting section, and TIMING **RATCH x2, CHANCE 10** doubles a note now and then.
-- **T4 DRUM 808 KIT**, **ATLAS** X 70, Y 150, DENS 52, **TOMS 30** for fills, EVOLVE LOCK 85 every 4 bars.
-- **MODS**: T1 TIDE 2 → T1 CUTOFF (the strings open and close over a few minutes), T3 SWARM 3 → T3 PAN, T4 SWARM 1 →
-  T4 AT X.
+- **T1 TRIO FIFTH DRONE**, CHORD: PROG **DRONE**, a strike every 4 bars, held; CHRD **POW** (root, fifth, octave),
+  VOICING +OCT, and **BREATH 70**, so the drone's voices swell and fade on their own.
+- **T2 TRIO CHIP CHOIR**, the chant: TURING LEN 16 in eighths, PROB 4 (nearly locked), one octave, SHIFT +24,
+  LENGTH **HIT** and VOICE LEGATO, so one voice sings from note to note. **FORM AB** of 4 bars answers the phrase
+  with a second line.
+- **T3 FM6 RIN**, hand bells: **POLY** with rhythms /3, /4 and /5, half of them dropped.
+- **T4 DRUM 808 KIT**, **ATLAS** X 192, Y 64, with **TOMS 60** as a second drum.
+- **ENERGY ARC 50** builds the generators up and pulls them back over minutes.
+- **MODS**: T1 TIDE 2 → T1 CUTOFF, T2 SWARM 3 → T2 PAN, ENERGY → T4 AT DENS (the drums swell with the arc).
 
 ## KOTO GARDEN (slot D)
 
