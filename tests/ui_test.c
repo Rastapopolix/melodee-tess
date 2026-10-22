@@ -484,7 +484,7 @@ static int test_phys_chrd_click(void)
 static int test_gen_family(void)
 {
     static const char STEP[] = "GEN EVOLVE NOTES PATTERN TEMPO PATTERNS SONG GEN", ARP[] = "ARP ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN ARP",
-                      GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH PATTERN TEMPO PATTERNS SONG";
+                      GEN[] = "GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH TIMING PATTERN TEMPO PATTERNS SONG";
     char got[128];
     int bad = 0, in_seq = 0, pattern_seq = 0;
     uint32_t k, n = 0;
@@ -502,7 +502,7 @@ static int test_gen_family(void)
     bad += check("SEQ in ARP: back to ARP (its last page), ARP 2 NOTES PATTERN TEMPO PATTERNS SONG GEN", str_eq(seq_taps(got, sizeof got, 9), ARP));
     if (!str_eq(got, ARP)) printf("    got: %s\n", got);
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_TURING);
-    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 10), GEN));
+    bad += check("SEQ in a generator: GEN EVOLVE FORM TWEAK TWEAK 2 LENGTH TIMING PATTERN TEMPO PATTERNS SONG", str_eq(seq_taps(got, sizeof got, 11), GEN));
     if (!str_eq(got, GEN)) printf("    got: %s\n", got);
     go_title("EVOLVE");
     press(B_ARP);
@@ -521,6 +521,23 @@ static int test_gen_family(void)
                      trk[tr].p[P_SGATE] > g);
         turn(EN_K1, -5);
         bad += check("LENGTH: back to STEP", tessera.nl_mode[tr] == NL_STEP);
+    }
+    go_title("TIMING");                           /* SUB: KNOB 1 RATCH a step a turn, KNOB 2 CHANCE; 3 and 4 nothing */
+    {
+        uint32_t tr = song.sel;
+        turn(EN_K1, 1);
+        turn(EN_K1, 4);
+        turn(EN_K2, -3);
+        turn(EN_K3, 2);
+        turn(EN_K4, -2);
+        bad += check("TIMING: RATCH x3 a step a turn, CHANCE turned down from 100, KNOB 3 and 4 nothing",
+                     tessera.sub_ratch[tr] == 2u && tessera.sub_chance[tr] < 100u && tessera.sub_chance[tr] > 0u &&
+                     str_eq(cur_page()->title, "TIMING"));
+        turn(EN_K1, -1);
+        turn(EN_K1, -1);
+        turn(EN_K1, -1);
+        bad += check("TIMING: back to x1, kept there", tessera.sub_ratch[tr] == 0u);
+        tessera_param_set(tr, TX_SUB_CHANCE, 100);
     }
     tessera_param_set(song.sel, TX_MODE, TESS_ENG_OFF);
     TSEL->p[P_AMODE] = 0;
