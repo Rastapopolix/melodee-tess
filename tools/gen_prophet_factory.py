@@ -32,7 +32,7 @@ def records():
 
 
 def pack(patches):
-    """The 133 raw bytes of every program, packed (eng_prophet_test.c p5_factory unpacks them): raw byte k is
+    """The 133 raw bytes of every program, packed (cz_p5_store.c p5_factory unpacks them): raw byte k is
     P5_FBASE[k] plus the next P5_FWIDTH[k] bits, LSB first; each program starts on a byte boundary. The
     trailer (size, model, command, group, program) follows from the program's number."""
     base = [min(p[k] for p in patches) for k in range(133)]
