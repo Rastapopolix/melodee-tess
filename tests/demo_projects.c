@@ -188,11 +188,10 @@ static void mixer(uint32_t tr, int32_t level, int32_t pan, int32_t reverb, int32
     trk[tr].p[P_FXSEND] = (int16_t)reverb; trk[tr].p[P_FXSEND2] = (int16_t)echo;
 }
 enum { DIV_4, DIV_8, DIV_16, DIV_32, DIV_8T, DIV_16T, DIV_2, DIV_1, DIV_2BAR, DIV_4BAR };   /* (params.c N_DIV) */
-enum { SCL_MIN = 2, SCL_DOR = 3, SCL_PHRY = 8, SCL_IN = 70, SCL_YO, SCL_HIRA, SCL_IWATO, SCL_KUMOI, SCL_RYUKYU };   /* (scales.h N_SCALE) */
-enum { FX_TINE = 8, FX_KALIMBA = 19, FX_SOFT_PAD = 25, FX_DEEP_PAD = 27, FX_DROP = 28, FX_RIN = 31, FX_FURIN = 33, FX_MOKUGYO = 35,
+enum { SCL_MIN = 2, SCL_DOR = 3, SCL_IN = 70, SCL_YO, SCL_HIRA, SCL_IWATO, SCL_KUMOI, SCL_RYUKYU };   /* (scales.h N_SCALE) */
+enum { FX_TINE = 8, FX_KALIMBA = 19, FX_SOFT_PAD = 25, FX_DEEP_PAD = 27, FX_RIN = 31, FX_FURIN = 33, FX_MOKUGYO = 35,
        FX_KOTO_PLUCK = 36, FX_KOTO_RING = 37, FX_KUGO_HARP = 39 };   /* FM6 presets (eng_fm6.c FM6_PRESETS) */
-enum { TR_FAT_BASS = 0, TR_WARM_PAD = 5, TR_STRING_MACH = 6, TR_HOLLOW_PAD = 7, TR_SUB_BASS = 9, TR_BREATH_FLUTE = 11, TR_ANALOG_BRASS = 13, TR_FIFTH_DRONE = 14,
-       TR_CHIP_CHOIR = 4 };   /* TRIO's */
+enum { TR_FAT_BASS = 0, TR_WARM_PAD = 5, TR_HOLLOW_PAD = 7, TR_SUB_BASS = 9, TR_BREATH_FLUTE = 11 };   /* TRIO's */
 enum { DK_808_KIT, DK_909_KIT };                                   /* DRUM's */
 
 /* ------------------------------------------------------------- the demos --- */
@@ -248,60 +247,6 @@ static void demo_still(void)
     cord(3, CS_ENERGY, 0, CD_FX_SEND, 1, 30, 0, 0);   /* ENERGY -> T2 FX SEND */
 }
 
-/* MOSAIC: a kirtan heard from below. A fifth drone that swells and breathes, a choir chanting one phrase over and
- * over (TURING nearly locked, FORM AB), hand bells on POLY's three rhythms, ATLAS pounding on the 808 with toms;
- * ENERGY's arc builds it up and pulls it back. C phrygian (Bhairavi), 92 BPM */
-static void demo_mosaic(void)
-{
-    song.g[G_BPM] = 92;
-    sound(0, ENGI_TRIO, TR_FIFTH_DRONE);
-    sound(1, ENGI_TRIO, TR_CHIP_CHOIR);
-    sound(2, ENGI_FM6, FX_RIN);
-    sound(3, ENGI_DRUM, DK_808_KIT);
-    scale(0, SCL_PHRY, 1);
-    sends(115, 100, 75, 60);
-
-    /* T1: CHORD DRONE, POWER (root, fifth, octave), 4 bars a strike, held, BREATH 70 */
-    trk[0].p[P_CHRD] = 9;                             /* POWER */
-    trk[0].p[P_VOIC] = 4;                             /* BASS: the root an octave down */
-    gen(0, TESS_ENG_CHORD, 3);
-    tx(0, TX_CH_PROG, GEN_CH_DRONE); tx(0, TX_CH_BARS, 3); tx(0, TX_CH_HIT, GEN_CH_HOLD);
-    tx(0, TX_CH_BREATH, 70);
-    mixer(0, 79, 0, 70, 0);
-
-    /* T2: the chant. TURING 16 steps of eighths, nearly locked, one octave: a phrase sung over and over; FORM AB
-     * of 4 bars answers it with a second line */
-    trk[1].p[P_SDIV] = DIV_8;
-    gen(1, TESS_ENG_TURING, 108);
-    tx(1, TX_TUR_LEN, 16); tx(1, TX_TUR_PROB, 4); tx(1, TX_TUR_SPAN, 1);
-    tx(1, TX_FM_FORM, 1); tx(1, TX_FM_CONTRAST, 40); tx(1, TX_EV_EVERY, 3);
-    tx(1, TX_TW_SHIFT, 24); tx(1, TX_TW_DROP, 10); tx(1, TX_TW_HUMAN, 35);
-    tx(1, TX_NL_MODE, 2);                             /* LENGTH HIT: each note sung to the next */
-    trk[1].p[P_VOICE] = V_LEGATO;                     /* one voice, sliding from note to note */
-    mixer(1, 100, -15, 90, 40);
-
-    /* T3: hand bells, POLY /3 /4 /5 over the beat */
-    trk[2].p[P_SDIV] = DIV_8;
-    gen(2, TESS_ENG_POLY, 12);
-    tx(2, TX_POL_DIV1, 3); tx(2, TX_POL_DIV2, 4); tx(2, TX_POL_DIV3, 5); tx(2, TX_POL_DIV4, 0);
-    tx(2, TX_POL_SPAN, 1); tx(2, TX_TW_SHIFT, 12); tx(2, TX_TW_DROP, 50); tx(2, TX_TW_HUMAN, 30);
-    mixer(2, 104, 30, 80, 60);
-
-    /* T4: ATLAS on the 808, pounding, the toms a second drum */
-    trk[3].p[P_SDIV] = DIV_16;
-    gen(3, TESS_ENG_GRIDS, 41);
-    tx(3, TX_GRD_X, 192); tx(3, TX_GRD_Y, 64); tx(3, TX_GRD_DENS, 55);
-    tx(3, TX_GRD_SNR, 50); tx(3, TX_GRD_HAT, 40); tx(3, TX_GRD_TOMS, 60);
-    tx(3, TX_EV_LOCK, 85); tx(3, TX_EV_EVERY, 3); tx(3, TX_EV_AMOUNT, 20);
-    mixer(3, 96, 0, 30, 0);
-
-    /* ENERGY: it builds and falls back over minutes */
-    tx(0, TX_EN_ARC, 50);
-    cord(0, CS_INERTIA, 0, CD_CUTOFF, 0, 30, 0, 0);   /* T1 TIDE 2 -> T1 CUTOFF: the drone opens and closes */
-    cord(1, CS_OCHD3, 1, CD_PAN, 1, 30, 0, 0);        /* T2 SWARM 3 -> T2 PAN: the singers move */
-    cord(2, CS_ENERGY, 0, CD_GRD_DENS, 3, 25, 0, 0);  /* ENERGY -> T4 AT DENS: the drums swell with it */
-}
-
 /* KOTO GARDEN: Zen-1's and FuMi-1's FM voices in HIRA on C. Two koto on QUAD's shared grid, one in eighths and one in
  * triplets, a column turning down so notes travel between them; a breath flute on the infinity series; a mokugyo
  * on POLY's three rhythms. 92 BPM */
@@ -350,7 +295,6 @@ static void demo_garden(void)
 
 static const struct { const char *name, *file; void (*make)(void); } DEMOS[] = {
     {"STILL TIDE", "still-tide", demo_still},
-    {"MOSAIC", "mosaic", demo_mosaic},
     {"KOTO GARDEN", "koto-garden", demo_garden},
 };
 #define NDEMO (sizeof DEMOS / sizeof DEMOS[0])

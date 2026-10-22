@@ -1,12 +1,11 @@
 # Tessera 2.0 demo projects
 
-Three projects that show what Tessera 2.0 does, each a few minutes of music that keeps changing on its own. Press
+Two projects that show what Tessera 2.0 does, each a few minutes of music that keeps changing on its own. Press
 PLAY and leave it, then open the pages named below to see what is moving and turn things.
 
 | File | Name on the FM-1 | What it shows |
 |---|---|---|
 | `still-tide.tsp` | STILL TIDE | Ambient: CHORD DRONE with BREATH, ENERGY's ARC and RESTS, FM6 and TRIO pads, FALL |
-| `mosaic.tsp` | MOSAIC | A kirtan from below: a breathing fifth drone, a chanting choir on TURING, hand bells on POLY, ATLAS pounding on the 808, ENERGY's arc |
 | `koto-garden.tsp` | KOTO GARDEN | ZEN-1's and FuMi-1's FM voices in HIRA: QUAD across two tracks, SERIES, POLY |
 
 They are made by the firmware's own code (`tests/demo_projects.c`), which saves each one to a slot, reads it back
@@ -24,15 +23,15 @@ The demos go into your slots through a backup of your own FM-1, so everything el
    python3 tools/demo_backup.py my-backup.json my-backup-with-demos.json
    ```
 
-   That puts STILL TIDE, MOSAIC and KOTO GARDEN into slots **B**, **C** and **D** and lists what each slot held.
-   `--slots D` puts only STILL TIDE into D; `--slots C,D demos/mosaic.tsp demos/koto-garden.tsp` picks the demos.
+   That puts STILL TIDE and KOTO GARDEN into slots **C** and **D** and lists what each slot held. `--slots D` puts
+   only STILL TIDE into D; `--slots A,B` picks other slots; `--slots D demos/koto-garden.tsp` picks the demo.
 3. **Complete backup** > **Restore backup**, and pick `my-backup-with-demos.json`. Then switch the FM-1 off and on.
 4. SAVE > PROJECT: pick the slot and load it, then PLAY.
 
 The slots you choose are replaced: save anything you want to keep in them first (or choose other slots). To go back,
 restore the backup from step 1.
 
-## STILL TIDE (slot B)
+## STILL TIDE (slot C)
 
 YO on D, 72 BPM. Made to run for an hour.
 
@@ -46,20 +45,6 @@ YO on D, 72 BPM. Made to run for an hour.
   of 8 to 18 s every few minutes while the drone holds.
 - **MODS**: T1 TIDE 1 → T1 CUTOFF, T1 SWARM 2 → T1 PAN, T3 TIDE 2 → T3 WIND (B ANGLE), ENERGY → T2 FX SEND.
 - Send effects: a long REVERB, an ECHO on the chimes and the pad. Try MENU > LIGHTS **AUTO** for a dark panel.
-
-## MOSAIC (slot C)
-
-C phrygian (the Indian Bhairavi), 92 BPM: a chant that goes round and round over a drone, dark and devotional at once.
-
-- **T1 TRIO FIFTH DRONE**, CHORD: PROG **DRONE**, a strike every 4 bars, held; CHRD **POW** (root, fifth, octave),
-  VOICING +OCT, and **BREATH 70**, so the drone's voices swell and fade on their own.
-- **T2 TRIO CHIP CHOIR**, the chant: TURING LEN 16 in eighths, PROB 4 (nearly locked), one octave, SHIFT +24,
-  LENGTH **HIT** and VOICE LEGATO, so one voice sings from note to note. **FORM AB** of 4 bars answers the phrase
-  with a second line.
-- **T3 FM6 RIN**, hand bells: **POLY** with rhythms /3, /4 and /5, half of them dropped.
-- **T4 DRUM 808 KIT**, **ATLAS** X 192, Y 64, with **TOMS 60** as a second drum.
-- **ENERGY ARC 50** builds the generators up and pulls them back over minutes.
-- **MODS**: T1 TIDE 2 → T1 CUTOFF, T2 SWARM 3 → T2 PAN, ENERGY → T4 AT DENS (the drums swell with the arc).
 
 ## KOTO GARDEN (slot D)
 

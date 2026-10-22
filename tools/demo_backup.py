@@ -3,9 +3,9 @@
 # Copyright (C) 2026 Theo Dainis (melodee-tess)
 """Put Tessera's demo projects (demos/*.tsp) into a backup of your own FM-1, to restore on the backup page.
 
-    python3 tools/demo_backup.py MY-BACKUP.json OUT.json                  the three demos into slots B, C and D
+    python3 tools/demo_backup.py MY-BACKUP.json OUT.json                  the two demos into slots C and D
     python3 tools/demo_backup.py MY-BACKUP.json OUT.json --slots D        only the first demo, into slot D
-    python3 tools/demo_backup.py MY-BACKUP.json OUT.json --slots C,D demos/mosaic.tsp demos/koto-garden.tsp
+    python3 tools/demo_backup.py MY-BACKUP.json OUT.json --slots D demos/koto-garden.tsp
 
 MY-BACKUP.json is a backup the installer's backup page saved from your FM-1 (Tessera 2.0 or later: projects in the
 TSP1 format). OUT.json is the same backup with the chosen slots holding the demos; everything else (the music playing,
@@ -21,7 +21,7 @@ import sys
 import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DEMOS = [ROOT / "demos" / n for n in ("still-tide.tsp", "mosaic.tsp", "koto-garden.tsp")]
+DEMOS = [ROOT / "demos" / n for n in ("still-tide.tsp", "koto-garden.tsp")]
 SLOT_ID = {"A": 2, "B": 3, "C": 4, "D": 5}      # the backup's objects 2..5: project slots A..D (editor_backup.c)
 TSP_MAGIC = b"TSP1"
 TSP_MAX = 32768                                  # project_tsp.c TSP_MAX: the largest record a slot takes
@@ -54,7 +54,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("backup", help="a backup of your FM-1 from the backup page (.json)")
     ap.add_argument("out", help="the backup to write, with the demos in it")
-    ap.add_argument("--slots", default="B,C,D", help="the slots to put them in, in order (default B,C,D)")
+    ap.add_argument("--slots", default="C,D", help="the slots to put them in, in order (default C,D)")
     ap.add_argument("demos", nargs="*", type=pathlib.Path, help="the demo records (default: demos/*.tsp)")
     a = ap.parse_args()
     slots = [s.strip().upper() for s in a.slots.split(",") if s.strip()]
