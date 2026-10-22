@@ -3,7 +3,7 @@ own name: a fork of [Melodee](https://github.com/keremimo/melodee) by keremimo, 
 Kuroshita / Hügelton Instruments (GPL-3.0-only). The [manual](../MANUAL.md) covers every page and the
 [recipes](../RECIPES.md) show ways in.
 
-Three **demo projects** come with it ([demos/](../demos/README.md)): an ambient piece, a groove and a koto garden.
+Three **demo projects** come with it ([demos/](../demos/README.md)): an ambient piece, a dub techno piece and a koto garden.
 Put them on your FM-1 to hear what 2.0 does before you build your own.
 
 ### ⚠️ Before you install

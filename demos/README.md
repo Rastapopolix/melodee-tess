@@ -6,7 +6,7 @@ PLAY and leave it, then open the pages named below to see what is moving and tur
 | File | Name on the FM-1 | What it shows |
 |---|---|---|
 | `still-tide.tsp` | STILL TIDE | Ambient: CHORD DRONE with BREATH, ENERGY's ARC and RESTS, FM6 and TRIO pads, FALL |
-| `mosaic.tsp` | MOSAIC | A groove: ATLAS on the 909, EUCLID, CHORD 2-5-1 with QNT CHRD, TURING in FORM, BRANCH, RATCH |
+| `mosaic.tsp` | MOSAIC | Dub techno: a CHORD stab on an EUCLID bass through LOGIC AND, a dotted-eighth echo, ATLAS 4/4 on the 909, TIDE on the filter |
 | `koto-garden.tsp` | KOTO GARDEN | ZEN-1's and FuMi-1's FM voices in HIRA: QUAD across two tracks, SERIES, POLY |
 
 They are made by the firmware's own code (`tests/demo_projects.c`), which saves each one to a slot, reads it back
@@ -49,16 +49,20 @@ YO on D, 72 BPM. Made to run for an hour.
 
 ## MOSAIC (slot C)
 
-A dorian, 108 BPM.
+Dub techno in C minor, 123 BPM.
 
-- **T1 TRIO FAT BASS**, EUCLID 5 of 16, ROT 2.
-- **T2 FM6 DX TINE**, CHORD **2-5-1**, a bar a chord, DIA7, OPEN. **SCL > QNT CHRD** is on, so the bass and T3's line
-  snap to the chord playing.
-- **T3 FM6 KALIMBA**, TURING LEN 8, PROB 8 (nearly locked), **FORM ABAC** of 4 bars; TWEAK 2 **BRANCH 25 → T2 COIN**
-  throws a quarter of its notes to the tine; TIMING **RATCH x2, CHANCE 12**.
-- **T4 DRUM 909 KIT**, **ATLAS** X 70, Y 150, DENS 58, **TOMS 35** for fills, EVOLVE LOCK 85 every 4 bars.
-- **MODS**: T4 SWARM 1 → T4 AT X (the groove walks the map and back), T2 SWARM 3 → T1 CUTOFF, T1 GATE → T2 GAIN (the
-  keys dip under the bass).
+- **T1 TRIO SUB BASS**, EUCLID 5 of 16 (3, 3, 3, 3, 4), mostly on C, an octave down.
+- **T2 TRIO**, ANALOG BRASS made into a stab: no sustain, the filter low (CUT 38, RES 45). **CHORD** with PROG
+  **TWO** (Cm7 and Fm7, 4 bars each) and HIT **STEP**, so it would strike every sixteenth, but TWEAK 2 **LOGIC AND
+  T1** lets it strike only where the bass hits. DROP 20 leaves a few out. **SCL > QNT CHRD** is on, so the bass sits
+  under the chord playing.
+- **T3 FM6 DROP**, TURING LEN 16, PROB 6, with DROP 75: a drip now and then, far off and mostly echo, with a RATCH x2
+  now and then.
+- **T4 DRUM 909 KIT**, **ATLAS** at X 192, Y 128: the kick on every beat, the hats off it, a snare on 2 now and then.
+- Send effects: the **ECHO** at its longest (RATE 127), which at 123 BPM is a dotted eighth, with a lot of feedback.
+  The stab sends most of itself there, and a long REVERB sits behind it.
+- **MODS**: T2 TIDE 3 → T2 CUTOFF (the stab opens and closes about once a minute), T2 SWARM 2 → T2 FX SEND, T3
+  SWARM 5 → T3 PAN, T4 SWARM 1 → T4 AT X.
 
 ## KOTO GARDEN (slot D)
 
