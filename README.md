@@ -117,8 +117,6 @@ See [BUILDING.md](BUILDING.md). The host tests run with `tests/run_tests.sh`; th
 
 ## About me
 
-<p align="center"><img src="assets/about/setup.jpg" alt="Theo's studio: two Eurorack cases, Elektron boxes and other synths around a corner desk" width="100%"></p>
-
 I'm Theo Dainis, from New Zealand. I've been using and building synthesisers for the past 15 years, and I'm passionate about modular and open source. Elektron and Mutable Instruments are big influences on me. I love the DIY side: building things, and learning how music hardware works on the inside. Tessera is the sequencer I wanted on the FM-1: modular in a box, a small instrument that writes with you.
 
 ### Built with Claude Code
