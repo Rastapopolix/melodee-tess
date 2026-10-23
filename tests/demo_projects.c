@@ -28,7 +28,7 @@ static int32_t fm1_enc_take(uint32_t e) { (void)e; return 0; }
 static void fm1_irq_off(void) {}
 static void fm1_irq_on(void) {}
 static void lcd_sync(void) {}
-static void lcd_gamma_test(uint32_t opt) { (void)opt; }   /* (lcd.c: the device's panel) */
+static void lcd_gamma_switch(uint32_t opt) { (void)opt; }   /* (lcd.c: the device's panel) */
 static uint16_t dm_screen[240 * 240];                  /* the display as drawn (video: its frames) */
 static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
 {

@@ -16,10 +16,7 @@ enum { MI_COLOR, MI_HOLD, MI_LIGHTS,
 #endif
        MI_MIDI_OUT, MI_CLOCK_OUT, MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_ACCEL, MI_TRACK_KNOB, MI_SCREEN, MI_GAMMA, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
-/* TEMPORARY (feat/panel-gamma-test): MENU > PANEL GAMMA, lcd.c lcd_gamma_test's options; not saved */
-#define LCD_GAMMA_N 6u
-static const char *const LCD_GAMMA_NAME[LCD_GAMMA_N] = {"G2.2 DEFAULT", "G1.8", "G2.5", "G1.0", "TUNED", "TUNED+VCOM"};
-static uint8_t lcd_gamma_opt;
+static const char *const GAMMA_NAME[GAMMA_N] = {"G2.2", "G1.8", "G2.5", "G1.0", "TUNED", "TUNED+VCOM"};   /* (lcd.c) */
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
                                               "USB AUDIO", "USB INPUT",
@@ -357,7 +354,7 @@ static void draw_menu(void)
             if (i == MI_CLOCK_OUT) value = settings_clock_out ? "ON" : "OFF";
             if (i == MI_AUTOSAVE) value = settings_autosave ? "ON" : "OFF";
             if (i == MI_SCREEN) value = (const char *const[]){"NEVER", "5 MIN", "15 MIN", "30 MIN", "60 MIN"}[scr_get()];
-            if (i == MI_GAMMA) value = LCD_GAMMA_NAME[lcd_gamma_opt % LCD_GAMMA_N];   /* (TEMPORARY: the gamma test) */
+            if (i == MI_GAMMA) value = GAMMA_NAME[gamma_get()];
             if (i == MI_LIGHTS) value = LIGHTS_NAME[settings_lights % LIGHTS_N];
 #if MELODEE_USB_AUDIO
             if (i == MI_USB_INPUT) value = ua_tracks_want ? "4 TRACKS" : "STEREO";
@@ -498,9 +495,9 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         settings_clock_out = (uint8_t)(s > 0 ? 1u : s < 0 ? 0u : !settings_clock_out);
         ui.force = 1; ok = 0;                          /* (on: from the next PLAY; off: STOP goes out now) */
     }
-    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_GAMMA) {   /* TEMPORARY: KNOB 2 / OCT+ the next panel gamma */
-        lcd_gamma_opt = (uint8_t)((lcd_gamma_opt + (s < 0 ? LCD_GAMMA_N - 1u : 1u)) % LCD_GAMMA_N);
-        lcd_gamma_test(lcd_gamma_opt);                 /* (the panel black and on again: ui.force draws it all) */
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_GAMMA) {   /* KNOB 2 / OCT+ the next panel gamma (saved on leaving) */
+        gamma_put((gamma_get() + (s < 0 ? GAMMA_N - 1u : 1u)) % GAMMA_N);
+        lcd_gamma_switch(gamma_get());                 /* (the panel black and on again: ui.force draws it all) */
         ui.force = 1; ok = 0;
     }
     if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_SCREEN) {

@@ -88,6 +88,18 @@ int main(void)
         assert(scale_favorite_set(69, 0) && !scale_favorite(69) && scale_favorite(95));
         p=original;settings_import(&p,sizeof p);
     }
+    {   /* PANEL GAMMA: row 15 byte 24 bits 1..3; 0 (any settings before it) TUNED+VCOM; bit 0, a CZ-1 star, kept */
+        assert(gamma_get() == GAMMA_DEF);
+        favorites.factory[15][24] = 0xF1u;
+        for (uint32_t g = 0; g < GAMMA_N; g++) {
+            gamma_put(g);
+            settings_export(&p); memset(&favorites, 0, sizeof favorites); settings_import(&p, sizeof p);
+            assert(gamma_get() == g && (favorites.factory[15][24] & 0xF1u) == 0xF1u);
+        }
+        assert(!(favorites.factory[15][24] & 0x0Eu));      /* the default stores 0 */
+        favorites.factory[15][24] = 7u << 1; assert(gamma_get() == GAMMA_DEF);   /* unknown: the default */
+        p=original;settings_import(&p,sizeof p);
+    }
     settings.lowcut = 0;
     settings_export(&p);
     assert(!p.lowcut && p.bold == 1 && p.favorites.user == (1u << 31));   /* bold: kept as saved */
