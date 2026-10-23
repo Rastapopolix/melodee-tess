@@ -1,0 +1,6 @@
+{
+  "what": "A generative four-track firmware: each track plays steps, an arpeggio or one of thirteen generators (Turing, Euclid, Markov, Atlas, Chord and more). Phrases evolve into song forms, tracks follow and answer each other, and 16 mod cords connect anything. FM, Trio and drum sounds.",
+  "kinds": ["groove"],
+  "play": "https://rastapopolix.github.io/tessera/webapp/sim/",
+  "editor": "https://rastapopolix.github.io/tessera/webapp/editor/"
+}
