@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- Tessera's project page (GitHub Pages root). web/make_site.py copies it to the site's index.html, with the
-     gallery (assets/gallery) in media/gallery and the brand pictures (assets/brand) in media/brand, and fills in
+     gallery (assets/gallery) in media/gallery, the brand pictures (assets/brand) in media/brand and the demo video
+     (assets/video, made by tools/demo_video.py) in media/video, and fills in
      the release (its version, and its packages for both cores and for one) where marked. -->
 <html lang="en">
 <head>
@@ -87,6 +88,10 @@ nav .links a:hover { color: var(--text); }
 }
 
 section { padding: 64px 0; border-top: 1px solid var(--line); }
+
+/* the demo video: square, the firmware's own sound and screens */
+.video { max-width: 720px; margin: 0 auto; background: var(--surf); padding: 7px; }
+.video video { display: block; width: 100%; height: auto; aspect-ratio: 1; background: var(--bg); }
 section > .wrap > header { margin-bottom: 28px; }
 section > .wrap > header p { color: var(--mid); max-width: 44em; margin-top: 10px; }
 
@@ -148,6 +153,7 @@ footer p { max-width: 52em; }
       TESSERA
     </a>
     <div class="links">
+      <a class="opt" href="#demo">Demo</a>
       <a class="opt" href="#generators">Generators</a>
       <a class="opt" href="#recipes">Recipes</a>
       <a href="#install">Install</a>
@@ -184,6 +190,23 @@ footer p { max-width: 52em; }
     </div>
   </div>
 </div>
+
+<section id="demo">
+  <div class="wrap">
+    <header>
+      <div class="kicker">Hear it</div>
+      <h2>Three minutes of Tessera</h2>
+      <p>The two demo projects, STILL TIDE and KOTO GARDEN, then a tour of the other modes. Every sound and every
+        screen in it is the firmware's own.</p>
+    </header>
+    <div class="video">
+      <video controls playsinline preload="none" poster="media/video/tessera-2.0-demo.jpg" width="1080" height="1080">
+        <source src="media/video/tessera-2.0-demo.mp4" type="video/mp4">
+        <a href="media/video/tessera-2.0-demo.mp4">Download the demo video (MP4, 5.8 MB)</a>
+      </video>
+    </div>
+  </div>
+</section>
 
 <section id="inside">
   <div class="wrap">
