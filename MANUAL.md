@@ -219,7 +219,7 @@ saved project keeps its seeds.
 
 ## OCT+ layers on GEN
 
-Four generators have more settings than three knobs. Hold **OCT+** on GEN: the knobs' labels move onto tiles in the
+Some generators have more settings than three knobs. Hold **OCT+** on GEN: the knobs' labels move onto tiles in the
 track's colour, an OCT+ key shows in the header, and the four knobs set the layer. Let go to return.
 
 <p align="center"><img src="assets/gallery/gen_grids_oct.png" alt="ATLAS with OCT+ held" width="240"> <img src="assets/gallery/gen_chord_oct.png" alt="CHORD with OCT+ held" width="240"> <img src="assets/gallery/gen_chord_user.png" alt="CHORD USER with OCT+ held" width="240"></p>
@@ -266,6 +266,28 @@ the first QUAD track), and KNOB 4 **RANGE** (3 OCT, 1 OCT, 2 OCT or ±1: the oct
 
 **AUTO** steers the ship for you: OFF follows Y, 1 to 9 is a wander of its own (faster further up), SEEK flies to
 the next star. It has no knob: set it with a mod to **C AUTO** (a cord with no source is a fixed value).
+
+### TURING and EUCLID: SOURCE, KEEP (STEP as seed)
+
+**SOURCE** (KNOB 1) lets TURING or EUCLID play from a STEP pattern you wrote. T1 to T4 is that track's pattern
+playing now, and it can be this track's own. The pattern itself never changes. OFF, or a pattern with no notes,
+plays the generator as usual.
+
+- **TURING** loops the source's first LEN steps (up to 16). Each step, PROB is the chance that the step about to
+  play changes and stays changed, as a Turing machine flips a bit. PROB 0 plays your melody as written; turn it up
+  and the melody drifts. A new SOURCE or LEN, or PLAY, starts again from the pattern.
+- **EUCLID** plays the source's notes in order on its own hits, so the melody gets a new rhythm.
+
+**KEEP** (KNOB 2) says what stays as written:
+
+| KEEP | TURING | EUCLID |
+|---|---|---|
+| **FREE** | a step's pitch or its hit may change | the source's notes on EUCLID's hits |
+| **RHYTHM** | only the pitches change (to another note of the loop) | the source's own rhythm, on EUCLID's pitches |
+| **PITCH** | only the hits come and go | as FREE |
+
+The notes keep their written pitch, then follow this track's scale, TRN and SHIFT. Print (REC held) keeps what it
+played, as for any generator.
 
 ---
 

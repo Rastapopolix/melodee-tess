@@ -158,6 +158,7 @@ static int test_tsp_record(void)
     tessera_param_set(1, TX_SUB_SHAPE, SUB_DECEL); tessera_param_set(0, TX_SUB_SHAPE, SUB_ACCEL);   /* (the record's SUB part) */
     tessera_param_set(2, TX_MIDI_CH, 9); tessera_param_set(3, TX_MIDI_CH, (int32_t)TESS_MIDI_OFF);   /* (its MIDI part) */
     tessera_param_set(0, TX_KEY_LINK, 0);                                    /* (its KEY part: OWN, not the default) */
+    tessera_param_set(1, TX_SD_SOURCE, 1); tessera_param_set(1, TX_SD_KEEP, TESS_SD_PITCH);   /* (its SEED part) */
     tessera.en_arc = 40u; tessera.en_rests = 60u;     /* (ENERGY: the block's project tail, TS18) */
     {
         cord_t c = {CS_LFO, 0, CD_CUTOFF, 1, 30, 0};
@@ -173,7 +174,8 @@ static int test_tsp_record(void)
                  tessera.en_arc == 40u && tessera.en_rests == 60u &&
                  tessera.sub_shape[1] == SUB_DECEL && tessera.sub_shape[0] == SUB_ACCEL && tessera.sub_shape[2] == SUB_EVEN &&
                  tessera.midi_ch[2] == 9u && tessera.midi_ch[3] == TESS_MIDI_OFF && tessera.midi_ch[0] == 0u &&
-                 tessera.key_link == 0u);
+                 tessera.key_link == 0u && tessera.sd_src[1] == 1u && tessera.sd_keep[1] == TESS_SD_PITCH &&
+                 tessera.sd_src[0] == 0u && tessera.sd_keep[0] == TESS_SD_FREE);
     ok = project_rename(0, "TSP TWO") == 0;
     memset(trk[0].step, 0, sizeof trk[0].step);
     project_load(0);
@@ -200,6 +202,16 @@ static int test_tsp_record(void)
     raw[tsp_seen.at[TSP_KEY]] = 2u;                     /* (KEY LINK past LINKED) */
     tsp_resum(raw);
     bad += check("TSP1: a KEY part out of range is refused", ok && !tsp_valid(raw, len));
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok = len && tsp_valid(raw, len) && tsp_seen.at[TSP_SEED];
+    raw[tsp_seen.at[TSP_SEED] + 2u] = (uint8_t)(TESSERA_TRACKS + 1u);   /* (track 3's SOURCE past T4) */
+    tsp_resum(raw);
+    ok &= !tsp_valid(raw, len);
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok &= len && tsp_valid(raw, len);
+    raw[tsp_seen.at[TSP_SEED] + NTRK] = TESS_SD_KEEPS;   /* (track 1's KEEP past PITCH) */
+    tsp_resum(raw);
+    bad += check("TSP1: a SEED part with a SOURCE or a KEEP out of range is refused", ok && !tsp_valid(raw, len));
 
     reset();                                           /* the largest: every step of every pattern full, 1,024 notes */
     for (k = 0; k < NTRK; k++) {

@@ -909,6 +909,43 @@ static int test_chord_user(void)
     return bad;
 }
 
+/* TURING / EUCLID on GEN with OCT+ held: KNOB 1 SOURCE, KNOB 2 KEEP (STEP as seed), their help; no octave, no sheet;
+ * let go, KNOB 2 is LEN again */
+static int test_seed_layer(void)
+{
+    int bad = 0;
+    uint32_t i, tr;
+    int32_t oct, len;
+    ui_power_on();
+    go_title("GEN");
+    tr = song.sel;
+    tessera_param_set(tr, TX_MODE, TESS_ENG_TURING);
+    frame();
+    oct = song.octave;
+    len = tessera_param_get(tr, TX_TUR_LEN);
+    fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+    host_pressed |= 1u << panel.btn[B_OCTUP];
+    frame();
+    for (i = 0; i < 3u; i++) turn(EN_K1, 1);           /* SOURCE T3 */
+    for (i = 0; i < 2u; i++) turn(EN_K1 + 1u, 1);      /* KEEP PITCH */
+    for (i = 0; i < 6u; i++) { frame(); fm1_ms += 200u; host_ticks += 200000u; }   /* (held 1.2 s) */
+    help_find(1);
+    bad += check("TURING, OCT+ held: KNOB 1 SOURCE T3, KNOB 2 KEEP PITCH; its help; LEN as it was",
+                 tessera_param_get(tr, TX_SD_SOURCE) == 3 && tessera_param_get(tr, TX_SD_KEEP) == TESS_SD_PITCH &&
+                 help.pid == PID_TESS(TX_SD_KEEP) && pid_find(help.pid) && tessera_param_get(tr, TX_TUR_LEN) == len);
+    bad += check("..the octave as it was, no sheet open", song.octave == oct && pop.on != POP_SHEET);
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
+    frame();
+    turn(EN_K1 + 1u, -1);
+    bad += check("OCT+ let go: KNOB 2 is LEN again, SOURCE kept", tessera_param_get(tr, TX_TUR_LEN) == len - 1 &&
+                 tessera_param_get(tr, TX_SD_SOURCE) == 3 && song.octave == oct);
+    tessera_param_set(tr, TX_SD_SOURCE, 0);
+    tessera_param_set(tr, TX_SD_KEEP, TESS_SD_FREE);
+    tessera_param_set(tr, TX_TUR_LEN, len);
+    tessera_param_set(tr, TX_MODE, TESS_ENG_OFF);
+    return bad;
+}
+
 /* GRIDS on GEN with OCT+ held: KNOB 1..4 KICK, SNR, HAT, TOMS (2 % a click), their help; no octave, no sheet; let go,
  * the knobs are MODE, X, Y, DENS again */
 static int test_grids_layer(void)
@@ -5607,6 +5644,7 @@ int main(void)
     bad += test_constel_speed();
     bad += test_constel_layer();
     bad += test_grids_layer();
+    bad += test_seed_layer();
     bad += test_chord_user();
     bad += test_step_evolve();
     bad += test_div_order();

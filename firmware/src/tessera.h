@@ -170,6 +170,9 @@ typedef struct {
     /* KEY LINK (ui.c scale_share; SCL's sheet), the project's: 1 one ROOT for every melodic track, shared as SCL and
      * QNT always are; 0 each track its own ROOT (as before). On in a new project; a record without its part: off */
     uint8_t          key_link;
+    /* STEP as seed (step_seed.c; OCT+ held on GEN, TURING and EUCLID): the record's SEED part, not the packed block */
+    uint8_t          sd_src[TESSERA_TRACKS];     /* SOURCE: 0 OFF, 1..4 that track's STEP pattern */
+    uint8_t          sd_keep[TESSERA_TRACKS];    /* KEEP: TESS_SD_FREE, _RHYTHM, _PITCH */
     /* CHORD's BREATH (HIT HOLD): its voices on slow cycles of their own, one now and then sitting out */
     uint8_t          ch_breath[TESSERA_TRACKS];  /* 0..100: 0 off (as before) */
     /* ENERGY (energy.c; the ENERGY page), the project's, not a track's: its slow tide and its rests */
@@ -300,8 +303,12 @@ enum {
     TX_SUB_SHAPE,                                   /* (0x262: SUB's SHAPE, any track's) */
     TX_MIDI_CH,                                     /* (0x263: MIDI OUT's channel, any track's) */
     TX_KEY_LINK,                                    /* (0x264: KEY LINK, the project's: one value, whichever track) */
+    TX_SD_SOURCE, TX_SD_KEEP,                       /* (0x265, 0x266: STEP as seed's SOURCE and KEEP, any track's) */
     TX_COUNT
 };
+enum { TESS_SD_FREE, TESS_SD_RHYTHM, TESS_SD_PITCH, TESS_SD_KEEPS };   /* TX_SD_KEEP */
+void tessera_sd_play(void);                         /* seq.c, PLAY: STEP as seed's loops from their sources again */
+void tessera_sd_layer_knob(uint32_t k, int32_t s);  /* TURING / EUCLID on GEN, OCT+ held: KNOB 1 SOURCE, 2 KEEP */
 #define TESS_MIDI_OFF 17u                           /* TX_MIDI_CH: 0 AUTO, 1..16, 17 OFF */
 int32_t tessera_param_get(uint32_t tr, uint32_t x);           /* the value its page shows */
 void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v); /* written as it is (cord.c, around a step) */
