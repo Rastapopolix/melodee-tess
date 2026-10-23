@@ -125,6 +125,7 @@
     <pre id="log"></pre>
   </div>
   <p class="small" data-t="beta"></p>
+  <p class="small" data-t="counted"></p>
   <p class="small"><span data-t="brick"></span>
     <a href="https://github.com/keremimo/melodee/blob/next/docs/RECOVERY.md" target="_blank" rel="noopener" data-t="recoveryLink"></a></p>
   <details>
@@ -898,6 +899,7 @@ const TEXT = {
     direct: "USB ケーブルはパソコンに直接つないでください。Probe や Transporter などの機材は不要です。",
     brick: "起動保護付きファームウェアの更新が中断した場合は、電源を入れ直すか、OCT− だけを押しながら電源を入れてください。キーのライトが短く3回点滅したら更新モードです。USB を接続し直して、もう一度インストールしてください。以前のファームウェアや長い1回の点滅の場合は、USB 復旧手順を確認してください:",
     recoveryLink: "USB 復旧手順とダウンロード",
+    counted: "インストールが終わると、このページは GoatCounter でその回数を数えます。送るのはバージョンとビルドだけで、Cookie や個人情報は使いません。このブラウザを数えないようにするには、一度このページを #nocount 付きで開いてください。",
     beta: "Tessera は Melodee から生まれた実験的なファームウェアです。不具合は github.com/Rastapopolix/tessera へ知らせてください。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
     back: "M-VAVEから公式FM-1 V15を取得し、未変更のFM-1.fwscを選んでください。ファイルはこのブラウザ内で検証し、サーバーへ送りません。",
     localTitle: "テストビルド（パソコンのファイル）", localFile: "テスト用ファームウェア（.fwsc）", localGo: "テストビルドをインストール",
@@ -946,6 +948,7 @@ const TEXT = {
     direct: "Connect the USB cable directly to the computer. No probe or Transporter is needed.",
     brick: "If an update is interrupted on firmware with boot protection, switch the FM-1 on again (or hold OCT− alone while switching on). Three short key-light flashes mean update mode: reconnect USB and press Install again. Older firmware and one long flash need the USB recovery instructions:",
     recoveryLink: "USB recovery instructions and downloads",
+    counted: "When an install finishes, the page counts it at GoatCounter: the version and the build only, no cookies or personal data. To leave this browser out, open this page once with #nocount at the end of its address.",
     beta: "Tessera is an experimental firmware grown out of Melodee; please report problems at github.com/Rastapopolix/tessera. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
     back: "Get official FM-1 V15 from M-VAVE and select the unmodified FM-1.fwsc. The browser validates it locally; it is not sent to a server.",
     localTitle: "Test build from this computer", localFile: "Test firmware (.fwsc)", localGo: "Install test build",
@@ -1003,7 +1006,7 @@ const selection = () => {     /* the release, or a channel ("nightly-dual": meta
 const ready = () => { lastKey = "ready"; $("status").textContent = `Tessera ${selection().channel.version} (${t(build() + "Tag")})`; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "2.0", "product": "FM-1_920", "pkg": {"dual": "../../firmware/tessera-2.0.fwsc", "single": "../../firmware/tessera-2.0-1core.fwsc"}, "nightly": null, "synth": null};
+const meta = {"version": "2.0.1", "product": "FM-1_83772001", "pkg": {"dual": "../../firmware/tessera-2.0.1.fwsc", "single": "../../firmware/tessera-2.0.1-1core.fwsc"}, "nightly": null, "synth": null};
 $("ver").textContent = `FM-1 · ${meta.version}`;
 $("nightly-options").hidden = !meta.nightly;
 if (meta.nightly) $("nightly-info").textContent = `next · ${meta.nightly.commit.slice(0, 7)} · ${meta.nightly.builtAt}`;
@@ -1037,14 +1040,27 @@ async function choose() {
 buildIds.forEach(k => $("build-" + k).addEventListener("change", choose));
 choose();
 
-// install an image whose identity the device must report afterwards (the chosen build, or a local test build)
-async function flash(image, product) {
+// the install count: one GoatCounter event per finished install of a published build (the version and the build, no
+// cookies); never for a local file, nor in a browser that opened this page with #nocount once
+const COUNT_URL = "https://tessera.goatcounter.com/count";
+const NOCOUNT = "tessera-nocount";
+try { if (location.hash === "#nocount") localStorage.setItem(NOCOUNT, "1"); } catch (e) { /* no storage: counted */ }
+function countInstall(what) {
+  try { if (localStorage.getItem(NOCOUNT)) return; } catch (e) { /* no storage: counted */ }
+  const q = new URLSearchParams({p: `install/${what}`, t: `Install ${what}`, e: "true", rnd: Math.random().toString(36).slice(2)});
+  try { navigator.sendBeacon(`${COUNT_URL}?${q}`); } catch (e) { /* the count is never worth an error */ }
+}
+
+// install an image whose identity the device must report afterwards (the chosen build, or a local test build);
+// what: the published build to count ("2.0/dual"), none for a local file
+async function flash(image, product, what) {
   lockInstaller(true);
   let midi;
   try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
   catch (e) { sayK("denied"); lockInstaller(false); return; }
   try {
     const up = new Updater(midi, log);
+    let done = false;
     const total = 74 + 1167;
     const step = (k, a) => {
       log(`${k} ${a ?? ""}`);
@@ -1053,15 +1069,17 @@ async function flash(image, product) {
       if (k === "loader") sayK("loader");
       if (k === "write") { sayK("write"); $("bar").value = ((74 + a) / total) * 100; }
       if (k === "reboot") sayK("reboot");
-      if (k === "done") { $("bar").value = 100; sayK("done"); }
+      if (k === "done") { $("bar").value = 100; sayK("done"); done = true; }
     };
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
-      sayK((await up.resume(image, step, product)) ? "done" : "stopped");
+      if (await up.resume(image, step, product)) done = true;
+      sayK(done ? "done" : "stopped");
     } else {
       await up.install(image, product, step);
     }
+    if (done && what) countInstall(what);
   } catch (e) {
     if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
     else sayK("error", e && e.message);
@@ -1069,9 +1087,9 @@ async function flash(image, product) {
   }
   lockInstaller(false);
 }
-$("go").addEventListener("click", () => { if (!writing && image) return flash(image, selection().channel.product); });
+$("go").addEventListener("click", () => { if (!writing && image) { const {channel, kind} = selection(); return flash(image, channel.product, `${channel.version}/${kind}`); } });
 
-// a test build from this computer: only a Melodee package (fm1pkg_make.py: CRCs intact, an FM-1_9 identity and
+// a test build from this computer: only a Melodee package (fm1pkg_make.py: CRCs intact, an FM-1_8377 or FM-1_9 identity and
 // Melodee's loader, so never a vendor or patched official package), as web/make_site.py checks before publishing
 const LOADER_MARK = Array.from("FELUCCA-LOADER-1", (c) => c.charCodeAt(0));
 const hasLoader = (raw) => {
@@ -1082,7 +1100,7 @@ const hasLoader = (raw) => {
 function checkLocal(raw) {
   new Package(raw);
   const product = productOf(raw);
-  if (!/^FM-1_9\d{2,4}$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Tessera package`);
+  if (!/^(FM-1_8377\d{4}|FM-1_9\d{2,4})$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Tessera package`);
   if (!hasLoader(raw)) throw new Error("no Tessera loader in it (only tools/fm1pkg_make.py packages)");
   return {image: logicalImage(raw), product};
 }

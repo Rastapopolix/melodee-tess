@@ -9,7 +9,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tessera · FM-1 firmware</title>
-<meta name="description" content="Tessera: a generative firmware for the M-Vave FM-1. Twelve generators, song forms, harmony and modulation on four tracks.">
+<meta name="description" content="Tessera: a generative firmware for the M-Vave FM-1. Thirteen generators, song forms, harmony and modulation on four tracks.">
 <meta property="og:title" content="Tessera">
 <meta property="og:description" content="Generative firmware for the M-Vave FM-1.">
 <meta property="og:image" content="https://rastapopolix.github.io/tessera/media/brand/social-preview.png">
@@ -174,17 +174,17 @@ footer p { max-width: 52em; }
       </div>
       <h1>TESSERA</h1>
       <div class="tag">Generative firmware for the M-Vave FM-1</div>
-      <p class="lede">Four tracks, twelve generators. Evolve the phrases, build them into song forms, let the tracks
+      <p class="lede">Four tracks, thirteen generators. Evolve the phrases, build them into song forms, let the tracks
         answer and follow each other, and modulate anything from anything. Small tiles, set into a larger pattern.</p>
       <div class="cta">
-        <a class="btn main" href="webapp/installer/">Install 2.0</a>
+        <a class="btn main" href="webapp/installer/">Install 2.0.1</a>
         <a class="btn" href="webapp/sim/">Try it in your browser</a>
         <a class="btn" href="https://github.com/Rastapopolix/tessera/blob/HEAD/MANUAL.md">Manual</a>
       </div>
     </div>
     <div class="screens">
+      <div class="screen"><img src="media/gallery/gen_tweak2.png" alt="TWEAK 2: BRANCH, LOGIC and COND set" width="480" height="480"></div>
       <div class="screen"><img src="media/gallery/gen_constel.png" alt="CONSTELLATION: stars play as they cross the crosshair" width="480" height="480"></div>
-      <div class="screen"><img src="media/gallery/gen_grids.png" alt="ATLAS: the drum map" width="480" height="480"></div>
       <div class="screen"><img src="media/gallery/gen_chord.png" alt="CHORD: a progression" width="480" height="480"></div>
       <div class="screen"><img src="media/gallery/matrix.png" alt="MATRIX: the mods track by track" width="480" height="480"></div>
     </div>
@@ -195,14 +195,14 @@ footer p { max-width: 52em; }
   <div class="wrap">
     <header>
       <div class="kicker">Hear it</div>
-      <h2>Three minutes of Tessera</h2>
-      <p>The two demo projects, STILL TIDE and KOTO GARDEN, then a tour of the other modes. Every sound and every
-        screen in it is the firmware's own.</p>
+      <h2>Four minutes of Tessera</h2>
+      <p>The two demo projects, STILL TIDE and KOTO GARDEN, then the pages that shape any generator, then a tour of
+        the other modes. Every sound and every screen in it is the firmware's own.</p>
     </header>
     <div class="video">
       <video controls playsinline preload="none" poster="media/video/tessera-2.0-demo.jpg" width="1080" height="1080">
         <source src="media/video/tessera-2.0-demo.mp4" type="video/mp4">
-        <a href="media/video/tessera-2.0-demo.mp4">Download the demo video (MP4, 5.8 MB)</a>
+        <a href="media/video/tessera-2.0-demo.mp4">Download the demo video (MP4, 7.7 MB)</a>
       </video>
     </div>
   </div>
@@ -217,7 +217,7 @@ footer p { max-width: 52em; }
         play, and every automatic layer starts off, so nothing moves until you ask it to.</p>
     </header>
     <div class="tiles">
-      <div class="tile" style="--c:var(--t1)"><h3>Twelve generators</h3><p>Turing, Euclid, Markov, Morph, Atlas, Bounce and Fall, Awake, Poly, Quad, Constellation, Series and Chord.</p></div>
+      <div class="tile" style="--c:var(--t1)"><h3>Thirteen generators</h3><p>Turing, Euclid, Markov, Morph, Atlas, Bounce and Fall, Awake, Poly, Quad, Constellation, Series, Chord and Answer.</p></div>
       <div class="tile" style="--c:var(--t2)"><h3>Evolve and form</h3><p>Mutate a phrase every few bars, or build sections A, B and C into forms such as AABA. STEP EVOLVE varies the steps you wrote.</p></div>
       <div class="tile" style="--c:var(--t3)"><h3>Tracks that talk</h3><p>Branch hits to another track's sound, combine tracks with AND, OR and XOR, follow another track's pitch, play only on certain bars.</p></div>
       <div class="tile" style="--c:var(--t4)"><h3>Harmony</h3><p>One key for every track with Key link. A Chord track plays a progression, or your own played in on the keys, and QNT CHRD makes every other track follow it.</p></div>
@@ -293,12 +293,12 @@ footer p { max-width: 52em; }
     </div>
     <p style="margin-top:22px;color:var(--mid)">Do not unplug the FM-1 while it is writing. This is experimental firmware: use it at your own risk.</p>
     <div class="cards">
-      <a class="card" style="--c:var(--t1)" href="webapp/installer/"><b>Install 2.0</b><span>The web installer, in Chrome or Edge.</span></a>
+      <a class="card" style="--c:var(--t1)" href="webapp/installer/"><b>Install 2.0.1</b><span>The web installer, in Chrome or Edge.</span></a>
       <a class="card" style="--c:var(--t2)" href="webapp/sim/"><b>Try it in your browser</b><span>The same firmware on an on-screen FM-1, with sound.</span></a>
-      <div class="card" style="--c:var(--t3)"><b>Download .fwsc</b><span><a href="firmware/tessera-2.0.fwsc">Standard</a> ·
-        <a href="firmware/tessera-2.0-1core.fwsc">single core</a> ·
+      <div class="card" style="--c:var(--t3)"><b>Download .fwsc</b><span><a href="firmware/tessera-2.0.1.fwsc">Standard</a> ·
+        <a href="firmware/tessera-2.0.1-1core.fwsc">single core</a> ·
         <a href="https://github.com/Rastapopolix/tessera/releases">all releases</a>. From a terminal:
-        <code>python3 tools/fm1_install.py tessera-2.0.fwsc</code> (<a href="https://github.com/Rastapopolix/tessera/blob/HEAD/tools/fm1_install.py">fm1_install.py</a>, needs mido and python-rtmidi).</span></div>
+        <code>python3 tools/fm1_install.py tessera-2.0.1.fwsc</code> (<a href="https://github.com/Rastapopolix/tessera/blob/HEAD/tools/fm1_install.py">fm1_install.py</a>, needs mido and python-rtmidi).</span></div>
       <a class="card" style="--c:var(--t4)" href="https://github.com/Rastapopolix/tessera/blob/HEAD/MANUAL.md"><b>Manual</b><span>Every page, knob and mode.</span></a>
       <a class="card" style="--c:var(--t1)" href="https://github.com/Rastapopolix/tessera/blob/HEAD/docs/cheatsheet/tessera-cheatsheet.pdf"><b>Cheatsheet</b><span>The buttons and combinations on one printable page.</span></a>
       <a class="card" style="--c:var(--t2)" href="webapp/editor/"><b>Web editor</b><span>Edit sounds and sequences from the computer.</span></a>
