@@ -1395,26 +1395,22 @@ static int test_help_gesture(void)
                  help.on && help.pid == PID_TESS(TX_EV_AMOUNT) && tessera_param_get(0, TX_EV_AMOUNT) == was);
     turn(EN_K1, 1);
     bad += check("...another knob while held: its help instead (LOCK)", help.on && help.pid == PID_TESS(TX_EV_LOCK));
-    {   /* turning LOCK on: larger while it all fits, then nothing (and no redraw); back: smaller, then nothing */
-        int ok = help.zoom == 0u || help.knob != 0u;
-        uint32_t k, z = 0;
-        help.zoom = help.top = 0;
-        for (k = 0; k < 6u; k++) {
-            ui.force = 0;
-            help_knob(0, 1);
-            if (ui.force) z++;
-            ok &= help_count(help.zoom) <= help_rows(help.zoom) && !help.top;
-        }
-        for (k = 0; k < 2u && help_count(k + 1u) <= help_rows(k + 1u); k++) ;
-        ok &= k > 0u && z == k && help.zoom == k;       /* (as large as LOCK's text fits: AF_S) */
-        ui.force = 0;
+    {   /* LOCK opens at the largest size all of it fits (12 px: at 15 px it would scroll); it fits: turning on or back
+         * changes nothing, and draws nothing again */
+        uint32_t big = help_count(HELP_ZOOMS - 1u) <= help_rows(HELP_ZOOMS - 1u) ? HELP_ZOOMS - 1u : 0u;
+        int ok = help.zoom == big && !help.top && help_count(help.zoom) <= help_rows(help.zoom);
+        help.card = 0; ui.force = 0;
         help_knob(0, 1);
-        ok &= !ui.force;
-        for (k = 0; k < 4u; k++) help_knob(0, -1);
-        ui.force = 0;
+        ok &= help.zoom == big && !help.top && !help.card && !ui.force;
         help_knob(0, -1);
-        bad += check("..turning it on: the text larger while all of it fits, then no redraw; back to the smallest",
-                     ok && !ui.force && help.zoom == 0u);
+        if (big) {                                      /* (a text that fit at 15 px: back to 12, the card alone redrawn) */
+            ok &= help.zoom == 0u && help.card && !ui.force;
+            frame();
+        }
+        help.card = 0; ui.force = 0;
+        help_knob(0, -1);
+        bad += check("..LOCK's help opens at the largest size it fits (12 px or 15 px, no longer 10), then turning changes "
+                     "nothing", ok && help.zoom == 0u && !help.card && !ui.force);
     }
     fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
     frame();
@@ -1429,6 +1425,13 @@ static int test_help_gesture(void)
         turn(EN_K1, 1);
         n = help_count(0);
         ok = help.on && help.pid == PID_TESS(TX_MODE) && help.zoom == 0u && n > help_rows(0);
+        frame();
+        help.card = 0; ui.force = 0;
+        help_knob(0, 1);                                /* (a scroll: the card alone, not the page under it) */
+        ok &= help.top == 1u && help.card && !ui.force;
+        frame();
+        ok &= !help.card && !ui.force;
+        bad += check("GEN's MODE help: a scroll redraws the card alone, not the page under it (no flicker)", ok);
         for (k = 0; k < 40u; k++) {
             help_knob(0, 1);
             most = help.top > most ? help.top : most;
