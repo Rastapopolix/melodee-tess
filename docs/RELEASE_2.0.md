@@ -14,6 +14,9 @@ Put them on your FM-1 to hear what 2.0 does before you build your own.
   sound banks and the settings. A 1.x backup restores on 1.x only.
 * The CZ-1 and Prophet sound banks are gone (their flash now holds the projects). FM6's banks and your user presets
   stay.
+* **The FM-1 now shows up on your computer as Tessera** (MIDI port **Tessera**, audio **Tessera Out** and **Tessera In**;
+  it was Melodee). A DAW that remembered the Melodee port needs the Tessera one picked once. During an update it
+  still shows up as Melodee Update, briefly.
 
 ### 🎹 Synth engines
 2.0 plays three engines, each tuned for generative music.

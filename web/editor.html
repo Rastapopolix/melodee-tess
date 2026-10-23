@@ -2938,7 +2938,7 @@ async function connect() {
       }
       access.onstatechange = onState;
     }
-    const isF = (p) => /tessera|melodee|felucca/i.test(p.name || "") && p.state !== "disconnected";   /* (the device's port: Melodee, from its USB name) */
+    const isF = (p) => /tessera|melodee|felucca/i.test(p.name || "") && p.state !== "disconnected";   /* (the device's port: Tessera, from its USB name; Melodee before 2.0) */
     const input = [...access.inputs.values()].find(isF);
     const output = [...access.outputs.values()].find(isF);
     if (!input || !output) { sayK("nodevice"); return; }
@@ -4169,7 +4169,7 @@ $("savefile").addEventListener("click", () => op(async () => {
     engine, preset, p: dev.dump.p.slice(), g: dev.dump.g.slice(),
     steps: dev.steps.map((s) => ({ n: s.n, notes: s.notes.slice(), time: s.time, flags: s.flags, vel: s.vel })) };
   if(data.engineName === "FM6") { const r=parse[CMD.FM6_GET](await rq(req.fm6Get(FM6.TARGET.TRACK,dev.sel||0)));if(r.rc)throw new Error("Cannot read FM6 voice");data.fm6=Array.from(r.packed); }
-  download(`melodee-${fileSlug(data.engineName || "patch")}-${fileSlug(data.presetName || preset)}.json`, data);
+  download(`tessera-${fileSlug(data.engineName || "patch")}-${fileSlug(data.presetName || preset)}.json`, data);
 }));
 $("loadfile").addEventListener("click", () => { $("file").value = ""; $("file").click(); });
 $("file").addEventListener("change", async () => {
@@ -4648,7 +4648,7 @@ $("bkexport").addEventListener("click", () => libOp(async (d, rqf) => {
       engineName: reservedFm4(dev.info.engines, u.engine) ? "DIGITAL" : dev.info.engines[u.engine] });   /* (DIGITAL's values) */
   }
   if(engine===12){for(let i=0;i<out.length;i+=32)downloadBytes(`fm6-presets-${i/32+1}.syx`,FM6.bankSysex(out.slice(i,i+32).map(x=>FM6.unpack(x.fm6))));}
-  else download(`melodee-bank-${today()}.json`,libraryFile("bank",out,libCtx()));
+  else download(`tessera-bank-${today()}.json`,libraryFile("bank",out,libCtx()));
   sayK("ready");
 }));
 
@@ -4822,7 +4822,7 @@ $("fm6bankexp").addEventListener("click", () => op(async () => {
     const r = parse[CMD.FM6_GET](await sessionRequest(dev, req.fm6Get(FM6.TARGET.BANK, k)));
     out.push(r.rc ? null : FM6.unpack(r.packed));
   }
-  downloadBytes(`melodee-fm6-bank-${today()}.syx`, FM6.bankSysex(out));
+  downloadBytes(`tessera-fm6-bank-${today()}.syx`, FM6.bankSysex(out));
   sayK("fm6Exported");
 }));
 
