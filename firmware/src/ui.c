@@ -1236,5 +1236,6 @@ static void confirm_open(uint32_t kind, uint32_t trk)
 #include "sysex_library.c"                       /* staged imports and USB library exports */
 
 #include "note_tools.c"
+#include "seq_tools.c"                            /* the Pattern sheet's DOUBLE, HALF, EUCLID */
 
 #include "ui_boot.c"                            /* visible progress before boot flash maintenance */

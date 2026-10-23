@@ -79,8 +79,8 @@ One way to move on every screen with something to move through (Kerem, 2026-10-1
   to Stage. Enter: a list row's list, a slot's sheet (PROJECT, USER, the STOREs), the action picked, a sound page's
   sheet; NOTES: an empty step gets the last note played, a note opens its sheet (Length, Velocity, Chance, Slide,
   Delete note); the drum grid: an empty place gets the lane's hit, a hit opens its sheet (Accent, Chance, Clear hit:
-  hits have no velocity of their own). OCT+ held on NOTES, PATTERN: the pattern's sheet (Clear pattern,
-  Clear motion). A clearing row with nothing there says so instead of asking.
+  hits have no velocity of their own). OCT+ held on NOTES, PATTERN: the pattern's sheet (Quantize,
+  Double, Half, Euclid, Euclid turn, Clear pattern, Clear motion; Tessera's SEQ tools: seq_tools.c). A clearing row with nothing there says so instead of asking.
 - **SELECT** turns the pages, as before, NOTES too (Kerem, 2026-10-10): there KNOB 1 alone moves, the steps one by
   one (empty ones too) and a step's notes one at a time (a chord's, a take's), back onto the step before's last note.
 - **Direct pages stay direct**: one knob per track where speed matters (Stage, MIXER, PATTERNS, NEW SONG's roles);

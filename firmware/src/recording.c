@@ -289,6 +289,36 @@ static int recording_copy(track_t *t, uint32_t source, uint32_t dest, int apply)
     recording_reindex();
     return 0;
 }
+/* A doubled bank (motion.c pattern_double): the events of its first len steps copied len steps later, the dormant
+ * ones there dropped first. Capacity is checked before anything changes; the index is the caller's to rebuild */
+static int recording_double(track_t *t, uint32_t bank, uint32_t len, int apply)
+{
+    uint32_t owner = trk_index(t) * NPAT + bank, count = 0, free = 0, i, j;
+    for (i = 0; i < RECORD_MAX; i++) {
+        uint32_t a = recording[i].step & 63u, mine = recording[i].vel && (recording[i].owner & 31u) == owner;
+        if (mine && a < len) count++;
+        if (!recording[i].vel || (mine && a >= len && a < 2u * len)) free++;
+    }
+    if (count > free) return 2;
+    if (!apply) return 0;
+    for (i = 0; i < RECORD_MAX; i++)
+        if (recording[i].vel && (recording[i].owner & 31u) == owner && (recording[i].step & 63u) >= len &&
+            (recording[i].step & 63u) < 2u * len) {
+            recording_end(t, i);
+            memset(&recording[i], 0, sizeof recording[i]);
+            memset(&recording_run[i], 0, sizeof recording_run[i]); recording_flags[i] = 0;
+        }
+    for (i = j = 0; i < RECORD_MAX; i++)                /* (a copy lands past len: never copied again) */
+        if (recording[i].vel && (recording[i].owner & 31u) == owner && (recording[i].step & 63u) < len) {
+            while (recording[j].vel) j++;
+            recording[j] = recording_snapshot(i);
+            recording[j].step = (uint8_t)(recording[j].step + len);
+            /* Rounded forward past the longer loop's end: shown on its first step, as a wrapped original is. */
+            if ((recording[j].step & 64u) && (recording[j].step & 63u) + 1u == 2u * len) recording[j].step |= 128u;
+            memset(&recording_run[j], 0, sizeof recording_run[j]); recording_flags[j] = 0;
+        }
+    return 0;
+}
 static void recording_release(track_t *t, uint32_t note)
 {
     for (uint32_t i = recording_head[recording_owner(t)]; i < RECORD_MAX; i = recording_next[i])

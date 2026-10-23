@@ -16,7 +16,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 SRC = _ROOT / "firmware" / "src" if (_ROOT / "firmware" / "src").is_dir() else _ROOT / "src"   # either layout
 # the UI, the stores, the editor and the console: main loop only, never called by sound code
 SIZE_FILES = ["ui.c", "gfx.c", "favorites.c", "icons.c", "ui_graph.c", "ui_draw.c", "ui_menu.c", "ui_input.c",
-              "editor_native.c", "scale_picker.c", "seq_edit.c", "seq_notes.c", "seq_undo.c", "native_presets.c", "note_tools.c", "sysex_library.c", "fm6_store.c", "ui_browser.c", "ui_designer.c", "ui_designer_input.c", "ui_layer.c", "ui_list.c", "ui_motion.c", "ui_name.c",
+              "editor_native.c", "scale_picker.c", "seq_edit.c", "seq_notes.c", "seq_undo.c", "native_presets.c", "note_tools.c", "seq_tools.c", "sysex_library.c", "fm6_store.c", "ui_browser.c", "ui_designer.c", "ui_designer_input.c", "ui_layer.c", "ui_list.c", "ui_motion.c", "ui_name.c",
               "ui_new.c", "ui_pages.c", "ui_patterns.c", "ui_popup.c", "ui_scales.c", "ui_sections.c", "ui_slots.c", "ui_stage.c",
               "storage.c", "upreset.c", "project.c", "settings_persist.c",
               "editor.c", "project_tsp.c", "editor_fm6.c", "editor_preferences.c", "editor_backup.c", "console.c",
