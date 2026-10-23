@@ -36,7 +36,7 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 | **EDIT** on an EDIT page | The map of the sound's pages: KNOB 1 across, KNOB 2 rows, OCT+ opens, OCT- or EDIT closes |
 | **PRESETS** on an EDIT page | The next / previous section (FM6: Algo, OP1 to OP6, Pitch, LFO, Ctrl, Store) |
 | **FX** | The insert and send effects |
-| **GLO** | MIXER, GLOBAL, SYSTEM, MIDI OUT |
+| **GLO** | MIXER, GLOBAL (BUDGET: the shared voices), SYSTEM, MIDI OUT |
 | **SAVE** | USER (save the sound), PROJECT, PRESETS |
 
 ## Quick layers: hold GLO or SCL

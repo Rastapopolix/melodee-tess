@@ -115,6 +115,22 @@ STRINGS) swell in slowly: they speak on long notes and drones, and stay quiet on
 **PRESETS** (SAVE) browses the sounds. Its LIST knob picks ALL, the favourites, RECENT or a category, and it starts
 on ALL at power-on.
 
+### How many voices at once
+
+All the tracks share one pool of voices, set by **GLO > GLOBAL > BUDGET** (16 by default). A note that rings on in
+its release still holds a voice, so a busy generator on a sound with a long release can keep most of the pool
+ringing on its own: TINE EP under MARKOV at 100 % density and 1/16 holds about 15. When the pool is full, a new note
+takes the oldest released voice; when the FM-1 has more six-operator voices to work out than it has time for, you
+hear a faint crackle.
+
+One busy FM6 track like that is fine; two or more of them at full density is past the FM-1's limit. To keep it
+clean:
+
+- thin one of them (DENSITY, DROP, or a slower DIV);
+- give one a shorter note (LENGTH) or a sound with a shorter release, such as a TRIO voice or DRUM;
+- lower **BUDGET** (12, say): fewer voices ring at once, which leaves the FM-1 headroom; higher allows more, and
+  crackles sooner.
+
 ---
 
 ## SEQ: the MODE and its pages
