@@ -1,0 +1,82 @@
+name: Test page 2.0-rc4 (temporary)
+
+# Temporary, on branch rc-build-2.0-rc4 only (never merged): the cloud can't build the device image or download
+# Actions artifacts, so this builds the 2.0-rc4 test page as BUILDING.md describes (both variants, the sim,
+# make_site.py into docs/test/2.0-rc4/) and pushes it to branch test-2.0-rc4, made from main, for a PR into main.
+on:
+  push:
+    branches: [rc-build-2.0-rc4]
+
+permissions:
+  contents: write
+
+jobs:
+  page:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      JIELI_TOOLCHAIN: ${{ github.workspace }}/.nightly-deps/jieli/toolchain
+      AC79_SDK: ${{ github.workspace }}/.nightly-deps/sdk
+      PARALLEL: '2'
+      V: 2.0-rc4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libharfbuzz-dev libfribidi-dev libraqm-dev
+          python -m pip install Pillow fonttools
+      - uses: actions/cache@v4
+        with:
+          path: .nightly-deps
+          key: jieli-linux-sdk-d179b448-v1
+      - name: Fetch pinned SDK and toolchain
+        run: |
+          if [ ! -x "$JIELI_TOOLCHAIN/pi32v2/bin/clang" ]; then
+            tools/get_toolchain.sh "$GITHUB_WORKSPACE/.nightly-deps/jieli"
+          fi
+          if [ ! -d "$AC79_SDK/.git" ]; then
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git "$AC79_SDK"
+          fi
+          test "$(git -C "$AC79_SDK" rev-parse HEAD)" = d179b4484759423312073f5fbb232501aa491047
+      - name: Full host suite (on a development build)
+        run: |
+          ./build.sh
+          tests/run_tests.sh
+      - name: Build both variants
+        run: |
+          mkdir -p ../pkgs
+          ./build.sh --release "$V" 2>&1 | tee dual.log
+          cp "build/tessera-$V.fwsc" ../pkgs/
+          MELODEE_DUAL_CORE=0 ./build.sh --release "$V" 2>&1 | tee single.log
+          cp "build/tessera-$V-1core.fwsc" ../pkgs/
+          echo '----- sizes'
+          grep -h -E -i "image [0-9]+ B|audio working arena|\.data\+\.bss|^app |^package " dual.log single.log
+          (cd ../pkgs && sha256sum *.fwsc)
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Simulator
+        run: web/sim/build.sh
+      - name: The page, pushed to test-2.0-rc4
+        run: |
+          python web/make_site.py "../pkgs/tessera-$V.fwsc" "../pkgs/tessera-$V-1core.fwsc" "$V" ../site build/sim
+          src=$(git rev-parse --short HEAD^)
+          git worktree add -B test-2.0-rc4 ../page origin/main
+          mkdir -p "../page/docs/test/$V"
+          cp -r ../site/. "../page/docs/test/$V/"
+          cd ../page
+          git config user.name Claude
+          git config user.email noreply@anthropic.com
+          git add "docs/test/$V"
+          git commit -q -m "Test page $V: develop $src (SEQ tools, STEP as seed, 2.0 docs)" \
+            -m "Built by the temporary workflow on rc-build-2.0-rc4." \
+            -m "Claude-Session: https://claude.ai/code/session_01BymwYkcNPJ3LSzN87JB1QY"
+          git show --stat HEAD | tail -3
+          git push -f origin test-2.0-rc4
