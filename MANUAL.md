@@ -49,12 +49,12 @@ page's four settings sit along the top of the screen in the same order.
 | **SEQ** | GEN, then the pages of the track's MODE | PATTERNS (the song under it) |
 | **ARP** | ARP's MODE and its page (again: ARP 2) | The help card for any knob you turn |
 | **LFO** | MODS, MATRIX, LFO, LFO 2, ORGANIC, LFO DEST (an FM6 track: then FM LFO) | |
-| **ENV** | ENV, ENV DEST | |
-| **SCL** | SCALES, SCL, CHORD | |
+| **ENV** | ENV, ENV DEST (an FM6 track: EG RATE, EG LVL, PITCH EG, PITCH LV) | |
+| **SCL** | SCALES, SCL, CHORD | Quick SET: a key sets ROOT; KNOB 1 to 4 set ROOT, SCL, CHRD, VOIC |
 | **EDIT** | The sound's EDIT pages; on an EDIT page, the map | With OCT- / OCT+: undo / redo |
 | **FX** | The insert and send effects | The mod amount of any knob you turn |
-| **GLO** | MIXER, GLOBAL, SYSTEM, MIDI OUT | |
-| **SAVE** | USER (ready to save the sound), PROJECT, PRESETS | With REC: save the project to its slot |
+| **GLO** | MIXER, GLOBAL, SYSTEM, MIDI OUT | Quick SET: the black keys mute T1 to T4, the white keys solo while held, KNOB 1 to 4 the levels, F4 taps the tempo; with PLAY, restart from the top |
+| **SAVE** | USER (ready to save the sound), PROJECT, PRESETS | Save the project to its slot (as SAVE + REC) |
 | **REC** | Record | Capture or print the last bars (see [Print and keep](#print-and-keep)) |
 | **OCT+** | Octave up; on some pages, an action (shown on screen) | A page's extra layer (see [OCT+ layers](#oct-layers-on-gen)) |
 
@@ -79,13 +79,13 @@ COLOR. Each track has its own colour, used for its tile, its cords and its row i
 |---|---|
 | Tap **SEQ** | **GEN** first: KNOB 1 (**MODE**) picks what the track plays. SEQ then shows only that mode's pages. |
 | Tap **ARP** | Switches a STEP track to ARP and opens **ARP**; tap again for **ARP 2**. On a generator track it opens GEN instead ("ARP: MODE ON GEN"), so a playing generator never goes quiet by accident. |
-| Hold **OCT+** on GEN | The generator's second layer, for QUAD, CHORD, ATLAS and CONSTELLATION (see [OCT+ layers](#oct-layers-on-gen)). |
+| Hold **OCT+** on GEN | The generator's second layer, for TURING, EUCLID, QUAD, CHORD, ATLAS, CONSTELLATION and ANSWER (see [OCT+ layers](#oct-layers-on-gen)). |
 | **GEN** on an AWAKE track, a white key | Picks that step: KNOB 1 sets its A, KNOB 2 its B. The same key lets it go. |
 | Hold **ARP**, turn a knob | The [help card](#help-card) for that knob. Turn the same knob further to scroll a long text. |
 | Hold **FX**, turn a knob | Sets how far a cord moves that knob's parameter (see [Mod shortcut](#mod-shortcut)). |
 | Hold **REC** | On a generator track: prints its last bars into STEP. On STEP EVOLVE: keeps the changes. On a STEP track: captures what you just played. |
 | Hold **EDIT**, press **OCT-** / **OCT+** | Undo / redo. |
-| **SAVE** + **REC** | Saves the project to its slot (stops playback first). |
+| **SAVE** + **REC**, or hold **SAVE** | Saves the project to its slot (stops playback first). |
 | **EVOLVE**, KNOB 4 (**ROLL**) | Each click is a new seed (1 to 128), so a new line; turn back for the last one, note for note. |
 | **FORM**, KNOB 3 (**CLEAR**) | Forgets B and C: the section playing becomes A. |
 | **MODS**, **OCT+** | Switches the picked mod between BI and UNI. |
