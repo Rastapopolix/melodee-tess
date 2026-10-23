@@ -81,7 +81,7 @@ COLOR. Each track has its own colour, used for its tile, its cords and its row i
 | Tap **ARP** | Switches a STEP track to ARP and opens **ARP**; tap again for **ARP 2**. On a generator track it opens GEN instead ("ARP: MODE ON GEN"), so a playing generator never goes quiet by accident. |
 | Hold **OCT+** on GEN | The generator's second layer, for QUAD, CHORD, ATLAS and CONSTELLATION (see [OCT+ layers](#oct-layers-on-gen)). |
 | **GEN** on an AWAKE track, a white key | Picks that step: KNOB 1 sets its A, KNOB 2 its B. The same key lets it go. |
-| Hold **ARP**, turn a knob | The [help card](#help-card) for that knob. Turn the same knob further to make the text larger or scroll it. |
+| Hold **ARP**, turn a knob | The [help card](#help-card) for that knob. Turn the same knob further to scroll a long text. |
 | Hold **FX**, turn a knob | Sets how far a cord moves that knob's parameter (see [Mod shortcut](#mod-shortcut)). |
 | Hold **REC** | On a generator track: prints its last bars into STEP. On STEP EVOLVE: keeps the changes. On a STEP track: captures what you just played. |
 | Hold **EDIT**, press **OCT-** / **OCT+** | Undo / redo. |
@@ -548,9 +548,9 @@ attenuverter beside a knob on a modular.
 
 ## Help card
 
-Hold **ARP** and turn any knob: a card with its parameter, its value and what it does. The value does not change.
-Turn the **same knob** further to make the text larger (while it still fits); a long text scrolls instead. Turn back
-to go smaller or scroll up. Let go of ARP to close it.
+Hold **ARP** and turn any knob: a card with its parameter, its value and what it does, on every page (on a page's own
+knobs, such as NOTES, SONG or PATTERNS, what that knob does there). The value does not change. Turn the **same knob**
+further to scroll a long text, back to scroll up. Let go of ARP to close it.
 
 <p align="center"><img src="assets/gallery/help.png" alt="Help card" width="240"></p>
 
