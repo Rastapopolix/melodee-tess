@@ -1395,36 +1395,41 @@ static int test_help_gesture(void)
                  help.on && help.pid == PID_TESS(TX_EV_AMOUNT) && tessera_param_get(0, TX_EV_AMOUNT) == was);
     turn(EN_K1, 1);
     bad += check("...another knob while held: its help instead (LOCK)", help.on && help.pid == PID_TESS(TX_EV_LOCK));
-    {   /* LOCK opens at the largest size all of it fits (12 px: at 15 px it would scroll); it fits: turning on or back
-         * changes nothing, and draws nothing again */
-        uint32_t big = help_count(HELP_ZOOMS - 1u) <= help_rows(HELP_ZOOMS - 1u) ? HELP_ZOOMS - 1u : 0u;
-        int ok = help.zoom == big && !help.top && help_count(help.zoom) <= help_rows(help.zoom);
-        help.card = 0; ui.force = 0;
-        help_knob(0, 1);
-        ok &= help.zoom == big && !help.top && !help.card && !ui.force;
-        help_knob(0, -1);
-        if (big) {                                      /* (a text that fit at 15 px: back to 12, the card alone redrawn) */
-            ok &= help.zoom == 0u && help.card && !ui.force;
+    {   /* one size, 15 px (Theo 2026-10-23): no larger / smaller any more. On EVOLVE, a text that fits the card: turning
+         * on or back changes nothing and draws nothing again; one longer than the card scrolls (the card alone) */
+        uint32_t k, fits = 0, longer = 0;
+        int ok = 1;
+        for (k = 0; k < 4u; k++) {
+            help.on = 0;                                /* (the knob's first turn: its card, at the top) */
+            turn(EN_K1 + k, 1);
+            ok &= help.on && help.knob == k && !help.top;
+            help.card = 0; ui.force = 0;
+            help_knob(k, 1);
+            if (help_count() <= HELP_ROWS) fits++, ok &= !help.top && !help.card && !ui.force;
+            else longer++, ok &= help.top == 1u && help.card && !ui.force;
             frame();
+            help.card = 0; ui.force = 0;
+            help_knob(k, -1);
+            help_knob(k, -1);
+            ok &= !help.top && !ui.force;
         }
-        help.card = 0; ui.force = 0;
-        help_knob(0, -1);
-        bad += check("..LOCK's help opens at the largest size it fits (12 px or 15 px, no longer 10), then turning changes "
-                     "nothing", ok && help.zoom == 0u && !help.card && !ui.force);
+        bad += check("..EVOLVE's help cards in the one size (15 px): one that fits stays, one longer scrolls, back to its top",
+                     ok && fits && longer);
+        help_find(0);
     }
     fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
     frame();
     frame();
     bad += check("ARP let go: the help closes, and no page opens (still EVOLVE)", !help.on && str_eq(cur_page()->title, "EVOLVE"));
-    {   /* GEN's MODE: longer than the card even at the smallest, so turning on scrolls it, to its end; back to the top */
+    {   /* GEN's MODE: longer than the card, so turning on scrolls it, to its end; back to the top */
         uint32_t k, n, most = 0;
         int ok;
         go_title("GEN");
         fm1_in.buttons |= 1u << panel.btn[B_ARP];
         frame();
         turn(EN_K1, 1);
-        n = help_count(0);
-        ok = help.on && help.pid == PID_TESS(TX_MODE) && help.zoom == 0u && n > help_rows(0);
+        n = help_count();
+        ok = help.on && help.pid == PID_TESS(TX_MODE) && n > HELP_ROWS;
         frame();
         help.card = 0; ui.force = 0;
         help_knob(0, 1);                                /* (a scroll: the card alone, not the page under it) */
@@ -1436,10 +1441,10 @@ static int test_help_gesture(void)
             help_knob(0, 1);
             most = help.top > most ? help.top : most;
         }
-        ok &= help.zoom == 0u && most == n - help_rows(0) && help.top == most;
+        ok &= most == n - HELP_ROWS && help.top == most;
         for (k = 0; k < 40u; k++) help_knob(0, -1);
-        bad += check("GEN's MODE help, longer than the card: turning on scrolls to its last line, back to its first",
-                     ok && !help.top && !help.zoom);
+        bad += check("GEN's MODE help, longer than the card at 15 px: turning on scrolls to its last line, back to its first",
+                     ok && !help.top);
         fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
         frame();
         frame();
