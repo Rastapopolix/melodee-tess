@@ -201,8 +201,18 @@ static void cover(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
         int touch = b->x0 < x1 && x0 < b->x1 && b->y0 < y1 && y0 < b->y1;
         if (in) continue;
         if (touch && !(b->flags & 48u)) finding("hidden in part by a later draw", b, 0);
-        if (touch && (b->flags & 48u)) scr[k++] = *b;   /* split across bands / scrolled: drawn on purpose */
-        else scr[k++] = *b;
+        scr[k] = *b;
+        if (touch && (b->flags & 48u) && x0 <= b->x0 && b->x1 <= x1) {   /* split across bands / scrolled / dimmed
+                                                         * under a popup: drawn on purpose; what is left of it (a sheet
+                                                         * drawn in slices covers it in turn) */
+            if (y0 <= b->y0) scr[k].y0 = (int16_t)y1;
+            else if (b->y1 <= y1) scr[k].y1 = (int16_t)y0;
+        } else if (touch && (b->flags & 16u) && y0 <= b->y0 && b->y1 <= y1) {   /* dimmed under a card narrower
+                                                         * than it: what sticks out at its side */
+            if (x0 <= b->x0) scr[k].x0 = (int16_t)x1;
+            else if (b->x1 <= x1) scr[k].x1 = (int16_t)x0;
+        }
+        k++;
     }
     nscr = k;
 }
@@ -373,10 +383,13 @@ static void state(void)                          /* a playing song with steps on
 {
     uint32_t i;
     ui_power_on();
+    help.on = 0;                                    /* (the help scene's card) */
+    msc.on = 0;                                     /* (the mod shortcut scene's map) */
+    msc.slot = -1;
     settings_boot = 0;
     memset(&tmpl, 0, sizeof tmpl);
 #if MELODEE_USB_AUDIO
-    ua_off_want = 0;
+    ua_off_want = 0; ua_tracks = ua_tracks_want = 0;
 #endif
     song.playing = 1;
     song.g[G_BPM] = 124;
@@ -416,56 +429,57 @@ static void drum(uint32_t kit)
     trk[3].p[P_SLEN] = 32;
 }
 static void eng(uint32_t e) { set_engine_of(TSEL, e); }
-/* the FM engine of the FM screens: DIGITAL with MELODEE_FM4, else FM6 (DIGITAL retired: its own screens, the OP ENV /
- * OP LEVEL pages and the algorithm charts, exist only there: fm4_screen) */
-#define E_FM (MELODEE_FM4 ? ENGI_DIGITAL : ENGI_FM6)
+/* the FM engine of the FM screens: FM6 (DIGITAL's own screens, the OP ENV / OP LEVEL pages and the algorithm charts,
+ * went with it: skipped) */
+#define E_FM ENGI_FM6
 
 enum { S_HOME, S_HOME_IDLE, S_HOME_NOTE, S_HOME_CHORD, S_HOME_INVERSION, S_HOME_WIDE, S_HOME_RELEASED, S_HOME_FM6, S_MESSAGE, S_MESSAGE_KEY, S_PRESETS, S_PRESETS_NOFAV, S_PRESETS_CAT, S_PRESETS_PENDING, S_PRESETS_RECENT, S_USER, S_PROJECT, S_PROJECT_BOOT, S_TEMPO,
        S_SONG_EMPTY, S_SONG, S_STEP, S_PATTERN, S_MOTION, S_DRUM, S_MIXER, S_MIXER_PAN,
-       S_ENV, S_ENVDEST, S_LFO, S_MOD, S_FX, S_SLICER, S_DLY, S_SCL, S_CHORD, S_CHORD_WIDE, S_CHORD_OFF, S_CHORD_KIT, S_ARP, S_VOICE, S_GLOBAL, S_SYSTEM,
-       S_EDIT_ANALOG, S_EDIT_DIGITAL, S_OP_ENV, S_EDIT_WHEEL, S_EDIT_PHYS,
+       S_ENV, S_ENVDEST, S_LFO, S_MOD, S_SCL, S_CHORD, S_CHORD_WIDE, S_CHORD_OFF, S_CHORD_KIT, S_ARP, S_VOICE, S_GLOBAL, S_SYSTEM,
+       S_EDIT_SID, S_EDIT_DIGITAL, S_OP_ENV, S_EDIT_WHEEL, S_EDIT_PHYS,
        S_ALG1, S_ALG2, S_ALG3, S_ALG4, S_ALG5, S_ALG6, S_ALG7, S_ALG8, S_OP_LEVEL,
-       S_FM6_ALG1, S_FM6_ALG5, S_FM6_ALG22, S_FM6_ALG32, S_FM6_FREQ, S_FM6_EG, S_FM6_PEG, S_FM6_STORE, S_CZ1_ENV,
+       S_FM6_ALG1, S_FM6_ALG5, S_FM6_ALG22, S_FM6_ALG32, S_FM6_FREQ, S_FM6_EG, S_FM6_PEG, S_FM6_STORE,
        S_CONFIRM_SEQ, S_CONFIRM_PROJ, S_CONFIRM_USER, S_CONFIRM_MOTION, S_CONFIRM_ERASE,
-       S_MENU, S_MENU_SPEAKER, S_ABOUT, S_ABOUT_REC, S_ABOUT_CREDITS, S_ABOUT_END, S_UBOOT, S_CALIBRATION,
+       S_MENU, S_ABOUT, S_ABOUT_REC, S_ABOUT_CREDITS, S_ABOUT_END, S_UBOOT, S_CALIBRATION,
        S_BATT0, S_BATT1, S_BATT2, S_BATT3, S_BATT_USB, S_MOTION_REC, S_MOTION_OFF, S_SONG_HOME,
-       S_FX_PEEK, S_FX_HELD, S_FX_WAIT, S_FX_HARM, S_MENU_HOLD, S_MENU_USB, S_REVERB,
-       S_GLO_PEEK, S_GLO_ACTIVE, S_GLO_EXT, S_SCL_PEEK, S_SCL_ACTIVE, S_EDIT_PEEK, S_EDIT_ACTIVE, S_EDIT_USER, S_LAYER_HINT,
+       S_MENU_HOLD, S_MENU_USB, S_MENU_USB_STEREO, S_MENU_USB_TRACKS, S_GLO_PEEK, S_GLO_ACTIVE, S_GLO_EXT, S_SCL_PEEK, S_SCL_ACTIVE, S_LAYER_HINT,
        S_NAME_USER, S_NAME_TYPING, S_NAME_123, S_NAME_EMPTY, S_NAME_FULL, S_NAME_PLAYING, S_PROJECT_NAMED, S_SONG_NAMED,
        S_USER_FOOT,
 #if MELODEE_SLICE && SMP_USER_SLOTS
        S_SLICES_BREAK, S_SLICES_USR,
 #endif
        S_ROLL_EMPTY, S_ROLL_ACID, S_ROLL_CHORDS, S_ROLL_TIES, S_ROLL_LEN32, S_ROLL_HIGH, S_ROLL_LOW, S_ROLL_WIDE, S_ROLL_PLAYING,
-       S_MOCK_HOME, S_MOCK_PRESETS, S_MOCK_SEQ, S_MOCK_DRUM, S_MOCK_MIXER, S_MOCK_DIALOG, S_MOCK_MENU, S_NATIVE_FM_USER, S_NATIVE_CZ_USER,
-       S_NOTES_SLIDE, S_NOTES_MIXED, S_NOTES_CHORD, S_NOTES_EMPTY, S_NOTES_RAW, S_NOTES_ZOOM, S_NOTES_LOOP, S_NOTES_DRUM, S_NOTES_DENSE, S_NOTES_REC, S_NOTES_ERASE, S_NOTES_DRUM_REC, S_NOTES_DRUM_ERASE, S_SCL_MICRO, S_SCL_MICRO_LAYER, S_SCL_MICRO_CHORD, S_SCALE_PICKER_EDO, S_SCALE_PICKER_HIST, S_SCALE_PICKER_FAV, S_SCALE_PICKER_EMPTY, S_SCALE_SETTINGS_FAV, S_MENU_CLICK, S_MENU_CLICK_LEVEL, S_MENU_COUNTIN, S_MENU_PREVIEW, S_MENU_ADD, S_DRUM_SOUND_808, S_DRUM_SOUND_909, S_DRUM_MIX_909, S_DRUM_HIT_909, S_DRUM_HIT_FREE, S_DRUM_HIT_LONG,
-       S_STAGE_DRUM, S_STAGE_CZ, S_STAGE_P5, S_STAGE_QUEUED, S_STAGE_BROWSE, S_STAGE_STOPPED, S_STAGE_FILTER, S_STAGE_ENV, S_PATGRID, S_PATGRID_STOPPED, S_PATGRID_SHEET, S_PATGRID_COPY, S_PATGRID_REPLACE, S_PATGRID_DELETE, S_PROJECT_NEW, S_NEW_KEY, S_NEW_ROLES,
+       S_MOCK_HOME, S_MOCK_PRESETS, S_MOCK_SEQ, S_MOCK_DRUM, S_MOCK_MIXER, S_MOCK_DIALOG, S_MOCK_MENU, S_NATIVE_FM_USER,
+       S_NOTES_SLIDE, S_NOTES_MIXED, S_NOTES_CHORD, S_NOTES_EMPTY, S_NOTES_RAW, S_NOTES_ZOOM, S_NOTES_LOOP, S_NOTES_DRUM, S_NOTES_DENSE, S_NOTES_REC, S_NOTES_ERASE, S_NOTES_DRUM_REC, S_NOTES_DRUM_ERASE, S_SCL_MICRO, S_SCL_MICRO_LAYER, S_SCL_MICRO_CHORD, S_SCALE_PICKER_EDO, S_SCALE_PICKER_HIST, S_SCALE_PICKER_FAV, S_SCALE_PICKER_EMPTY, S_SCALE_SETTINGS_FAV, S_MENU_CLICK, S_MENU_CLICK_LEVEL, S_MENU_COUNTIN, S_MENU_PREVIEW, S_MENU_ADD, S_MENU_AUTOSAVE_ON, S_MENU_AUTOSAVE_OFF, S_DRUM_SOUND_808, S_DRUM_SOUND_909, S_DRUM_MIX_909, S_DRUM_HIT_909, S_DRUM_HIT_FREE, S_DRUM_HIT_LONG,
+       S_STAGE_DRUM, S_STAGE_TRIO, S_STAGE_QUEUED, S_STAGE_BROWSE, S_STAGE_STOPPED, S_STAGE_FILTER, S_PATGRID, S_PATGRID_STOPPED, S_PATGRID_SHEET, S_PATGRID_COPY, S_PATGRID_REPLACE, S_PATGRID_DELETE, S_PROJECT_NEW, S_NEW_KEY, S_NEW_ROLES,
        S_REF_STAGE_HELD, S_REF_STAGE_RELEASED, S_REF_STAGE_CUTOFF, S_REF_STAGE_DRUM, S_REF_BROWSER, S_REF_PATTERNS, S_REF_SONG,
-       S_REF_ENV, S_REF_LFO, S_REF_EDIT_OSC, S_REF_FX, S_REF_DLY, S_REF_MIXER, S_REF_NOTES, S_REF_SETTINGS, S_REF_DIALOG,
-       S_REF_SHEET_SOUND, S_REF_SHEET_SONG, S_REF_PICKER_WAVE, S_REF_SECTIONS_P5, S_REF_MAP_P5, S_REF_MAP_FM6,
+       S_REF_ENV, S_REF_LFO, S_REF_EDIT_OSC, S_REF_MIXER, S_REF_NOTES, S_REF_SETTINGS, S_REF_DIALOG,
+       S_REF_SHEET_SOUND, S_REF_SHEET_SONG, S_REF_PICKER_WAVE, S_REF_PICKER_MODE, S_REF_SECTIONS_P5, S_REF_MAP_P5, S_REF_MAP_FM6,
        S_REF_SCL_LIST, S_REF_SHEET_PROJECT, S_REF_SHEET_NOTE, S_REF_SHEET_HIT, S_REF_MOTION,
        S_REF_SHEET_MOTION, S_REF_MOD, S_REF_PICKER_MOD, S_REF_ARP, S_REF_PATTERN,
-       S_REF_SLICER, S_REF_FMEG, S_REF_GRID, S_REF_SCALES, S_COUNT };
+       S_REF_FMEG, S_REF_GRID, S_REF_SCALES, S_FX_PHASER, S_FX_WIDTH, S_FX_FORMANT, S_FX_TAPE, S_FX_SPIT, S_FX_ECHO, S_FX_ROOM, S_FX_REVERB, S_FX_CHORUS, S_FX_FULL, S_FX_SLOT2, S_FX_SLOT3, S_FX_SEND, S_FX_SEPARATE, S_FX_SENDS, S_FX_BUS1, S_FX_BUS2, S_FX_BUS3,
+       S_GEN_TURING, S_GEN_EUCLID, S_GEN_MARKOV, S_GEN_MORPH, S_GEN_EVOLVE, S_CORDS, S_HELP, S_CORDS_PICK_SRC, S_CORDS_PICK_DST,
+       S_GEN_GRIDS, S_GEN_TWEAK, S_GEN_TWEAK_OFF, S_MOD_SHORTCUT, S_GEN_BOUNCE, S_GEN_AWAKE, S_GEN_POLY, S_GEN_TWEAK2, S_GEN_TWEAK2_OFF, S_ORGANIC, S_GEN_TWEAK2_COIN, S_MODS_LIVE, S_MODS_LIVE_GEN, S_MATRIX, S_GEN_QUAD, S_GEN_LENGTH, S_GEN_FALL, S_GEN_CONSTEL, S_GEN_LENGTH_HIT, S_GEN_LENGTH_KEYS, S_GEN_LENGTH_STEP, S_GEN_PATTERN_CONSTEL, S_GEN_SERIES, S_GEN_CHORD, S_GEN_CHORD_OCT, S_GEN_GRIDS_OCT, S_GEN_CHORD_USER, S_GEN_STEP_EVOLVE, S_HELP_GEN, S_GEN_TIMING, S_GEN_TIMING_X1, S_GEN_ENERGY, S_GEN_ANSWER, S_GEN_ANSWER_OCT, S_GEN_SEED_OCT, S_COUNT };
 static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "home_note", "home_chord", "home_inversion", "home_wide", "home_released", "home_fm6", "message", "message_key", "presets", "presets_nofav", "presets_cat", "presets_pending", "presets_recent", "user",
     "project", "project_boot", "tempo", "song_empty", "song", "step", "pattern", "motion", "drum",
-    "mixer", "mixer_pan", "env", "env_dest", "lfo", "mod", "fx", "slicer", "dly", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
-    "voice", "global", "system", "edit_analog", MELODEE_FM4 ? "edit_digital" : "edit_fm6", "op_env", "edit_wheel",
-    "edit_phys", "alg_1", "alg_2", "alg_3", "alg_4", "alg_5", "alg_6", "alg_7", "alg_8", "op_level", "fm6_alg_01", "fm6_alg_05", "fm6_alg_22", "fm6_alg_32", "fm6_freq", "fm6_eg", "fm6_peg", "fm6_store", "cz1_env", "confirm_seq", "confirm_project", "confirm_user",
-    "confirm_motion", "confirm_erase", "menu", "menu_speaker", "about", "about_rec", "about_credits", "about_end", "uboot", "calibration",
+    "mixer", "mixer_pan", "env", "env_dest", "lfo", "mod", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
+    "voice", "global", "system", "edit_sid", "edit_fm6", "op_env", "edit_wheel",
+    "edit_phys", "alg_1", "alg_2", "alg_3", "alg_4", "alg_5", "alg_6", "alg_7", "alg_8", "op_level", "fm6_alg_01", "fm6_alg_05", "fm6_alg_22", "fm6_alg_32", "fm6_freq", "fm6_eg", "fm6_peg", "fm6_store", "confirm_seq", "confirm_project", "confirm_user",
+    "confirm_motion", "confirm_erase", "menu", "about", "about_rec", "about_credits", "about_end", "uboot", "calibration",
     "batt_0", "batt_1", "batt_2", "batt_3", "batt_usb", "motion_rec", "motion_off", "song_home",
-    "perform_peek", "perform_held", "perform_wait", "perform_harm", "menu_hold", "menu_usb", "reverb_spring",
-    "layer_glo_peek", "layer_glo_active", "layer_glo_ext", "layer_scl_peek", "layer_scl_active", "layer_edit_peek",
-    "layer_edit_active", "layer_edit_user", "layer_hint",
+    "menu_hold", "menu_usb", "menu_usb_stereo", "menu_usb_tracks",
+    "layer_glo_peek", "layer_glo_active", "layer_glo_ext", "layer_scl_peek", "layer_scl_active", "layer_hint",
     "name_user", "name_typing", "name_123", "name_empty", "name_full", "name_playing", "project_named", "song_named",
     "user_foot",
 #if MELODEE_SLICE && SMP_USER_SLOTS
     "slices_break", "slices_usr",
 #endif
     "roll_empty", "roll_acid", "roll_chords", "roll_ties", "roll_len32_p2", "roll_high", "roll_low", "roll_wide", "roll_playing",
-    "mock_home", "mock_presets", "mock_seq", "mock_drum", "mock_mixer", "mock_dialog", "mock_menu", "native_fm_user", "native_cz_user",
-    "notes_slide", "notes_mixed", "notes_chord", "notes_empty", "notes_raw", "notes_zoom", "notes_loop", "notes_drum", "notes_dense", "notes_rec", "notes_erase", "notes_drum_rec", "notes_drum_erase", "scl_micro", "scl_micro_layer", "scl_micro_chord", "scale_picker_edo", "scale_picker_historical", "scale_picker_favorites", "scale_picker_empty", "scale_settings_favorite", "menu_click", "menu_click_level", "menu_countin", "menu_preview", "menu_add", "drum_sound_808", "drum_sound_909", "drum_mix_909", "drum_hit_909", "drum_hit_free", "drum_hit_long",
-    "stage_drum", "stage_cz", "stage_p5", "stage_queued", "stage_browse", "stage_stopped", "stage_filter", "stage_env", "patterns", "patterns_stopped", "patterns_sheet", "patterns_copy", "patterns_replace", "patterns_delete", "project_new", "new_key", "new_roles",
-    "ref_stage_held", "ref_stage_released", "ref_stage_cutoff", "ref_stage_drum", "ref_browser", "ref_patterns", "ref_song", "ref_env", "ref_lfo", "ref_edit_osc", "ref_fx", "ref_dly", "ref_mixer", "ref_notes", "ref_settings", "ref_dialog", "ref_sheet_sound", "ref_sheet_song", "ref_picker_wave", "ref_sections_p5", "ref_map_p5", "ref_map_fm6", "ref_scl_list", "ref_sheet_project", "ref_sheet_note", "ref_sheet_hit", "ref_motion", "ref_sheet_motion", "ref_mod", "ref_picker_mod", "ref_arp", "ref_pattern", "ref_slicer", "ref_fmeg", "ref_grid", "ref_scales"};
+    "mock_home", "mock_presets", "mock_seq", "mock_drum", "mock_mixer", "mock_dialog", "mock_menu", "native_fm_user",
+    "notes_slide", "notes_mixed", "notes_chord", "notes_empty", "notes_raw", "notes_zoom", "notes_loop", "notes_drum", "notes_dense", "notes_rec", "notes_erase", "notes_drum_rec", "notes_drum_erase", "scl_micro", "scl_micro_layer", "scl_micro_chord", "scale_picker_edo", "scale_picker_historical", "scale_picker_favorites", "scale_picker_empty", "scale_settings_favorite", "menu_click", "menu_click_level", "menu_countin", "menu_preview", "menu_add", "menu_autosave_on", "menu_autosave_off", "drum_sound_808", "drum_sound_909", "drum_mix_909", "drum_hit_909", "drum_hit_free", "drum_hit_long",
+    "stage_drum", "stage_trio", "stage_queued", "stage_browse", "stage_stopped", "stage_filter", "patterns", "patterns_stopped", "patterns_sheet", "patterns_copy", "patterns_replace", "patterns_delete", "project_new", "new_key", "new_roles",
+    "ref_stage_held", "ref_stage_released", "ref_stage_cutoff", "ref_stage_drum", "ref_browser", "ref_patterns", "ref_song", "ref_env", "ref_lfo", "ref_edit_osc", "ref_mixer", "ref_notes", "ref_settings", "ref_dialog", "ref_sheet_sound", "ref_sheet_song", "ref_picker_wave", "ref_picker_mode", "ref_sections_p5", "ref_map_p5", "ref_map_fm6", "ref_scl_list", "ref_sheet_project", "ref_sheet_note", "ref_sheet_hit", "ref_motion", "ref_sheet_motion", "ref_mod", "ref_picker_mod", "ref_arp", "ref_pattern", "ref_fmeg", "ref_grid", "ref_scales", "fx_phaser", "fx_width", "fx_formant", "fx_tape", "fx_spit", "fx_echo", "fx_room", "fx_reverb", "fx_chorus", "fx_full", "fx_slot2", "fx_slot3", "fx_send", "fx_separate", "fx_sends", "fx_bus1", "fx_bus2", "fx_bus3",
+    "gen_turing", "gen_euclid", "gen_markov", "gen_morph", "gen_evolve", "cords", "help", "cords_pick_src", "cords_pick_dst", "gen_grids", "gen_tweak", "gen_tweak_off", "mod_shortcut", "gen_bounce", "gen_awake", "gen_poly", "gen_tweak2", "gen_tweak2_off", "organic", "gen_tweak2_coin", "mods_live", "mods_live_gen", "matrix", "gen_quad", "gen_length", "gen_fall", "gen_constel", "gen_length_hit", "gen_length_keys", "gen_length_step", "gen_pattern_constel", "gen_series", "gen_chord", "gen_chord_oct", "gen_grids_oct", "gen_chord_user", "gen_step_evolve", "help_gen", "gen_timing", "gen_timing_x1", "gen_energy", "gen_answer", "gen_answer_oct", "gen_seed_oct"};
 
 /* the scenes of the UI design screens: the state the UI-redesign
  * prototype drew them from (its setup(): two pattern tracks, the drum pattern on track 4, a synthetic scope),
@@ -509,7 +523,7 @@ static void mock_state(int s)
         go_page(GR_TRK);
         trk[0].p[P_LEVEL] = 100; trk[1].p[P_LEVEL] = 84; trk[2].p[P_LEVEL] = 64; trk[3].p[P_LEVEL] = 110;
         trk[0].p[P_PAN] = -20; trk[1].p[P_PAN] = 24; trk[2].p[P_PAN] = 0; trk[3].p[P_PAN] = -4;
-        trk[0].p[P_REV] = 30; trk[1].p[P_REV] = 80; trk[2].p[P_REV] = 10; trk[3].p[P_REV] = 0;
+        trk[0].p[P_RESERVED36] = 30; trk[1].p[P_RESERVED36] = 80; trk[2].p[P_RESERVED36] = 10; trk[3].p[P_RESERVED36] = 0;
         trk[2].p[P_MUTE] = 1;
         song.rec = 2u;
         trk[0].peak = 11000; trk[1].peak = 3300; trk[3].peak = 20000;     /* (the mock's stand-in meters) */
@@ -610,13 +624,14 @@ static void roll_scene(int s)
 }
 
 /* the redesign's reference scenes (docs/design/ref, tools/ui_mockcmp.py): the mockups' state with the device's own
- * sounds: 1 909 KIT, 2 Pickle Pincher (PROPHET, selected), 3 a CZ-1 ELEC.PIANO, 4 FM6 BRASS SECT; patterns P1 P2 P1 P4;
+ * sounds: 1 909 KIT, 2 TRIO WARM PAD (selected), 3 FM6 TINE EP, 4 FM6 BRASS SECT (the mockups' Prophet and CZ-1, retired
+ * 2026-10-22: TRIO and FM6 in their places); patterns P1 P2 P1 P4;
  * playing at 124 BPM, step 6 */
 static uint32_t preset_named(uint32_t e, const char *n)
 {
     uint32_t k;
     for (k = 0; k < ENGINES[e]->npresets; k++)
-        if (!strcmp(ENGINES[e]->presets[k].name, n)) return k;
+        if (!strcmp(eng_preset(ENGINES[e], k)->name, n)) return k;
     return 0;
 }
 /* Stage's knobs out (a knob just turned), dropped in all the way */
@@ -642,8 +657,8 @@ static void ref_scene(int s)
     uint32_t k;
     song.playing = 0;
     set_engine_of(&trk[0], ENGI_DRUM); apply_preset_to(&trk[0], preset_named(ENGI_DRUM, "909 KIT"));
-    set_engine_of(&trk[1], ENGI_PROPHET); apply_preset_to(&trk[1], 33);           /* Pickle Pincher */
-    set_engine_of(&trk[2], ENGI_CZ); apply_preset_to(&trk[2], preset_named(ENGI_CZ, "ELEC.PIANO"));
+    set_engine_of(&trk[1], 6); apply_preset_to(&trk[1], preset_named(6, "WARM PAD"));
+    set_engine_of(&trk[2], ENGI_FM6); apply_preset_to(&trk[2], preset_named(ENGI_FM6, "TINE EP"));
     set_engine_of(&trk[3], ENGI_FM6); apply_preset_to(&trk[3], preset_named(ENGI_FM6, "BRASS SECT"));
     for (k = 0; k < NTRK; k++) {
         trk[k].engine = trk[k].eng_req;
@@ -652,8 +667,6 @@ static void ref_scene(int s)
         trk[k].seq_idx = 5;
         trk[k].peak = 9000 + 3000 * (int32_t)k;
     }
-    p5_patch_of(&trk[1])->raw[P5_CUTOFF] = 79; p5_patch_of(&trk[1])->raw[P5_RESONANCE] = 38;
-    p5_patch_of(&trk[1])->raw[P5_ENV_FILTER] = 105; p5_patch_of(&trk[1])->raw[P5_RELEASE_AMP] = 40;
     song.playing = 1; song.g[G_BPM] = 124; song.sel = 1; trk[1].pattern_next = 2;   /* (P3 waiting for the bar) */
     song.batt_raw = 600; usb.config = 0;               /* (the mockups show no battery) */
     for (k = 0; k < SCOPE_N; k++) {                     /* the mockups' waveform: three partials (let go: quieter) */
@@ -722,13 +735,12 @@ static void ref_scene(int s)
         song.playing = 1; chain.running = 1; chain.row = 1; chain.remaining = 1; trk[0].seq_idx = 4;
         break;
     }
-    case S_REF_ENV: case S_REF_LFO: case S_REF_EDIT_OSC: case S_REF_FX: case S_REF_DLY: case S_REF_NOTES:
-        /* (R5) track 2: ANALOG ACID; ENV: SUSTAIN just turned, LFO: RATE, DLY: FEEDBACK */
-        set_engine_of(&trk[1], 0); apply_preset_to(&trk[1], preset_named(0, "ACID")); trk[1].engine = 0;
+    case S_REF_ENV: case S_REF_LFO: case S_REF_EDIT_OSC: case S_REF_NOTES:
+        /* (R5) track 2: SID SAW BASS (ANALOG ACID until 2.0); ENV: SUSTAIN just turned, LFO: RATE, DLY: FEEDBACK */
+        set_engine_of(&trk[1], 3); apply_preset_to(&trk[1], preset_named(3, "SAW BASS")); trk[1].engine = 3;
         song.playing = 0; trk[1].pattern_next = 0xFF; trk[1].p[P_LD_FLT] = 30;
-        if (s == S_REF_EDIT_OSC) { trk[1].p[P_E1] = 0; trk[1].p[P_E2] = 0; trk[1].p[P_E3] = 0; ui.home = 0; ui.page = (uint8_t)page_first(FAM_EDIT); page_entered(); }
-        else if (s != S_REF_NOTES) go_title(s == S_REF_ENV ? "ENV" : s == S_REF_LFO ? "LFO" : s == S_REF_FX ? "FX" : "DLY");
-        if (s == S_REF_DLY) { song.g[G_DTIME] = 1; song.g[G_DFDBK] = 47; song.g[G_DCOLOR] = 51; song.g[G_DMIX] = 85; }
+        if (s == S_REF_EDIT_OSC) { ui.home = 0; ui.page = (uint8_t)page_first(FAM_EDIT); page_entered(); }
+        else if (s != S_REF_NOTES) go_title(s == S_REF_ENV ? "ENV" : s == S_REF_LFO ? "LFO" : "ENV");
         if (s == S_REF_NOTES) {                      /* (the step at the cursor its note, PITCH just turned; playing) */
             static const uint8_t N[8][3] = {{0, 51, 2}, {2, 51, 1}, {3, 54, 1}, {4, 56, 3}, {8, 51, 2}, {10, 54, 1},
                                             {12, 56, 2}, {14, 58, 2}};   /* the mock's: step, note, length */
@@ -742,10 +754,12 @@ static void ref_scene(int s)
             go_title("NOTES"); cursor_set(7); song.playing = 1; trk[1].seq_idx = 5;
             ui.hot_col = 1; ui.hot_t = 30;
         }
-        if (s != S_REF_EDIT_OSC && s != S_REF_FX && s != S_REF_NOTES) { ui.hot_col = s == S_REF_ENV ? 2 : s == S_REF_LFO ? 0 : 1; ui.hot_t = 30; }
+        if (s != S_REF_EDIT_OSC && s != S_REF_NOTES) { ui.hot_col = s == S_REF_ENV ? 2 : s == S_REF_LFO ? 0 : 1; ui.hot_t = 30; }
         break;
-    case S_REF_SECTIONS_P5: case S_REF_MAP_P5:       /* (R7) Prophet's FILTER (CUTOFF just turned), its map */
-        song.playing = 0; go_title("P5 FILTER");
+    case S_REF_SECTIONS_P5: case S_REF_MAP_P5:       /* (R7) the mockups' Prophet FILTER (retired: SID's FILTER in its
+                                                      * place, its first knob just turned), its map */
+        set_engine_of(&trk[1], 3); trk[1].engine = 3; song.playing = 0;
+        ui.home = 0; ui.page = (uint8_t)(page_first(FAM_EDIT) + 1u); page_entered();   /* (its second EDIT page) */
         if (s == S_REF_MAP_P5) smap_open();
         else { ui.hot_col = 0; ui.hot_t = 30; }
         break;
@@ -785,35 +799,35 @@ static void ref_scene(int s)
     }
     case S_REF_MOTION: case S_REF_SHEET_MOTION: {    /* (R6) MOTION: ACID's CUTOFF RESO DRIVE moved; the playhead at 5 */
         static const uint8_t CUT[16] = {60, 60, 70, 70, 80, 80, 90, 95, 95, 90, 85, 80, 85, 90, 80, 70};
-        static const uint8_t RES[16] = {30, 30, 30, 40, 40, 50, 50, 40, 40, 40, 30, 30, 40, 40, 30, 30};
+        static const uint8_t RES[16] = {7, 7, 7, 10, 10, 12, 12, 10, 10, 10, 7, 7, 10, 10, 7, 7};   /* (SID's RES: 0..15) */
         static const uint8_t DRV[16] = {10, 10, 20, 20, 30, 40, 40, 30, 40, 50, 50, 40, 30, 30, 20, 20};
         uint32_t i;
-        set_engine_of(&trk[1], 0); apply_preset_to(&trk[1], preset_named(0, "ACID")); trk[1].engine = 0;
+        set_engine_of(&trk[1], 3); apply_preset_to(&trk[1], preset_named(3, "SAW BASS")); trk[1].engine = 3;
         song.playing = 0; trk[1].pattern_next = 0xFF; trk[1].p[P_SLEN] = 16;
         motion_clear(&trk[1]);
         for (i = 0; i < 16u; i++) {
             motion_set_event(&trk[1], i, P_E0 + 4u, CUT[i]);
             motion_set_event(&trk[1], i, P_E0 + 5u, RES[i]);
-            motion_set_event(&trk[1], i, P_E0 + 6u, DRV[i]);
+            motion_set_event(&trk[1], i, P_E0 + 7u, DRV[i]);   /* (SID's DRIVE) */
         }
         go_title("MOTION"); mo.lane = 0;
         if (s == S_REF_SHEET_MOTION) { motion_enter(); pop.sel = 1; }
         else { song.playing = 1; trk[1].seq_idx = 4; }
         break;
     }
-    case S_REF_MOD: case S_REF_PICKER_MOD:           /* (R6) MOD: LFO > Cutoff, Mod wheel > Mix (picked), Velocity > Level */
-        set_engine_of(&trk[1], 0); apply_preset_to(&trk[1], preset_named(0, "ACID")); trk[1].engine = 0;
+    case S_REF_MOD: case S_REF_PICKER_MOD:           /* (R6) MOD: LFO > Cutoff, Mod wheel > PW (picked), Velocity > Level */
+        set_engine_of(&trk[1], 3); apply_preset_to(&trk[1], preset_named(3, "SAW BASS")); trk[1].engine = 3;
         song.playing = 0; trk[1].pattern_next = 0xFF;
         trk[1].p[P_M1SRC] = MS_LFO; trk[1].p[P_M1DST] = MD_CUT; trk[1].p[P_M1AMT] = 40;
-        trk[1].p[P_M2SRC] = MS_MODW; trk[1].p[P_M2DST] = MD_E1 + 2; trk[1].p[P_M2AMT] = -64;
+        trk[1].p[P_M2SRC] = MS_MODW; trk[1].p[P_M2DST] = MD_E1 + 3; trk[1].p[P_M2AMT] = -64;
         trk[1].p[P_M3SRC] = MS_VEL; trk[1].p[P_M3DST] = MD_AMP; trk[1].p[P_M3AMT] = 19;
         mod_ui_slot = 1; go_title("MOD");
         if (s == S_REF_PICKER_MOD) pick_touch(0);
         else { ui.hot_col = 3; ui.hot_t = 30; }
         break;
-    case S_REF_ARP: case S_REF_PATTERN: case S_REF_SLICER: {   /* (R6) ARP Up 2 oct; PATTERN 32 steps; SLICER Gate */
+    case S_REF_ARP: case S_REF_PATTERN: {   /* (R6) ARP Up 2 oct; PATTERN 32 steps; SLICER Gate */
         uint32_t i;
-        set_engine_of(&trk[1], 0); apply_preset_to(&trk[1], preset_named(0, "ACID")); trk[1].engine = 0;
+        set_engine_of(&trk[1], 3); apply_preset_to(&trk[1], preset_named(3, "SAW BASS")); trk[1].engine = 3;
         song.playing = 0; trk[1].pattern_next = 0xFF;
         if (s == S_REF_ARP) {
             trk[1].p[P_AMODE] = 1; trk[1].p[P_AOCT] = 2; go_title("ARP"); ui.hot_col = 0;
@@ -822,8 +836,6 @@ static void ref_scene(int s)
             for (i = 0; i < 32u; i++)
                 if ((0x8A2A4A2Bu >> i) & 1u) { trk[1].step[i].time = ST_NOTE; trk[1].step[i].n = 1; trk[1].step[i].note[0] = 57; }
             song.playing = 1; trk[1].seq_idx = 6; go_title("PATTERN"); ui.hot_col = 0;
-        } else {
-            trk[1].p[P_SLCR] = SL_GATE; trk[1].p[P_SLPAT] = 1; trk[1].p[P_SLDEPTH] = 127; go_title("SLICER"); ui.hot_col = 3;
         }
         ui.hot_t = 30;
         break;
@@ -847,10 +859,12 @@ static void ref_scene(int s)
     case S_REF_SHEET_SONG:                           /* (R6) the song's sheet over SONG */
         ref_scene(S_REF_SONG); page_sheet_open();
         break;
-    case S_REF_PICKER_WAVE:                          /* (R6) ANALOG's WAVE turning: its picker */
-        set_engine_of(&trk[1], 0); apply_preset_to(&trk[1], preset_named(0, "ACID")); trk[1].engine = 0;
+    case S_REF_PICKER_WAVE: case S_REF_PICKER_MODE:  /* (R6) a list knob turning: its picker, over its column and the
+                                                      * next (SID's WAVE on KNOB 2; its filter MODE on KNOB 3) */
+        set_engine_of(&trk[1], 3); apply_preset_to(&trk[1], preset_named(3, "SAW BASS")); trk[1].engine = 3;
         song.playing = 0; trk[1].pattern_next = 0xFF;
-        ui.home = 0; ui.page = (uint8_t)page_first(FAM_EDIT); page_entered(); pick_touch(0);
+        if (s == S_REF_PICKER_WAVE) { ui.home = 0; ui.page = (uint8_t)page_first(FAM_EDIT); page_entered(); pick_touch(1); }
+        else { go_title("EDIT 2"); pick_touch(2); }
         break;
     case S_REF_DIALOG:                               /* (R5) PROJECT: overwrite A? */
         song.playing = 0; go_title("PROJECT"); ui.confirm = CF_OVR_PROJ; ui.confirm_trk = 0;
@@ -860,7 +874,7 @@ static void ref_scene(int s)
         break;
     case S_REF_MIXER: {                              /* (R5) the mock's levels, pans, sends; 3 muted, 1 and 4 armed */
         static const int16_t LV[4] = {91, 70, 44, 112}, PN[4] = {0, -20, 0, 13}, RV[4] = {51, 15, 0, 20};
-        for (k = 0; k < NTRK; k++) { trk[k].p[P_LEVEL] = LV[k]; trk[k].p[P_PAN] = PN[k]; trk[k].p[P_REV] = RV[k]; }
+        for (k = 0; k < NTRK; k++) { trk[k].p[P_LEVEL] = LV[k]; trk[k].p[P_PAN] = PN[k]; trk[k].p[P_RESERVED36] = RV[k]; }
         trk[2].p[P_MUTE] = 1; song.rec = 1u | 8u; song.playing = 0;
         go_title("MIXER");
         break;
@@ -874,6 +888,10 @@ static void setup(int s)
     memset(kb_chn, 0, sizeof kb_chn);               /* no key held (roll_playing holds one) */
     memset(&stage, 0, sizeof stage);                /* (Stage's knobs in) */
     chain.running = 0;                              /* (the song the SONG scene plays) */
+    help.on = 0;
+    msc.on = 0;
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);   /* (OCT+ let go: a layer's scene holds it) */
+    msc.slot = -1;
     if (s >= S_MOCK_HOME && s <= S_MOCK_MENU) {
         mock_state(s);
         return;
@@ -904,13 +922,13 @@ static void setup(int s)
         break;
     }
     case S_MESSAGE: ui_say("LOADED ", "07 A VERY LONG PATTERN NAME"); break;
-    case S_MESSAGE_KEY: ui_message("[SAVE] HOLD TO UNDO"); break;            /* a message with a keycap */
+    case S_MESSAGE_KEY: ui_message("[EDIT] HOLD TO UNDO"); break;            /* a message with a keycap */
     case S_PRESETS: favorite_set(0, 4, 1); favorite_set(0, 5, 1); go_page(GR_BROWSE); break;
     case S_PRESETS_NOFAV: favorites.filter = 1; go_page(GR_BROWSE); break;
-    case S_PRESETS_CAT: list_set(LM_CAT + 5u); eng(ENGI_PROPHET); go_page(GR_BROWSE); break;   /* STRING */
+    case S_PRESETS_CAT: list_set(LM_CAT + 5u); eng(ENGI_FM6); go_page(GR_BROWSE); break;   /* STRING */
     case S_PRESETS_PENDING: {                                               /* a fast turn, still moving */
         uint32_t total;
-        eng(ENGI_CZ); go_page(GR_BROWSE); brw.on = 1; brw.trk = song.sel; brw.mode = (uint8_t)list_mode();
+        eng(ENGI_FM6); go_page(GR_BROWSE); brw.on = 1; brw.trk = song.sel; brw.mode = (uint8_t)list_mode();
         brw.n = (uint16_t)(list_cur(&total) + 9u); brw.t = fm1_ms; break;
     }
     case S_PRESETS_RECENT: list_set(LM_RECENT); go_page(GR_BROWSE); break;
@@ -980,8 +998,7 @@ static void setup(int s)
         break;
     }
     case S_STEP: song.rec = 1; go_page(GR_ROLL); ui.cursor = 6; break;
-    /* Stage: the drum track selected, three lanes just hit; CZ-1's and PROPHET's own knobs (CZ-1's KNOB 3 just
-     * turned); track 2 waiting for pattern 3 (blinking: drawn lit), track 3 muted, track 2 armed; browsing (a sound
+    /* Stage: the drum track selected, three lanes just hit; TRIO's knobs (its KNOB 3 just turned); track 2 waiting for pattern 3 (blinking: drawn lit), track 3 muted, track 2 armed; browsing (a sound
      * shown, not loaded); stopped with notes let go */
     /* NEW SONG: PROJECT with NEW picked (KNOB 3: OCT+); the KEY screen (KNOB 3 TEMPO just turned); ROLES */
     case S_PROJECT_NEW: song.playing = 0; go_page(GR_SLOTS); song.g[G_SLOT] = PROJ_TMPL; ui.proj_new = 1; ui.act = 3; break;
@@ -993,18 +1010,12 @@ static void setup(int s)
         break;
     case S_STAGE_DRUM:
         drum(0); go_home(); trk[3].seq_idx = 9; drum_flash[3] = 1u | 8u | 32u; break;
-    case S_STAGE_CZ:
-        eng(ENGI_CZ); apply_preset(3); go_home(); ui.hot_col = 2; ui.hot_t = 30; stage_out();
+    case S_STAGE_TRIO:
+        eng(6); apply_preset(3); go_home(); ui.hot_col = 2; ui.hot_t = 30; stage_out();
         input_on(TSEL, 48, 100); input_on(TSEL, 55, 100); input_on(TSEL, 64, 100); break;
-    case S_STAGE_P5:
-        eng(ENGI_PROPHET); go_home(); input_on(TSEL, 62, 100); input_on(TSEL, 65, 100); input_on(TSEL, 69, 100);
-        input_on(TSEL, 72, 100); ui.hot_col = 0; ui.hot_t = 30; stage_out(); break;   /* (CUTOFF turning: the filter's curve) */
-    case S_STAGE_FILTER:                                 /* ANALOG's RES turning, a chord held: the curve behind it */
-        go_home(); TSEL->p[P_E5] = 100; ui.hot_col = 1; ui.hot_t = 30; stage_out();
+    case S_STAGE_FILTER:                                 /* SID's RES turning, a chord held: the curve behind it */
+        eng(3); go_home(); TSEL->p[P_E5] = 12; ui.hot_col = 3; ui.hot_t = 30; stage_out();
         input_on(TSEL, 57, 100); input_on(TSEL, 60, 100); input_on(TSEL, 64, 100); break;
-    case S_STAGE_ENV:                                    /* ANALOG's REL turning: the envelope */
-        go_home(); TSEL->p[P_ATK] = 20; TSEL->p[P_DEC] = 50; TSEL->p[P_SUS] = 80; TSEL->p[P_REL] = 90;
-        ui.hot_col = 3; ui.hot_t = 30; stage_out(); break;
     case S_STAGE_QUEUED:
         go_home(); trk[1].pattern_next = 2; trk[2].p[P_MUTE] = 1; song.rec = 2u; fm1_ms = 0; break;
     case S_STAGE_BROWSE:
@@ -1057,24 +1068,393 @@ static void setup(int s)
     case S_MIXER:
         go_page(GR_TRK);
         trk[0].p[P_LEVEL] = 100; trk[1].p[P_LEVEL] = 84; trk[2].p[P_LEVEL] = 64; trk[3].p[P_LEVEL] = 110;
-        trk[0].p[P_PAN] = -20; trk[1].p[P_PAN] = 24; trk[3].p[P_PAN] = -4; trk[1].p[P_REV] = 80;
+        trk[0].p[P_PAN] = -20; trk[1].p[P_PAN] = 24; trk[3].p[P_PAN] = -4; trk[1].p[P_RESERVED36] = 80;
         trk[2].p[P_MUTE] = 1; trk[3].p[P_MUTE] = 1; song.rec = 2u | 8u; trk[0].peak = 9000;
         break;
     case S_MIXER_PAN:                            /* PAN just turned, the ends of each knob, OFF, armed while stopped */
         go_page(GR_TRK); song.playing = 0; song.sel = 1;
         trk[0].p[P_LEVEL] = 127; trk[1].p[P_LEVEL] = 0; trk[2].p[P_LEVEL] = 1; trk[3].p[P_LEVEL] = 104;
         trk[0].p[P_PAN] = -64; trk[1].p[P_PAN] = 63; trk[2].p[P_PAN] = 0; trk[3].p[P_PAN] = 1;
-        trk[0].p[P_REV] = 127; trk[2].p[P_REV] = 1; trk[3].p[P_MUTE] = 1;
+        trk[0].p[P_RESERVED36] = 127; trk[2].p[P_RESERVED36] = 1; trk[3].p[P_MUTE] = 1;
         song.rec = 1u | 8u; ui.hot_col = 3; ui.hot_t = 30;
+        break;
+    case S_FX_PHASER: case S_FX_WIDTH: case S_FX_FORMANT: case S_FX_TAPE: case S_FX_SPIT: case S_FX_ECHO: case S_FX_ROOM: case S_FX_REVERB: case S_FX_CHORUS: case S_FX_FULL:
+        go_title("FX 1");TSEL->p[P_FXTYPE]=(int16_t)(s==S_FX_FULL?FX_ECHO:s-S_FX_PHASER+1);
+        TSEL->p[P_FXMIX]=84;TSEL->p[P_FXRATE]=60;TSEL->p[P_FXCHAR]=72;
+        if(s==S_FX_FULL)fx_state[(song.sel%NPART)*FX_SLOTS].failed=1;
+        break;
+    case S_FX_SEND:
+        go_title("FX SEND");TSEL->p[P_FXSEND]=81;song.g[G_FXRETURN]=100;break;
+    case S_FX_SEPARATE:
+        song.g[G_FXMODE]=1;go_title("FX SEND");TSEL->p[P_FXSEND]=81;song.g[G_FXRETURN]=100;break;
+    case S_FX_SENDS:
+        song.g[G_FXMODE]=1;go_title("FX SENDS");TSEL->p[P_FXSEND]=50;TSEL->p[P_FXSEND2]=71;TSEL->p[P_FXSEND3]=99;break;
+    case S_GEN_QUAD:                                 /* tracks 1, 2 and 4 in QUAD (track 3 STEP: its row dim), track 1
+                                                      * LINKed to 4, playing: each row's cell lit */
+        tessera_reset();
+        song.sel = 1;
+        tessera_knob(0, TESS_ENG_QUAD);
+        tessera_knob(1, 2);                          /* PEND */
+        song.sel = 3;
+        tessera_knob(0, TESS_ENG_QUAD);
+        tessera_knob(1, 4);                          /* HOLD */
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_QUAD);
+        tessera_knob(2, -15);                        /* PROB 70 */
+        tessera_knob(3, 1);
+        tessera_knob(3, 1);
+        tessera_knob(3, 1);                          /* LINK T4 (a click a track) */
+        tessera.quad[0].pos = 2, tessera.quad[1].pos = 1, tessera.quad[3].pos = 0;
+        go_title("GEN");
+        break;
+    case S_GEN_LENGTH: case S_GEN_LENGTH_HIT: case S_GEN_LENGTH_KEYS: case S_GEN_LENGTH_STEP:
+        tessera_reset();                            /* NOTE LENGTH: FIXED 1/4 KEYS 3; HIT; FIXED 1/1 KEYS 2; STEP */
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_EUCLID);
+        tessera_param_set(0, TX_NL_MODE, s == S_GEN_LENGTH_HIT ? NL_HIT : s == S_GEN_LENGTH_STEP ? NL_STEP : NL_FIXED);
+        tessera_param_set(0, TX_NL_LEN, s == S_GEN_LENGTH_KEYS ? 5 : 3);
+        tessera_param_set(0, TX_NL_KEYS, s == S_GEN_LENGTH_KEYS ? 2 : 3);
+        go_title("LENGTH");
+        break;
+    case S_GEN_TIMING: case S_GEN_TIMING_X1:          /* SUB: RATCH x3 at CHANCE 60 (some steps once); x1, CHANCE dim */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_EUCLID);
+        tessera_param_set(0, TX_SUB_RATCH, s == S_GEN_TIMING ? 2 : 0);
+        tessera_param_set(0, TX_SUB_CHANCE, 60);
+        go_title("TIMING");
+        break;
+    case S_GEN_ENERGY:                              /* ENERGY: ARC 60, RESTS 40, stopped (the tide's curve, no dot) */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_EUCLID);
+        tessera_param_set(0, TX_EN_ARC, 60);
+        tessera_param_set(0, TX_EN_RESTS, 40);
+        go_title("ENERGY");
+        break;
+    case S_GEN_PATTERN_CONSTEL:                     /* PATTERN of a CONSTELLATION track: its steps, not GEN's sky */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_CONSTEL);
+        go_title("PATTERN");
+        break;
+    case S_GEN_POLY:                                 /* rhythms 4, 3 and 5 (RHY 3 picked), two octaves, on step 7 */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_POLY);
+        tessera_knob(1, 1);
+        tessera_knob(1, 1);                         /* RHY 3 */
+        tessera_knob(2, 5);
+        tessera_knob(3, 1);
+        tessera.poly[0].tick = 9, tessera.poly[0].pos = 1;
+        song.playing = 1;
+        go_title("GEN");
+        break;
+    case S_GEN_AWAKE:                                /* lengths 8 and 5, playing: A's step 3 and B's 3 lit */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_AWAKE);
+        tessera_knob(2, -2);
+        tessera.awake[0].pos_a = 3, tessera.awake[0].pos_b = 3;
+        song.playing = 1;
+        go_title("GEN");
+        break;
+    case S_GEN_SERIES:                               /* SERIES a few steps in, INTV 2, a LOOP of 12 */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_SERIES);
+        tessera_knob(2, 1);
+        tessera_param_set(0, TX_SR_LOOP, 12);
+        for (uint32_t k = 0; k < 5u; k++) {
+            gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0};
+            gen_series_tick(&tessera.series[0], &o);
+        }
+        go_title("GEN");
+        break;
+    case S_GEN_CHORD:                                /* CHORD POP a bar each, playing its second chord, 6 steps in */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_CHORD);
+        for (uint32_t k = 0; k < 22u; k++) {
+            gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0};
+            gen_clock_t clk = {0, 16, 0};
+            gen_chord_tick(&tessera.chord[0], &clk, &o);
+        }
+        song.playing = 1;
+        go_title("GEN");
+        break;
+    case S_GEN_CHORD_OCT:                            /* CHORD with OCT+ held: OCT +1, CHRD DIA7, VOIC OPEN */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_CHORD);
+        tessera_chord_oct_knob(1);
+        TSEL->p[P_CHRD] = CH_DIA7;
+        TSEL->p[P_VOIC] = VC_OPEN;
+        go_title("GEN");
+        fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+        break;
+    case S_GEN_STEP_EVOLVE:                          /* STEP EVOLVE: a STEP melody, LOCK 60, AMOUNT 80, 3 steps changed */
+        tessera_reset();
+        song.sel = 0;
+        {
+            static const uint8_t MEL[8] = {60, 62, 64, 0, 67, 65, 0, 72};
+            for (uint32_t k = 0; k < 8u; k++) {
+                step_t *st = &trk[0].step[k];
+                st->n = MEL[k] ? 1u : 0u;
+                st->note[0] = MEL[k];
+                st->time = MEL[k] ? ST_NOTE : ST_REST;
+                st->vel = 100;
+            }
+            trk[0].p[P_SLEN] = 8;
+        }
+        tessera_param_set(0, TX_SV_LOCK, 60);
+        tessera_param_set(0, TX_SV_AMOUNT, 80);
+        tess_sv.mut[0][1] = 2u;                   /* (MOVE +2, an OCT up, a GHOST) */
+        tess_sv.mut[0][4] = 1u << 3;
+        tess_sv.mut[0][6] = VARY_PREV << 5;
+        go_title("EVOLVE");
+        break;
+    case S_GEN_ANSWER:                               /* ANSWER: five notes heard, its second answer, its third note */
+    case S_GEN_ANSWER_OCT:                           /* (OCT+ held: ORDER SHUFFLE, SHIFT 3, SPACE 50, LEN LONG) */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_ANSWER);
+        {
+            static const uint8_t K[5] = {62, 69, 65, 64, 57};
+            for (uint32_t k = 0; k < 5u; k++) tessera_answer_hear(&trk[0], K[k], 100);
+            tessera.answer[0].at[2] = 4, tessera.answer[0].at[3] = 6, tessera.answer[0].at[4] = 10;
+        }
+        tess_an.phase[0] = TESS_AN_PLAY;
+        tess_an.ans[0] = 1;
+        tess_an.slot[0] = 3;
+        song.playing = 1;
+        if (s == S_GEN_ANSWER_OCT) {
+            tessera_param_set(0, TX_AN_ORDER, TESS_AN_SHUFFLE);
+            tessera_param_set(0, TX_AN_SHIFT, 3);
+            tessera_param_set(0, TX_AN_SPACE, 50);
+            tessera_param_set(0, TX_AN_LEN, TESS_AN_LONG);
+        }
+        go_title("GEN");
+        if (s == S_GEN_ANSWER_OCT) fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+        break;
+    case S_GEN_SEED_OCT:                             /* TURING, OCT+ held: SOURCE T2, KEEP RHYTHM (STEP as seed) */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_TURING);
+        tessera_param_set(0, TX_SD_SOURCE, 2);
+        tessera_param_set(0, TX_SD_KEEP, TESS_SD_RHYTHM);
+        go_title("GEN");
+        fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+        break;
+    case S_GEN_CHORD_USER:                           /* CHORD USER, eight chords played in, OCT+ held: LEN 8 */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_CHORD);
+        tessera_param_set(0, TX_CH_PROG, GEN_CH_USER);
+        {
+            static const uint8_t K[8] = {60, 69, 65, 67, 62, 64, 71, 60};
+            for (uint32_t k = 0; k < 8u; k++) tessera_chord_user_key(0, K[k], k == 0u);
+        }
+        go_title("GEN");
+        fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+        break;
+    case S_GEN_GRIDS_OCT:                            /* GRIDS with OCT+ held: KICK 100, SNR 60, HAT 30, TOMS 40 (four lanes) */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_GRIDS);
+        tessera_knob(3, 10);                         /* DENSITY 70 */
+        tessera_param_set(0, TX_GRD_SNR, 60);
+        tessera_param_set(0, TX_GRD_HAT, 30);
+        tessera_param_set(0, TX_GRD_TOMS, 40);
+        go_title("GEN");
+        fm1_in.buttons |= 1u << panel.btn[B_OCTUP];
+        break;
+    case S_GEN_CONSTEL:                              /* CONSTELLATION flying a while: a loop caught, a star just caught */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_CONSTEL);
+        tessera_knob(2, 10);                         /* DENS 70 */
+        tessera_param_set(0, TX_CS_SIZE, 4);
+        {
+            uint32_t r = 1, k;
+            for (k = 0; k < 60u; k++) {
+                gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0};
+                gen_clock_t c = {(uint8_t)(k & 15u), 16, 0};
+                gen_constel_tick(&tessera.constel[0], &c, &r, &o);
+                if (k > 40u && tessera.constel[0].caught) break;
+            }
+        }
+        go_title("GEN");
+        break;
+    case S_GEN_FALL:                                 /* FALL, a wind from the right gusting, some leaves landed and fading */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_BOUNCE);
+        for (uint32_t i = 0; i < 4u; i++) tessera_knob(3, 1);
+        tessera_knob(2, -20);
+        {
+            uint32_t r = 1;
+            for (uint32_t i = 0; i < 40u; i++) {    /* (on till a gust blows, with some leaves landed) */
+                gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0, 0};
+                gen_bounce_tick(&tessera.bounce[0], 0, &r, &o);
+                if (i >= 12u && tessera.bounce[0].gust) break;
+            }
+        }
+        go_title("GEN");
+        break;
+    case S_GEN_BOUNCE:                               /* three balls, the first on its way up from the left wall */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_BOUNCE);
+        tessera_knob(3, 1);
+        tessera_knob(3, 1);
+        tessera.bounce[0].x[0] = 40, tessera.bounce[0].y[0] = 150, tessera.bounce[0].hit = 2;
+        go_title("GEN");
+        break;
+    case S_GEN_TURING: case S_GEN_EUCLID: case S_GEN_MARKOV: case S_GEN_MORPH: case S_GEN_EVOLVE: case S_GEN_GRIDS:
+        tessera_reset();                            /* (track 1's generator, from its defaults) */
+        song.sel = 0;
+        tessera_knob(0, s == S_GEN_TURING ? TESS_ENG_TURING : s == S_GEN_EUCLID ? TESS_ENG_EUCLID :
+                        s == S_GEN_MORPH ? TESS_ENG_MORPH : s == S_GEN_GRIDS ? TESS_ENG_GRIDS : TESS_ENG_MARKOV);
+        if (s == S_GEN_GRIDS) tessera_knob(3, 10);  /* DENSITY 70 */
+        if (s == S_GEN_EVOLVE) {
+            tessera_evolve_knob(0, 30);             /* LOCK 60 */
+            tessera_evolve_knob(1, 1);
+            tessera_evolve_knob(1, 1);              /* EVERY 2 bars */
+        }
+        go_title(s == S_GEN_EVOLVE ? "EVOLVE" : "GEN");    /* (GEN: ARP's tap) */
+        break;
+    case S_GEN_TWEAK: case S_GEN_TWEAK_OFF:         /* TWEAK: each knob's picture, set and at its off position */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_TURING);
+        if (s == S_GEN_TWEAK) {
+            tessera_tweak_knob(0, 7);               /* SHIFT +7 */
+            tessera_tweak_knob(1, 19);              /* DROP 38 */
+            tessera_tweak_knob(2, 30);              /* HUMAN 60 */
+            tessera_tweak_knob(3, 1);
+            tessera_tweak_knob(3, 1);               /* FOLLOW T3 (T2 first, then T3) */
+        }
+        go_title("TWEAK");
+        break;
+    case S_MODS_LIVE_GEN:                           /* TWEAK 2's BRANCH moved by a mod now: the card's live mark */
+    case S_GEN_TWEAK2: case S_GEN_TWEAK2_OFF: case S_GEN_TWEAK2_COIN:   /* TWEAK 2: each knob's picture, set and off;
+                                                                           * COIN: the fork shaded 70/30 */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_TURING);
+        if (s == S_GEN_TWEAK2_COIN || s == S_MODS_LIVE_GEN) {
+            tessera_tweak2_knob(0, 15);             /* BRANCH 30 */
+            tessera_tweak2_knob(1, 1);              /* TO T2 COIN */
+        }
+        if (s == S_GEN_TWEAK2) {
+            tessera_tweak2_knob(0, 30);             /* BRANCH 60 */
+            for (int i = 0; i < 5; i++) tessera_tweak2_knob(1, 1);   /* TO T3 TOGGLE */
+            for (int i = 0; i < 6; i++) tessera_tweak2_knob(2, 1);   /* LOGIC OR T4 */
+            for (int i = 0; i < 3; i++) tessera_tweak2_knob(3, 1);   /* COND 1:4 */
+        }
+        go_title("TWEAK 2");
+        if (s == S_MODS_LIVE_GEN) {
+            static const cord_t C1 = {CS_OCHD2, 0, CD_TW_BRANCH, 0, 70, 0};
+            cord_clear();
+            cord_set(0, &C1);
+            organic_play();
+        }
+        break;
+    case S_ORGANIC:                                 /* SLOTH and OCHD a while after PLAY */
+        tessera_reset();
+        song.sel = 0;
+        organic_play();
+        for (int i = 0; i < 200000; i++) organic_tick();
+        go_title("ORGANIC");
+        break;
+    case S_MOD_SHORTCUT:                            /* FX held on TWEAK: DROP +40 from the LFO, HUMAN -20 from ENV,
+                                                     * FOLLOW no mod */
+        tessera_reset();
+        cord_clear();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_TURING);
+        go_title("TWEAK");
+        fm1_in.buttons |= 1u << panel.btn[B_FX];
+        msc_knob(3, 1);
+        msc_knob(2, -10);
+        msc_select(1);                              /* (HUMAN's: LFO -> ENV) */
+        msc_knob(1, 20);
+        msc_select(-1);                             /* (DROP's stays LFO: ENV -> LFO) */
+        fm1_in.buttons &= ~(1u << panel.btn[B_FX]);
+        break;
+    case S_HELP_GEN:                                /* ARP held, KNOB 1 on GEN: MODE's help, the longest */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_MARKOV);
+        go_title("GEN");
+        help.on = 1;
+        help.knob = 0;
+        help_find(0);
+        help.top = 0;
+        break;
+    case S_HELP:                                    /* ARP held, KNOB 1 on EVOLVE (tessera-notes/docs/design/phase2/help.png) */
+        tessera_reset();
+        song.sel = 0;
+        tessera_knob(0, TESS_ENG_MARKOV);
+        tessera_evolve_knob(0, 30);
+        go_title("EVOLVE");
+        help.on = 1;
+        help_find(0);
+        help.top = 0;
+        break;
+    case S_CORDS: case S_CORDS_PICK_SRC: case S_CORDS_PICK_DST: {   /* (tessera-notes/docs/design/phase2/cords.png's four; KNOB 1's
+                                                     * and 3's lists) */
+        static const cord_t C4[4] = {{CS_NOTE, 0, CD_CUTOFF, 1, 40, 0}, {CS_GATE, 1, CD_DECAY, 3, -25, 0},
+                                     {CS_LFO, 2, CD_EUC_PULSES, 0, 30, 0}, {CS_SH, 0, CD_FX_SEND, 1, 15, 0}};
+        uint32_t k;
+        cord_clear();
+        for (k = 0; k < 4u; k++) cord_set(k, &C4[k]);
+        cord_ui_sel = 1;
+        go_title("MODS");
+        if (s == S_CORDS_PICK_SRC) pick_touch(0);
+        else if (s == S_CORDS_PICK_DST) pick_touch(2);
+        break;
+    }
+    case S_MODS_LIVE: {                             /* SID's PW and MODEL moved by mods now: their live marks */
+        static const cord_t C2[2] = {{CS_OCHD1, 0, CD_E4, 0, 80, 0}, {CS_OCHD3, 0, CD_E1, 0, -60, 0}};
+        eng(3);
+        cord_clear();
+        cord_set(0, &C2[0]);
+        cord_set(1, &C2[1]);
+        organic_play();
+        go_title("EDIT 1");
+        break;
+    }
+    case S_MATRIX: {                                /* the mods track by track: four, two in one cell, picked */
+        static const cord_t C5[5] = {{CS_OCHD1, 0, CD_CUTOFF, 1, 80, 0}, {CS_LFO, 0, CD_PAN, 1, 40, 0},
+                                     {CS_DRIFT, 2, CD_FX_SEND, 3, 30, 0}, {CS_OCHD8, 3, CD_EUC_PULSES, 0, -50, 0},
+                                     {CS_APATHY, 1, CD_LEVEL, 1, 20, 0}};
+        uint32_t k;
+        cord_clear();
+        for (k = 0; k < 5u; k++) cord_set(k, &C5[k]);
+        organic_play();
+        for (k = 0; k < 20000u; k++) organic_tick();
+        mx_from = 0; mx_to = 1; mx_k = 1;
+        go_title("MATRIX");
+        break;
+    }
+    case S_FX_BUS1: case S_FX_BUS2: case S_FX_BUS3:
+        go_title(s==S_FX_BUS1?"SEND FX 1":s==S_FX_BUS2?"SEND FX 2":"SEND FX 3");
+        for(uint32_t slot=0;slot<3;slot++){uint32_t b=G_MFXTYPE+slot*4;song.g[b]=slot==0?FX_REVERB:slot==1?FX_TAPE:FX_ECHO;song.g[b+1]=127;song.g[b+2]=90;song.g[b+3]=100;}break;
+    case S_FX_SLOT2: case S_FX_SLOT3:
+        go_title(s==S_FX_SLOT2?"FX 2":"FX 3");
+        for(uint32_t slot=0;slot<FX_SLOTS;slot++){
+            uint32_t base=P_FXTYPE+slot*FX_PARAMS;
+            TSEL->p[base]=(int16_t)(slot==0?FX_PHASER:slot==1?FX_ECHO:FX_REVERB);
+            TSEL->p[base+1]=84;TSEL->p[base+2]=60;TSEL->p[base+3]=72;
+        }
         break;
     case S_ENV: go_title("ENV"); ui.hot_col = 2; ui.hot_t = 30; break;
     case S_ENVDEST: go_title("ENV DEST"); break;
     case S_LFO: go_title("LFO"); break;
     case S_MOD: TSEL->p[P_M1SRC] = 1; TSEL->p[P_M1DST] = 2; TSEL->p[P_M1AMT] = 40; TSEL->p[P_M2SRC] = 6;
         TSEL->p[P_M2DST] = 14; TSEL->p[P_M2AMT] = -64; mod_ui_slot = 1; go_title("MOD"); break;
-    case S_FX: go_title("FX"); break;
-    case S_SLICER: TSEL->p[P_SLCR] = 1; go_title("SLICER"); break;
-    case S_DLY: go_title("DLY"); break;
     case S_SCL: TSEL->p[P_SCALE] = 2; go_title("SCL"); break;
     case S_SCALE_PICKER_EDO:
     case S_SCALE_PICKER_HIST:
@@ -1114,7 +1494,7 @@ static void setup(int s)
     case S_VOICE: go_title("VOICE"); break;
     case S_GLOBAL: go_title("GLOBAL"); break;
     case S_SYSTEM: go_title("SYSTEM"); break;
-    case S_EDIT_ANALOG: go_title("EDIT 1"); break;
+    case S_EDIT_SID: eng(3); go_title("EDIT 1"); break;
     case S_EDIT_DIGITAL: eng(E_FM); go_title("EDIT 1"); break;
     case S_OP_ENV: eng(1); go_title("OP1 ENV"); break;
     case S_EDIT_WHEEL: eng(7); go_title("EDIT 1"); ui.hot_col = 1; ui.hot_t = 30; break;
@@ -1144,14 +1524,12 @@ static void setup(int s)
         eng(ENGI_FM6); song.playing = 0; fm6_factory(5, fm6_buf); (void)native_store(ENGI_FM6, 63, song.sel, "WOOD BARS");
         go_title("STORE"); fm6_bslot = 63;
         break;
-    case S_CZ1_ENV: eng(ENGI_CZ); go_title("C1 WAV R1-4"); break;   /* INIT TONE: R1 R2 live, R3 R4 dim (END 2) */
     case S_CONFIRM_SEQ: ui.confirm = CF_CLEAR_SEQ; ui.confirm_trk = 2; break;
     case S_CONFIRM_PROJ: ui.confirm = CF_OVR_PROJ; ui.confirm_trk = 0; break;
     case S_CONFIRM_USER: song.playing = 0; up_store(6, "A VERY LONG SOUND NAME"); ui.confirm = CF_OVR_USER; ui.confirm_trk = 6; break;
     case S_CONFIRM_MOTION: ui.confirm = CF_CLEAR_MOTION; ui.confirm_trk = 3; break;
     case S_CONFIRM_ERASE: song.playing = 0; up_store(6, "A VERY LONG SOUND NAME"); ui.confirm = CF_ERASE_USER; ui.confirm_trk = 6; break;
     case S_MENU: ui.menu = 1; ui.menu_sel = 0; song.rec = 1; break;
-    case S_MENU_SPEAKER: ui.menu = 1; ui.menu_sel = 1; settings.lowcut = 2; break;
     case S_ABOUT: ui.menu = 2; ui.menu_scroll = 0; break;
     case S_ABOUT_REC: ui.menu = 2; ui.menu_scroll = 0; song.rec = 1; break;          /* the REC mark beside OCT- BACK */
     case S_ABOUT_CREDITS: ui.menu = 2; ui.menu_scroll = 360; break;
@@ -1174,24 +1552,6 @@ static void setup(int s)
     /* the FX layer's map: held alone; REPEAT 1/16 + LPF + a mute playing with the macros turned;
      * at 72 BPM: a REPEAT 1/16 waiting for its 1/16 (shown THEME) beside TAPE STOP playing, and REPEAT 1/8
      * held, too long at that tempo (it and REVERSE dimmed) */
-    case S_FX_PEEK: go_title("ENV"); ui.layer = LAYER_FX; break;
-    case S_FX_HELD:
-        go_home(); ui.layer = LAYER_FX;
-        perf_held = perf_act = PF_BIT(PF_R16) | PF_BIT(PF_LPF) | PF_BIT(PF_M1 + 1);
-        perf_k[0] = -40; perf_k[1] = 25; perf_k[3] = 30; ui.hot_col = 0; ui.hot_t = 30;
-        break;
-    case S_FX_WAIT:
-        song.playing = 1; song.g[G_BPM] = 72; ui.layer = LAYER_FX;
-        perf_held = PF_BIT(PF_R16) | PF_BIT(PF_R8) | PF_BIT(PF_TAPE); perf_act = PF_BIT(PF_TAPE);
-        perf_k[2] = 100;
-        break;
-    case S_FX_HARM:                                 /* OCT UP playing, KNOB 4 its shimmer; OCT DN held under it */
-        song.playing = 1; ui.layer = LAYER_FX;
-        perf_ord[PF_ODN] = ++perf_seq; perf_ord[PF_OUP] = ++perf_seq;
-        perf_held = perf_act = PF_BIT(PF_OUP) | PF_BIT(PF_ODN);
-        perf_k[3] = 60; ui.hot_col = 3; ui.hot_t = 30;
-        break;
-    case S_REVERB: go_title("REVERB"); song.g[G_RTYPE] = 1; ui.hot_col = 0; ui.hot_t = 30; break;   /* TYPE: SPRING */
     case S_MENU_CLICK: ui.menu=1;ui.menu_sel=MI_CLICK;settings_click=2;break;
     case S_MENU_CLICK_LEVEL: ui.menu=1;ui.menu_sel=MI_CLICK_LEVEL;settings_click_level=2;break;
     case S_MENU_COUNTIN: ui.menu=1;ui.menu_sel=MI_COUNTIN;settings_countin=2;break;
@@ -1204,26 +1564,25 @@ static void setup(int s)
         else go_title(s==S_DRUM_MIX_909?"DRUM MIX":"DRUM SOUND");
         ui.hot_col=2;ui.hot_t=30;break;
     case S_MENU_ADD: ui.menu=1;ui.menu_sel=MI_ADD;settings_chord_add=1;break;
+    case S_MENU_AUTOSAVE_ON: ui.menu=1;ui.menu_sel=MI_AUTOSAVE;settings_autosave=1;break;
+    case S_MENU_AUTOSAVE_OFF: ui.menu=1;ui.menu_sel=MI_AUTOSAVE;settings_autosave=0;break;
     case S_MENU_HOLD: ui.menu = 1; ui.menu_sel = MI_HOLD; settings_hold = 2; break;
 #if MELODEE_USB_AUDIO
     case S_MENU_USB: ui.menu = 1; ui.menu_sel = MI_USB; ua_off_want = UA_OFF_IN; break;   /* (OUT only) */
+    case S_MENU_USB_STEREO: ui.menu = 1; ui.menu_sel = MI_USB_INPUT; ua_tracks_want = 0; break;
+    case S_MENU_USB_TRACKS: ui.menu = 1; ui.menu_sel = MI_USB_INPUT; ua_tracks_want = 1; break;
 #endif
-    /* the GLO SCL EDIT layers (ui_layer.c): just opened (a peek), and in use: GLO with T2 muted, T3 soloed (its key
+    /* the GLO SCL layers (ui_layer.c): just opened (a peek), and in use: GLO with T2 muted, T3 soloed (its key
      * held) and KNOB 1 turned; with CLK EXT (TAP dimmed); SCL at D# minor, KNOB 2 turned; EDIT on DIGITAL preset 3,
      * a favourite; a user preset; the hint after a tap */
     case S_GLO_PEEK: go_title("ENV"); ui.layer = LAYER_GLO; break;
     case S_GLO_ACTIVE:
-        go_home(); ui.layer = LAYER_GLO; trk[1].p[P_MUTE] = 1; perf_solo = 4; trk[0].p[P_LEVEL] = 90;
+        go_home(); ui.layer = LAYER_GLO; trk[1].p[P_MUTE] = 1; track_solo = 4; trk[0].p[P_LEVEL] = 90;
         ui.hot_col = 0; ui.hot_t = 30;
         break;
     case S_GLO_EXT: go_home(); ui.layer = LAYER_GLO; song.g[G_CLOCK] = 1; trk[0].p[P_MUTE] = trk[3].p[P_MUTE] = 1; break;
     case S_SCL_PEEK: go_title("ENV"); ui.layer = LAYER_SCL; break;
     case S_SCL_ACTIVE: go_home(); ui.layer = LAYER_SCL; TSEL->p[P_ROOT] = 3; TSEL->p[P_SCALE] = 2; ui.hot_col = 1; ui.hot_t = 30; break;
-    case S_EDIT_PEEK: go_title("EDIT 1"); ui.layer = LAYER_EDIT; break;
-    case S_EDIT_ACTIVE: eng(E_FM); apply_preset_to(TSEL, 2); favorite_set(E_FM, 2, 1); go_home(); ui.layer = LAYER_EDIT;
-        ui.hot_col = 0; ui.hot_t = 30; break;
-    case S_EDIT_USER: song.playing = 0; eng(6); up_store(6, "MY LONG TRIO NAME"); up_load(6); favorite_set(NENGINES, 6, 1);
-        go_home(); ui.layer = LAYER_EDIT; break;
     case S_LAYER_HINT: go_page(GR_TRK); ui.msg_t = 0; layer_tap(LAYER_GLO); break;
     /* NAME (ui_name.c): USER SAVE prefilled; a letter cycling (RS: S, R next); 123 on a project; an empty project name
      * (the placeholder); 12 of the widest letters, the cursor past them; playing (OCT+ dim) */
@@ -1267,7 +1626,6 @@ static void setup(int s)
         break;
 #endif
     case S_NATIVE_FM_USER: eng(ENGI_FM6); song.playing=0; native_store(ENGI_FM6,63,song.sel,"LAST VOICE"); ui.uslot=63; go_page(GR_USER); break;
-    case S_NATIVE_CZ_USER: eng(ENGI_CZ); song.playing=0; native_store(ENGI_CZ,127,song.sel,"LAST CZ TONE"); ui.uslot=127; go_page(GR_USER); break;
     default: break;
     }
 }
@@ -1294,7 +1652,7 @@ static void sweep_columns(void)
     char name[64];
     for (e = 0; e < NENGINES; e++) {
         if (!eng_ok(e))
-            continue;                                    /* (DIGITAL without MELODEE_FM4: no track has it) */
+            continue;                                    /* (DIGITAL, retired: no track has it) */
         for (i = 0; i < NPAGES; i++) {
             state();
             pal(UI_GRAY_INDEX);
@@ -1623,12 +1981,83 @@ static void roll_cost(void)
             t_full / CLOCKS_PER_SEC / N * 1e6, (unsigned long long)(px_full / N), (unsigned long long)(bl_full / N));
 }
 
+static void designer_sweep(const char *out)
+{
+    char name[96],file[64];
+    for(uint32_t palid=0;palid<UI_PAL_ENTRIES;palid++)for(uint32_t eng=0;eng<NENG_SHOWN;eng++){
+        int night=str_eq(UI_PALETTES[palid].name,"NIGHT");
+        state();sound_init_of(TSEL,eng_vis(eng));pal(palid);designer_open();
+        snprintf(name,sizeof name,"%s/designer %s START",UI_PALETTES[palid].name,ENGINES[TSEL->eng_req]->name);cur_name=name;
+        nscr=npend=0;ui.force=1;ui_draw();lint();if(palid==UI_GRAY_INDEX)mono_check();
+        if(TSEL->eng_req==ENGI_FM6 && night)write_ppm(out,"NIGHT","designer_start");
+        ds.expert=1;designer_begin();
+        for(uint32_t i=0;i<ds.n;i++){
+            ds.at=(uint8_t)i;designer_page();
+            if(designer_feat_on()){                     /* FEATURES: every row lifted in turn */
+                uint32_t n;designer_feats(&n);
+                for(uint32_t r=0;r<n;r++){
+                    ds.row=(uint8_t)r;
+                    snprintf(name,sizeof name,"%s/designer %s FEATURES row %u",UI_PALETTES[palid].name,ENGINES[TSEL->eng_req]->name,r+1);cur_name=name;
+                    nscr=npend=0;ui.force=1;ui_draw();lint();if(palid==UI_GRAY_INDEX)mono_check();
+                }
+                ds.row=0;ui.force=1;ui_draw();
+                if(night){snprintf(file,sizeof file,"designer_features_%u",TSEL->eng_req);write_ppm(out,"NIGHT",file);}
+                continue;
+            }
+            snprintf(name,sizeof name,"%s/designer %s %s OP%u",UI_PALETTES[palid].name,ENGINES[TSEL->eng_req]->name,cur_page()->title,fm6_opsel+1);cur_name=name;
+            nscr=npend=0;ui.force=1;ui_draw();lint();if(palid==UI_GRAY_INDEX)mono_check();
+            if(night && TSEL->eng_req==ENGI_FM6 && str_eq(cur_page()->title,"FREQ") && fm6_opsel==0){
+                snprintf(file,sizeof file,"designer_%u",TSEL->eng_req);write_ppm(out,"NIGHT",file);
+            }
+        }
+        designer_compare();                             /* the original, its chip */
+        snprintf(name,sizeof name,"%s/designer %s ORIGINAL",UI_PALETTES[palid].name,ENGINES[TSEL->eng_req]->name);cur_name=name;
+        nscr=npend=0;ui.force=1;ui_draw();lint();if(palid==UI_GRAY_INDEX)mono_check();
+        designer_compare();
+        designer_finish();                              /* its sheet, the question */
+        snprintf(name,sizeof name,"%s/designer %s sheet",UI_PALETTES[palid].name,ENGINES[TSEL->eng_req]->name);cur_name=name;
+        nscr=npend=0;ui.force=1;ui_draw();lint();if(palid==UI_GRAY_INDEX)mono_check();
+        if(TSEL->eng_req==ENGI_FM6 && night)write_ppm(out,"NIGHT","designer_sheet");
+        pop_close();confirm_open(CF_DISCARD_DESIGN,song.sel);
+        snprintf(name,sizeof name,"%s/designer %s discard",UI_PALETTES[palid].name,ENGINES[TSEL->eng_req]->name);cur_name=name;
+        nscr=npend=0;ui.force=1;ui_draw();lint();if(palid==UI_GRAY_INDEX)mono_check();
+        if(TSEL->eng_req==ENGI_FM6 && night)write_ppm(out,"NIGHT","designer_discard");
+        ui.confirm=0;designer_close(1);
+    }
+    cur_name=0;
+}
+static void library_note_sweep(const char *out)
+{
+    static const char *const names[]={"sysex_import_fm6","preset_bulk","notes_bulk","notes_fractional","preset_bulk_confirm","sysex_import_confirm","notes_bulk_menu","notes_quantize_pattern","notes_quantize_selected","notes_move_single","notes_copy_single","notes_menu_manual"};
+    for(uint32_t p=0;p<UI_PAL_ENTRIES;p++)for(uint32_t scene=0;scene<NELEM(names);scene++){
+        char title[64];state();song.playing=0;pal(p);
+        if(scene==0u){
+            uint8_t raw[FM6_PACKED];
+            memcpy(raw,FM6_INIT,FM6_PACKED);
+            sysex_stage(ENGI_FM6,raw,1,FM6_PACKED);ui.uslot=15;ui.msg_t=0;slot_enter();
+        } else if(scene==1u){eng(ENGI_FM6);go_page(GR_USER);ui.uslot=15;bulk=(typeof(bulk)){.on=1,.engine=ENGI_FM6,.anchor=12,.end=15};slot_enter();}
+        else if(scene==4u||scene==5u){eng(ENGI_FM6);go_page(GR_USER);sx_import.count=32;confirm_open(scene==4u?CF_BULK_ERASE:CF_IMPORT,0);}
+        else {go_page(GR_ROLL);cursor_set(2);TSEL->step[2]=(step_t){{60},1,ST_NOTE,0,96};TSEL->step[5]=(step_t){{64},1,ST_NOTE,0,96};
+            if(scene==2u)bulk=(typeof(bulk)){.on=1,.anchor=2,.end=5};
+            else if(scene==3u)note_manual_length(1,RECORD_UNIT/4u);
+            else if(scene==6u||scene==8u){bulk=(typeof(bulk)){.on=1,.anchor=2,.end=5};notes_bulk_sheet_open();if(scene==8u){pop.sel=2;ui.note_grid=2;}}
+            else if(scene==7u){page_sheet_open();ui.note_grid=1;}
+            else if(scene==9u)note_move_arm();
+            else if(scene==10u)note_copy_arm();
+            else step_enter();
+        }
+        snprintf(title,sizeof title,"%s/%s",UI_PALETTES[p].name,names[scene]);cur_name=title;draw(-1);lint();
+        if(p==UI_GRAY_INDEX)mono_check();
+        if(p==0u)write_ppm(out,"NIGHT",names[scene]);
+    }
+}
+#ifndef UI_RENDER_NO_MAIN                           /* (tests/gallery_render.c: the scenes without this main) */
 int main(int argc, char **argv)
 {
     const char *out = argc > 1 ? argv[1] : "build/ui_new";
     char path[600];
     uint32_t p, s;
-    static const char *const SHOW[] = {"NIGHT", "DAY", "CONTRAST", "GRAY"};
+    static const char *const SHOW[] = {"NIGHT", "CONTRAST", "SMALTI"};
     snprintf(path, sizeof path, "%s/report.txt", out);
     rep = fopen(path, "w");
     if (!rep) { fprintf(stderr, "cannot write %s\n", path); return 1; }
@@ -1658,8 +2087,8 @@ int main(int argc, char **argv)
         for (s = 0; s < S_COUNT; s++) {
             char name[64];
             uint32_t k;
-            if (!MELODEE_FM4 && (s == S_OP_ENV || (s >= S_ALG1 && s <= S_OP_LEVEL)))
-                continue;                           /* (DIGITAL's own screens: MELODEE_FM4=1 only) */
+            if (s == S_OP_ENV || (s >= S_ALG1 && s <= S_OP_LEVEL))
+                continue;                           /* (DIGITAL's own screens: retired) */
             snprintf(name, sizeof name, "%s/%s", UI_PALETTES[p].name, S_NAME[s]);
             cur_name = name;
             setup((int)s);
@@ -1668,9 +2097,11 @@ int main(int argc, char **argv)
             draw((int)s);
             lint();
             if (p == UI_GRAY_INDEX) { audit_scene(S_NAME[s]); aud = 0; mono_check(); }
-            for (k = 0; k < 3u; k++)
+            for (k = 0; k < sizeof SHOW / sizeof SHOW[0]; k++)
                 if (!strcmp(UI_PALETTES[p].name, SHOW[k])) write_ppm(out, SHOW[k], S_NAME[s]);
         }
+    library_note_sweep(out);
+    designer_sweep(out);
     {   /* every FM6 chart (the lint above, fmp_check, runs on each), in MONO: gray */
         uint32_t a, e, c0 = fmp_charts;
         for (e = FM6_MODERN; e <= FM6_OPL; e++)
@@ -1695,7 +2126,7 @@ int main(int argc, char **argv)
     roll_frames(argc > 2 ? argv[2] : 0);
     /* draw cost: a full redraw of a screen (all strips), and HOME frame by frame (the scope, every other frame) */
     {
-        static const int COST[] = {S_HOME, S_PRESETS, S_STEP, S_ROLL_CHORDS, S_DRUM, S_MIXER, S_MENU, S_ABOUT_CREDITS, S_CONFIRM_PROJ};
+        static const int COST[] = {S_HOME, S_PRESETS, S_STEP, S_ROLL_CHORDS, S_DRUM, S_MIXER, S_MENU, S_ABOUT_CREDITS, S_CONFIRM_PROJ, S_GEN_BOUNCE};
         enum { N = 200 };
         uint32_t i, k;
         fprintf(rep, "\ndraw cost on the host (cc -O1; only the ratios mean anything on the device):\n");
@@ -1786,6 +2217,7 @@ int main(int argc, char **argv)
             "%u FM6 charts linted\n", nfind, nfree, mono_bad, nsweep, fmp_charts);
     fclose(rep);
     printf("ui_render: %u screens x %u palettes + the page/value sweep; %u lint findings, %u ellipsised free texts (%u distinct), "
-           "%u MONO pixels off gray; report %s\n", (unsigned)(S_COUNT - (MELODEE_FM4 ? 0 : 1 + S_OP_LEVEL - S_ALG1 + 1)), (unsigned)NPALETTES, nfind, nfree, nfree_seen, mono_bad, path);
+           "%u MONO pixels off gray; report %s\n", (unsigned)(S_COUNT - (1 + S_OP_LEVEL - S_ALG1 + 1)), (unsigned)NPALETTES, nfind, nfree, nfree_seen, mono_bad, path);
     return nfind || mono_bad ? 1 : 0;
 }
+#endif

@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* MELODEE boot and main loop. Boot order: WDT first, boot-loop guard, fatal vectors,
  * guards; then LCD, input (TIMER5 IRQ, 10 kHz), audio (ALNK0 IRQ). */
 extern uint32_t _data_start[], _data_end[], _data_load[], _bss_start[], _bss_end[];
 extern uint32_t _dsp_start[], _dsp_end[], _dsp_load[], _dt_start[], _dt_end[], _dt_load[];
+extern uint32_t _audio_start[], _audio_end[], _audio_load[];
 extern uint32_t _pool_start[], _pool_end[], _rt_start[], _rt_end[], _rt_load[];
 
 
@@ -25,7 +27,8 @@ void fm1_timer5_irq(void)
     uint32_t t0 = fm1_ticks(), usb_due = sub % 5u == 0u;
     fm1_timer5_ack();
     melodee_dbg.timer_irqs++;
-    fm1_input_tick();
+    AP_START(input_start);fm1_input_tick();
+    if(melodee_dbg.in_audio){AP_END(AP_INPUT,input_start);}
     {   /* milliseconds from the 24 MHz TIMER4 (robust to a late tick) */
         static uint32_t last, acc;
         acc += t0 - last;
@@ -51,7 +54,8 @@ void fm1_timer5_irq(void)
             if (last_ua && gap > ua.poll_max_ticks)
                 ua.poll_max_ticks = gap;
             last_ua = t0;
-            ua_service();                       /* at most 4 kHz, independent of coalesced ticks */
+            AP_START(usb_start);ua_service();
+            if(melodee_dbg.in_audio){AP_END(AP_USB,usb_start);}                       /* at most 4 kHz, independent of coalesced ticks */
             gap = fm1_ticks() - t0;
             if (gap > ua.service_max_ticks)
                 ua.service_max_ticks = gap;
@@ -62,18 +66,27 @@ void fm1_timer5_irq(void)
      * can safely nest in audio; deferring it made clock jitter depend on load. */
 #if MELODEE_UART
     if (owed & 2u) {
-        uart_midi_poll();
+        AP_START(midi_start);uart_midi_poll();
+        if(melodee_dbg.in_audio){AP_END(AP_MIDI_RX,midi_start);}
         owed &= ~2u;
     }
 #endif
     if (melodee_dbg.in_audio) {
         melodee_dbg.nested++;
-        t5_nested_ticks += fm1_ticks() - t0;
+        uint32_t elapsed=fm1_ticks()-t0;t5_nested_ticks+=elapsed;
+        if(elapsed>audio_timer5_max_ticks)audio_timer5_max_ticks=elapsed;
+#if MELODEE_AUDIO_PROFILE
+        audio_profile_add(AP_TIMER5,elapsed);
+#endif
         return;
     }
     if (owed & 1u)
         usb_poll();
     owed = 0;
+    /* The ISR footer can be preempted after the C audio-active flag clears.
+     * Its conservative bound therefore needs ordinary TIMER5 service too. */
+    uint32_t elapsed=fm1_ticks()-t0;
+    if(elapsed>audio_timer5_max_ticks)audio_timer5_max_ticks=elapsed;
 }
 extern void isr_timer5(void);
 
@@ -82,36 +95,48 @@ static void timer5_start(void)                 /* OSC /4 = 6 MHz, PRD 600 -> 10 
     fm1_timer5_start(isr_timer5, 4);   /* above ALNK0 (3): the scan nests into the render (see fm1_timer5_irq) */
 }
 
-static void hexs(char *b, uint32_t v)
+/* The voices CPU1 + CPU0 carry at the clock running: the SPL's 360 MHz, or a 320 that a soft reset kept from a
+ * 1.3.x / 1.4 rc session until power-off (hal/fm1_clock.h: Melodee never writes the PLL) */
+static void clock_boot(void)
 {
-    uint32_t i;
-    for (i = 0; i < 8u; i++)
-        b[i] = "0123456789ABCDEF"[(v >> (28u - 4u * i)) & 15u];
-    b[8] = 0;
+    uint32_t m = fm1_clock_mult();
+    vbudget_cpu1 = VBUDGET * (m ? fm1_clock_mhz_of(m) : 360u) / 360u;
 }
 
-static void fm1_fault(const fm1_crash_t *c)
+/* the crash screen: the fault's registers, each named, then where it was (the audio interrupt, or the main loop's
+ * breadcrumb: its drawing stage and page) and how long after the start. A photo of it finds the line in the build
+ * (VEC and PC first). The where is kept with the record (melodee_dbg, .noinit) for ABOUT after the restart */
+static void crash_line(uint32_t y, const char *label, uint32_t v)
 {
     char b[12];
+    hexs(b, v);
+    draw_text_line(16, y, 60, &AF_M, label, UI_CRASH_INK, UI_CRASH_BG, 0);
+    draw_text_line(80, y, 150, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
+}
+static void fm1_fault(const fm1_crash_t *c)
+{
+    char b[32];
     uint32_t t0;
 #if MELODEE_DUAL_CORE
     if (audio_worker_online)
         fm1_core1_bar_set();                          /* one core on every boot until power-off */
 #endif
     fm1_audio_stop();
+    melodee_dbg.crash_audio = melodee_dbg.in_audio;   /* (before anything else can change them) */
+    melodee_dbg.crash_stage = melodee_dbg.stage;
+    melodee_dbg.crash_page = melodee_dbg.page;
+    melodee_dbg.crash_magic = DBG_CRASH_MAGIC;
     scr_wake_now();
     lcd_fill(0, 0, 240, 240, UI_CRASH_BG);            /* fixed, outside the palettes */
-    draw_text_line(0, 8, 240, &AF_M, "MELODEE CRASH", UI_CRASH_INK, UI_CRASH_BG, 1);
-    hexs(b, c->vec);
-    draw_text_line(10, 40, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->pc);
-    draw_text_line(10, 60, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->emu);
-    draw_text_line(10, 84, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->dbg);
-    draw_text_line(10, 102, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
-    hexs(b, c->rets);
-    draw_text_line(10, 120, 220, &AF_M, b, UI_CRASH_INK, UI_CRASH_BG, 0);
+    draw_text_line(0, 8, 240, &AF_M, "TESSERA CRASH", UI_CRASH_INK, UI_CRASH_BG, 1);
+    crash_line(40, "VEC", c->vec);
+    crash_line(60, "PC", c->pc);
+    crash_line(80, "RETS", c->rets);
+    crash_line(100, "EMU", c->emu);
+    crash_line(120, "DBG", c->dbg);
+    crash_where(b, melodee_dbg.crash_audio, melodee_dbg.crash_stage, melodee_dbg.crash_page, c->uptime_ms);
+    draw_text_line(0, 152, 240, &AF_S, b, UI_CRASH_INK, UI_CRASH_BG, 1);
+    draw_text_line(0, 200, 240, &AF_S, "PHOTO THIS SCREEN: IT RESTARTS", UI_CRASH_INK, UI_CRASH_BG, 1);
     t0 = fm1_ticks();
     while ((uint32_t)(fm1_ticks() - t0) < 4000u * 1000u * FM1_TICKS_PER_US)
         ;
@@ -126,14 +151,16 @@ static void melodee_init(void)
     pattern_init();
     for (i = 0; i < G_COUNT; i++)
         song.g[i] = GP[i].def;
+    song.g[G_BPM] = TRK_DEF_BPM;
     undo_depth++;                             /* (no undo copy of the power-on loads) */
     fm6_init();                               /* every track's FM6 patch: the init voice */
-    cz_init();
     for (i = 0; i < NTRK; i++) {
         track_t *t = &trk[i];
         track_defaults(t);
         set_engine_of(t, TRK_DEF[i][0]);
         apply_preset_to(t, TRK_DEF[i][1]);    /* with its sends */
+        if (TRK_DEF[i][0] != ENGI_DRUM)
+            t->p[P_SCALE] = TRK_DEF_SCALE;
         t->engine = t->eng_req;
         track_defaults_steps(t);              /* (a sound load never touches them) */
         pat_sig[i] = steps_sig(t);            /* (empty: not the user's) */
@@ -149,16 +176,21 @@ static void melodee_init(void)
 static void fm1_main(void)
 {
     int32_t knob = 512 * 16;
+    fm1__pc_out(6,0);                         /* codec held quiet before flash and splash */
+    settings_init();                           /* a readable default palette before loading flash */
+    lcd_init();                                /* maintenance must be visible before any boot writes */
+    splash("STARTING UP");
+    lcd_sync();
+    dsp_tables_init();                        /* the RAM lookup tables (FM6), before anything renders */
     persist_boot();
 #if MELODEE_OTA
-    if (flash_ok)
+    if (flash_ok && boot_work.state != 2u)
         ota_boot_cleanup();                             /* staging area left by an update */
 #endif
     settings_init();
-    lcd_init();
-    lcd_fill(0, 0, 240, 240, T_BG);
-    draw_text_box(0, 94, 240, &AF_L, "MELODEE", T_THEME, 1);
-    draw_text_box(0, 134, 240, &AF_S, "MULTI-ENGINE SYNTH", T_MID, 1);
+    clock_boot();                             /* the voice budget at the clock found (never changed) */
+    if (boot_work.state != 2u)
+        splash("FM-1 FIRMWARE");
     if (melodee_dbg.magic != DBG_MAGIC) {
         memset(&melodee_dbg, 0, sizeof melodee_dbg);
         melodee_dbg.magic = DBG_MAGIC;
@@ -177,9 +209,9 @@ static void fm1_main(void)
     panel_init();
     melodee_init();
 #if MELODEE_DUAL_CORE
-    /* One core after a crash in the first 30 s (a second would enter UBOOT),
+    /* One core if stock supply setup failed, after a crash in the first 30 s (a second would enter UBOOT),
      * and until power-off once CPU1 was retired or CPU0 crashed beside it. */
-    if (!bootguard.failed && !fm1_core1_barred())
+    if (fm1_power_ready && !bootguard.failed && !fm1_core1_barred())
         fm1_multicore_start();              /* bounded handshake; failure keeps serial rendering */
     /* CPU1 starts through mask-ROM before it reaches our RAM worker. Restrict
      * instruction fetch only after that bootstrap has returned, or stopped
@@ -199,11 +231,13 @@ static void fm1_main(void)
     if ((fm1_in.buttons & 3u) == 3u) {
         panel_setup();                        /* OCT- + OCT+ held at power-on */
         settings_save();
+        splash("FM-1 FIRMWARE");              /* (the bed back for the tiles) */
     }
     glo_restore();                            /* CLK TUNE MIDI ROUT as last used, */
-    project_boot();                           /* then the BOOT project or the template (theirs win) */
-    fm1_delay_ms(400);
-    lcd_fill(0, 0, 240, 240, T_BG);
+    project_boot();                           /* then the BOOT project or the template (they keep them) */
+    splash_lay(400, boot_work.state != 2u);   /* the mosaic set in the boot's wait (src/splash.c) */
+    if (boot_work.state != 2u)
+        lcd_fill(0, 0, 240, 240, T_BG);
 
     for (;;) {
         uint32_t m = fm1_ms;
@@ -258,11 +292,10 @@ static void fm1_main(void)
                 draw_text_box(0, 110, 240, &AF_M, "UBOOT", T_THEME, 1);
                 usb_detach();
                 fm1_delay_ms(30);
-                bootguard.pending = 0;                  /* intentional reset: not a failed boot */
+                reset_intended();
                 fm1_enter_uboot();
             }
         }
-        cz_service();
         fm6_service();                                  /* DX7 SysEx for FM6, a pending FM6 settings save */
 #if MELODEE_OTA
         ed_service();                                   /* web editor SysEx */
@@ -283,7 +316,7 @@ static void fm1_main(void)
             fm1_delay_ms(20);
             usb_detach();
             fm1_delay_ms(30);
-            bootguard.pending = 0;
+            reset_intended();
             fm1_enter_uboot();
         }
 #if MELODEE_CDC
@@ -296,9 +329,6 @@ static void fm1_main(void)
         ui_input();
         glo_poll();                                     /* a kept GLO value changed: the settings, later */
         settings_poll();                              /* queued settings save: only while stopped */
-#if MELODEE_DUAL_CORE
-        fm1_core1_poll();                             /* a retired CPU1 sits out until power-off */
-#endif
         melodee_dbg.stage = 2;
         ui_leds();
         ui_draw();
@@ -348,7 +378,10 @@ void fm1_cstart(void)
         *d = *s;                                /* DSP code: audio is stopped while NOR is busy */
     for (s = _dt_load, d = _dt_start; d < _dt_end; s++, d++)
         *d = *s;                                /* the oscillator correction tables */
+    for (s = _audio_load, d = _audio_start; d < _audio_end; s++, d++)
+        *d = *s;                                /* resident audio profile: executable ordinary SRAM */
     fm1_mailbox_clear();
+    fm1_power_ready = (uint8_t)fm1_power_init(); /* stock V15 supplies before cache, peripherals or CPU1 */
 #if MELODEE_CACHE_RAM
     {   /* XIP-to-SRAM exceeds the direct-call range on pi32v2. */
         void (*volatile init)(uint32_t) = fm1_cache_init;

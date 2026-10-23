@@ -52,7 +52,7 @@ static void lane_budget(void)
     for (p = 0; p < NPART; p++)
         memset(trk[p].v, 0, sizeof trk[p].v);
     host_preset(&trk[0], ENGI_DRUM, 0);
-    host_preset(&trk[1], 0, 0);
+    host_preset(&trk[1], HOST_SYNTH, HOST_PLAIN);
     trk[1].p[P_VOICE] = V_POLY;
     trk[1].p[P_SUS] = 127;
     trk_note_on(&trk[1], 48, 100);
@@ -73,7 +73,7 @@ static void lane_budget(void)
            bad ? "FAIL" : "ok");
     fails += bad != 0;
     /* A new track can still take a drum voice: no permanent reservation for the kit. */
-    host_preset(&trk[2], 0, 0);
+    host_preset(&trk[2], HOST_SYNTH, HOST_PLAIN);
     trk[2].p[P_VOICE] = V_MONO;
     trk_note_off(&trk[0], TOM[3]);
     trk_note_on(&trk[2], 72, 100);
@@ -234,7 +234,7 @@ static void kit_808(void)
         trk_note_on(&trk[0], 36, 110);
         k = drum_kit_part(0)[DV_KICK].r.ins == DR_BD && blocks_peak(4) > 200;
         printf("drum_test: retired custom kit plays 808: %s\n", k ? "ok" : "FAIL");
-        fails += !k || ENG_DRUM.npresets != 2 || ENG_DRUM.edit[0].min != DK_808;
+        fails += !k || ENG_DRUM.npresets != 4 || ENG_DRUM.edit[0].min != DK_808;
     }
     {   /* the corners: TUNE TONE DECY SNAP at 0 / 127, ACC 127, velocity 127, the whole kit at once: no clipping */
         int32_t pk = 0, q;

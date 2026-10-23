@@ -106,7 +106,7 @@ static struct {
 
 static int16_t *ed_val(uint32_t i)
 {
-    return i < P_COUNT ? &TSEL->p[i] : i == P_COUNT + G_A4 ? &tuning_a4 : &song.g[i - P_COUNT];
+    return i<P_COUNT?&TSEL->p[i]:i==P_COUNT+G_A4?&tuning_a4:i==P_COUNT+G_BUDGET?&settings_budget:&song.g[i-P_COUNT];
 }
 static uint32_t ed_step_sig(const step_t *s)
 {
@@ -224,7 +224,7 @@ static const param_desc_t *ed_desc(uint32_t scope, uint32_t id, int16_t **vp)
     }
     if (scope == 1 && id < G_COUNT) {
         *vp = ed_val(P_COUNT + id);
-        return &GP[id];
+        return global_desc(id);
     }
     return 0;
 }
@@ -280,9 +280,7 @@ static int ed_flash_stop(void)
 #include "editor_preferences.c"
 #include "editor_backup.c"
 #include "editor_fm6.c"
-#include "editor_cz.c"
 #include "editor_native.c"
-#include "editor_prophet.c"
 
 static void ed_motion_reply(uint32_t k, uint32_t rc)
 {
@@ -318,7 +316,7 @@ static int ed_args_ok(uint32_t cmd, const uint8_t *a, uint32_t n)
         return n == 2u || n == 10u || n == 13u || (n == 14u && a[13] <= 100u);
     case ED_MOTION:
         return (n == 1u || (n == 2u && a[1] == 2u) || (n == 3u && a[1] == 1u && a[2] <= 1u) ||
-                (n == 6u && a[1] == 3u) || (n == 4u && a[1] == 4u)) && a[0] < NTRK;
+                (n == 6u && a[1] == 3u) || ((n == 4u || n == 6u) && a[1] == 4u)) && a[0] < NTRK;
     case ED_BANK_SONG: case ED_SONG:
         return n && (a[0] == 1u || n == 1u);
     default:
@@ -337,19 +335,86 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     const param_desc_t *d;
     if (!ed_args_ok(cmd, a, na))
         return;
-    if(cmd==ED_SET || (cmd==ED_TRACK_PARAM && na==4u) || cmd==ED_FM6_PUT || cmd==ED_CZ_PUT || (cmd==95u && na && a[0]>=1u && a[0]<=3u))momentary_restore();
+    if(cmd==ED_SET || (cmd==ED_TRACK_PARAM && na==4u) || cmd==ED_FM6_PUT || (cmd==95u && na && a[0]>=1u && a[0]<=3u))momentary_restore();
     ed_begin(cmd);
-    if(ed_prophet_handle(cmd,a,na)){ed_send();return;}
 
     if (ed_ui_handle(cmd, a, na)) { ed_send(); return; }
     if (ed_backup_handle(cmd, a, na)) { ed_send(); return; }
     if (ed_fm6_handle(cmd, a, na)) { ed_send(); return; }
-    if (ed_cz_handle(cmd, a, na)) { ed_send(); return; }
     if (ed_native_handle(cmd, a, na)) { ed_send(); return; }
     switch (cmd) {
+    case 100: {
+#ifdef FM1_IRQ_TARGET
+        if(na){ed_b(1);break;}
+        uint32_t values[8u+NPART];fm1_irq_off();
+        values[0]=fm1_clock_mhz_of(fm1_clock_mult());values[1]=audio_timer5_max_ticks;values[2]=audio_irq_max_ticks;
+        values[3]=MELODEE_AUDIO_PROFILE;values[4]=MELODEE_AUDIO_BENCH;values[5]=MELODEE_ADMISSION;values[6]=HALF_FRAMES;
+        for(uint32_t p=0;p<NPART;p++)values[7u+p]=voice_contract_cap(&trk[p]);
+        values[7u+NPART]=(uint32_t)settings_budget;
+        fm1_irq_on();ed_b(0);ed_b(2);ed_b(8u+NPART);
+        for(uint32_t k=0;k<8u+NPART;k++)for(uint32_t j=0;j<5u;j++)ed_b(values[k]>>(7u*j));
+#else
+        ed_b(2);
+#endif
+        break;
+    }
+    case 98: {
+#if MELODEE_AUDIO_PROFILE
+        uint32_t values[AP_COUNT*3u+5u];
+        if(na>1u || (na && a[0]>1u)){ed_b(1);break;}
+        fm1_irq_off();
+        for(uint32_t k=0;k<AP_COUNT;k++){
+            values[k*3u]=audio_profile[k].ticks;values[k*3u+1u]=audio_profile[k].calls;values[k*3u+2u]=audio_profile[k].max_ticks;
+        }
+#if MELODEE_DUAL_CORE
+        values[AP_COUNT*3u]=audio_worker.job_ticks;values[AP_COUNT*3u+1u]=audio_worker.wait_ticks;
+        values[AP_COUNT*3u+2u]=audio_worker.jobs;values[AP_COUNT*3u+3u]=audio_worker.waits;
+#else
+        for(uint32_t k=0;k<4u;k++)values[AP_COUNT*3u+k]=0;
+#endif
+#ifdef FM1_IRQ_TARGET
+        values[AP_COUNT*3u+4u]=fm1_clock_mhz_of(fm1_clock_mult());
+#else
+        values[AP_COUNT*3u+4u]=0;
+#endif
+        if(na && a[0]){
+            memset(audio_profile,0,sizeof audio_profile);
+#if MELODEE_DUAL_CORE
+            audio_worker.job_ticks=audio_worker.wait_ticks=audio_worker.waits=0;
+#endif
+        }
+        fm1_irq_on();ed_b(0);ed_b(1);ed_b(AP_COUNT);
+        for(uint32_t k=0;k<AP_COUNT*3u+5u;k++)for(uint32_t j=0;j<5u;j++)ed_b(values[k]>>(7u*j));
+#else
+        ed_b(2);
+#endif
+        break;
+    }
+#if MELODEE_AUDIO_BENCH
+    case 99: {
+        if(na==3u && a[0]==2u && a[1]<NTRK && a[2]<=FM6_OPL){
+            fm1_irq_off();fm6_fn_set(a[1],FN_ENGINE,a[2]);fm1_irq_on();ed_b(0);break;
+        }
+        if(na!=1u || a[0]>1u){ed_b(1);break;}
+        fm1_irq_off();audio_bench_until=a[0]?fm1_ticks()+30u*24000000u:0;fm1_irq_on();
+        ed_b(0);break;
+    }
+#endif
+#if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
+    case 97: {
+        uint32_t rc=0;
+        if((na==6u || (na==7u && a[6]<=1u)) && a[0]<=15u && a[1]<FX_COUNT && a[2]<FX_COUNT && a[3]<FX_COUNT){
+            fx_profile_request=a[0]?((uint32_t)(na==7u?a[6]:0u)<<30u)|((uint32_t)a[0]<<26u)|((uint32_t)a[5]<<19u)|((uint32_t)a[4]<<12u)|((uint32_t)a[3]<<8u)|((uint32_t)a[2]<<4u)|a[1]:0;
+        }else if(na)rc=1;
+        uint32_t values[14];fm1_irq_off();values[0]=fx_profile_control;values[13]=fx_hw_status;
+        for(uint32_t k=0;k<4u;k++){values[1+k*3]=fx_profile_ticks[k];values[2+k*3]=fx_profile_blocks[k];values[3+k*3]=fx_profile_max[k];}fm1_irq_on();
+        ed_b(rc);for(uint32_t k=0;k<14u;k++)for(uint32_t j=0;j<5u;j++)ed_b(values[k]>>(j*7u));
+        break;
+    }
+#endif
 #if MELODEE_USB_AUDIO
-    case ED_AUDIO_STATS: {                         /* flags: 1 resets maxima, 2 voices, 4 cores, 8 resource/cache banks */
-        uint32_t snapshot[47] = {0}, k, count = na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
+    case ED_AUDIO_STATS: {                         /* flags: 1 resets maxima, 2 voices, 4 cores, 8 memory, 16 part victims */
+        uint32_t snapshot[64] = {0}, k, count = na && (a[0] & 32u) ? 64u : na && (a[0] & 16u) ? 55u : na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
         fm1_irq_off();
         snapshot[0] = ua.play_alt;
         snapshot[1] = ua.cap_alt;
@@ -394,7 +459,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             snapshot[23] = fm1_core1_fault.count;     /* CPU1 faults: either retires the worker */
         }
 #endif
-        if (count == 47u) {
+        if (count >= 47u) {
             snapshot[32] = fm1_cache.status;
             snapshot[33] = fm1_cache.con_before;
             snapshot[34] = fm1_cache.data_before;
@@ -414,14 +479,35 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
                     (uintptr_t)resource[r].ptr < (uintptr_t)_resource_cache_end)
                     snapshot[46] += resource[r].size;
         }
+        if (count >= 55u)
+            for (uint32_t p = 0; p < NPART; p++) {
+                snapshot[47u+p] = shed_part[p];
+                snapshot[51u+p] = voice_kills_part[p];
+            }
+        if(count==64u){
+            /* Upper envelope includes measured C entry/exit and allows one
+             * TIMER5 preemption during the short assembly footer, plus 4 us
+             * for register/timestamp/return overhead at supported clocks. */
+            uint32_t upper=(audio_irq_max_ticks+audio_timer5_max_ticks+96u+23u)/24u;
+            snapshot[55]=audio_full_max_us>upper?audio_full_max_us:upper;snapshot[56]=audio_full_last_us;
+            snapshot[57]=audio_deadline_misses;snapshot[58]=audio_target_exceeded;
+            snapshot[59]=audio_batch_pairs;snapshot[60]=capacity_steals;snapshot[61]=admission_rejections;
+            snapshot[62]=MELODEE_ADMISSION;
+#if MELODEE_AUDIO_BENCH
+            snapshot[63]=(uint32_t)audio_bench_active()|(audio_bench_shed_requests<<1u);
+#endif
+        }
         if (na && (a[0] & 1u)) {
+            audio_full_max_us=0;
+            audio_irq_max_ticks=0;
+            audio_timer5_max_ticks=0;
             ua.poll_max_ticks = ua.service_max_ticks = melodee_dbg.max_us = 0;
 #if MELODEE_DUAL_CORE
             audio_worker.max_job_ticks = audio_worker.max_wait_ticks = 0;
 #endif
         }
         fm1_irq_on();
-        ed_b(count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
+        ed_b(count == 64u ? 7u : count == 55u ? 6u : count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
         for (i = 0; i < count; i++)
             for (k = 0; k < 5u; k++)
                 ed_b(snapshot[i] >> (7u * k));
@@ -432,7 +518,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case ED_CORE1_TEST: {        /* mode: 0 report, 1 misread request, 2 null job, 3 stalled job, 4 reboot */
         uint32_t mode = na ? a[0] : 0u, rc = 0, waited = 0, v[16];
         if (mode == 4u) {                           /* (a[1] 1: keep fm1_core1_bar, else clear it as power-off does) */
-            bootguard.pending = 0;                  /* (intentional: not a failed boot) */
+            reset_intended();
             if (!(na > 1u && a[1]))
                 fm1_core1_bar.magic = 0;
             fm1_reboot();
@@ -470,7 +556,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
                 core1_test_count_only = na > 1u && a[1];
             for (i = 0; i < FM1_RAILS; i++)
                 v[i] = fm1_power_get(i);
-            v[3] = (uint32_t)fm1_core1_barred(); v[4] = bootguard.failed; v[5] = 0;
+            v[3] = (uint32_t)fm1_core1_barred(); v[4] = bootguard.failed;
+            v[5] = 0;                           /* (reserved: the boot retune's undo flag until 1.3.4, which never retunes) */
             fm1_clock_regs(v + 6);
             v[11] = audio_worker.misread; v[12] = fm1_core1_fault.count;
             v[13] = fm1_cpu_ticks();
@@ -522,7 +609,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             else if (a[1] == 4u) {
                 uint32_t id = a[3] | ((a[2] & 64u) << 1);
                 if (motion_param(id) || (id >= MO_NATIVE && id < MO_NATIVE + MO_NATIVE_N))
-                    motion_delete_event(t, a[2] & 63u, id);
+                    motion_delete_event(t, a[2] & 63u, na==6u ? id|(motion_native_event(id,ed_rv(a+4))?256u:0u) : id|512u);
                 else rc = 1;
             }
             else rc = 1;
@@ -532,7 +619,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         break;
     }
     case ED_INFO:
-        ed_str("MELODEE " MELODEE_VERSION, 24);
+        ed_str("TESSERA " MELODEE_VERSION, 24);
         ed_b(NENGINES);
         ed_b(P_COUNT);
         ed_b(G_COUNT);
@@ -547,21 +634,20 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(0x42); ed_b(1); ed_b(3); /* bounded full-backup read + restore */
         ed_b(0x50); ed_b(1); ed_b(NPAT); ed_b(CHAIN_ROWS);     /* bank controls: 73/74 */
         ed_b(0x46); ed_b(1); ed_b(FM6_NFAC); ed_b(0);   /* FM6 patches: cmds 68..71 */
-        ed_b(0x43); ed_b(1); ed_b(CZ_BYTES & 127u); ed_b(CZ_BYTES >> 7); ed_b(0); ed_b(0); /* old CZ bank controls retired */
-        ed_b(0x35);ed_b(1);ed_b(ENGI_PROPHET);ed_b(USER_GENERAL);ed_b(USER_NATIVE_FM);ed_b(USER_NATIVE_CZ);ed_b(USER_NATIVE_P5);ed_b(0);ed_b(1); /* Prophet/native stable namespaces */
-        ed_b(0x4e); ed_b(1); ed_b(NATIVE_FM_SLOTS); ed_b(0); ed_b(NATIVE_CZ_SLOTS&127u); ed_b(NATIVE_CZ_SLOTS>>7); /* native user pools, command 78 */
+        ed_b(0x35);ed_b(1);ed_b(0);ed_b(USER_GENERAL);ed_b(USER_NATIVE_FM);ed_b(USER_NATIVE_CZ);ed_b(USER_NATIVE_P5);ed_b(0);ed_b(1); /* native stable namespaces
+                                                     * (its engine 0: no Prophet; ENGI_PROPHET until it was retired, 2026-10-22) */
+        ed_b(0x4e); ed_b(1); ed_b(NATIVE_FM_SLOTS); ed_b(0); ed_b(0); ed_b(0); /* native user pools, command 78 (CZ-1's: 0, retired) */
         break;
     case ED_GET:
     case ED_SET:
         if (na < 2u || !(d = ed_desc(a[0], a[1], &vp)))
             return;
-        if (cmd == ED_SET && na >= 4u && !(chain_busy() && !a[0] && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
-            if (a[0] == 1 && a[1] == G_ENGSEL) {          /* engine change: the safe path (1 without MELODEE_FM4:
-                                                           * DIGITAL's first preset, as FM6) */
+        if (cmd == ED_SET && na >= 4u && !(a[0] ? global_reserved(a[1]) : param_reserved(a[1])) && !(chain_busy() && !a[0] && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
+            if (a[0] == 1 && a[1] == G_ENGSEL) {          /* engine change: the safe path */
                 set_engine((uint32_t)clamp(ed_rv(a + 2), 0, NENGINES - 1));
             } else if (d->max > d->min) {
                 *vp = (int16_t)enum_orig(d, clamp(ed_rv(a + 2), d->min, d->max));
-                if (a[0] == 1 && a[1] == G_A4)
+                if (a[0] == 1 && (a[1] == G_A4 || a[1] == G_BUDGET))
                     settings_save();
                 if (a[0] == 0) {
                     (void)motion_capture(TSEL, a[1], *vp);
@@ -620,11 +706,6 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case ED_PRESET:                                        /* engine, preset */
         if (na < 2u || a[0] >= NENGINES)
             return;
-#if !MELODEE_FM4
-        if (a[0] == ENGI_DIGITAL)                          /* a DIGITAL preset (retired): its sound, as FM6 */
-            fm4_load_preset(TSEL, a[1]);
-        else
-#endif
         {
             if (a[0] != TSEL->eng_req)
                 set_engine(a[0]);
@@ -659,7 +740,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         room = sizeof ed_out - ed_n - 2u - 18u - 4u - 1u;
         for (i = s0; i < en->npresets && n < 127u; i++, n++) {
             uint32_t len = 0;
-            while (len < 20u && en->presets[i].name[len])
+            const char *nm = eng_preset(en, i)->name;
+            while (len < 20u && nm[len])
                 len++;
             if (len + 1u > room)
                 break;
@@ -668,7 +750,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(a[0]);
         ed_b(n);
         for (i = 0; i < n; i++)
-            ed_str(en->presets[s0 + i].name, 20);
+            ed_str(eng_preset(en, s0 + i)->name, 20);
         for (i = 0; i < 2u; i++)                           /* then the two edit-page titles */
             ed_str(en->page_title[i], 8);
         ed_b(en->npresets);                                /* then all presets and this page's first: the */
@@ -865,7 +947,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             return;
         t = &trk[a[0]];
         d = ed_tdesc(t, a[1]);
-        if (na >= 4u && !(chain_busy() && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
+        if (na >= 4u && !param_reserved(a[1]) && !(chain_busy() && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
             if (d->max > d->min)                           /* as SET: clamped; a fixed value stays */
                 t->p[a[1]] = (int16_t)enum_orig(d, clamp(ed_rv(a + 2), d->min, d->max));
             (void)motion_capture(t, a[1], t->p[a[1]]);
@@ -962,7 +1044,7 @@ static void ed_service(void)
     uint32_t n;
     ed_sync();                                             /* v2 pushes (while watched) */
     if(!ota_frame_get(&p,&n))return;
-    if(p5_native_frame(p,n)){ota_frame_done();return;}
+    if(general_sysex_frame(p,n)){ota_frame_done();return;}
     if (n < 4u || p[0] != ED_HDR0 || p[1] != ED_HDR1 || p[2] != ED_HDR2)
         return;
     ed_w.last_ms = fm1_ms;                                 /* any request keeps WATCH alive */

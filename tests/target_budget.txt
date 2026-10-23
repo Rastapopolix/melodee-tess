@@ -6,8 +6,6 @@
 midi_parameter 47
 audition_tick 129
 click_render 30
-analog_render 393
-phase_render 127
 sid_render 1204
 formant_render 314
 trio_render 341
@@ -38,27 +36,26 @@ dr_cb 68
 dr_cy 114
 dr_hat 37
 dr8_run 20
-slicer_track 632
 fm1_alnk0_irq 18778
 # Standalone voice-loop baseline from 83cdcdc's track_render, compiled
 # noinline with the same target flags. Existing ISR/engine limits unchanged.
 track_render_audio 821
-mod_begin 158
+# mod_begin +24 (2026-10-16, melodee-tess): Tessera's cords join the matrix (cord.c, out of line); with neither
+# slots nor cords it still returns at once.
+mod_begin 182
 mod_voice 30
 mod_end 7
-perf_begin 28
-perf_mute 21
-perf_pre 27
-perf_block 507
-perf_master 31
-rev_room 218
-rev_spring 126
-cz_native_render 529
-cz_native_wave 0
-drum_source 10
+# Quarter-rate Tape now includes the fused wet interpolation/mix, replacing full-rate passes.
+# These are static compiled-loop sizes; device before/after proves the actual CPU reduction.
+fx_tape 259
+# Eight-control snapshot loop is now local and visible here; it replaces
+# drum808_values' full-track copy. The original PCM conversion loop remains.
+drum_source 15
 drum_limit 22
 drum_color 19
-dr_metal_tune 7
+# Private scratch pointer adds one loop instruction; concurrent voices no
+# longer race on global metal increments. All other kernel budgets retained.
+dr_metal_tune 8
 d9_render_bd 224
 d9_render_sd 280
 d9_render_tom 3064
@@ -66,6 +63,14 @@ d9_render_rim 4383
 d9_render_clap 1047
 d9_render_smp 1444
 
-# Native fp32 Prophet kernels, r3 + fprev1 disassembly.
-p5_samples 1075
-p5_mod_samples 105
+# FX performance run: normal target, reduced-rate kernels and send-aware track sum.
+fx_filter 176
+fx_down 126
+fx_up 141
+fx_time 249
+fx_reverb 1016
+mix_fx_samples 82
+mix_extra_sends 94
+fx_bus_kernel 267
+# Full-rate stereo chorus: two integer taps; no sample-loop calls or divides.
+fx_chorus 97

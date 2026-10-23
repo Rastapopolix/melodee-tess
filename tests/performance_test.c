@@ -12,8 +12,8 @@ static void assert_capture_poison(void){for(uint32_t i=0;i<CTL*NTRK;i++)assert(t
 static void setup(void)
 {
     memset(trk,0,sizeof trk);memset(&song,0,sizeof song);host_tracks_init();
-    for(uint32_t k=0;k<NTRK;k++){host_preset(&trk[k],0,0);trk[k].p[P_CHOR]=trk[k].p[P_REV]=trk[k].p[P_DIST]=0;}
-    usb.up=usb.config=1;usb.suspended=0;ua_reset();
+    for(uint32_t k=0;k<NTRK;k++){host_preset(&trk[k],HOST_SYNTH,HOST_PLAIN);trk[k].p[P_RESERVED34]=trk[k].p[P_RESERVED36]=trk[k].p[P_RESERVED33]=0;}
+    usb.up=usb.config=1;usb.suspended=0;ua_reset();ua_cap_channels=4;
 }
 static void capture_transitions(void)
 {
@@ -43,13 +43,10 @@ static void cache_transitions(void)
     setup();track_t *t=&trk[0];trk_note_on(t,60,100);
     for(int32_t k=-64;k<=64;k+=16){
         t->p[P_LEVEL]=(int16_t)(k+64);t->p[P_PAN]=(int16_t)k;
-        t->p[P_CHOR]=(int16_t)(k+64);t->p[P_REV]=(int16_t)(64-k);song.g[G_TUNE]=(int16_t)k;
+        t->p[P_RESERVED34]=(int16_t)(k+64);t->p[P_RESERVED36]=(int16_t)(64-k);song.g[G_TUNE]=(int16_t)k;
         mix_block(out,CTL);
         assert(mix_cache[0].lvl==LEVEL_Q12[t->p[P_LEVEL]&127]);
         assert(mix_cache[0].gl==4096-(k>0?k*64:0) && mix_cache[0].gr==4096+(k<0?k*64:0));
-        assert(mix_cache[0].c==t->p[P_CHOR]*258 && mix_cache[0].r==t->p[P_REV]*258);
-        int32_t max=mix_cache[0].c>mix_cache[0].r?mix_cache[0].c:mix_cache[0].r;
-        assert(mix_cache[0].xmax==0x7fffffff/(max|1));
         int32_t pitch=k>=0?k*16/100:-((-k*16+99)/100);
         assert(tune_cache.pitch==pitch && tune_cache.fine==(k*16-pitch*100)*2367/16000);
     }
@@ -69,9 +66,9 @@ static void silent_clocks(void)
     t->xf_on=1;t->xf=3;memcpy(t->pe_old,t->p+P_E0,sizeof t->pe_old);
     track_render_audio(t,b,CTL,0);assert(t->xf==2);t->xf_on=0;
     track_render(t,b,CTL);for(uint32_t i=0;i<CTL;i++)assert(!b[i]);
-    t->tail=16;t->p[P_DIST]=100;
+    t->p[P_RESERVED33]=100;
     for(uint32_t i=0;i<CTL;i++)part_buf[i]=123456;
-    mix_part(t,CTL);for(uint32_t i=0;i<CTL;i++)assert(!part_buf[i]);
+    mix_part(t,CTL);for(uint32_t i=0;i<CTL;i++)assert(part_buf[i]==123456);
     host_preset(t,ENGI_FM6,0);fm6_part_t *p=fm6_part(0);p->dc_x1=123;p->dc_y1=456;
     uint32_t tick=p->pt.tick;track_render_audio(t,b,CTL,0);
     assert(p->pt.tick!=tick && !p->dc_x1 && !p->dc_y1);

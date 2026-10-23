@@ -1,0 +1,268 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 Theo Dainis (melodee-tess) */
+/* MODS (LFO family; MOD's place: its page hidden, ui.c page_visible; tessera-notes/docs/design/phase2/cords.png): the cords (cord.c)
+ * four to a screen, as MOD's rows:
+ * "2  [2] ENV -> [4] DECAY  -25 %" over the amount's bar from the middle; the cord KNOB 2 is on: a card. The knobs as
+ * MOD's: KNOB 1 the source (--, then T1 LFO .. T4 NOTE), 2 the cord, 3 the destination (--, then T1 PITCH ..), 4 the
+ * amount. A cord without a source is a fixed move: KNOB 4 its OFFSET. OCT+: a bipolar source's polarity, BI (both
+ * ways from the knob) or UNI (folded to 0..1: one way, "+" after its name). Included by ui_pages.c. */
+
+static int32_t accel(uint32_t role, int32_t s, int32_t range);                       /* ui_input.c */
+static int32_t list_accel(uint32_t role, int32_t s, uint32_t total, uint32_t *fast);
+static uint8_t cord_ui_sel;                             /* the cord KNOB 2 is on: 0 .. CORD_LIVE - 1 */
+
+/* every frame (ui_input): a route of MOD's that came in (a project, a sound) into a cord (cord.c cord_adopt); no
+ * room: MODS FULL, once for each route more left */
+static void cu_adopt(void)
+{
+    static uint32_t was;
+    uint32_t left = cord_adopt();
+    if (left > was) ui_message("MODS FULL");
+    if (left != was) ui.force = 1;
+    was = left;
+}
+
+#define CU_NSRC (1u + NTRK * (CS_N - 1u))               /* KNOB 1's list: --, then track by track */
+#define CU_DPT (CD_N - 2u)                              /* a track's destinations (none, the retired one: not listed) */
+#define CU_NDST (1u + NTRK * CU_DPT)
+static uint32_t cu_src_of(const cord_t *c) { return c->src ? 1u + c->src_trk * (CS_N - 1u) + c->src - 1u : 0u; }
+static uint32_t cu_dst_k(uint32_t code) { return code - 1u - (code > CD_RETIRED_CL_RULE); }   /* code -> its place */
+static uint32_t cu_dst_code(uint32_t k) { return k + 1u + (k + 1u >= CD_RETIRED_CL_RULE); }
+static uint32_t cu_dst_of(const cord_t *c) { return c->dst ? 1u + c->dst_trk * CU_DPT + cu_dst_k(c->dst) : 0u; }
+
+/* the source's name, "+" after it when UNI folds it (cord.c cord_fold_on) */
+static const char *cu_src_name(const cord_t *c)
+{
+    static char b[12];
+    if (!c->src) return "--";
+    str_cpy(b, cord_src_name(c->src), sizeof b - 1u);
+    if (cord_fold_on(c)) str_cpy(b + str_len(b), "+", 2);
+    return b;
+}
+
+/* a destination's name: E1..E8 by the destination track's engine (as MOD names them) */
+static const char *cu_dst_name(const cord_t *c)
+{
+    if (c->dst >= CD_E1 && c->dst <= CD_E8)
+        return mod_dst_name(&trk[c->dst_trk % NTRK], MD_E1 + (c->dst - CD_E1));
+    return cord_dest(c->dst) ? cord_dest(c->dst)->name : "--";
+}
+
+/* the move's percentage as "+40 %" (an amount, or a fixed cord's offset) */
+static int32_t cu_pct(const cord_t *c) { return c->src ? c->amount : c->offset; }
+static void cu_pct_text(char *b, int32_t v)
+{
+    char n[8];
+    fmt_int(n, v < 0 ? -v : v);
+    b[0] = v < 0 ? '-' : v > 0 ? '+' : ' ';
+    str_cpy(b + 1, n, 8);
+    str_cpy(b + str_len(b), " %", 3);
+}
+
+/* a chip: the track's number on its colour, then the name */
+static void cu_chip(int32_t x, int32_t y, int32_t w, uint32_t tr, const char *s, int on, int has_trk, uint16_t bg)
+{
+    uint16_t fill = on ? ux_mix(bg, T_THEME, 30) : ux_mix(bg, T_LINE, 50);
+    char num[2] = {(char)('1' + (tr & 3u)), 0};
+    cv_rrect(x, y, w, 18, 5, fill, bg);
+    if (has_trk) {
+        cv_rrect(x + 3, y + 3, 12, 12, 3, on ? T_TRK(tr) : T_DIM, fill);
+        cv_text_on(x + 6, y + 4, &AF_X, num, T_BG, on ? T_TRK(tr) : T_DIM);
+        x += 14;
+        w -= 14;
+    }
+    cv_free_text(x + 4 + (w - 8 - (text_w(&AF_X, s) < w - 8 ? text_w(&AF_X, s) : w - 8)) / 2, y + 4, &AF_X, s,
+                 on ? T_TEXT : T_DIM, fill, w - 8);
+}
+
+static uint8_t cu_led_was[4];                           /* (cu_leds: the step each light shows; a row redrawn: none) */
+static uint8_t cu_bar_was[4];                           /* (and where each row's live mark is) */
+#define CU_Y 22                                         /* the rows: 48 px each from y 22 (as MOD's), the chips at 220 */
+#define CU_H 48
+static void cu_rows(void)
+{
+    static uint32_t sig;
+    uint32_t k, top = cord_ui_sel / 4u * 4u, sg = cord_ui_sel * 7u + ux.gen * 977u + ux.pal * 31u;
+    for (k = 0; k < CORD_LIVE; k++) {
+        const uint8_t *b = (const uint8_t *)cord_get(k);
+        uint32_t i;
+        for (i = 0; i < sizeof(cord_t); i++)
+            sg = (sg ^ b[i]) * 16777619u;
+    }
+    for (k = 0; k < NTRK; k++)
+        sg = (sg ^ trk[k].engine) * 16777619u;          /* (E1..E8's names) */
+    if (!ui.force && sg == sig)
+        return;
+    sig = sg;
+    memset(cu_led_was, 0xFF, sizeof cu_led_was);        /* (the rows over their lights and moves: cu_leds again) */
+    memset(cu_bar_was, 0xFF, sizeof cu_bar_was);
+    for (k = 0; k < 4u; k++) {
+        const cord_t *c = cord_get(top + k);
+        int sel = top + k == cord_ui_sel, on = c->dst != CD_OFF && (c->amount || c->offset);
+        uint16_t bg = sel ? T_LIFT : T_BG;
+        int32_t a = cu_pct(c);
+        char b[16];
+        cv_begin(240, CU_H, T_BG);
+        if (sel) {
+            cv_rrect(4, 1, 232, CU_H - 4, 7, T_THEME, T_BG);
+            cv_rrect(5, 2, 230, CU_H - 6, 6, bg, T_THEME);
+        }
+        fmt_int(b, (int32_t)(top + k + 1u));
+        cv_text_on(top + k + 1u >= 10u ? 8 : 12, 7, &AF_S, b, sel ? T_THEME : T_MID, bg);
+        cu_chip(26, 6, 74, c->src_trk, cu_src_name(c), c->src != CS_OFF, c->src != CS_OFF, bg);
+        cv_rect(104, 14, 10, 2, on ? T_MID : T_DIM);    /* an arrow */
+        cv_line(110, 11, 113, 14, on ? T_MID : T_DIM);
+        cv_line(110, 17, 113, 14, on ? T_MID : T_DIM);
+        cu_chip(118, 6, 74, c->dst_trk, cu_dst_name(c), c->dst != CD_OFF, c->dst != CD_OFF, bg);
+        cu_pct_text(b, a);
+        cv_text_r(232, 9, &AF_X, b, on ? (sel ? T_THEME : T_SEC) : T_DIM, bg);
+        cv_blit(0, (uint32_t)(CU_Y + (int32_t)k * CU_H));   /* (its move: cu_leds) */
+    }
+}
+
+/* a row's activity light under its number (tessera-notes/docs/design/phase2/cords.png): how far the cord moves its destination
+ * now (cord.c cord_share: the source by the amount, and the offset), in 8 steps of the theme's colour; and its move,
+ * the bar from the middle (its AMOUNT, or OFFSET), with a mark where it moves the destination now. Each its own small
+ * canvas, sent when it changes */
+#define CU_LED_X 9                                      /* 8 x 8 at (9, a row's y + 28) */
+#define CU_LED_Y 28
+#define CU_BAR_X 24                                     /* the move: 210 x 9 at (24, a row's y + 27), the bar 206 long */
+#define CU_BAR_W 210
+static void cu_bar(uint32_t k, const cord_t *c, int sel, int32_t s)
+{
+    uint16_t bg = sel ? T_LIFT : T_BG;
+    int on = cord_live(c);
+    int32_t a = cu_pct(c), m = 104, x = 2 + (a + 100) * 206 / 200, lx = m + clamp(s, -32768, 32768) * 103 / 32768;
+    cv_begin(CU_BAR_W, 9, bg);
+    cv_rect(2, 3, 206, 3, T_LINE);
+    if (a)
+        cv_rect(x < m ? x : m, 3, x < m ? m - x : x - m, 3, on ? (sel ? T_THEME : ux_mix(bg, T_THEME, 60)) : T_DIM);
+    cv_rect(m, 1, 1, 7, T_MID);
+    if (on && c->src)                                   /* (a fixed OFFSET: no mark, the bar says it) */
+        cv_rect(lx - 1, 0, 3, 9, T_TEXT);
+    cv_blit(CU_BAR_X, (uint32_t)(CU_Y + (int32_t)k * CU_H + 27));
+}
+static void cu_leds(void)
+{
+    uint8_t *was = cu_led_was;
+    uint32_t k, top = cord_ui_sel / 4u * 4u;
+    for (k = 0; k < 4u; k++) {
+        const cord_t *c = cord_get(top + k);
+        int32_t s = cord_live(c) ? cord_share(c) : 0;
+        uint8_t lv = (uint8_t)(cord_live(c) ? 1 + clamp((s < 0 ? -s : s) * 7 / 32768, 0, 7) : 0);
+        uint8_t key = (uint8_t)(lv | (top + k == cord_ui_sel) << 4 | (ux.pal & 7u) << 5);
+        uint8_t bk = (uint8_t)(clamp(s, -32768, 32768) * 103 / 32768 + 104);   /* (the mark's x, 1 .. 207) */
+        uint16_t bg = top + k == cord_ui_sel ? T_LIFT : T_BG;
+        if (ui.force || bk != cu_bar_was[k]) {
+            cu_bar_was[k] = bk;
+            cu_bar(k, c, top + k == cord_ui_sel, s);
+        }
+        if (!ui.force && key == was[k])
+            continue;
+        was[k] = key;
+        cv_begin(8, 8, bg);
+        if (lv)
+            cv_disc(4, 4, 6, lv > 1 ? ux_mix(T_DIM, T_THEME, (lv - 1) * 100 / 7) : T_DIM, 0);   /* (T_DIM: on either row) */
+        cv_blit(CU_LED_X, (uint32_t)(CU_Y + (int32_t)k * CU_H + CU_LED_Y));
+    }
+}
+
+/* the chips under the rows (ui_draw.c draw_columns): KNOB 1 the source, 2 the cord, 3 the destination, 4 the move */
+static void cu_columns(void)
+{
+    const cord_t *c = cord_get(cord_ui_sel);
+    char val[24], src[16];
+    if (c->src) {
+        src[0] = 'T'; src[1] = (char)('1' + c->src_trk); src[2] = ' ';
+        str_cpy(src + 3, cord_src_name(c->src), sizeof src - 3);
+    } else
+        str_cpy(src, "--", sizeof src);
+    draw_column(0, "", src, c->src && cord_bipolar(c->src, c->src_trk) ? (c->uni ? "UNI" : "BI") : "",
+                c->src ? VAL(0u) : T_DIM, -1, ICON_NONE);
+    fmt_int(val, (int32_t)cord_ui_sel + 1);
+    draw_column(1, "MOD", val, "/16", VAL(1u), (int32_t)cord_ui_sel * 1000 / (CORD_LIVE - 1u), ICON_NONE);
+    if (c->dst) {
+        val[0] = 'T'; val[1] = (char)('1' + c->dst_trk); val[2] = ' ';
+        str_cpy(val + 3, cu_dst_name(c), sizeof val - 3);
+    } else
+        str_cpy(val, "--", sizeof val);
+    draw_column(2, "", val, "", c->dst ? VAL(2u) : T_DIM, -1, ICON_NONE);
+    cu_pct_text(val, cu_pct(c));
+    draw_column(3, c->src ? "" : "OFS", val, "", cu_pct(c) ? VAL(3u) : T_DIM, (cu_pct(c) + 100) * 1000 / 200, ICON_NONE);
+}
+
+/* KNOB 1's and 3's lists for the picker (ui_popup.c): their length and the cord's entry; 0: no list on that knob */
+static int cu_pick(uint32_t col, int32_t *count, int32_t *cur)
+{
+    const cord_t *c = cord_get(cord_ui_sel);
+    if (col != 0u && col != 2u)
+        return 0;
+    *count = (int32_t)(col ? CU_NDST : CU_NSRC);
+    *cur = (int32_t)(col ? cu_dst_of(c) : cu_src_of(c));
+    return 1;
+}
+/* entry i of a list: its name, its track (-1: none, the "--" first) */
+static const char *cu_pick_name(uint32_t col, int32_t i, int32_t *tr)
+{
+    cord_t c = {0};
+    *tr = -1;
+    if (i <= 0)
+        return "--";
+    if (col == 0u) {
+        *tr = (i - 1) / (int32_t)(CS_N - 1u);
+        return cord_src_name((uint32_t)((i - 1) % (int32_t)(CS_N - 1u) + 1));
+    }
+    *tr = (i - 1) / (int32_t)CU_DPT;
+    c.dst = (uint8_t)cu_dst_code((uint32_t)(i - 1) % CU_DPT);
+    c.dst_trk = (uint8_t)*tr;
+    return cu_dst_name(&c);
+}
+
+/* OCT+ on MODS: the cord's polarity, BI <-> UNI (a source that is 0..1 already: nothing to fold) */
+static void cu_polarity(void)
+{
+    cord_t c = *cord_get(cord_ui_sel);
+    if (!c.src || !cord_bipolar(c.src, c.src_trk)) {
+        ui_message(c.src ? "UNI ALREADY" : "NO SOURCE");
+        return;
+    }
+    c.uni = (uint8_t)!c.uni;
+    (void)cord_set(cord_ui_sel, &c);
+    ui_message(c.uni ? "UNI: ONE WAY" : "BI: BOTH WAYS");
+    ui.force = 1;
+}
+
+/* a knob on CORDS (ui_input.c edit_param) */
+static void cu_knob(uint32_t slot, int32_t steps)
+{
+    cord_t c = *cord_get(cord_ui_sel);
+    int32_t v;
+    if (slot == 1u) {                                   /* (no ui.force: the rows, their lights and the chips redraw
+                                                         * by their own signatures; a whole frame flickered) */
+        cord_ui_sel = (uint8_t)clamp((int32_t)cord_ui_sel + (steps > 0 ? 1 : -1), 0, CORD_LIVE - 1);
+        return;
+    }
+    if (slot == 0u) {
+        v = clamp((int32_t)cu_src_of(&c) + list_accel(EN_K1, steps, CU_NSRC, 0), 0, CU_NSRC - 1);
+        c.src = v ? (uint8_t)((v - 1) % (CS_N - 1u) + 1u) : CS_OFF;
+        c.src_trk = v ? (uint8_t)((v - 1) / (CS_N - 1u)) : 0u;
+        if (c.src && !c.amount) { c.amount = c.offset; c.offset = 0; }   /* (one move shown: a fixed move becomes */
+        if (!c.src && c.amount) { c.offset = c.amount; c.amount = 0; }   /* the source's, and back) */
+    } else if (slot == 2u) {
+        int was = c.dst != CD_OFF;
+        v = clamp((int32_t)cu_dst_of(&c) + list_accel(EN_K1 + 2u, steps, CU_NDST, 0), 0, CU_NDST - 1);
+        c.dst = v ? (uint8_t)cu_dst_code((uint32_t)(v - 1) % CU_DPT) : CD_OFF;
+        c.dst_trk = v ? (uint8_t)((uint32_t)(v - 1) / CU_DPT) : 0u;
+        if (!was && c.dst && !c.amount && !c.offset) {  /* (connected: a move to hear at once) */
+            if (c.src) c.amount = 50;
+            else c.offset = 25;
+        }
+    } else {
+        v = clamp(cu_pct(&c) + accel(EN_K1 + 3u, steps, 200), -100, 100);
+        if (c.src) c.amount = (int8_t)v;
+        else c.offset = (int8_t)v;
+    }
+    (void)cord_set(cord_ui_sel, &c);
+    if (slot == 3u)                                     /* (SOURCE, DESTINATION: their list over the page, which */
+        ui.force = 1;                                   /* stays as it is under it: the chips alone, cu_under) */
+}

@@ -1,22 +1,24 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* MELODEE memory map.
- * Code + constants execute in place from XIP (app.bin offset 0 = 0x02000120).
- * 0x01C00000..0x01C06000 holds .ram_text (code that must run while the flash
+ * Code + constants execute in place from XIP (body offset 0 = 0x02001000; boot stub at 0x02000120).
+ * 0x01C00000..0x01C07F00 holds .ram_text (code that must run while the flash
  * is busy: the flash driver). Unused RAMTEXT/debug space ends at 0x01C07F00:
- * crt0 still writes STATUS in the last 256 bytes. Linker-derived SRAM tails
+ * the boot stub writes STATUS in the last 256 bytes. Linker-derived SRAM tails
  * join the audio resource banks without changing retained state or stacks.
+ * 0x01C7C000..0x01C7C01F belongs to the boot stub, across warm resets.
  * RAM  : .data/.bss (96 KiB)
  * POOL : big zero-initialised buffers (FX lines, canvases), section .pool
  * STACKS with 256-byte guard bands; NOINIT survives resets and UBOOT entry.
  * 0x01C7FD50.. is reserved: boot_info, boot-state mailbox, vector table. */
 MEMORY
 {
-    XIP    (rx)  : ORIGIN = 0x02000120, LENGTH = 0x8DFBC   /* the app area to 0x93000 (fm1pkg_make.py APP_SLOT) */
-    RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x6000
+    XIP    (rx)  : ORIGIN = 0x02001000, LENGTH = 0x8C000   /* body ends before commit-marker sector 0x91000 */
+    RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x7F00
     RAM    (rwx) : ORIGIN = 0x01C08000, LENGTH = 96K
-    POOL   (rw)  : ORIGIN = 0x01C20000, LENGTH = 0x54000
-    NOINIT (rw)  : ORIGIN = 0x01C7C000, LENGTH = 0x3D50
+    POOL   (rwx) : ORIGIN = 0x01C20000, LENGTH = 0x54000
+    NOINIT (rw)  : ORIGIN = 0x01C7C020, LENGTH = 0x3D30
     CACHE  (rw)  : ORIGIN = 0x01F28000, LENGTH = 28K
 }
 SECTIONS
@@ -36,6 +38,11 @@ SECTIONS
     _resource_data_start = _bss_end;
     _resource_data_end = ORIGIN(RAM) + LENGTH(RAM);
     .pool (NOLOAD) : { _pool_start = .; *(.pool*) . = ALIGN(4); _pool_end = .; } > POOL
+    /* .audio_text's C functions are aligned(16) where they are declared: placed by 2 bytes, an edit anywhere
+     * before them could start one off a word (FM6's control code was, 2026-10-23: plucky voices glitched) */
+    .audio_text : { _audio_start = .; *(.audio_text*) . = ALIGN(4); _audio_end = .; } > POOL AT > XIP
+    _audio_load = LOADADDR(.audio_text);
+    _guard_ram_end = SIZEOF(.audio_text) ? _audio_end : _dsp_end;
     .cpu1_stacks (NOLOAD) : {
         . = ALIGN(32); _cpu1_stacks_lo = .;
         KEEP(*(.cpu1_stacks))
@@ -44,9 +51,16 @@ SECTIONS
     _cpu1_ustack_top = _cpu1_stacks_lo + 4096;
     _cpu1_sstack_top = _cpu1_stacks_lo + 8192;
     _resource_end = ORIGIN(POOL) + LENGTH(POOL);
-    ASSERT(_resource_end - _resource_start >= 152K, "audio working arena below worst-case budget")
+    /* Complete resident interrupt/input graph trades arena capacity for code.
+     * Four largest engine states must fit 48 KiB (ram_audio_test); effect
+     * delay memory has its own admission/allocation limits. */
+    _resource_minimum = DEFINED(AUDIO_RESIDENT) ? 48K : 139K;
+    ASSERT(_resource_end - _resource_start >= _resource_minimum, "audio working arena below worst-case budget")
     .noinit (NOLOAD) : { *(.noinit*) . = ALIGN(4); _noinit_end = .; } > NOINIT
-    _resource_retained_start = _noinit_end;
+    /* These transfer/job buffers are always filled before use, never retained
+     * musical state. Keep diagnostic .noinit addresses ahead of them intact. */
+    .audio_scratch (NOLOAD) : { . = ALIGN(32); *(.audio_scratch*) . = ALIGN(4); _audio_scratch_end = .; } > NOINIT
+    _resource_retained_start = _audio_scratch_end;
     _resource_retained_end = ORIGIN(NOINIT) + LENGTH(NOINIT);
     /* Never part of .bss or startup zeroing: use only after HAL self-test. */
     _resource_cache_start = ORIGIN(CACHE);

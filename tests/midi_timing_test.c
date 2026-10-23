@@ -7,7 +7,6 @@ static uint32_t timing_now;
 #define MIDI_TICKS_PER_MS 24000u
 #define MIDI_CONTROL_NO_MAIN 1
 #include "midi_control_test.c"
-#include "frozen_project.h"
 
 static void timing_reset(uint32_t source, uint32_t start)
 {
@@ -117,6 +116,7 @@ static int timeline_test(void)
     }
     bad += check("24 MHz timer wrap preserves the exact six-clock step boundary", trk[0].seq_idx == 1 && trk[0].seq_pos == 0);
     timing_reset(2, 24000000u);
+    timing_packet(24000000u, 0xFA, 0, 0, 2); events_block(0);
     trk[0].seq_pos = 3072;
     trk[0].arp_pos = 2048;
     song.g[G_CLOCK] = 0;
@@ -142,6 +142,94 @@ static int phase_test(void)
         if (pulse % 6 == 0 && (trk[0].seq_idx != (pulse / 6) % 16 || trk[0].seq_pos != 0)) exact = 0;
     }
     bad += check("128 beats stay on exact steps through tempo changes and polling jitter", exact);
+    return bad;
+}
+static void tempo_packet(uint32_t start, uint32_t time, uint32_t status, uint32_t source)
+{
+    timing_packet(time, status, 0, 0, source);
+    /* TIMER4 wraps every ~179 s; the independent millisecond timer does not. */
+    fm1_ms = 1000u + (time - start) / MIDI_TICKS_PER_MS;
+    midi_in_ms[(mi_w - 1u) % MQ] = fm1_ms;
+    events_block(0);
+}
+static int tempo_flutter_test(void)
+{
+    int bad = 0;
+    for (uint32_t source = 1; source <= 2; source++) {
+        /* Alternate endpoint delays on the six-clock measurement windows,
+         * plus per-pulse polling jitter. Exercise the raw timer's wrap too. */
+        uint32_t start = 0xFFF00000u, time = start;
+        timing_reset(source, start);
+        song.rec = 0;
+        tempo_packet(start, start, 0xFA, source);
+        uint32_t min_beat = UINT32_MAX, max_beat = 0;
+        uint32_t min_advance = UINT32_MAX, max_advance = 0;
+        int stable = 1, exact = 1;
+        for (uint32_t pulse = 0; pulse <= 24u * 16u; pulse++) {
+            uint32_t delay = ((pulse / 6u) % 2u) * MIDI_TICKS_PER_MS +
+                             (pulse % 2u) * MIDI_TICKS_PER_MS / 4u;
+            tempo_packet(start, time + delay, 0xF8, source);
+            if (pulse >= 24u * 4u) {
+                if (song.g[G_BPM] != 120) stable = 0;
+                if (beat_samples() < min_beat) min_beat = beat_samples();
+                if (beat_samples() > max_beat) max_beat = beat_samples();
+            }
+            if (pulse % 6u == 0 && (trk[0].seq_idx != pulse / 6u % 16u || trk[0].seq_pos)) exact = 0;
+            /* Render half an ideal pulse after arrival: a jittery previous
+             * interval must not speed up / slow down this block's playhead. */
+            uint32_t before = trk[0].seq_pos;
+            timing_now = time + delay + 250000u;
+            fm1_ms = 1000u + (timing_now - start) / MIDI_TICKS_PER_MS;
+            events_block(0);
+            if (pulse >= 24u * 4u) {
+                uint32_t advance = trk[0].seq_pos - before;
+                if (advance < min_advance) min_advance = advance;
+                if (advance > max_advance) max_advance = advance;
+            }
+            time += 500000u;
+        }
+        bad += check(source == 1 ? "USB jitter keeps the BPM display at 120" : "TRS jitter keeps the BPM display at 120", stable);
+        bad += check("jitter moves the synced modulation period by less than 0.25 percent", max_beat - min_beat < FS / 800u);
+        bad += check("between-pulse playhead advances stay within two musical units", max_advance - min_advance <= 2u);
+        bad += check("filtered tempo keeps every six-clock step exactly on its pulse", exact);
+        /* A real large tempo change must lock in one six-clock window. */
+        uint32_t last = time - 500000u;
+        for (uint32_t pulse = 1; pulse <= 6u; pulse++) {
+            tempo_packet(start, last + pulse * 400000u, 0xF8, source);
+        }
+        bad += check("a real 120 to 150 BPM change locks within six clocks", song.g[G_BPM] == 150 && beat_samples() == FS * 2u / 5u);
+        /* Small edits still get through the filter and display hysteresis. */
+        last += 6u * 400000u;
+        for (uint32_t pulse = 1; pulse <= 24u * 4u; pulse++) {
+            tempo_packet(start, last + (uint32_t)((uint64_t)pulse * 60000u * MIDI_TICKS_PER_MS / (151u * 24u)), 0xF8, source);
+        }
+        bad += check("a one-BPM master edit reaches the display within four beats", song.g[G_BPM] == 151);
+        /* Fractional tempos near a rounding boundary must not alternate
+         * digits, including the shortest supported clock interval. */
+        static const uint32_t bpm10[] = {400, 730, 1205, 1370, 2395, 2400};
+        for (uint32_t k = 0; k < NELEM(bpm10); k++) {
+            timing_reset(source, start);
+            song.rec = 0;
+            tempo_packet(start, start, 0xFA, source);
+            int16_t shown = 0;
+            int settled = 1, precise = 1;
+            uint32_t expected = FS * 600u / bpm10[k];
+            for (uint32_t pulse = 0; pulse <= 24u * 16u; pulse++) {
+                uint32_t at = start + (uint32_t)((uint64_t)pulse * 600000u * MIDI_TICKS_PER_MS / (bpm10[k] * 24u));
+                uint32_t delay = ((pulse / 6u) % 2u) * MIDI_TICKS_PER_MS;
+                tempo_packet(start, at + delay, 0xF8, source);
+                if (pulse == 24u * 4u) shown = song.g[G_BPM];
+                if (pulse >= 24u * 4u) {
+                    if (song.g[G_BPM] != shown) settled = 0;
+                    if (beat_samples() + expected / 400u < expected || beat_samples() > expected + expected / 400u) precise = 0;
+                }
+            }
+            char label[100];
+            snprintf(label, sizeof label, "%s %u.%u BPM stays steady and modulation stays within 0.25 percent",
+                     source == 1 ? "USB" : "TRS", bpm10[k] / 10u, bpm10[k] % 10u);
+            bad += check(label, settled && precise && shown * 10 >= (int32_t)bpm10[k] - 10 && shown * 10 <= (int32_t)bpm10[k] + 10);
+        }
+    }
     return bad;
 }
 static int divisions_test(void)
@@ -195,6 +283,8 @@ static int lengths_and_swing_test(void)
     timing_packet(start, 0xFA, 0, 0, 2);
     for (uint32_t pulse = 0; pulse <= 192; pulse++) {
         timing_packet(start + pulse * 500000u, 0xF8, 0, 0, 2); events_block(CTL);
+        /* This fixture measures continuous capture beyond the first pass. */
+        song.rec_pass = 0;
         uint32_t units = pulse * 1024u, pair = units / 12288u, within = units % 12288u;
         /* SWING 100: 6144 + floor(6144*100/250) = 8601, then 3687. */
         uint32_t odd = within >= 8601u;
@@ -215,8 +305,11 @@ static int loop_replay_test(void)
         timing_packet(timing_now, 0xFA, 0, 0, 2);
         timing_packet(timing_now, 0xF8, 0, 0, 2);
         events_block(CTL);
+        /* Exercise the event store's cross-loop releases independently of the
+         * UI's one-pattern punch-out (covered in recording_test.c). */
+        song.rec_pass = 0;
         seq_advance(15u * 6144u + 5000u);
-        t->p[P_RECQ] = 3; /* optional playback 1/16 grid */
+        t->p[P_RECQ] = 3; /* commit a 1/16 grid when this take stops */
         /* Three paths retain the same late last-step original onset. */
         if (source == 0) input_on(t, 60, 111);
         else { timing_packet(timing_now, 0x90, 60, 111, source); events_block(CTL); }
@@ -251,9 +344,9 @@ static int recorded_gate_storage_test(void)
     pattern_request(&trk[0], 1);
     trk[0].step[2] = (step_t){{64}, 1, ST_NOTE, 0, 70, 0, 211};
     project_capture(&proj_scratch);
-    int ok = bank_pack(proj_wire_u.raw, &proj_scratch, 1) && bank_valid(proj_wire_u.raw, BANK_STORE_SIZE);
+    uint32_t n = tsp_pack(proj_wire_u.raw, &proj_scratch, 1); int ok = n && tsp_valid(proj_wire_u.raw, n);
     if (ok) {
-        project_restore_runtime(&proj_scratch); bank_restore(proj_wire_u.raw);
+        project_restore_runtime(&proj_scratch); tsp_restore(proj_wire_u.raw);
         ok = trk[0].step[2].acc == 211 && pattern_at(0, 0)->step[0].acc == 83;
     }
     return check("recorded gates survive project save/load in active and inactive banks", ok);
@@ -262,33 +355,8 @@ static int old_formats_and_overdub_test(void)
 {
     int bad = 0;
     timing_reset(2, 24000000u);
-    trk[0].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 96};
-    project_capture(&proj_scratch);
-    int ok = bank_pack(proj_wire_u.raw, &proj_scratch, 1);
-    /* Build the frozen 92-parameter FUN10/FBKD layout, not today's
-     * payload with an old magic. Its banks use n+5*time metadata. */
-    uint8_t legacy[PROJ_STORE_V11]; memset(legacy, 0, sizeof legacy);
-    frozen_project92(legacy,proj_wire_u.raw+8u,PROJ_REC_OFF-PROJ_PARAM_EXTRA);
-    uint32_t magic = PROJ_MAGIC_V10, size = PROJ_STORE_V11, sum;
-    memcpy(legacy, &magic, 4); memcpy(legacy + 4u, &size, 4);
-    sum = proj_hash(legacy, sizeof legacy - 4u); memcpy(legacy + sizeof legacy - 4u, &sum, 4);
-    for (uint32_t i = 0; i < NTRK * (NPAT - 1u) * NSTEP; i++) {
-        uint8_t *bytes = proj_wire_u.raw + BANK_EXTRA_OFF + i * 8u;
-        step_t st; bank_step_unpack(&st, bytes);
-        bytes[3] = (bytes[3] & 15u) | ((st.n + 5u * st.time) << 4);
-    }
-    frozen_bank_tail(proj_wire_u.raw + 8u + PROJ_STORE_V11, proj_wire_u.raw + 8u + PROJ_STORE_SIZE,
-            BANK_SIZE_E - 8u - PROJ_STORE_V11 - 4u);
-    memcpy(proj_wire_u.raw + 8u, legacy, sizeof legacy);
-    magic = BANK_MAGIC_D; size = BANK_SIZE_E;
-    memcpy(proj_wire_u.raw, &magic, 4); memcpy(proj_wire_u.raw + 4u, &size, 4);
-    sum = proj_hash(proj_wire_u.raw, BANK_SIZE_E - 4u); memcpy(proj_wire_u.raw + BANK_SIZE_E - 4u, &sum, 4);
-    ok &= bank_valid(proj_wire_u.raw, BANK_SIZE_E);
-    if (ok) bank_upgrade(proj_wire_u.raw);
-    ok &= bank_valid(proj_wire_u.raw, BANK_STORE_SIZE) && *(uint32_t *)proj_wire_u.raw == BANK_MAGIC &&
-          *(uint32_t *)(proj_wire_u.raw + 8) == PROJ_MAGIC;
-    bad += check("existing FUN10/FBKD projects migrate while retaining legacy GATE behavior", ok && !step_gate(&proj_scratch.t[0].step[0]));
     timing_reset(2, 24000000u);
+    timing_packet(24000000u, 0xFA, 0, 0, 2); events_block(0);
     track_t *t = &trk[0]; seq_start(); seq_advance(0);
     input_on(t, 60, 111); seq_advance(14000); input_off(t, 60);
     seq_stop(); seq_start(); seq_advance(0);
@@ -304,7 +372,7 @@ static int old_formats_and_overdub_test(void)
 #ifndef MIDI_TIMING_NO_MAIN
 int main(void)
 {
-    int bad = grid_test() + timeline_test() + phase_test() + divisions_test() + lengths_and_swing_test() +
+    int bad = grid_test() + timeline_test() + phase_test() + tempo_flutter_test() + divisions_test() + lengths_and_swing_test() +
               loop_replay_test() + recorded_gate_storage_test() + old_formats_and_overdub_test();
     printf("%s\n", bad ? "MIDI TIMING TEST FAILED" : "MIDI timing tests passed");
     return bad != 0;

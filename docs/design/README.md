@@ -42,12 +42,18 @@ Colours: background `#17141F`, panel `#1D1926`, surface `#221E2C`, raised `#2620
 
 Type (Rubik): labels 8.5-9 px / 500, capitals, in the track's colour; names 10 px (selected: 500); header 11 px / 500;
 values 15 px / 500 with 9 px units in mid; the chord root 30 px / 500, its quality 17 px / 500, the notes 11 px / 500.
+On the device the small faces are a pixel larger for legibility: X 10 px (the 9 px labels, units, chips) and S 12 px
+(the 11 px names, values, rows), each set on the smaller size's baseline and line height (tools/gen_aa_font.py lifts
+them a row), so every position below holds; the mocks keep 9 / 11 px.
 
 Stage (`stage_note_overlay`), all positions in device pixels:
 
-- Header, 18 px: play glyph at x 8; BPM 11 px / 500 at x 20; four track dots (r 2.5, x 54 + 8 k, y 11: the selected
-  white, the others dim); at the right a context chip 82 x 14 r 4 at x 150, filled in the track's colour, its text
-  9 px / 500 in the background colour (the engine: PROPHET-5, 909 KIT ..).
+- Header, 18 px: play glyph at x 8; BPM 11 px / 500 at x 20; then, only when they apply, the REC mark (12 px, REC
+  red: filled, the selected track armed; a ring, another track armed), the octave shift as an outlined pill ("+2",
+  "-1") and a song's row ("ROW 3"), then (a page) its dots; at the right a context chip 82 x 14 r 4 at x 150, filled
+  in the track's colour, its text 9 px / 500 in the background colour (the engine: PROPHET-5, 909 KIT ..). No track
+  dots: Stage's columns say which track, a page's sound bar starts with the track's numeral (filled in its colour),
+  then the engine and the sound.
 - Cards: 54 x 44 at x 4 + 58 k, y 22, r 6, surface; label 8.5 px at baseline 12, value 15 px at baseline 30, unit after
   it, gauge 42 x 3 r 1.5 at y 36 (line, filled in the track's colour). The knob turning: a fill of 22 % track colour
   over the surface, outlined in the track's colour.
@@ -73,8 +79,8 @@ One way to move on every screen with something to move through (Kerem, 2026-10-1
   to Stage. Enter: a list row's list, a slot's sheet (PROJECT, USER, the STOREs), the action picked, a sound page's
   sheet; NOTES: an empty step gets the last note played, a note opens its sheet (Length, Velocity, Chance, Slide,
   Delete note); the drum grid: an empty place gets the lane's hit, a hit opens its sheet (Accent, Chance, Clear hit:
-  hits have no velocity of their own). OCT+ held on NOTES, PATTERN: the pattern's sheet (Clear pattern,
-  Clear motion). A clearing row with nothing there says so instead of asking.
+  hits have no velocity of their own). OCT+ held on NOTES, PATTERN: the pattern's sheet (Quantize,
+  Double, Half, Euclid, Euclid turn, Clear pattern, Clear motion; Tessera's SEQ tools: seq_tools.c). A clearing row with nothing there says so instead of asking.
 - **SELECT** turns the pages, as before, NOTES too (Kerem, 2026-10-10): there KNOB 1 alone moves, the steps one by
   one (empty ones too) and a step's notes one at a time (a chord's, a take's), back onto the step before's last note.
 - **Direct pages stay direct**: one knob per track where speed matters (Stage, MIXER, PATTERNS, NEW SONG's roles);
@@ -82,7 +88,7 @@ One way to move on every screen with something to move through (Kerem, 2026-10-1
   track's pattern's sheet (Copy to.., Delete pattern; Kerem 2026-10-11). Copy to: the place it goes framed in the
   theme's colour on the track's row (the first empty one first, an empty place a "+"), the header "copy 1 to 4"; any
   knob moves it, OCT+ copies (over a pattern in use: "Replace pattern 2?" first), OCT- leaves. Delete pattern asks,
-  then empties it (its notes and motion; SAVE held undoes it).
+  then empties it (its notes and motion; EDIT held undoes it).
 
 | Screen | KNOB 1 | KNOB 2 | KNOB 3 / 4 | OCT+ | OCT- |
 |---|---|---|---|---|---|
@@ -104,7 +110,7 @@ TAKE JAM: REC held on SONG (elsewhere REC held captures).
 
 ## Popups (R6)
 
-- **Action sheet**: OCT+ on an item opens what can be done with it (KNOB 2 the row, KNOB 1 a row's value, OCT+ does
+- **Action sheet**: OCT+ on an item opens what can be done with it (KNOB 1 the row, KNOB 2 a row's value, OCT+ does
   it, OCT- closes); OCT+ held opens the page's own (a ⋯ in the header says there are some). A destructive row asks the
   question first. TOOLS is gone, its actions in these (Clear pattern: NOTES / PATTERN; Init sound: the sound pages;
   Delete section, Clear song: SONG); PROJECT / USER / FM6 STORE / P5 STORE are slot lists (no chips), a slot's sheet:
@@ -112,8 +118,9 @@ TAKE JAM: REC held on SONG (elsewhere REC held captures).
   USER on its slot, no sheet popped up (Kerem, 2026-10-10); OCT+ its sheet, on Save here (SAVE, OCT+, OCT+, OCT+). MOTION: no chips, its lanes (a parameter each,
   scaled to what it moves through, the playhead across); a lane's sheet: Play, Clear <lane>, Clear all motion. MOD:
   the four routes as rows (source -> destination, the amount's bar from the middle), the knobs' chips at the bottom.
-- **Picker**: a knob whose value is a list (wave, MOD source / destination, chord, delay division) shows the list
-  around its value while it turns, gone ST_KNOB_MS after the last turn; over the page as it is, not dimmed (2026-10-10:
+- **Picker**: a knob whose value is a list of names (wave, MOD source / destination, chord, delay division) shows the
+  list around its value while it turns (a list of numbers, such as GLO's DRUM channel, FM6's algorithm or a CZ
+  envelope step, steps on its card like its neighbours: Kerem, 2026-10-11), gone ST_KNOB_MS after the last turn; over the page as it is, not dimmed (2026-10-10:
   it comes with every turn of such a knob, and dimming sent the whole screen twice). SCALES keeps its own list page
   (Kerem: the list is intuitive), no picker.
 
@@ -127,13 +134,17 @@ TAKE JAM: REC held on SONG (elsewhere REC held captures).
 
 ## Pages: lists or knobs (R6)
 
-- **List pages** (set and leave): a row a setting (KNOB 2 the row, KNOB 1 its value, OCT+ a list value's full list,
-  OCT- back), the page's picture under the rows where it has one. SCL (OCT+ on Scale: the SCALES list), CHORD, VOICE
-  1-3 (one list), MPC, ENV DEST, LFO DEST, LFO 2, ARP 2, DLY 2, FM6's LFO and controller pages (a list each).
+- **List pages** (set and leave): only where there are more than four settings (Kerem, 2026-10-11: four or fewer are
+  the page's own four knobs). A row a setting (KNOB 1 the row, KNOB 2 its value, OCT+ a list value's full list, OCT-
+  back), the page's picture under the rows where it has one: SCL (OCT+ on Scale: the SCALES list; with Quantise MPC
+  a row for MPC degree, which had a page of its own), VOICE
+  1-3 (one list), FM6's LFO and controller pages (a list each).
   TEMPO, GLOBAL, SYSTEM stay knobs (BPM and TUNE are turned while playing, their digits roll); TEMPO's third knob is
   the selected track's Quantize (TIMING's page retired, Kerem 2026-10-10).
 - **Knob pages** (played while tweaked): four rings over the page's picture (R5): the engines' EDIT pages, ENV, LFO,
-  DLY, REVERB, CHORUS, FX, SLICER, ARP, PATTERN; MIXER, Stage, PATTERNS direct.
+  DLY, REVERB, CHORUS, FX, SLICER, ARP, PATTERN; and the pages of four settings or fewer: CHORD (over its chord),
+  ENV DEST, LFO DEST, LFO 2 (over the LFO), ARP 2 (over the notes it plays), DLY 2 (over the echoes); MIXER,
+  Stage, PATTERNS direct.
 - **ENV / LFO follow the engine** (Kerem, 2026-10-10): the Prophet, FM6 and CZ-1 have envelopes and LFOs of their own
   (the track's ADSR and ENV DEST do nothing there), so ENV visits theirs (P5 FLT ENV, AMP ENV, ENV MOD; FM6 EG RATE,
   EG LVL, PITCH EG, PITCH LV; CZ-1 each line's pitch, wave and amp envelope) and the track ADSR hides; LFO visits
@@ -149,9 +160,30 @@ TAKE JAM: REC held on SONG (elsewhere REC held captures).
   pages (on across the sections). The sections as tabs under the header, the pages of one as the header's dots.
 - **The map**: EDIT pressed on an EDIT page: a row a section, a tile a page (FM6: operators x their pages); KNOB 1 / 2
   move, OCT+ opens, OCT- closes.
-- **EDIT held**: the sections on the white keys; Init, Favourite, Undo, Store on the black keys. The engine is chosen
-  in the browser only (KNOB 4; Kerem, 2026-10-10).
+- **EDIT held**: undo; EDIT + OCT- / OCT+ undo/redo. Hold SAVE to save the current project. The engine is chosen
+  in the browser (KNOB 4).
 - **Init sound** (Kerem 2026-10-11: sound design from scratch): the engine's own INIT, nothing changed and dry:
   INIT PROPHET, INIT TONE, INIT SID, FM6's INIT VOICE (the DX7 init voice, a preset after F24 so the stores keep the
   factory's numbers); DRUM its 808 kit. The browser's KNOB 4 (the engine) loads the engine's INIT, and each engine's
-  INIT comes first in its sounds there; Init sound (the sound's sheet, EDIT held's black key) the engine's own.
+  INIT comes first in its sounds there; Init sound (the sound's sheet) the engine's own.
+
+## FX inserts (2026-10-12)
+
+FX opens the selected track's insert family. SELECT moves between FX 1, FX 2
+and FX 3, using the existing page dots; all three slots can run together. Each
+is an R5 knob page: four rings over a
+rounded picture, the existing track palette, Rubik faces, sound bar and footer.
+KNOB 1: the effect-name picker; KNOB 2: MIX; KNOB 3: RATE (ECHO: TIME, ROOM / REVERB: SIZE);
+KNOB 4: DEPTH / FOCUS / JITTER / BITE / REPEAT / DECAY. OCT+ opens the sound's
+actions, OCT- returns to Stage. FX held opens no keyboard layer. WIDTH says
+“All-pass L / dry R” and “Mono changes the tone”. MEMORY FULL appears in the
+picture when that slot's time-effect buffer cannot be allocated. REVERB says
+“Diffused stereo reverb”; ROOM keeps its existing character and picture.
+Reverb's fourth knob is DEPTH, combining wet body
+and longer sustain; MIX and SIZE stay separate. Effects
+belong to the track: preset loads, engine changes, Init sound and sound undo keep
+them. Projects and templates save the chain. Reduced processing rates apply
+only to effects, with no change to synth rendering. Screens for every effect
+and this state are rendered and linted in every palette by `tests/ui_render.c`.
+
+FX SEND uses the same four-ring page with SEND for the selected track and RETURN for the shared bus. SEND FX 1–3 keep the insert page layout, show TYPE / MIX / RATE or SIZE / CHAR or DEPTH, and identify SEND / RETURN and ALL TRACKS in the footer. These controls belong to the project and track, never the instrument preset. Shared MIX defaults fully wet.

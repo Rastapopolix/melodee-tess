@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Modulation matrix: per track four slots, each SRC -> DST by AMT (-64..63), added to the fixed
- * routings (ENV DEST, LFO DEST). Runs in the audio ISR (fx.c mix_part, voice.c track_render).
+ * routings (ENV DEST, LFO DEST). Runs in the audio ISR (mix.c mix_part, voice.c track_render).
  *
  * Sources, Q15:
  *   LFO   the track LFO with its FADE (as LFO DEST), bipolar; with LFO 2 POL UNI 0..1 (1.2)
@@ -24,7 +24,7 @@
  *            the fixed routings can reach, so the engines see no new range
  *     AMP    a gain <= 1: AMT > 0 the source opens it (AMT 64: silent at 0, full at 1), AMT < 0 closes it
  *            (bipolar sources as 0..1, as LFO DEST AMP); several AMP slots multiply
- *   per track, once per block: PAN, DIST CHO DLY REV (the sends), RATE (LFO rate), VIB (LFO DEST PIT, the
+ *   per track, once per block: PAN, RATE (LFO rate), VIB (LFO DEST PIT, the
  *     vibrato depth), E1..E8 (the engine's parameters P_E0..P_E7, named by the engine): AMT 64 at a full
  *     source = the parameter's whole range; the sum is clamped to its range
  *   DEPTH (#132, per track): the depth of the track LFO, a gain <= 1 on it as AMP is on the voice (AMT > 0 the source
@@ -36,13 +36,13 @@
  * envelope of the latest note-on's voice (one block late, 0 when it has ended).
  *
  * Per-block destinations are modulated in place: mod_begin writes the modulated values into t->p for the
- * part's block (its render and its mix in fx.c mix_part) and mod_end puts the stored values back. Both run
+ * part's block (its render and its mix in mix.c mix_part) and mod_end puts the stored values back. Both run
  * in the audio ISR, so nothing outside it ever sees a modulated value (the UI, the editor, projects and
  * presets read and write t->p from the main loop, which the ISR preempts; TIMER5 only fills the MIDI rings),
  * and the engines read t->p as before. An engine reads its parameters in note_on (events_block) unmodulated.
  * Nothing active (every slot with SRC, DST or AMT at 0): no work, and the sound is bit-identical. */
 enum { MS_OFF, MS_LFO, MS_ENV, MS_VEL, MS_KEY, MS_RAND, MS_MODW, MS_AT, MS_EXPR, MS_SH, MS_SLEW, MS_N };
-enum { MD_OFF, MD_PITCH, MD_CUT, MD_SHP, MD_AMP, MD_PAN, MD_DIST, MD_CHO, MD_DLY, MD_REV, MD_RATE, MD_VIB, MD_E1,
+enum { MD_OFF, MD_PITCH, MD_CUT, MD_SHP, MD_AMP, MD_PAN, MD_RESERVED6, MD_RESERVED7, MD_RESERVED8, MD_RESERVED9, MD_RATE, MD_VIB, MD_E1,
        MD_DEPTH = MD_E1 + 8, MD_N };              /* (append-only: the stored values keep their meaning) */
 _Static_assert(NELEM(N_MSRC) == MS_N && NELEM(N_MDST) == MD_N, "N_MSRC / N_MDST == MS_* / MD_*");
 _Static_assert(P_M2SRC == P_M1SRC + 3 && P_M4AMT == P_M1SRC + 11 && P_M4AMT + 1 == P_FM1_ATK, "matrix slots: 3 ids each");
@@ -51,11 +51,17 @@ _Static_assert(P_M2SRC == P_M1SRC + 3 && P_M4AMT == P_M1SRC + 11 && P_M4AMT + 1 
 #define MS_BIPOLAR(s) ((s) == MS_LFO || (s) == MS_KEY || (s) == MS_RAND || (s) >= MS_SH)
 #define MD_ENGINE(d) ((d) >= MD_E1 && (d) < MD_E1 + 8)           /* E1..E8: P_E0..P_E7 */
 
+/* Tessera's cords (cord.c) join the matrix here: up to CORD_MAX more parameters held per block, the per-track terms */
+#include "cord.h"
+static uint32_t cord_mask[NTRK];
+static uint8_t cord_envsrc;
+static __attribute__((noinline)) int32_t cord_depth(const track_t *t, int32_t g);   /* (out of mod_begin: */
+static __attribute__((noinline)) void cord_block(track_t *t, int32_t *off, int32_t lfo);   /* no cords, no cost) */
+
 /* the track parameter of a per-block destination */
 static uint32_t mod_param(uint32_t d)
 {
-    static const uint8_t ID[MD_E1] = {[MD_PAN] = P_PAN, [MD_DIST] = P_DIST, [MD_CHO] = P_CHOR, [MD_DLY] = P_DLY,
-                                      [MD_REV] = P_REV, [MD_RATE] = P_LRATE, [MD_VIB] = P_LD_PIT};
+    static const uint8_t ID[MD_E1] = {[MD_PAN] = P_PAN, [MD_RATE] = P_LRATE, [MD_VIB] = P_LD_PIT};
     return MD_ENGINE(d) ? P_E0 + d - MD_E1 : ID[d];
 }
 
@@ -65,10 +71,10 @@ static struct {                  /* the part in mix_part (one at a time) */
     uint8_t nv, nk;              /* voice terms, per-block parameters held */
     int32_t pit, cut, shp, gain; /* per voice, from the per-track sources (gain Q15) */
     int32_t ldep;                /* DEPTH: the track LFO's gain (Q15; 32767 = none, track_render leaves it alone) */
-    uint8_t vsrc[NMSLOT], vdst[NMSLOT];
-    int8_t vamt[NMSLOT];
-    uint8_t kid[NMSLOT];         /* per-block: the parameter, its stored value */
-    int16_t keep[NMSLOT];
+    uint8_t vsrc[NMSLOT + CORD_LIVE], vdst[NMSLOT + CORD_LIVE];   /* (and the cords' on their own track: cord.c) */
+    int8_t vamt[NMSLOT + CORD_LIVE];
+    uint8_t kid[NMSLOT + CORD_MAX];   /* per-block: the parameter, its stored value (and the cords') */
+    int16_t keep[NMSLOT + CORD_MAX];
 } mod;
 
 static uint32_t mod_seed = 0x2545F491u;
@@ -149,19 +155,19 @@ static __attribute__((noinline)) int32_t mod_depth(const track_t *t, int32_t lfo
     return g;
 }
 
-/* before a part's block (fx.c mix_part): the per-track offsets, the per-block destinations into t->p.
+/* before a part's block (mix.c mix_part): the per-track offsets, the per-block destinations into t->p.
  * 0 = no slot active (then nothing changed) */
 static __attribute__((noinline)) int mod_begin(track_t *t)
 {
     const int16_t *p = t->p;
-    int32_t lfo, off[NMSLOT];
+    int32_t lfo, off[NMSLOT + CORD_MAX];
     uint32_t k, j;
     mod.on = 0;
     for (k = 0; k < NMSLOT; k++)
-        if (p[P_M1SRC + 3u * k] && p[P_M1DST + 3u * k] && p[P_M1AMT + 3u * k])
+        if (p[P_M1SRC + 3u * k] && (((0x1FFFFFu & ~0x3C1u) >> ((uint32_t)p[P_M1DST + 3u * k] & 31u)) & 1u) && p[P_M1AMT + 3u * k])
             break;
-    if (k == NMSLOT)
-        return 0;
+    if (k == NMSLOT && !cord_mask[t - trk] && !((cord_envsrc >> (t - trk)) & 1u))
+        return 0;                                       /* (a cord reading its ENV: its voices report it) */
     lfo = mulq15(t->lfo_val, t->lfo_fade);              /* (the LFO of the block before: track_render ticks it) */
     mod.on = 1;
     mod.amp = 0;
@@ -169,11 +175,13 @@ static __attribute__((noinline)) int mod_begin(track_t *t)
     mod.pit = mod.cut = mod.shp = 0;
     mod.gain = 32767;
     mod.ldep = mod_depth(t, lfo);
+    if (cord_mask[t - trk])
+        mod.ldep = cord_depth(t, mod.ldep);
     if (mod.ldep < 32767) lfo = mulq15(lfo, mod.ldep);
     for (; k < NMSLOT; k++) {
         uint32_t s = (uint32_t)p[P_M1SRC + 3u * k], d = (uint32_t)p[P_M1DST + 3u * k];
         int32_t a = p[P_M1AMT + 3u * k], x;
-        if (!s || !d || d == MD_DEPTH || !a || s >= MS_N || d >= MD_N)
+        if (!s || !d || d == MD_DEPTH || (d >= MD_RESERVED6 && d <= MD_RESERVED9) || !a || s >= MS_N || d >= MD_N)
             continue;
         if (d <= MD_AMP) {                              /* per voice */
             mod.amp |= d == MD_AMP;
@@ -202,6 +210,8 @@ static __attribute__((noinline)) int mod_begin(track_t *t)
             off[j] += (((x * a) >> 6) * (pd->max - pd->min)) >> 15;
         }
     }
+    if (cord_mask[t - trk])
+        cord_block(t, off, lfo);
     for (j = 0; j < mod.nk; j++) {
         uint32_t id = mod.kid[j];
         const param_desc_t *pd = id >= P_E0 ? &ENGINES[t->engine]->edit[id - P_E0] : &TP[id];

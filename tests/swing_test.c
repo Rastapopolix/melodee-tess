@@ -96,52 +96,7 @@ static int test_seq(void)
 }
 
 /* --------------------------------------------------------- 3. SLICER --- */
-static int test_slicer(void)
-{
-    static const int C[][2] = {{100, 100}, {100, 0}, {0, 100}, {80, 70}, {0, 0}};
-    uint32_t c, k, f, miss = 0, lens = 0, blocks = 0;
-    int bad = 0;
-    for (c = 0; c < sizeof C / sizeof C[0]; c++) {
-        sl_t s;
-        host_tracks_init();
-        song.g[G_BPM] = 97;
-        set_swing(&trk[0], C[c][0], C[c][1]);
-        trk[0].p[P_SLRATE] = 1;
-        memset(&s, 0, sizeof s);
-        s.idx = 15;
-        for (k = 0; k < 32u; k++) {
-            sl_enter(&trk[0], &s);
-            lens += s.len != step_samples(&trk[0], s.base, s.idx);
-        }
-    }
-    bad += check("SLICER step lengths == the sequencer's (one helper) at 100+100, 100+0, 0+100, 80+70, 0+0", !lens);
 
-    host_tracks_init();
-    song.g[G_BPM] = 131;
-    for (k = 0; k < NTRK; k++) {                     /* every track past 100 in sum, the SLICER on */
-        trk[k].p[P_SLEN] = 16;
-        trk[k].p[P_SLRATE] = 1;
-        trk[k].p[P_SLCR] = SL_GATE;
-        trk[k].p[P_SLPAT] = (int16_t)(3u + k);
-        trk[k].p[P_SLDEPTH] = 127;
-        trk[k].p[P_SSWING] = (int16_t)(40 + 20 * k);
-    }
-    song.g[G_SWING] = 100;
-    memset(sl, 0, sizeof sl);
-    transport_req = 1;
-    for (f = 0; f < 8u * FS; f += CTL) {
-        int32_t o[2 * CTL];
-        mix_block(o, CTL);
-        blocks++;
-        for (k = 0; k < NTRK; k++) {                 /* the SLICER step that holds the block's first sample */
-            uint32_t idx = sl[k].pos >= CTL ? sl[k].idx : (sl[k].idx + 15u) & 15u;
-            miss += idx != trk[k].seq_idx % 16u;
-        }
-    }
-    transport_req = 2;
-    bad += check("SLICER on the sequencer's step, SWG 40..100 + global 100, 131 BPM, 4 tracks", !miss && blocks > 1000u);
-    return bad;
-}
 
 /* -------------------------------------------------------- 4. display --- */
 static const char *shown(const param_desc_t *d, int32_t v)
@@ -161,13 +116,13 @@ static int test_display(void)
         ok &= sw[k]->fmt == F_PCT && sw[k]->min == 0 && sw[k]->max == 100 && !strcmp(shown(sw[k], 100), "100") &&
               !strcmp(shown(sw[k], 50), "50") && !strcmp(shown(sw[k], 0), "0");
     ok &= !strcmp(shown(&TP[P_SUS], 127), "100") && !strcmp(shown(&TP[P_SUS], 64), "50") &&
-          !strcmp(shown(&TP[P_DLY], 0), "0");
+          !strcmp(shown(&TP[P_RESERVED35], 0), "0");
     return check("display: SWG / global SWG / ARP SWG 100 -> 100 %, 50 -> 50 %; 0..127 percents unchanged", ok);
 }
 
 int main(void)
 {
-    int bad = test_sum() + test_seq() + test_slicer() + test_display();
+    int bad = test_sum() + test_seq() + test_display();
     printf("swing: %s\n", bad ? "FAILED" : "all ok");
     return bad ? 1 : 0;
 }

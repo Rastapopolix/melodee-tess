@@ -3,26 +3,26 @@
 /* Small-canvas renderer (no full framebuffer). Draw text/lines into
  * an off-screen strip, then blit it in one DMA transfer. Pixels are stored
  * byte-swapped (the panel takes RGB565 big-endian).
- * Text and icons are 4-bit alpha bitmaps made at build time (tools/gen_aa_font.py: Rubik;
+ * Text and icons are 4-bit alpha bitmaps made at build time (tools/gen_aa_font.py: Chakra Petch;
  * tools/gen_icons.py: Melodee's own drawings). A glyph is trimmed to its ink box, advances are in 1/16 px, and
- * each glyph is rasterised at 1 << psh horizontal phases (S M 4, L 2: drawn at a pen of +0, +1/4 .. px);
+ * each glyph is rasterised at 1 << psh horizontal phases (2: drawn at a pen of +0, +1/2 px);
  * cv_text takes the phase that puts it within a phase step of its true place. Blending uses a 16-entry
  * ramp per (ink, background) pair, cached, so a pixel costs a nibble read and a store. Colours come from the theme tokens. */
 typedef struct { uint16_t off, adv; int8_t bx; uint8_t by, bw, bh; } aag_t;
 typedef struct {
     uint8_t h, asc, first, last, nex;   /* line height, baseline; ASCII range; extras */
-    uint16_t nk;                        /* kerning pairs */
+    uint8_t nkr;                        /* right kerning classes (0: no kerning) */
     const aag_t *g;
     const uint8_t *data;
-    const uint16_t *kkey;               /* a << 8 | b, sorted */
-    const int8_t *kd;                   /* 1/16 px */
+    const uint8_t *kl, *kr;             /* each glyph's left / right kerning class, 0 = no pair */
+    const int8_t *km;                   /* 1/16 px: [(left class - 1) * nkr + right class - 1] */
     const uint8_t *ex;                  /* codes of the extra glyphs */
     uint8_t psh;                        /* log2 of the phases per glyph: g[i << psh] .. g[(i << psh) + phases - 1] */
     const uint8_t *hc;                  /* data's Huffman code (cv_alpha_hc), 0 = 2 px per byte (cv_alpha) */
 } aafont_t;
 typedef struct { const char *name; uint16_t bg, surf, text, accent, trk[4]; } ui_pal_t;
 typedef struct { uint16_t off; uint8_t w; const char *label; } kc_t;
-#include "ui_fonts.h"                   /* AF_X 9 px / 500 (labels), AF_S 11 px / 400, AF_M 15 px / 500, AF_L 30 px / 500 */
+#include "ui_fonts.h"                   /* AF_X 10 px / 500 (labels), AF_S 12 px / 400, AF_M 15 px / 500, AF_L 30 px / 500 */
 #include "ui_palettes.h"
 #include "ui_keycaps.h"                 /* KC_*: the keycaps / badges (tools/gen_aa_keycaps.py), KNOB_* arcs */
 #define ELLIPSIS '\x85'                 /* the ellipsis glyph of AF_S and AF_M */
@@ -48,10 +48,25 @@ typedef struct { uint16_t off; uint8_t w; const char *label; } kc_t;
  * there while SPI reads the first; large graphs reuse the full canvas only
  * after its transfer finishes. No second full-screen-sized allocation. */
 #define CV_ALT_MAX (240u * 24u)                   /* (240 x 24: the diff's hashes took the rest, below) */
-static uint16_t cv_primary[CV_MAX] __attribute__((section(".pool")));
+/* Decoded projects use this canvas between draws. A borrow waits for SPI;
+ * the wire/archive buffer stays separate because transfers span UI frames. */
+static union {
+    uint16_t pixels[CV_MAX];
+    uint32_t work[CV_MAX / 2u];
+} cv_primary_u __attribute__((section(".pool")));
+#define cv_primary cv_primary_u.pixels
+#define CV_WORK_BYTES (sizeof cv_primary_u)
 static uint16_t cv_alt[CV_ALT_MAX] __attribute__((section(".pool")));
 static uint16_t *cv_px = cv_primary;
 static const uint16_t *cv_flight;
+static void *cv_work(void)
+{
+    if (cv_flight == cv_primary) {
+        lcd_sync();
+        cv_flight = 0;
+    }
+    return cv_primary_u.work;
+}
 static uint32_t cv_w, cv_h;
 static uint16_t cv_bg;           /* what cv_begin cleared the canvas to */
 static uint8_t cv_scroll;        /* 1: drawing a scrolled view (its text may run past the canvas) */
@@ -162,19 +177,18 @@ static int palette_track(uint32_t t)
     return 1;
 }
 
-/* settings store a tagged id (UI_PAL_TAG + index); 64..71 are Melodee 0.13's eight palettes, ids below 20
- * Felucca's twenty: both map to the nearest of today's */
-static uint32_t palette_from_stored(uint32_t v)
+/* settings store a tagged id (UI_PAL_TAG + the palette's slot, UI_PAL_SLOTS); a retired slot's (DAY's) is still a
+ * valid id and reads as the default, as does any other id */
+static uint32_t palette_slot_index(uint32_t v)       /* the index of stored id v, NPALETTES: none */
 {
-    if (v >= UI_PAL_TAG && v - UI_PAL_TAG < NPALETTES) return v - UI_PAL_TAG;
-    if (v >= 64u && v < 72u) return UI_PALETTE_MIGRATE64[v - 64u];
-    return v < 20u ? UI_PALETTE_MIGRATE[v] : UI_DEFAULT_INDEX;
+    uint32_t i;
+    for (i = 0; i < NPALETTES; i++)
+        if (v == UI_PAL_TAG + UI_PAL_SLOTS[i]) break;
+    return i;
 }
-static uint32_t palette_to_stored(uint32_t i) { return UI_PAL_TAG + i % NPALETTES; }
-static int palette_stored_ok(uint32_t v)
-{
-    return v < 20u || (v >= 64u && v < 72u) || (v >= UI_PAL_TAG && v - UI_PAL_TAG < NPALETTES);
-}
+static int palette_stored_ok(uint32_t v) { return v >= UI_PAL_TAG && v - UI_PAL_TAG <= UI_PAL_SLOTS[NPALETTES - 1u]; }
+static uint32_t palette_from_stored(uint32_t v) { return palette_slot_index(v) < NPALETTES ? palette_slot_index(v) : UI_DEFAULT_INDEX; }
+static uint32_t palette_to_stored(uint32_t i) { return UI_PAL_TAG + UI_PAL_SLOTS[i % NPALETTES]; }
 
 static inline uint16_t swap16(uint32_t c) { return (uint16_t)(((c >> 8) & 0xFFu) | ((c & 0xFFu) << 8)); }
 
@@ -214,10 +228,10 @@ static void cv_dim_rows(uint32_t r0)
 }
 /* ------------------------------------------------------------- diff --- */
 /* The SPI (12 MHz) is the UI's bottleneck: the whole screen takes ~77 ms. So a big canvas sent where it was sent
- * before (the same x, y, w, h) sends only what changed: DF_N such places keep 16-bit hashes of their 4-row bands and
+ * before (the same x, y, w, h) sends only what changed: DF_N such places keep 32-bit hashes of their 4-row bands and
  * 8-column blocks as last sent, and a blit sends the dirty band runs x the dirty block runs. Anything else written
  * over a place (another canvas, a fill: gfx_fill) marks the bands and blocks it covered dirty: sent again next time */
-#define DF_N 14u
+#define DF_N 9u                                         /* (tests/ui_render.c's LCD audit: as much sent as with 14) */
 #ifndef DF_MIN
 #define DF_MIN 2048u                                    /* (smaller canvases: sent whole) */
 #endif
@@ -225,10 +239,13 @@ static void cv_dim_rows(uint32_t r0)
 #define DF_BLK 8u
 #define DF_NB (240u / DF_BAND)
 #define DF_NK (240u / DF_BLK)
+#define DF_SLOTS 76u                                    /* a canvas's bands, then its blocks: at most 60 + 16 (CV_MAX) */
+#define DF_FITS() ((cv_h + DF_BAND - 1u) / DF_BAND + (cv_w + DF_BLK - 1u) / DF_BLK <= DF_SLOTS)
 static struct { uint64_t pb; uint32_t pk; uint8_t x, y, w, h, on; uint16_t use; } df_key[DF_N];   /* pb, pk: bands and
                                                                                     * blocks drawn over since (dirty) */
-static uint16_t df_sum[DF_N][DF_NB + DF_NK] __attribute__((section(".pool")));
-static uint16_t df_now[DF_NB + DF_NK] __attribute__((section(".pool")));
+static uint32_t df_sum[DF_N][DF_SLOTS] __attribute__((section(".pool")));   /* (16 bits: one changed block in 65536
+                                                                             * collided, left stale) */
+static uint32_t df_now[DF_SLOTS] __attribute__((section(".pool")));
 static uint16_t df_clock;
 
 static void df_damage(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t keep)   /* (keep: a place spared) */
@@ -262,7 +279,8 @@ static uint32_t df_find(uint32_t x, uint32_t y)        /* the canvas's place (DF
 }
 static void df_hash(void)                               /* the canvas's bands, then its blocks, into df_now */
 {
-    uint32_t nk = (cv_w + DF_BLK - 1u) / DF_BLK, r, k, i, band = 2166136261u, blk[DF_NK];
+    uint32_t nb = (cv_h + DF_BAND - 1u) / DF_BAND, nk = (cv_w + DF_BLK - 1u) / DF_BLK, r, k, i, band = 2166136261u;
+    uint32_t blk[DF_NK];
     for (k = 0; k < nk; k++)
         blk[k] = 2166136261u;
     for (r = 0; r < cv_h; r++) {
@@ -275,12 +293,12 @@ static void df_hash(void)                               /* the canvas's bands, t
             band = (band ^ h) * 16777619u;
         }
         if (r % DF_BAND == DF_BAND - 1u || r + 1u == cv_h) {
-            df_now[r / DF_BAND] = (uint16_t)(band ^ band >> 16);
+            df_now[r / DF_BAND] = band;
             band = 2166136261u;
         }
     }
     for (k = 0; k < nk; k++)
-        df_now[DF_NB + k] = (uint16_t)(blk[k] ^ blk[k] >> 16);
+        df_now[nb + k] = blk[k];
 }
 static void df_keep(uint32_t x, uint32_t y)             /* the canvas just sent whole: its place remembered */
 {
@@ -298,7 +316,7 @@ static void df_keep(uint32_t x, uint32_t y)             /* the canvas just sent 
     df_key[at].pb = 0;
     df_key[at].pk = 0;
     df_key[at].use = ++df_clock;
-    for (i = 0; i < DF_NB + DF_NK; i++)
+    for (i = 0; i < DF_SLOTS; i++)
         df_sum[at][i] = df_now[i];
 }
 /* canvas columns c0 .. c0+w-1 of rows r0 .. r0+h-1 to the screen: whole rows straight from the canvas, else gathered
@@ -354,7 +372,7 @@ static int df_diff(uint32_t x, uint32_t y)
     for (i = 0; i < nb; i++)
         anyb |= db[i] = df_now[i] != df_sum[e][i] || ((df_key[e].pb >> i) & 1u);
     for (i = 0; i < nk; i++)
-        anyk |= dk[i] = df_now[DF_NB + i] != df_sum[e][DF_NB + i] || ((df_key[e].pk >> i) & 1u);
+        anyk |= dk[i] = df_now[nb + i] != df_sum[e][nb + i] || ((df_key[e].pk >> i) & 1u);
     df_key[e].use = ++df_clock;
     df_key[e].pb = 0;
     df_key[e].pk = 0;
@@ -364,7 +382,7 @@ static int df_diff(uint32_t x, uint32_t y)
         db[i] = 1;
     for (i = 0; i < nk && !anyk; i++)
         dk[i] = 1;
-    for (i = 0; i < DF_NB + DF_NK; i++)
+    for (i = 0; i < DF_SLOTS; i++)
         df_sum[e][i] = df_now[i];
     nr = df_runs(db, nb, 1u, ra, rb);
     nc = df_runs(dk, nk, 2u, ca, cb);
@@ -453,7 +471,7 @@ static void gfx_forget(void)                            /* the panel's memory no
 
 static void cv_blit(uint32_t x, uint32_t y)
 {
-    uint32_t big = cv_w * cv_h >= DF_MIN;
+    uint32_t big = cv_w * cv_h >= DF_MIN && DF_FITS();
     if (fq_n)
         fq_cover(x, y, cv_w, cv_h);
     GFX_HOOK_BLIT(x, y, 0u);
@@ -493,7 +511,7 @@ static void cv_blit_from(uint32_t x, uint32_t y, uint32_t r0)
 static void cv_blit_spans(uint32_t x, uint32_t y, uint32_t a0, uint32_t aw, uint32_t b0, uint32_t bw)
 {
     uint32_t e;
-    if (cv_dim || cv_w * cv_h < DF_MIN) {
+    if (cv_dim || cv_w * cv_h < DF_MIN || !DF_FITS()) {
         cv_blit(x, y);
         return;
     }
@@ -515,7 +533,7 @@ static void cv_blit_spans(uint32_t x, uint32_t y, uint32_t a0, uint32_t aw, uint
         df_diff(x, y);
         return;
     }
-    for (uint32_t i = 0; i < DF_NB + DF_NK; i++)
+    for (uint32_t i = 0; i < DF_SLOTS; i++)
         df_sum[e][i] = df_now[i];
     df_key[e].use = ++df_clock;
     if (a0 < cv_w && aw)
@@ -620,11 +638,14 @@ static uint32_t rr_cov(int32_t r, int32_t i, int32_t j)
     return (uint32_t)n;
 }
 /* a filled rectangle with rounded corners (r <= 8), the corners anti-aliased against `under` (what lies
- * behind it): the flat look's cards, panels, rows, bars and buttons */
+ * behind it): the flat look's cards, panels, rows, bars and buttons. Tessera's tiles: every corner at most
+ * UI_TILE_R, whatever r the caller asks (0: square, Tessera's look) */
+#define UI_TILE_R 0
 static void cv_rrect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c, uint16_t under)
 {
     int32_t i, j;
     GFX_HOOK_CELL(x, y + cv_oy, x + w, y + h + cv_oy);   /* (the lint: what is drawn on it stays inside it) */
+    if (r > UI_TILE_R) r = UI_TILE_R;
     if (r > w / 2) r = w / 2;
     if (r > h / 2) r = h / 2;
     if (r < 1) {
@@ -646,11 +667,17 @@ static void cv_rrect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint
 }
 
 /* a disc of diameter d (px) centred on (cx, cy) (odd d: a pixel's centre; even: its corner), anti-aliased over
- * what is on the canvas (4 x 4 samples a pixel); ring: only its outer 1 px (the patterns' track numbers) */
+ * what is on the canvas (4 x 4 samples a pixel); ring 1: only its outer 1 px (the patterns' track numbers), 2: the
+ * whole disc, round (BOUNCE's balls, TIDE's dots) */
 static uint16_t mix565(uint16_t bg, uint16_t fg, uint32_t a);
 static void cv_disc(int32_t cx, int32_t cy, int32_t d, uint16_t c, int ring)
 {
     int32_t qx = cx * 8 + ((d & 1) ? 4 : 0), qy = (cy + cv_oy) * 8 + ((d & 1) ? 4 : 0), r = d * 4, ri = r - 8, x, y;
+    if (!ring) {                                        /* Tessera: a dot is a square tile, a pixel inside the disc's box */
+        int32_t e = d > 3 ? d - 1 : d;
+        cv_rect(cx - e / 2, cy - e / 2, e, e, c);
+        return;
+    }
     for (y = cy + cv_oy - d / 2 - 1; y <= cy + cv_oy + d / 2 + 1; y++)
         for (x = cx - d / 2 - 1; x <= cx + d / 2 + 1; x++) {
             int32_t n = 0, i, j;
@@ -658,7 +685,7 @@ static void cv_disc(int32_t cx, int32_t cy, int32_t d, uint16_t c, int ring)
             for (j = 0; j < 4; j++)
                 for (i = 0; i < 4; i++) {
                     int32_t dx = x * 8 + 1 + 2 * i - qx, dy = y * 8 + 1 + 2 * j - qy, q = dx * dx + dy * dy;
-                    n += q <= r * r && !(ring && q < ri * ri);
+                    n += q <= r * r && !(ring == 1 && q < ri * ri);
                 }
             if (n) {
                 uint16_t *p = &cv_px[(uint32_t)y * cv_w + (uint32_t)x];
@@ -668,6 +695,7 @@ static void cv_disc(int32_t cx, int32_t cy, int32_t d, uint16_t c, int ring)
 }
 static void cv_circle(int32_t cx, int32_t cy, int32_t d, uint16_t c, uint16_t under) { (void)under; cv_disc(cx, cy, d, c, 0); }
 static void cv_ring(int32_t cx, int32_t cy, int32_t d, uint16_t c) { cv_disc(cx, cy, d, c, 1); }
+static void cv_ball(int32_t cx, int32_t cy, int32_t d, uint16_t c) { cv_disc(cx, cy, d, c, 2); }
 /* column x from y a to y b (1/16 px, either order) 2 px thick, its ends anti-aliased, blended over the canvas: a
  * smooth trace drawn a column at a time (Stage's waveform, docs/design) */
 static void cv_vspan_aa(int32_t x, int32_t a, int32_t b, uint16_t c)
@@ -683,10 +711,15 @@ static void cv_vspan_aa(int32_t x, int32_t a, int32_t b, uint16_t c)
         *p = swap16(mix565(swap16(*p), c, (uint32_t)cov * 2u));
     }
 }
-/* a 1 px dashed outline, 3 on, 2 off (a pattern waiting: the design's dashed chip), its corners rounded (r) and solid */
+/* a 1 px dashed outline, 3 on, 2 off (a pattern waiting: the design's dashed chip), its corners rounded (r, at most
+ * UI_TILE_R) and solid */
 static void cv_dashed(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c)
 {
     int32_t i;
+    if (r > UI_TILE_R) r = UI_TILE_R;
+    if (r < 1) {                                    /* square: its four corner pixels solid */
+        cv_pset(x, y, c); cv_pset(x + w - 1, y, c); cv_pset(x, y + h - 1, c); cv_pset(x + w - 1, y + h - 1, c);
+    }
     for (i = r; i < w - r; i++)
         if ((i - r) % 5 < 3) { cv_pset(x + i, y, c); cv_pset(x + i, y + h - 1, c); }
     for (i = r; i < h - r; i++)
@@ -898,17 +931,11 @@ static uint32_t glyph(const aafont_t *f, uint32_t ch)
 
 static int32_t kern(const aafont_t *f, uint32_t a, uint32_t b)       /* 1/16 px */
 {
-    uint32_t key = (a << 8) | b, lo = 0, hi = f->nk;
-    while (lo < hi) {
-        uint32_t m = (lo + hi) / 2u;
-        if (f->kkey[m] == key)
-            return f->kd[m];
-        if (f->kkey[m] < key)
-            lo = m + 1u;
-        else
-            hi = m;
-    }
-    return 0;
+    int32_t i, j;
+    uint32_t l, r;
+    if (!f->nkr || (i = glyph_at(f, a)) < 0 || (j = glyph_at(f, b)) < 0 || !(l = f->kl[i]) || !(r = f->kr[j]))
+        return 0;
+    return f->km[(l - 1u) * f->nkr + r - 1u];
 }
 
 static uint32_t fold(const aafont_t *f, uint32_t c)
@@ -1180,7 +1207,7 @@ static int32_t kc_tag(const char *s, uint32_t *len)
     }
     return -1;
 }
-/* free text (S) that may start with a keycap, "[SAVE] HOLD TO UNDO", or have one after its first word,
+/* free text (S) that may start with a keycap, "[EDIT] HOLD TO UNDO", or have one after its first word,
  * "HOLD [GLO] QUICK": the word, the keycap, then the rest, cut to maxw */
 static int32_t cv_free_hint(int32_t x, int32_t y, const char *s, uint16_t fg, uint16_t bg, int32_t maxw)
 {

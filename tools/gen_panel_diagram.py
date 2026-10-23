@@ -270,7 +270,7 @@ def build(photo_path):
     text("what a button does held", 1009, 82, 13.5, 450, op=0.8)
 
     # right: the top row of buttons, lanes above the row (FX the highest, so no leader crosses)
-    top = (("FX", "Effects", "FX layer"), ("SCL", "Scale, chords", "SCL layer"), ("ENV", "Envelope", None),
+    top = (("FX", "Unused", None), ("SCL", "Scale, chords", "SCL layer"), ("ENV", "Envelope", None),
            ("LFO", "LFO, mod matrix", None), ("EDIT", "Engine", "EDIT layer"), ("GLO", "Mixer, global", "GLO layer"))
     RX, RW = 987, 190
     step = (PH - LH) / 5
@@ -313,10 +313,8 @@ def build(photo_path):
             y += 4 + (step - 20)
 
     CY = BY + LH + 16
-    B = card(23, CY, 527, H - 9, "Hold for a quick layer", "control_fx")
-    rows_of(B, (("FX", ("repeat, reverse, filter sweeps, tape stop, freeze,",
-                        "harmonizer; mutes on the black keys")),
-                ("GLO", ("mute, solo, tap tempo; KNOB 1–4 track levels",)),
+    B = card(23, CY, 527, H - 9, "Hold for a quick layer", "symbol_modular")
+    rows_of(B, (("GLO", ("mute, solo, tap tempo; KNOB 1–4 track levels",)),
                 ("SCL", ("a key sets the root; scale, chord keys",)),
                 ("EDIT", ("a white key picks the engine",))), 58, CY + 65)
     C = card(541, CY, 845, H - 9, "Hold a button", "symbol_stopwatch")

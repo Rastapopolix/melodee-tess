@@ -8,7 +8,7 @@
 static void scale_reset(void)
 {
     ui_power_on();
-    memset(midi_ch, 0, sizeof midi_ch); memset(midi_notes, 0, sizeof midi_notes);
+    memset(midi_ch, 0, sizeof midi_ch); memset(midi_sel_on, 0, sizeof midi_sel_on);
     memset(midi_owners, 0, sizeof midi_owners); memset(mchord, 0, sizeof mchord);
     mi_r = mi_w = 0; midi_in_overflow = 0;
     fm1_in.notes = kb_prev = 0; song.sel = 0; song.octave = 0;
@@ -124,10 +124,10 @@ static int play_test(void)
     midi(0x90, 62, 100);                              /* D4: the second white key -> B4 */
     bad += check("WHITE: a MIDI note plays its mapped note", sounding(t, 71) && !sounding(t, 62) && nsounding(t) == 1u);
     midi(0x90, 61, 100);                              /* C#4: black, silent, owns nothing */
-    bad += check("WHITE: a black-key note plays nothing", nsounding(t) == 1u && !midi_notes[0][61]);
+    bad += check("WHITE: a black-key note plays nothing", nsounding(t) == 1u && !mn_get(0, 61));
     midi(0x80, 61, 0);
     midi(0x80, 62, 0);
-    bad += check("WHITE: its note-off ends the mapped note, nothing hangs", !nsounding(t) && !midi_notes[0][62] &&
+    bad += check("WHITE: its note-off ends the mapped note, nothing hangs", !nsounding(t) && !mn_get(0, 62) &&
                  !midi_owners[0]);
     t->p[P_QUANT] = Q_ALL;
     midi(0x90, 61, 100);

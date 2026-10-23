@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* An engine's EDIT pages in sections (docs/design README "Sound pages, fast", mock/r7_sound_nav): Prophet's Osc,
- * Mixer, Filter ..; FM6's Algo, OP1 .. OP6 (the operator pages, once per operator: fm6_opsel), Pitch, LFO, Ctrl; CZ-1's
- * Line, Line 1, Pitch 1 ..; Store and Tools last. PRESETS jumps a section (to the page last used in it), SELECT turns
+/* An engine's EDIT pages in sections (docs/design README "Sound pages, fast", mock/r7_sound_nav): FM6's Algo,
+ * OP1 .. OP6 (the operator pages, once per operator: fm6_opsel), Pitch, LFO, Ctrl; Store last. PRESETS jumps a section (to the page last used in it), SELECT turns
  * the pages (on across the sections, as ever); the sections as tabs under the header, a section's pages as the
  * header's dots. EDIT pressed on an EDIT page: the map, a row a section, a tile a page (KNOB 1 across, KNOB 2 down,
  * OCT+ opens, OCT- or EDIT closes). EDIT held: the sections on the white keys (ui_layer.c).
@@ -9,13 +8,7 @@
 #define SEC_MAX 16
 #define SEC_TAB_H 16                                    /* the tabs: rows 18 .. 33 */
 static const struct { const char *prefix, *name; } SEC_RULE[] = {   /* a page's section by its title (first match) */
-    {"P5 OSC", "Osc"}, {"P5 B WAVES", "Osc"}, {"P5 MIXER", "Mixer"}, {"P5 FILTER", "Filter"}, {"P5 FLT ENV", "Filter"},
-    {"P5 AMP", "Amp"}, {"P5 ENV MOD", "Mod"}, {"P5 POLYMOD", "Mod"}, {"P5 MOD FLT", "Mod"}, {"P5 LFO", "LFO"},
-    {"P5 WHEEL", "Wheel"}, {"P5 UNISON", "Voice"}, {"P5 BEND", "Voice"}, {"P5 STORE", "Store"},
-    {"STORE", "Store"}, {"ALGO", "Algo"}, {"PITCH", "Pitch"}, {"FM LFO", "LFO"}, {"FM ", "Ctrl"},
-    {"CZ TOOLS", "Tools"}, {"CZ1 ", "Line 1"}, {"C1 PIT", "Pitch 1"}, {"C1 WAV", "Wave 1"}, {"C1 AMP", "Amp 1"},
-    {"CZ2 ", "Line 2"}, {"C2 PIT", "Pitch 2"}, {"C2 WAV", "Wave 2"}, {"C2 AMP", "Amp 2"}, {"CZ ", "Line"},
-    {"DCW", "Env"}, {"DCA", "Env"}, {"DCO", "Env"}, {"CZ LEVEL", "Env"}, {"OP", "Env"},
+    {"STORE", "Store"}, {"ALGO", "Algo"}, {"PITCH", "Pitch"}, {"FM LFO", "LFO"}, {"FM ", "Ctrl"}, {"OP", "Env"},
     {"DRUM", "Drum"}, {"LANES", "Lanes"}, {"VOICE", "Voice"}, {"EDIT", "Sound"}};
 static const char *const SEC_OP[6] = {"OP1", "OP2", "OP3", "OP4", "OP5", "OP6"};
 static struct {
@@ -31,7 +24,7 @@ static const char *sec_rule(uint32_t i, uint32_t *plen)   /* page i's section na
     uint32_t r;
     for (r = 0; r < NELEM(SEC_RULE); r++) {
         uint32_t n = str_len(SEC_RULE[r].prefix);
-        if (!memcmp(PAGES[i].title, SEC_RULE[r].prefix, n)) {
+        if (str_prefix(PAGES[i].title, SEC_RULE[r].prefix)) {
             if (plen) *plen = n;
             return SEC_RULE[r].name;
         }
@@ -144,7 +137,7 @@ static void sec_chip(uint32_t i, char *b, uint32_t n)
         return;
     }
     for (k = 0; k < NELEM(STRIP); k++)
-        if (!memcmp(t, STRIP[k], str_len(STRIP[k])) && t[str_len(STRIP[k])]) {
+        if (str_prefix(t, STRIP[k]) && t[str_len(STRIP[k])]) {
             t += str_len(STRIP[k]);
             break;
         }
@@ -157,36 +150,41 @@ static void sec_short(uint32_t i, char *b, uint32_t n)   /* .. in words ("Flt en
     menu_words(b, c, n);
 }
 
-/* the tabs under the header: the section shown filled, its neighbours; as many as fit around it */
-static void sec_tabs(void)
+/* tabs under the header: name[cur] filled, its neighbours; as many as fit around it (sig: what they show) */
+static void tabs_draw(const char *const *name, uint32_t n, uint32_t cur, uint32_t sig)
 {
     static uint32_t drawn;
-    uint32_t cur, k, first, sig;
+    uint32_t k, first;
     int32_t x, w;
-    sec_build();
-    cur = sec_of(ui.page);
-    sig = cur * 7u + sec.n * 131u + sec.eng * 1031u + ux.gen * 977u + ux.pal * 31u + song.sel;
     if (!ui.force && sig == drawn)
         return;
     drawn = sig;
     for (first = cur; first > 0u; first--) {           /* from the furthest back that still lets cur fit */
         for (x = 6, k = first - 1u; k <= cur; k++)
-            x += text_w(&AF_X, sec.name[k]) + 15;
+            x += text_w(&AF_X, name[k]) + 15;
         if (x > 236)
             break;
     }
     cv_begin(240, SEC_TAB_H, T_BG);
-    for (x = 6, k = first; k < sec.n; k++) {
+    for (x = 6, k = first; k < n; k++) {
         int on = k == cur, far = (k > cur ? k - cur : cur - k) > 2u;
-        w = text_w(&AF_X, sec.name[k]) + 12;
+        w = text_w(&AF_X, name[k]) + 12;
         if (x + w > 236)
             break;
         if (on)
-            cv_rrect(x, 1, w, 14, 4, T_THEME, T_BG), cv_rrect(x + 1, 2, w - 2, 12, 3, ux_mix(T_BG, T_THEME, 22), T_THEME);
-        cv_text_c(x + w / 2, 3, &AF_X, sec.name[k], on ? T_THEME : far ? T_DIM : T_MID, on ? ux_mix(T_BG, T_THEME, 22) : T_BG);
+            cv_rrect(x, 0, w, 16, 5, T_THEME, T_BG), cv_rrect(x + 1, 1, w - 2, 14, 4, ux_mix(T_BG, T_THEME, 22), T_THEME);
+        cv_text_c(x + w / 2, 3, &AF_X, name[k], on ? T_THEME : far ? T_DIM : T_MID, on ? ux_mix(T_BG, T_THEME, 22) : T_BG);
         x += w + 3;
     }
     cv_blit(0, H_HEAD);
+}
+/* an engine's sections as the tabs */
+static void sec_tabs(void)
+{
+    uint32_t cur;
+    sec_build();
+    cur = sec_of(ui.page);
+    tabs_draw(sec.name, sec.n, cur, cur * 7u + sec.n * 131u + sec.eng * 1031u + ux.gen * 977u + ux.pal * 31u + song.sel);
 }
 
 /* ---------------------------------------------------------- the map --- */
@@ -225,10 +223,10 @@ static void smap_input(int32_t k1, int32_t k2, uint32_t oct)
     uint8_t pg[8];
     uint32_t n;
     if (k2)
-        smap.row = (uint8_t)clamp((int32_t)smap.row + (k2 > 0 ? 1 : -1), 0, (int32_t)sec.n - 1);
+        smap.row = (uint8_t)clamp((int32_t)smap.row + k2, 0, (int32_t)sec.n - 1);   /* (a detent a row: none lost) */
     n = smap_pages(smap.row, pg);
     if (k1)
-        smap.col = (uint8_t)clamp((int32_t)smap.col + (k1 > 0 ? 1 : -1), 0, (int32_t)n - 1);
+        smap.col = (uint8_t)clamp((int32_t)smap.col + k1, 0, (int32_t)n - 1);
     if (smap.col >= n)
         smap.col = (uint8_t)(n ? n - 1u : 0u);
     if (oct & 1u) {

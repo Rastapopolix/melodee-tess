@@ -1,153 +1,138 @@
-# Melodee (Tess)
+<p align="center"><img src="assets/brand/banner.png" alt="Tessera: generative firmware for the M-Vave FM-1" width="100%"></p>
 
-<p align="center"><img src="docs/media/splash_tess.png" alt="Melodee (Tess) boot splash: MELODEE, TESS, MULTI-ENGINE SYNTH" width="360"></p>
+<p align="center">
+<b><a href="https://rastapopolix.github.io/tessera/">Project page</a></b> ·
+<b><a href="https://rastapopolix.github.io/tessera/webapp/installer/">Install</a></b> ·
+<b><a href="https://rastapopolix.github.io/tessera/webapp/sim/">Try it in your browser</a></b> ·
+<b><a href="MANUAL.md">Manual</a></b> ·
+<b><a href="RECIPES.md">Recipes</a></b> ·
+<b><a href="https://github.com/Rastapopolix/tessera/releases/latest">Releases</a></b>
+</p>
 
-A fork of the M-Vave FM-1 alt-firmware [Melodee](https://github.com/keremimo/melodee) developed by **keremimo** (itself built upon *Felucca* by **Leo Kuroshita / Hügelton Instruments**). GPL-3.0-only. **Status: Experimental.**
+**Tessera** is a generative firmware for the M-Vave FM-1. Each of the four tracks can play its own steps, an
+arpeggio, or one of twelve generators, and the pages around them evolve the phrases, build song forms, pass hits
+between tracks and modulate anything from anything. GPL-3.0-only. **Status: Experimental.**
+By **Theo Dainis** ([Rastapopolix](https://github.com/Rastapopolix)).
 
-Melodee (Tess) is the testbed for **Tessera**, a standalone FM-1 firmware in progress with its own generative character. Expect features to change between releases.
+Tessera grew out of Melodee (Tess), a fork of [Melodee](https://github.com/keremimo/melodee) by **keremimo**,
+itself built on *Felucca* by **Leo Kuroshita / Hügelton Instruments**. Releases up to 1.3.x were published as
+Melodee (Tess).
 
-**Latest release: [v1.3.3](https://github.com/Rastapopolix/melodee-tess/releases/latest)**, based on Melodee 1.3.6 with picks from 1.4.1. Also listed on [altstrument.org](https://altstrument.org/firmware/m-vave-fm-1/melodee-tess).
-
-**[Try it in your browser](https://rastapopolix.github.io/melodee-tess/webapp/sim/)**: the firmware running on an on-screen FM-1, with the same engines, sequencer and Tessera generators. No FM-1 or install needed; press *Play the demo* to hear the generators.
+*Tessera* (plural *tesserae*) is the Latin word for the small tile of stone or glass in a mosaic. Each generator
+makes a short phrase; EVOLVE and FORM set mutated phrases side by side into sections, so a piece is built from small
+tiles arranged into a larger pattern. The word also meant a die, which suits the chance-driven generators.
 
 ---
 
 ## Install
 
 Flash it from your browser (Chrome or Edge, FM-1 connected directly by USB):
+**[Web installer](https://rastapopolix.github.io/tessera/webapp/installer/)**. Afterwards you can edit sounds
+and sequences from the computer with the [web editor](https://rastapopolix.github.io/tessera/webapp/editor/).
 
-**[Web installer](https://rastapopolix.github.io/melodee-tess/webapp/installer/)**
+Each release has two builds: `tessera-X.Y.fwsc` (standard, dual core: start here) and
+`tessera-X.Y-1core.fwsc` (single core, for FM-1s that crash with the standard build).
 
-After installing, you can edit sounds and sequences from the computer with the [web editor](https://rastapopolix.github.io/melodee-tess/webapp/editor/).
-
-Do not unplug the FM-1 while it is writing. This is experimental firmware and use is at your own risk. The installer page also has a way back to the official V15 firmware, with a backup first.
-
----
-
-## What It Is
-
-**Melodee (Tess)** adds algorithmic note generators to the four tracks, plus controls for evolving them over time, building song forms from them, and saving them with the project. Each track can stay a normal step sequencer or be switched to a Tessera engine. 
-
-The build outputs `melodee-tess.fwsc` (standard, dual core) and `melodee-tess-1core.fwsc` (single core, for FM-1s that crash with the standard build).
+Do not unplug the FM-1 while it is writing. This is experimental firmware: use it at your own risk. The installer
+page also has a way back to the official V15 firmware, with a backup first.
 
 ---
 
-## Using it
+## What's inside
 
-**[Read the manual](MANUAL.md)** for every Tess page, knob and shortcut, and recipes such as
-[Grids variations that repeat](MANUAL.md#recipe-grids-variations-that-repeat).
+* **Twelve generators** on SEQ > GEN: TURING, EUCLID, MARKOV, MORPH, ATLAS (with a fourth drum part), BOUNCE (and
+  FALL), AWAKE, POLY, QUAD, CONSTELLATION, SERIES and CHORD, besides the step sequencer and the arpeggiator.
+* **Shaping**: EVOLVE mutates a phrase every few bars, and **STEP EVOLVE** does the same to steps you wrote; FORM
+  builds sections such as AABA; TWEAK shifts, drops, humanises or follows another track; TWEAK 2 branches hits
+  to another track's sound, combines tracks with logic, and plays only on certain bars; LENGTH sets how long notes
+  hold.
+* **Harmony**: one key and scale for the whole project (**Key link**); a CHORD track plays a progression (or your
+  own), and **QNT CHRD** makes the other tracks follow it.
+* **Modulation**: 16 cords from any source to any destination on any track, generators included; slow organic
+  sources (TIDE, SWARM); live marks on every knob a cord moves, and **MATRIX** to see the whole patch.
+* **Print**: hold REC to turn what a generator played into ordinary steps.
+* **Sounds**: FM6 (six-operator FM, three engine models), TRIO and DRUM (808, 909, SID KIT).
+* **MIDI OUT** of every track and the generators, each on a channel of its own (GLO > MIDI OUT), and **CLOCK OUT**,
+  over USB.
+* **Its own look**: the SMALTI palette, square tiles, Chakra Petch, and an animated mosaic splash.
 
-The short version:
-
-* **Tap SEQ** for **GEN**, where **KNOB 1 (MODE)** picks what the track plays; SEQ then shows only that mode's pages. The modes are the step sequencer (`STEP`), the arpeggiator (`ARP`, also the ARP button) and the generators:
-  * **Turing**: a looping shift register in the style of a Turing Machine (`LENGTH`, `PROB`, `SPAN`).
-  * **Euclid**: Euclidean rhythms (`STEPS`, `PULSE`, `ROT`) on pitches picked by the track's seed.
-  * **Markov**: a random walk over 8 scale degrees (`LEAP`, `DENS`, `SPAN`).
-  * **Morph**: a rhythm blended between two preset patterns (`POS`, `SNP A`, `SNP B`).
-  * **Grids**: Mutable Instruments Grids' drum map, kick, snare and hat (`X`, `Y`, `DENS`).
-  * **Bounce**: balls bouncing in a box, a note at each wall hit (`SPEED`, `ANGLE`, `BALLS`).
-  * **Awake**: two loops in the style of norns' Awake, steps settable from the keys (`LEN A`, `LEN B`, `PROB`).
-  * **Poly**: four notes stepped on by four rhythms (`RHY`, `DIV`, `SPAN`).
-* **EVOLVE** mutates the phrase every few bars (`LOCK`, `EVERY`, `AMOUNT`); **ROLL** picks the track's seed, a line you can always come back to.
-* **FORM** builds sections A, B and C into forms such as `AABA`; **TWEAK** transposes, thins, humanises or follows another track.
-* **TWEAK 2** branches hits to another track's sound (BRANCH), combines them with another track's (LOGIC), and plays them only on certain bars (COND).
-* **Tap LFO to MODS** for 16 modulation cords between any source and destination on any track, generators included. Each track has slow organic sources, SLOTH and OCHD (LFO > ORGANIC); knobs show live marks where the cords move them, and **MATRIX** shows which tracks modulate which.
-* **Hold FX and turn a knob** to set how far a cord modulates that knob's parameter.
-* **Hold ARP and turn a knob** to see what that knob does.
+The **[manual](MANUAL.md)** covers every page, knob and shortcut; **[RECIPES.md](RECIPES.md)** has step-by-step
+patches and tips.
 
 ---
 
-## Saving & Storage
+## Gallery
 
-Generator settings, seeds, FORM sections and the cords are saved with the project, in their own flash object (`OBJ_TESSERA` at `0x9D000`) because the main project record is near capacity. The current block format is version 5 ("TSR5", with BRANCH, LOGIC, COND, SLOTH and OCHD); projects and backups saved by earlier Tess versions still load and convert.
-
-* **Tagging & Validation**: Each slot's block carries a hash of its parent project record. If hashes mismatch, the project loads with Tessera `OFF` to prevent stale data. Every field is range-checked.
-* **Compatibility**: Projects saved by stock Melodee load normally with Tessera `OFF`, and projects saved by this fork remain readable.
-
----
-
-## To come
-
-Planned for later Tess builds. Plans can change, and nothing here has a date yet.
-
-* **More sounds**: a pad voice, a chord pad/drone mode that holds one chord a bar and changes it with the FORM sections, and our own pad, pluck and lead voices.
-* **More generators**: a few smaller modes.
-* **A new UI**: an optional Monomachine-style look (black and white, shapes instead of colours) as a separate firmware build.
-
----
-
-## Visual Reference Gallery
-
-*The pages as v1.3.3 draws them, rendered on the host from the firmware's own drawing code (`tests/gallery_render.c` in the firmware sources) and shown at 2x.*
-
-### Sequencing
+*The pages as the firmware draws them, rendered on the host from the firmware's own drawing code
+(`tests/gallery_render.c`) in the default SMALTI palette, shown at 2x.*
 
 <table>
 <tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/seq_mode.png" alt="SEQ MODE" width="240"><br><b>SEQ MODE</b><br><sub>Tap SEQ for GEN: KNOB 1 picks STEP, ARP or a generator, and SEQ then shows only that mode's pages.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/home.png" alt="HOME" width="240"><br><b>HOME</b><br><sub>The four tracks, their sounds and knobs, with the scope below.</sub></td>
+<td align="center" valign="top" width="33%"><img src="assets/gallery/home.png" alt="HOME" width="240"><br><b>HOME</b><br><sub>The four tracks, their sounds and knobs.</sub></td>
+<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_constel.png" alt="CONSTELLATION" width="240"><br><b>CONSTELLATION</b><br><sub>Stars play as they cross the ship's crosshair (after the norns script Constellation).</sub></td>
+<td align="center" valign="top" width="33%"><img src="assets/gallery/gen_grids.png" alt="ATLAS" width="240"><br><b>ATLAS</b><br><sub>Inspired by Émilie Gillet's Grids (Mutable Instruments): kick, snare, hat and a fourth part.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top"><img src="assets/gallery/gen_quad.png" alt="QUAD" width="240"><br><b>QUAD</b><br><sub>A 4 x 4 grid of notes the tracks share, a row each (after the norns script initenere).</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_chord.png" alt="CHORD" width="240"><br><b>CHORD</b><br><sub>Progressions in the track's scale; QNT CHRD makes the others follow.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_series.png" alt="SERIES" width="240"><br><b>SERIES</b><br><sub>Per Nørgård's infinity series.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top"><img src="assets/gallery/gen_turing.png" alt="TURING" width="240"><br><b>TURING</b><br><sub>A looping shift register.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_poly.png" alt="POLY" width="240"><br><b>POLY</b><br><sub>Four notes on four rhythms.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_fall.png" alt="FALL" width="240"><br><b>FALL</b><br><sub>Leaves in the wind, playing where they land (after the norns script Fall).</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top"><img src="assets/gallery/gen_evolve.png" alt="EVOLVE" width="240"><br><b>EVOLVE</b><br><sub>LOCK, EVERY, AMOUNT; ROLL picks the seed.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_tweak2.png" alt="TWEAK 2" width="240"><br><b>TWEAK 2</b><br><sub>BRANCH, LOGIC and COND.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/step_evolve.png" alt="STEP EVOLVE" width="240"><br><b>STEP EVOLVE</b><br><sub>Your steps, varied as they play.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top"><img src="assets/gallery/cords.png" alt="MODS" width="240"><br><b>MODS</b><br><sub>16 cords, any source to any destination.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/matrix.png" alt="MATRIX" width="240"><br><b>MATRIX</b><br><sub>The cords track by track, lit as they move.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/help.png" alt="Help card" width="240"><br><b>Help card</b><br><sub>Hold ARP and turn a knob.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top"><img src="assets/gallery/gen_answer.png" alt="ANSWER" width="240"><br><b>ANSWER</b><br><sub>Play a phrase; it answers, changing a little each time.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_timing.png" alt="TIMING" width="240"><br><b>TIMING</b><br><sub>Ratchets x1 to x8, EVEN, ACCEL or DECEL.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/gen_energy.png" alt="ENERGY" width="240"><br><b>ENERGY</b><br><sub>A slow tide over minutes, and rests.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top"><img src="assets/gallery/edit_fm6.png" alt="FM6" width="240"><br><b>FM6</b><br><sub>Six-operator FM.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/edit_trio.png" alt="TRIO" width="240"><br><b>TRIO</b><br><sub>Three oscillators.</sub></td>
+<td align="center" valign="top"><img src="assets/gallery/drum.png" alt="DRUM" width="240"><br><b>DRUM</b><br><sub>808, 909 and SID kits.</sub></td>
 </tr>
 </table>
 
-### Generators
-
-<table>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_turing.png" alt="Turing" width="240"><br><b>Turing</b><br><sub>A looping shift register: LENGTH, PROB (Lock holds the loop), SPAN.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_euclid.png" alt="Euclid" width="240"><br><b>Euclid</b><br><sub>Euclidean rhythms: STEPS, PULSE, ROT, on pitches from the track's seed.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_markov.png" alt="Markov" width="240"><br><b>Markov</b><br><sub>A random walk over 8 scale degrees: LEAP, DENS, SPAN.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_morph.png" alt="Morph" width="240"><br><b>Morph</b><br><sub>A rhythm blended between two preset patterns: POS, SNP A, SNP B.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_grids.png" alt="Grids" width="240"><br><b>Grids</b><br><sub>Grids' drum map, kick, snare and hat: X, Y, DENS.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_bounce.png" alt="Bounce" width="240"><br><b>Bounce</b><br><sub>Balls bouncing in a box, a note at each wall hit: SPEED, ANGLE, BALLS.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_awake.png" alt="Awake" width="240"><br><b>Awake</b><br><sub>Two loops in the style of norns' Awake, steps settable from the keys: LEN A, LEN B, PROB.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_poly.png" alt="Poly" width="240"><br><b>Poly</b><br><sub>Four notes stepped on by four rhythms over up to 3 octaves: RHY, DIVISION, SPAN.</sub></td>
-</tr>
-</table>
-
-### Shaping the phrase
-
-<table>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_evolve.png" alt="EVOLVE" width="240"><br><b>EVOLVE</b><br><sub>Mutates the phrase every few bars: LOCK, EVERY, AMOUNT; ROLL picks the seed.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_tweak.png" alt="TWEAK" width="240"><br><b>TWEAK</b><br><sub>SHIFT, DROP, HUMAN and FOLLOW, each drawn on the page.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/gen_tweak2.png" alt="TWEAK 2 (new)" width="240"><br><b>TWEAK 2 (new)</b><br><sub>BRANCH hits to another track's sound, LOGIC with another track's hits, COND for certain bars.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/organic.png" alt="ORGANIC (new)" width="240"><br><b>ORGANIC (new)</b><br><sub>Each track's SLOTH (TORPOR, APATHY, INERTIA) and eight OCHD LFOs, slow sources for the cords.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/help.png" alt="Help card" width="240"><br><b>Help card</b><br><sub>Hold ARP and turn a knob to see what it does.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/cords.png" alt="MODS" width="240"><br><b>MODS</b><br><sub>Tap LFO for 16 modulation cords between any source and destination, generators included.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/mod_shortcut.png" alt="Mod shortcut" width="240"><br><b>Mod shortcut</b><br><sub>Hold FX and turn a knob to set how far a cord moves that parameter.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/mods_live.png" alt="Live mod mark (new)" width="240"><br><b>Live mod mark (new)</b><br><sub>A knob a cord reaches shows where the cords move it now: here an OCHD sweeping BRANCH.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/matrix.png" alt="MATRIX (new)" width="240"><br><b>MATRIX (new)</b><br><sub>The cords track by track, lit as they move. OCT+ opens one in MODS.</sub></td>
-</tr>
-</table>
-
-### Sound engines
-
-<table>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/edit_sid.png" alt="SID" width="240"><br><b>SID</b><br><sub>The C64 chip, 6581 or 8580 model.</sub></td>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/edit_trio.png" alt="TRIO" width="240"><br><b>TRIO</b><br><sub>Three oscillators: WAVE, INT2, INT3, DETUNE.</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="assets/gallery/edit_phys.png" alt="PHYS" width="240"><br><b>PHYS</b><br><sub>Physical modelling (Rings / DaisySP): MODEL, STRC, BRIT, DAMP.</sub></td>
-</tr>
-</table>
+More pages are in the [manual](MANUAL.md).
 
 ---
 
-## Licence
+## Building
 
-GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved.
+See [BUILDING.md](BUILDING.md). The host tests run with `tests/run_tests.sh`; the gallery renders with
+`tests/gallery_render.c` (build line at its top) and the banner and social preview with `tools/gen_brand.py`.
+
+---
+
+## About me
+
+I'm Theo Dainis, from New Zealand. I've been using and building synthesisers for the past 15 years, and I'm passionate about modular and open source. Elektron and Mutable Instruments are big influences on me. I love the DIY side: building things, and learning how music hardware works on the inside. Tessera is the sequencer I wanted on the FM-1: modular in a box, a small instrument that writes with you.
+
+### Built with Claude Code
+
+Tessera's code is written with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. I designed it, made the decisions, and test every release on my own FM-1 before it goes out. The source is open, so you can read every line and every change. Like any firmware, it comes with no warranty: save a **Complete backup** from the web editor before you flash.
+
+---
+
+## Credits and licence
+
+Tessera is by **Theo Dainis (Rastapopolix)**. GPL-3.0-only, inherited from Melodee. Original copyright and SPDX headers are preserved. Melodee is by keremimo,
+Felucca by Leo Kuroshita / Hügelton Instruments.
+
+The ATLAS generator uses the drum map of **Grids** by Émilie Gillet / Mutable Instruments. Several generators are
+inspired by **norns** scripts (ideas only, no code copied): **QUAD** by initenere, **FALL** by ambalek's Fall,
+**CONSTELLATION** by timothy-taylor's Constellation, **AWAKE** by tehn's Awake and **SERIES** by nørgård. The
+The TIDE and SWARM mod sources are inspired by **Triple Sloth** by Nonlinear Circuits (Andrew Fitch) and **ochd** by
+Instruō and DivKid. See
+[LICENSING.md](LICENSING.md) for every third-party part and its licence.

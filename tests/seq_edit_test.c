@@ -7,7 +7,7 @@
 static track_t *edit_setup(void)
 {
     ui_power_on();
-    set_engine_of(TSEL, 0u);
+    set_engine_of(TSEL, 3);                       /* (SID: the generic ENV) */
     TSEL->engine = TSEL->eng_req;
     TSEL->p[P_VOICE] = V_POLY;
     TSEL->p[P_QUANT] = Q_OFF;
@@ -26,14 +26,14 @@ static void put_note(track_t *t, uint32_t at, uint32_t pitch, uint32_t length)
     step_note_resize(t, at, (int32_t)length);
 }
 
-/* SAVE+OCT acts before the hold timeout, and never opens the SAVE page on release. */
+/* EDIT+OCT acts before the hold timeout, and never opens the EDIT page on release. */
 static void history_key(uint32_t oct)
 {
-    fm1_in.buttons |= 1u << panel.btn[B_SAVE];
-    host_pressed |= 1u << panel.btn[B_SAVE];
+    fm1_in.buttons |= 1u << panel.btn[B_EDIT];
+    host_pressed |= 1u << panel.btn[B_EDIT];
     frame();
     press(oct);
-    fm1_in.buttons &= ~(1u << panel.btn[B_SAVE]);
+    fm1_in.buttons &= ~(1u << panel.btn[B_EDIT]);
     frame();
 }
 
@@ -67,19 +67,19 @@ static int test_note_edits(void)
                  cur_page()->graph == GR_ROLL && ui.cursor == 1 && step_note_length(t, 1) == 3 && t->step[4].note[0] == 72 &&
                  t->step[1].n == 3 && t->step[1].note[1] == 64 && t->step[1].vel == 105 &&
                  t->step[1].flags == (SF_ACCENT | SF_SLIDE) && t->step[1].probability == 50);
-    hold(B_SAVE);
+    hold(B_EDIT);
     bad += check("several SCL-held moves are one undo", step_note_length(t, 14) == 3 && t->step[14].n == 3 && ui.cursor == 14);
     history_key(B_OCTUP);
     bad += check("move redo preserves all note data", step_note_length(t, 1) == 3 && t->step[1].probability == 50);
     cursor_set(2); press(B_EDIT);
     bad += check("EDIT on a chord tail removes one pitch and preserves its neighbours and ties",
                  t->step[1].n == 2 && t->step[1].note[0] == 64 && t->step[2].time == ST_TIE && t->step[3].time == ST_TIE && t->step[4].note[0] == 72);
-    hold(B_SAVE);
+    hold(B_EDIT);
     bad += check("whole-note deletion is one undo with its tail cursor", step_note_length(t, 1) == 3 && ui.cursor == 2);
     cursor_set(4); turn(EN_K3, 1);
-    bad += check("LENGTH grows the selected note directly", step_note_length(t, 4) == 2);
+    bad += check("LENGTH snaps the selected note to 1.25 steps", notes_selected(t)<RECORD_MAX && recording[notes_selected(t)].duration*(1u<<(recording[notes_selected(t)].owner>>5))==5u*RECORD_UNIT/4u);
     turn(EN_K3, 1);
-    bad += check("LENGTH keeps the onset while extending its tie tail", step_note_length(t, 4) == 3 && t->step[4].time == ST_NOTE);
+    bad += check("LENGTH snaps to 1.50 without moving the onset", notes_selected(t)<RECORD_MAX && recording[notes_selected(t)].duration*(1u<<(recording[notes_selected(t)].owner>>5))==3u*RECORD_UNIT/2u && recording[notes_selected(t)].on==0 && (recording[notes_selected(t)].step&63u)==4u);
     t = edit_setup();
     put_note(t, 0, 60, 1); t->step[2].time = ST_TIE;
     bad += check("resize cannot attach an orphan tie chain", step_note_resize(t, 0, 16) == 1);
@@ -100,12 +100,12 @@ static int test_entry_history(void)
     track_t *t = edit_setup();
     key_down(7); frame(); turn(EN_SELECT, 3); key_up(7); frame();
     bad += check("held panel entry, SELECT length, release advances by its full length", step_note_length(t, 0) == 4 && ui.cursor == 4);
-    hold(B_SAVE);
+    hold(B_EDIT);
     bad += check("held entry and resize are one undo, cursor restored", !step_on(&t->step[0]) && t->step[1].time == ST_REST && ui.cursor == 0);
     history_key(B_OCTUP);
-    bad += check("SAVE+OCT+ restores the whole held entry", step_note_length(t, 0) == 4 && ui.cursor == 4 && cur_page()->graph == GR_ROLL);
+    bad += check("EDIT+OCT+ restores the whole held entry", step_note_length(t, 0) == 4 && ui.cursor == 4 && cur_page()->graph == GR_ROLL);
     history_key(B_OCTDN);
-    bad += check("SAVE+OCT- undoes without changing octave", !step_on(&t->step[0]) && !song.octave);
+    bad += check("EDIT+OCT- undoes without changing octave", !step_on(&t->step[0]) && !song.octave);
     turn(EN_K2, 1);
     history_key(B_OCTUP);
     bad += check("a new edit drops redo", msg_is("NOTHING TO REDO") && step_on(&t->step[0]));
@@ -124,7 +124,7 @@ static int test_entry_history(void)
     bad += check("editor changes invalidate history", t->step[0].note[0] == 99 && msg_is("NOTHING TO UNDO"));
     turn(EN_K2, 1); t->p[P_SLEN] = 8; frame(); history_key(B_OCTDN);
     bad += check("pattern-length changes invalidate history", msg_is("NOTHING TO UNDO"));
-    cursor_set(0); frame(); press(B_OCTUP); turn(EN_K2, 1); turn(EN_K2, 1); turn(EN_K1, -30); press(B_OCTDN); hold(B_SAVE);
+    cursor_set(0); frame(); press(B_OCTUP); turn(EN_K2, 1); turn(EN_K2, 1); turn(EN_K1, -30); press(B_OCTDN); hold(B_EDIT);
     bad += check("CHANCE edits (the note's sheet) share manual step undo", step_chance(&t->step[0]) == 100);
     return bad;
 }
@@ -139,12 +139,12 @@ static int test_midi_entry(void)
     midi_note_event(0, 62, 100); midi_note_event(0, 62, 0);
     midi_note_event(0, 64, 100); midi_note_event(0, 64, 0); frame();
     bad += check("two MIDI taps in one frame enter two steps", t->step[3].note[0] == 62 && t->step[4].note[0] == 64 && ui.cursor == 5);
-    hold(B_SAVE);
+    hold(B_EDIT);
     bad += check("same-frame MIDI taps remain separate undo entries", step_on(&t->step[3]) && !step_on(&t->step[4]) && ui.cursor == 4);
-    hold(B_SAVE);
+    hold(B_EDIT);
     bad += check("previous same-frame MIDI entry undoes independently", !step_on(&t->step[3]) && ui.cursor == 3);
 
-    t = edit_setup();
+    t = edit_setup(); song.g[G_ROUTE] = 1;   /* SEL allows overlapping channels on one track. */
     midi_note_event(0, 60, 100); midi_note_event(4, 60, 100); frame();
     midi_note_event(0, 60, 0); frame();
     bad += check("overlapping channels with the same pitch keep entry held", ui.entry_open && ui.cursor == 0 && step_midi_held == 1);
@@ -152,7 +152,7 @@ static int test_midi_entry(void)
     bad += check("last source release advances once", ui.cursor == 1 && !step_midi_held && t->step[0].n == 1);
     midi_channel(0)->pedal = 1;
     midi_note_event(0, 65, 100); frame(); midi_note_event(0, 65, 0); frame();
-    bad += check("sustain holds audio while physical MIDI release ends step entry", ui.cursor == 2 && !step_midi_held && (midi_notes[0][65] & MIDI_PEDAL_NOTE));
+    bad += check("sustain holds audio while physical MIDI release ends step entry", ui.cursor == 2 && !step_midi_held && (mn_get(0, 65) & MIDI_PEDAL_NOTE));
     midi_pedal_up(0); frame();
     bad += check("pedal-up never advances an extra step", ui.cursor == 2);
 
@@ -240,7 +240,7 @@ static int test_step_modifiers(void)
     turn(EN_SELECT, 1);
     host_enc[panel.enc[EN_SELECT]] += panel.dir[EN_SELECT]; fm1_in.buttons &= ~(1u << panel.btn[B_SCL]); frame();
     bad += check("SCL+SELECT includes a release-frame detent and consumes the SCL page tap", cur_page()->graph == GR_ROLL && step_note_length(t, 6) == 4 && ui.cursor == 6 && !ui.ly);
-    hold(B_SAVE);
+    hold(B_EDIT);
     bad += check("one SCL-held movement gesture is one undo", step_note_length(t, 4) == 4 && ui.cursor == 4);
     history_key(B_OCTUP);
     cursor_set(7); frame(); press(B_EDIT);
@@ -252,7 +252,7 @@ static int test_step_modifiers(void)
     press(B_EDIT); fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]); frame();
     bad += check("OCT+ then EDIT redoes, either order works", !step_on(&t->step[6]) && ui.cursor == 7 && !song.octave && cur_page()->graph == GR_ROLL);
     put_note(t, 7, 62, 1); frame(); press(B_FX);
-    bad += check("FX tapped on STEP: its page, the note stays (EDIT deletes)", step_on(&t->step[7]) && cur_page()->fam == FAM_FX);
+    bad += check("FX leaves the edited note intact and opens its page", step_on(&t->step[7]) && !ui.home && cur_page()->fam == FAM_FX);
     t = edit_setup(); cursor_set(7); frame();
     press(B_OCTUP);
     bad += check("plain STEP OCT+: neither the cursor (the knobs move it) nor the octave (Stage only)", ui.cursor == 7 &&
@@ -327,17 +327,64 @@ static int test_held_gestures(void)
     {
         uint32_t ly = ui.ly;
         fm1_in.buttons &= ~(1u << panel.btn[B_FX]); frame();
-        bad += check("  FX while recording live: its performance layer, the note stays", ly == LAYER_FX &&
+        bad += check("  retired FX while recording live: no layer, the note stays", !ly &&
                      step_on(&t->step[9]));
     }
     song.octave = 0; song.rec = 0; song.playing = 0;
     return bad;
 }
 
+static int test_compact_history(void)
+{
+    int bad = 0, exact = 1;
+    /* Every control combination and byte value: preserve unused notes,
+     * independent n on rests/ties, per-hit gates, and all accent masks. */
+    for (uint32_t n = 0; n <= 4u; n++)
+        for (uint32_t time = ST_NOTE; time <= ST_REST; time++)
+            for (uint32_t flags = 0; flags < 8u; flags++)
+                for (uint32_t byte = 0; byte < 256u; byte++) {
+                    step_t s = {{(uint8_t)byte, (uint8_t)(byte ^ 255u), 0, 255},
+                                (uint8_t)n, (uint8_t)time, (uint8_t)flags,
+                                (uint8_t)byte, (uint8_t)byte, (uint8_t)(byte ^ 255u), (uint8_t)byte};
+                    step_snapshot_t packed;
+                    step_snapshot_put(&packed, &s);
+                    step_t decoded = step_snapshot_get(&packed);
+                    exact &= !memcmp(&s, &decoded, sizeof s);
+                }
+    bad += check("compact history preserves every step byte for all control combinations", exact);
+    {   /* step v2: RATCH and NUDGE (the sub byte) go through history too */
+        step_t v = {{60}, 1, ST_NOTE, 0, 96, 0, 0, 0, 0}, w;
+        step_snapshot_t snap;
+        step_set_ratch(&v, 7); step_set_nudge(&v, -5);
+        step_snapshot_put(&snap, &v); w = step_snapshot_get(&snap);
+        bad += check("history keeps RATCH (x7: its high bit) and NUDGE", !memcmp(&v, &w, sizeof v) && step_ratch(&w) == 7u &&
+                     step_nudge(&w) == -5);
+        step_set_ratch(&v, 9); step_set_nudge(&v, 3);
+        bad += check("RATCH stops at x8, NUDGE keeps its bits apart", step_ratch(&v) == 8u && step_nudge(&v) == 3);
+    }
+    bad += check("all eight levels have fixed storage even for dense patterns",
+                 sizeof step_history.state[0].step == NSTEP * 10u && sizeof undo_sram[0].step == NSTEP * 10u);
+    track_t *t = edit_setup();
+    for (uint32_t i = 0; i < NSTEP; i++) {
+        put_note(t, i, 48u + i % 36u, 1);
+        t->step[i].vel = (uint8_t)(30u + i);
+    }
+    project_capture(&proj_scratch);
+    bad += check("decoded project borrows canvas with a separate archive buffer",
+                 (void *)&proj_scratch == (void *)cv_primary && (void *)proj_wire_u.raw != (void *)cv_primary);
+    uint32_t len = tsp_pack(proj_wire_u.raw, &proj_scratch, 1), h = len ? proj_hash(proj_wire_u.raw, len) : 0u;
+    bad += check("dense project packs while decoded and serialized scratch coexist", len != 0u);
+    cv_begin(240, 124, RGB(10, 20, 30));
+    int same = tsp_valid(proj_wire_u.raw, len) && proj_hash(proj_wire_u.raw, len) == h;
+    for (uint32_t i = 0; i < NSTEP; i++) same &= proj_scratch.t[t - trk].step[i].vel == 30u + i;
+    bad += check("screen drawing cannot damage a pending archive; decoding reacquires scratch", same);
+    return bad;
+}
+
 int main(void)
 {
     int bad = test_note_edits() + test_entry_history() + test_midi_entry() + test_record_timing() + test_step_modifiers() +
-              test_held_gestures();
+              test_held_gestures() + test_compact_history();
     printf("sequencer editing: %s\n", bad ? "FAILED" : "all passed");
     return bad != 0;
 }

@@ -1,15 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Popups (docs/design: mock/r6_popups, README "Popups"), over the page dimmed (ui_draw.c: drawn under cv_dim).
  * An action sheet: what can be done with the page (OCT+ held; a "..." in the header says there is one) or with the
- * thing its cursor is on: a card from the bottom, its rows; KNOB 2 the row, KNOB 1 a row's value, OCT+ does it (a
+ * thing its cursor is on: a card from the bottom, its rows; KNOB 1 the row, KNOB 2 a row's value, OCT+ does it (a
  * destructive one asks its question first), OCT- closes.
- * A picker: a knob whose value is a name from a list (a wave, a source, a division) turning on a page: the names
+ * A picker: a knob whose value is a name from a list (a wave, a source, a division; not a list of numbers) turning
+ * on a page: the names
  * around its value in a card under its ring; it goes ST_KNOB_MS after the last turn, on OCT- or when another knob
  * turns. The knob edits as ever; the page under it waits. Included by ui_draw.c */
 typedef struct {
     const char *label;
     void (*value)(char *b);                             /* its value at the right (0: none) */
-    void (*turn)(int32_t s);                            /* KNOB 1 changes it (0: none) */
+    void (*turn)(int32_t s);                            /* KNOB 2 changes it (0: none) */
     void (*act)(void);                                  /* OCT+ does it (0: OCT+ steps the value) */
     uint8_t cf;                                         /* the question it asks first (CF_*), 0 none; with act: act
                                                          * asks it itself (after its checks), the row drawn red;
@@ -20,7 +21,7 @@ enum { POP_NONE, POP_SHEET, POP_PICK, POP_LIST };
 #define POP_X 6                                         /* a sheet: 228 wide, its rows 20 px, 22 apart from y 28 */
 #define POP_W 228
 #define POP_ROW 22
-#define POP_PICK_W 110                                  /* a picker: up to five names, 20 px each */
+#define POP_PICK_W 112                                  /* a picker: up to eight names, 20 px each; two whole columns */
 static struct {
     uint8_t on, n, sel, col;
     char title[24], sub[20];
@@ -74,7 +75,7 @@ static void ps_fav(void) { preset_mark(!preset_favorite()); }
 static void ps_undo(void) { undo_step(0); }
 static const sheet_row_t SHEET_SOUND[] = {
     {"Init sound", 0, 0, 0, CF_INIT_SOUND}, {"Save as user\x85", 0, 0, ps_save, 0}, {"Favourite", ps_fav_v, 0, ps_fav, 0},
-    {"Undo last load", 0, 0, ps_undo, 0}};
+    {"Undo last load", 0, 0, ps_undo, 0}, {"Sound designer", 0, 0, designer_open, 0}};
 /* the song's (SONG) */
 static int ps_song_free(void)
 {
@@ -129,11 +130,18 @@ static const sheet_row_t SHEET_SONG[] = {
     {"Take jam", ps_jam_v, 0, ps_jam, 0}, {"Clear song", 0, 0, 0, CF_CLEAR_SONG}};
 
 /* the pattern's (NOTES, the drum grid, PATTERN: OCT+ held; TOOLS' Clear pattern lives here) */
-static const sheet_row_t SHEET_PATTERN[] = {{"Clear pattern", 0, 0, 0, CF_CLEAR_SEQ}, {"Clear motion", 0, 0, 0, CF_CLEAR_MOTION}};
+static void nt_quantize_v(char *b){str_cpy(b,ui.note_grid==2u?"0.25 step":ui.note_grid==1u?"0.5 step":"1 step",16);}
+static void nt_quantize_grid(int32_t s){ui.note_grid=(uint8_t)clamp((int32_t)ui.note_grid+s,0,2);ui.force=1;}
+static void nt_quantize(void){ui.note_copy=ui.note_move=0;note_quantize(RECORD_UNIT>>ui.note_grid);ui.force=1;}
+/* .. and the SEQ tools (seq_tools.c): DOUBLE, HALF, EUCLID's hits and rotation (KNOB 2; OCT+ writes it) */
+static const sheet_row_t SHEET_PATTERN[] = {{"Quantize",nt_quantize_v,nt_quantize_grid,nt_quantize,0},
+    {"Double", seqt_double_v, 0, seqt_double, 0}, {"Half", seqt_half_v, 0, seqt_half, 0},
+    {"Euclid", seqt_hits_v, seqt_hits_turn, seqt_euclid, 0}, {"Euclid turn", seqt_rot_v, seqt_rot_turn, seqt_euclid, 0},
+    {"Clear pattern", 0, 0, 0, CF_CLEAR_SEQ}, {"Clear motion", 0, 0, 0, CF_CLEAR_MOTION}};
 /* PATTERNS' (OCT+): the selected track's pattern; Copy to: its place picked on the grid (ui_patterns.c) */
 static const sheet_row_t SHEET_PATTERNS[] = {{"Copy to\x85", 0, 0, ptc_start, 0}, {"Delete pattern", 0, 0, 0, CF_DEL_PAT}};
 
-/* the step's: NOTES' note at the cursor (KNOB 1 its length, velocity, chance), the drum grid's hit of the lane there */
+/* the step's: NOTES' note at the cursor (KNOB 2 its length, velocity, chance), the drum grid's hit of the lane there */
 static void st_cap(uint32_t c, char *b)                 /* NOTES' column c as its chip shows it (draw_columns) */
 {
     lrow_t rw;
@@ -176,6 +184,33 @@ static void nt_chance(int32_t s)
     if (st_free())
         step_set_chance(st, (uint32_t)clamp((int32_t)step_chance(st) + s, 0, 100));
 }
+static void nt_ratch_v(char *b) { b[0] = 'x'; fmt_int(b + 1, (int32_t)step_ratch(st_at())); }   /* the step's RATCH */
+static void nt_ratch(int32_t s)
+{
+    step_t *st = st_at();
+    if (!st_free())
+        return;
+    fm1_irq_off();
+    step_set_ratch(st, (uint32_t)clamp((int32_t)step_ratch(st) + (s > 0 ? 1 : -1), 1, 8));
+    fm1_irq_on();
+}
+static void nt_nudge_v(char *b)                        /* the step's NUDGE: "+3/16" of a step, "0" on its line */
+{
+    int32_t v = step_nudge(st_at());
+    if (!v) { str_cpy(b, "0", 4); return; }
+    b[0] = v > 0 ? '+' : '-';
+    fmt_int(b + 1, v > 0 ? v : -v);
+    str_cpy(b + str_len(b), "/16", 4);
+}
+static void nt_nudge(int32_t s)
+{
+    step_t *st = st_at();
+    if (!st_free())
+        return;
+    fm1_irq_off();
+    step_set_nudge(st, clamp(step_nudge(st) + (s > 0 ? 1 : -1), -8, 7));
+    fm1_irq_on();
+}
 static void nt_slide_v(char *b) { str_cpy(b, st_at()->flags & SF_SLIDE ? "On" : "Off", 8); }
 static void nt_slide(void)
 {
@@ -190,16 +225,19 @@ static void nt_delete(void)
     if (st_free())
         step_delete_edit();
 }
+static void nt_copy(void) { if(st_free())note_copy_arm(); }
 static const sheet_row_t SHEET_NOTE[] = {{"Length", nt_len_v, nt_len, 0, 0}, {"Velocity", nt_vel_v, nt_vel, 0, 0},
-    {"Chance", nt_chance_v, nt_chance, 0, 0}, {"Slide", nt_slide_v, 0, nt_slide, 0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
+    {"Chance", nt_chance_v, nt_chance, 0, 0}, {"Ratchet", nt_ratch_v, nt_ratch, 0, 0}, {"Nudge", nt_nudge_v, nt_nudge, 0, 0},
+    {"Slide", nt_slide_v, 0, nt_slide, 0},
+    {"Move note",0,0,note_move_arm,0}, {"Copy note",0,0,nt_copy,0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
 static const sheet_row_t SHEET_REC_NOTE[] = {{"Length", nt_len_v, nt_len, 0, 0}, {"Velocity", nt_vel_v, nt_vel, 0, 0},
-    {"Delete note", 0, 0, nt_delete, SR_RED}};
+    {"Move note",0,0,note_move_arm,0}, {"Copy note",0,0,nt_copy,0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
 static int ht_acc_on(void) { return (step_accents(&seq_steps(TSEL)[ui.cursor]) >> ui.lane) & 1u; }
 static void ht_acc_v(char *b) { str_cpy(b, ht_acc_on() ? "On" : "Off", 8); }
 static void ht_acc(void) { edit_param(3u, ht_acc_on() ? -1 : 1); }
 static void ht_clear(void) { edit_param(2u, -1); }
 static const sheet_row_t SHEET_HIT[] = {{"Accent", ht_acc_v, 0, ht_acc, 0}, {"Chance", nt_chance_v, nt_chance, 0, 0},
-    {"Clear hit", 0, 0, ht_clear, SR_RED}};
+    {"Ratchet", nt_ratch_v, nt_ratch, 0, 0}, {"Nudge", nt_nudge_v, nt_nudge, 0, 0}, {"Clear hit", 0, 0, ht_clear, SR_RED}};
 
 /* OCT+ on NOTES / the drum grid: an empty place gets a note (the last one played) / the lane's hit; on a note or a
  * hit: its sheet. 0: not such a page */
@@ -241,10 +279,12 @@ static int step_enter(void)
 static uint32_t page_sheet(void)
 {
     uint32_t fam;
-    if (ui.menu || ui.confirm || ui.layer || pop.on || name_on() || new_on() || slot_kind() || ptc_on())
+    if (designer_on() || ui.menu || ui.confirm || ui.layer || pop.on || name_on() || new_on() || slot_kind() || ptc_on())
         return 0;
     if (ui.home)
         return 1;
+    if (cur_page()->graph == GR_CORDS || cur_page()->graph == GR_MATRIX)
+        return 0;                                       /* (MODS, MATRIX: OCT+ is the mod's, tapped or held: Theo 2026-10-19) */
     if (cur_page()->graph == GR_SONG)
         return 2;
     if (cur_page()->graph == GR_PATGRID)
@@ -302,15 +342,15 @@ static int cf_refused(uint32_t cf)
     return 1;
 }
 
-/* KNOB 2 the row, KNOB 1 its value; OCT+ does it (its question first), OCT- closes (oct: bit 0 OCT-, bit 1 OCT+) */
+/* KNOB 1 the row, KNOB 2 its value; OCT+ does it (its question first), OCT- closes (oct: bit 0 OCT-, bit 1 OCT+) */
 static void sheet_input(int32_t k1, int32_t k2, uint32_t oct)
 {
     const sheet_row_t *r;
-    if (k2)
-        pop.sel = (uint8_t)clamp((int32_t)pop.sel + (k2 > 0 ? 1 : -1), 0, (int32_t)pop.n - 1);
+    if (k1)
+        pop.sel = (uint8_t)clamp((int32_t)pop.sel + (k1 > 0 ? 1 : -1), 0, (int32_t)pop.n - 1);
     r = &pop.rows[pop.sel % pop.n];
-    if (k1 && r->turn)
-        r->turn(k1);
+    if (k2 && r->turn)
+        r->turn(k2);
     if (oct & 1u) {
         pop_close();
     } else if (oct & 2u) {
@@ -328,6 +368,20 @@ static void sheet_input(int32_t k1, int32_t k2, uint32_t oct)
 /* knob c turned on a page: its picker when its value is a name from a long list; another knob: the picker goes.
  * Not on a screen of its own: SCALES is the scales' list itself (Kerem: the picker covered it) */
 static int own_screen(void);                            /* ui_draw.c */
+/* a list of numbers (a MIDI channel, an algorithm, an envelope step; one name such as OFF among them): its value steps
+ * on the card as MIDI's and ROUT's do, no picker (Kerem, 2026-10-11) */
+static int pick_numbers(const param_desc_t *d)
+{
+    uint32_t named = 0;
+    int32_t v;
+    for (v = d->min; v <= d->max; v++) {
+        const char *s = d->names[v];
+        while (*s >= '0' && *s <= '9')
+            s++;
+        named += *s || s == d->names[v];
+    }
+    return named <= 1u;
+}
 static void pick_touch(uint32_t c)
 {
     int16_t *vp;
@@ -336,9 +390,16 @@ static void pick_touch(uint32_t c)
         pop_close();
     if (ui.home || pop.on == POP_SHEET || own_screen())
         return;
+    if (cur_page()->graph == GR_CORDS) {                /* CORDS: its source and destination lists (ui_cords.c) */
+        int32_t n, i;
+        if (!cu_pick(c, &n, &i))
+            return;
+        d = 0;
+    } else {
     d = page_desc(cur_page(), c, &vp);
-    if (!d || !vp || d->fmt != F_ENUM || !d->names || d->max - d->min < 4)
+    if (!d || !vp || d->fmt != F_ENUM || !d->names || d->max - d->min < 4 || pick_numbers(d))
         return;
+    }
     if (pop.on != POP_PICK)
         ui.force = 1;                                   /* (the page dimmed under it) */
     pop.on = POP_PICK;
@@ -353,6 +414,21 @@ static void pick_poll(void)                             /* ST_KNOB_MS after the 
 
 /* ------------------------------------------------ a value's list --- */
 /* OCT+ on a list page's row whose value is a name from a list: the whole list (KNOB 2, OCT+ takes it, OCT- closes) */
+/* Compact enum lists omit retired empty entries without changing stored IDs. */
+static int32_t enum_rows(const param_desc_t *d)
+{
+    int32_t count=0;for(int32_t v=d->min;v<=d->max;v++)count+=d->names[v-d->min][0]!=0;return count;
+}
+static int32_t enum_rank(const param_desc_t *d,int32_t value)
+{
+    if(enum_order(d))return enum_order_pos(d,value);   /* (N_DIV: slow to fast) */
+    int32_t rank=0;for(int32_t v=d->min;v<value;v++)rank+=d->names[v-d->min][0]!=0;return rank;
+}
+static int32_t enum_value(const param_desc_t *d,int32_t rank)
+{
+    if(enum_order(d))return enum_order(d)[clamp(rank,0,d->max-d->min)];
+    for(int32_t v=d->min;v<=d->max;v++)if(d->names[v-d->min][0] && !rank--)return v;return d->min;
+}
 static struct { uint8_t page, slot; int16_t sel; } vl;
 static const param_desc_t *vlist_desc(int16_t **vp) { return page_desc(&PAGES[vl.page], vl.slot, vp); }
 static void vlist_open(uint8_t page, uint8_t slot)
@@ -368,7 +444,7 @@ static void vlist_open(uint8_t page, uint8_t slot)
     pop.on = POP_LIST;
     ui.force = 1;
 }
-static void vlist_input(int32_t k2, uint32_t oct)
+static void vlist_input(int32_t k1, uint32_t oct)   /* KNOB 1 the row, as the lists */
 {
     int16_t *vp;
     const param_desc_t *d = vlist_desc(&vp);
@@ -376,8 +452,8 @@ static void vlist_input(int32_t k2, uint32_t oct)
         pop_close();
         return;
     }
-    if (k2)
-        vl.sel = (int16_t)clamp(vl.sel + (k2 > 0 ? 1 : -1), d->min, d->max);
+    if (k1)
+        vl.sel = (int16_t)enum_turn(d, vl.sel, k1 > 0 ? 1 : -1);
     if (oct & 1u) {
         pop_close();
     } else if (oct & 2u) {                              /* (its page edits it, as if it were shown) */
@@ -401,12 +477,12 @@ static void vlist_draw(void)
         pop_close();
         return;
     }
-    n = d->max - d->min + 1 < 7 ? d->max - d->min + 1 : 7;
+    n = enum_rows(d) < 7 ? enum_rows(d) : 7;
     sig = (uint32_t)(vl.sel + 1) * 7919u + vl.page * 131u + ux.gen * 977u + ux.pal * 31u;
     if (!ui.force && sig == pop.sig)
         return;
     pop.sig = sig;
-    first = clamp(vl.sel - 3, d->min, d->max - n + 1);
+    first = clamp(enum_rank(d,vl.sel) - 3, 0, enum_rows(d) - n);
     h = 30 + n * 20 + 6;
     y0 = 236 - h;
     for (top = 0; top < h; ) {                          /* in slices between rows (a canvas holds 124 rows) */
@@ -419,7 +495,7 @@ static void vlist_draw(void)
         if (top == 0)
             cv_text_on(10, 8, &AF_S, b, T_TEXT, T_SURF);
         for (i = 0; i < n; i++) {
-            int32_t v = first + i, y = 28 + i * 20, on = v == vl.sel, cur = v == *vp;
+            int32_t v = enum_value(d,first + i), y = 28 + i * 20, on = v == vl.sel, cur = v == *vp;
             uint16_t bg = on ? T_LIFT : T_SURF;
             if (y + 20 <= top || y >= top + sh)
                 continue;
@@ -483,39 +559,74 @@ static void sheet_draw(void)
         top += sh;
     }
 }
-static void pick_draw(void)
+/* the picker's list: its length, the value's entry, entry i's name and track (-1: none). An enum's names; MODS
+ * (the cords): its own (ui_cords.c) */
+static int pick_list(int32_t *count, int32_t *cur)
 {
     int16_t *vp;
-    const param_desc_t *d = page_desc(cur_page(), pop.col, &vp);
-    int32_t x, v, i;
+    const param_desc_t *d;
+    if (cur_page()->graph == GR_CORDS)
+        return cu_pick(pop.col, count, cur);
+    d = page_desc(cur_page(), pop.col, &vp);
+    if (!d || !vp || !d->names)
+        return 0;
+    *count = enum_rows(d);
+    *cur = enum_rank(d, *vp);
+    return 1;
+}
+static const char *pick_name(int32_t i, int32_t *tr)
+{
+    int16_t *vp;
+    const param_desc_t *d;
+    int32_t v;
+    *tr = -1;
+    if (cur_page()->graph == GR_CORDS)
+        return cu_pick_name(pop.col, i, tr);
+    d = page_desc(cur_page(), pop.col, &vp);
+    v = enum_value(d, i);
+    return d->names[v - d->min];
+}
+static void pick_draw(void)
+{
+    int32_t x, i, count, cur;
     uint32_t sig;
-    if (!d || !vp || !d->names) {
+    if (!pick_list(&count, &cur)) {
         pop_close();
         return;
     }
-    v = *vp;
-    sig = (uint32_t)(v + 1) * 7919u + pop.col * 131u + ux.gen * 977u + ux.pal * 31u;
+    sig = (uint32_t)(cur + 1) * 7919u + pop.col * 131u + ux.gen * 977u + ux.pal * 31u + cord_ui_sel * 37u;
     if (!ui.force && sig == pop.sig)
         return;
     pop.sig = sig;
     {
-    int32_t rows = d->max - d->min + 1 < 5 ? d->max - d->min + 1 : 5, h = 16 + rows * 20;
-    int32_t first = clamp(v - 2, d->min, d->max - rows + 1);   /* five names around it, the list's ends kept */
-    x = clamp(30 + 60 * (int32_t)pop.col - POP_PICK_W / 2, 4, 236 - POP_PICK_W);
+    int32_t most = (pick_bottom() - 40 - 16) / 20;     /* (8 over MODS' chips, 6 over a page's strips) */
+    int32_t rows = count < most ? count : most, h = 16 + rows * 20;
+    int32_t first = clamp(cur - (rows - 1) / 2, 0, count - rows);   /* the names around it, the list's ends kept */
+    x = 4 + 60 * (int32_t)(pop.col < 3u ? pop.col : 2u);   /* its column and the next (the last: the two last), whole:
+                                                         * a neighbour's value is under it entirely or not at all */
     cv_begin(POP_PICK_W, (uint32_t)h, T_BG);
     cv_rrect(0, 0, POP_PICK_W, h, 10, T_LINE, T_BG);
     cv_rrect(1, 1, POP_PICK_W - 2, h - 2, 9, T_SURF, T_LINE);
     for (i = 0; i < rows; i++) {
-        int32_t n = first + i, y = 8 + i * 20, far = n - v > 1 || v - n > 1;
+        int32_t n = first + i, y = 8 + i * 20, far = n - cur > 1 || cur - n > 1, tr, tx = 12;
+        uint16_t bg = n == cur ? T_LIFT : T_SURF;
+        const char *name = pick_name(n, &tr);
         char b[16];
-        list_words(b, d->names[n - d->min], sizeof b);
-        if (n == v) {
+        if (tr >= 0 || cur_page()->graph == GR_CORDS)
+            str_cpy(b, name, sizeof b);                 /* (a cord's: as its chips name it, "LFO RTE") */
+        else
+            list_words(b, name, sizeof b);
+        if (n == cur) {
             cv_rrect(4, y - 1, POP_PICK_W - 8, 20, 5, T_THEME, T_SURF);
             cv_rrect(5, y, POP_PICK_W - 10, 18, 4, T_LIFT, T_THEME);
-            cv_free_text(12, y + 2, &AF_S, b, T_TEXT, T_LIFT, POP_PICK_W - 20);
-        } else {
-            cv_free_text(12, y + 2, &AF_S, b, far ? T_MID : T_SEC, T_SURF, POP_PICK_W - 20);
         }
+        if (tr >= 0) {                                  /* a cord's: the track's number on its colour (as the rows') */
+            char num[2] = {(char)('1' + (tr & 3)), 0};
+            cv_rrect(10, y + 3, 12, 12, 3, T_TRK((uint32_t)tr), bg);
+            cv_text_on(13, y + 4, &AF_X, num, T_BG, T_TRK((uint32_t)tr));
+            tx = 27;
+        }
+        cv_free_text(tx, y + 2, &AF_S, b, n == cur ? T_TEXT : far ? T_MID : T_SEC, bg, POP_PICK_W - 8 - tx);
     }
     cv_blit((uint32_t)x, 40);
     }

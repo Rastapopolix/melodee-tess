@@ -1,0 +1,64 @@
+# Cord destinations (firmware/src/cord.c): code, name, kind, parameter. FROZEN: saved cords keep the
+# codes. Rewrite (CORD_UPDATE=1) only to append.
+ 0 --       voice -
+ 1 PITCH    voice -
+ 2 CUTOFF   voice -
+ 3 SHAPE    voice -
+ 4 GAIN     voice -
+ 5 LEVEL    block LEVEL
+ 6 PAN      block PAN
+ 7 SPREAD   block STEREO SPREAD
+ 8 ATTACK   block ENV ATTACK
+ 9 DECAY    block ENV DECAY
+10 SUSTAIN  block ENV SUSTAIN
+11 RELEASE  block ENV RELEASE
+12 ENV FLT  block ENV TO FILTER
+13 ENV PIT  block ENV TO PITCH
+14 ENV SHP  block ENV TO SHAPE
+15 LFO RTE  block LFO RATE
+16 LFO DEP  depth -
+17 LFO PIT  block LFO TO PITCH
+18 LFO FLT  block LFO TO FILTER
+19 LFO SHP  block LFO TO SHAPE
+20 LFO AMP  block LFO TO LEVEL
+21 FX SEND  block FX SEND
+22 E1       block ENGINE 1
+23 E2       block ENGINE 2
+24 E3       block ENGINE 3
+25 E4       block ENGINE 4
+26 E5       block ENGINE 5
+27 E6       block ENGINE 6
+28 E7       block ENGINE 7
+29 E8       block ENGINE 8
+30 T PROB   step  TURING PROB
+31 T LEN    step  TURING LENGTH
+32 E PULSE  step  EUCLID PULSES
+33 E ROT    step  EUCLID ROTATION
+34 M LEAP   step  MARKOV LEAP
+35 M DENS   step  MARKOV DENSITY
+36 MP POS   step  MORPH POSITION
+37 SHIFT    step  TWEAK SHIFT
+38 DROP     step  TWEAK DROP
+39 HUMAN    step  TWEAK HUMAN
+40 EV AMT   step  EVOLVE AMOUNT
+41 CONTR    step  FORM CONTRAST
+42 AT X     step  ATLAS X
+43 AT Y     step  ATLAS Y
+44 AT DENS  step  ATLAS DENSITY
+45 B SPEED  step  BOUNCE SPEED
+46 B ANGLE  step  BOUNCE ANGLE
+47 A PROB   step  AWAKE PROB
+48 BRANCH   step  TWEAK BRANCH
+49 Q PROB   step  QUAD PROB
+50 C Y      step  CONSTELLATION Y
+51 C SIZE   step  CONSTELLATION SIZE
+52 C DENS   step  CONSTELLATION DENS
+53 S START  step  SERIES START
+54 ?        ?     -
+55 C AUTO   step  CONSTELLATION AUTO
+56 CH PROG  step  CHORD PROG
+57 AT KICK  step  ATLAS KICK
+58 AT SNR   step  ATLAS SNARE
+59 AT HAT   step  ATLAS HAT
+60 AT TOMS  step  ATLAS TOMS
+61 AN VARY  step  ANSWER VARY

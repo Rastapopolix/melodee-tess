@@ -23,6 +23,9 @@
 #ifndef AW_FAULTS
 #define AW_FAULTS() 0u               /* CPU1 faults the platform's exception handler caught */
 #endif
+#ifndef AW_RETIRED
+#define AW_RETIRED() ((void)0)       /* record retirement before CPU0 continues */
+#endif
 #ifndef AW_MISREAD
 #define AW_MISREAD(n) 0              /* n misreads so far: 1 answered (keep the worker), 0 retire it */
 #endif
@@ -35,8 +38,14 @@ static struct {
     audio_worker_fn fn;
     void *context;
     uint32_t check, max_wait_ticks, timeouts;
+#if MELODEE_AUDIO_PROFILE
+    uint32_t wait_ticks, waits;
+#endif
     AW_WORD ready __attribute__((aligned(32)));
     AW_WORD complete, rejected;
+#if MELODEE_AUDIO_PROFILE
+    uint32_t job_ticks;
+#endif
     uint32_t jobs, max_job_ticks, misread;          /* misread: the last request refused, as CPU1 read it */
 } audio_worker __attribute__((aligned(32)));
 static int audio_worker_online;
@@ -59,6 +68,7 @@ static int audio_worker_submit(audio_worker_fn fn, void *context)
 static void audio_worker_retire(void)
 {
     AW_HOLD();
+    AW_RETIRED();
     audio_worker_online = 0;
     AW_STORE(&audio_worker.complete, AW_LOAD(&audio_worker.request));
 }
@@ -89,6 +99,9 @@ static int audio_worker_join(void)
         }
     }
     uint32_t elapsed = AW_TICKS() - start;
+#if MELODEE_AUDIO_PROFILE
+    audio_worker.wait_ticks+=elapsed;audio_worker.waits++;
+#endif
     if (elapsed > audio_worker.max_wait_ticks) audio_worker.max_wait_ticks = elapsed;
     return 1;
 }
@@ -108,6 +121,9 @@ static inline __attribute__((always_inline)) void audio_worker_poll(uint32_t *do
             fn(context);
             uint32_t elapsed = AW_TICKS() - start;
             audio_worker.jobs++;
+#if MELODEE_AUDIO_PROFILE
+            audio_worker.job_ticks+=elapsed;
+#endif
             if (elapsed > audio_worker.max_job_ticks) audio_worker.max_job_ticks = elapsed;
             *done = request;
             AW_STORE(&audio_worker.complete, request);

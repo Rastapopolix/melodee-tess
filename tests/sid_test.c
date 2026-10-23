@@ -2,7 +2,9 @@
 /* SID (src/eng_sid.c) against the chip as reSID documents it: the noise register, waveforms, ring modulation, hard
  * sync, the R-2R DACs of both revisions, the envelope generator cycle for cycle (rates, the exponential counter,
  * sustain, the zero freeze, the ADSR delay), the 16-bit frequency register, the cutoff curves and resonance laws,
- * the filter's sum, the 6581's DC thump through the C64's output stage, band-limited edges, and the 32 presets. */
+ * the filter's sum, the 6581's DC thump through the C64's output stage, band-limited edges, a new gate at the top of
+ * the envelope, MODEL C64 (one voice, the registers written at PAL frames, the hard restart, a held chord
+ * arpeggiated a note a frame), and the 32 presets. */
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
@@ -88,6 +90,12 @@ static void envelope_tests(void)
         check("a new gate in the release: the attack counts up from the level reached", lvl > 0x80 && lvl < 0xff &&
               env_run(9) == lvl + 1);
     }
+    /* C64: a hard restart's release runs at rate 0 whatever REL is, then the gate: the attack, its counter cleared */
+    env_reset(0, 127, 127, 127);
+    es.env = 0xff; es.hold_zero = 0; es.hr = 1;
+    check("C64 hard restart from 0xFF: rate 0 to zero in 756 x 9 cycles (not REL 127), then the attack from zero",
+          env_run(756 * 9 - 1) == 1 && es.state == SID_RELEASE && env_run(1) == 0 && es.state == SID_ATTACK &&
+          !es.hr && !es.hold_zero && env_run(8) == 0 && env_run(1) == 1);
     check("the track's ADSR -> SID rates: 1 ms = rate 0, 10 s = attack 15 / decay 13 (9 s)",
           SID_ADSR_RATE[0] == 0x00 && SID_ADSR_RATE[127] == 0xdf);
 }
@@ -129,10 +137,20 @@ static uint32_t play(int32_t *buf, uint32_t ms, uint32_t note, uint32_t release_
     }
     return n;
 }
+/* a C64 chord's next note: the next held note up from cur, past the top the lowest */
+static uint32_t chord_up(const uint8_t *c, uint32_t n, uint32_t cur)
+{
+    uint32_t i, up = 128u, low = 128u;
+    for (i = 0; i < n; i++) {
+        low = c[i] < low ? c[i] : low;
+        up = c[i] > cur && c[i] < up ? c[i] : up;
+    }
+    return up < 128u ? up : low;
+}
 static void fresh(uint32_t preset)
 {
     memset(trk, 0, sizeof trk); host_tracks_init(); host_preset(&trk[0], 3, preset); T = &trk[0];
-    T->p[P_DIST] = T->p[P_CHOR] = T->p[P_DLY] = T->p[P_REV] = 0;
+    T->p[P_RESERVED33] = T->p[P_RESERVED34] = T->p[P_RESERVED35] = T->p[P_RESERVED36] = 0;
 }
 
 /* Hann-windowed DFT from f0 / 2 to FS / 4: the share of energy (dB) outside +-3 bins of the harmonics of f0 */
@@ -174,7 +192,7 @@ static void combined_tests(void)
             }
             fclose(f);
             memset(got, 0xa5, sizeof got);
-            sid_unpack(got, SID_WAVE_LZ + SID_WAVE_AT[m][w], 4096);
+            lz_unpack(got, SID_WAVE_LZ + SID_WAVE_AT[m][w], 4096);
             same &= !memcmp(got, want, 4096);
         }
     check("combined waveforms: the 8 packed tables unpack to reSID's samples bit for bit", same && !missing);
@@ -368,6 +386,195 @@ int main(void)
         for (uint32_t i = 0; i < 300u * FS / 1000u / CTL; i++)
             track_render(T, out, CTL);
         check("REL 0: the voice sounds out its release and its output stage, then ends", still && !T->v[0].active);
+    }
+    /* MODEL C64 6581 / 8580: one voice, the registers written at the player's frames */
+    {
+        static int32_t a[FS], b[FS];
+        uint32_t k, n, live[2], same = 1, steps[2], lo[2], hi[2];
+        for (k = 0; k < 2u; k++) {                     /* nothing modulated: the same chip, sample for sample */
+            fresh(0); T->p[P_E0] = (int16_t)k; n = play(a, 400, 60, 250);
+            fresh(0); T->p[P_E0] = (int16_t)(2u + k); play(b, 400, 60, 250);
+            same &= !memcmp(a, b, n * sizeof a[0]);
+        }
+        check("C64 6581 / C64 8580, nothing modulated: the 6581 / 8580 sample for sample", same);
+        for (k = 0; k < 2u; k++) {
+            fresh(0); T->p[P_E0] = (int16_t)(k ? 2 : 0);
+            trk_note_on(T, 60, 100); trk_note_on(T, 64, 100); trk_note_on(T, 67, 100);
+            track_render(T, out, CTL);
+            live[k] = 0;
+            for (uint32_t i = 0; i < NVOICE; i++)
+                live[k] += T->v[i].active && T->v[i].gate;
+        }
+        check("C64: one voice per track (a chord's last note has it); 6581: up to four", live[0] == 3u && live[1] == 1u);
+        for (k = 0; k < 2u; k++) {                     /* a 4-octave glide: when voice 1's frequency changes */
+            uint32_t i, last = 0, prev, inc;
+            voice_t *g = 0;
+            fresh(0); T->p[P_E0] = (int16_t)(k ? 2 : 0); T->p[P_VOICE] = V_MONO;
+            T->p[P_GLIDE] = 127; T->p[P_GLMODE] = 1;
+            trk_note_on(T, 36, 100); track_render(T, out, CTL);
+            trk_note_on(T, 84, 100);
+            for (i = 0; i < NVOICE; i++)
+                if (T->v[i].active && T->v[i].gate) g = &T->v[i];
+            prev = g ? sid_voice(T, g)->inc_cache[0] : 0;
+            steps[k] = 0; lo[k] = ~0u; hi[k] = 0;
+            for (i = 1; g && i <= FS / 2u / CTL; i++) {
+                track_render(T, out, CTL);
+                if ((inc = sid_voice(T, g)->inc_cache[0]) == prev)
+                    continue;
+                if (steps[k]++) {
+                    lo[k] = i - last < lo[k] ? i - last : lo[k];
+                    hi[k] = i - last > hi[k] ? i - last : hi[k];
+                }
+                last = i; prev = inc;
+            }
+        }
+        printf("SID:   glide over 0.5 s: 6581 %u frequency writes (every %u..%u blocks), C64 %u (every %u..%u)\n",
+               steps[0], lo[0], hi[0], steps[1], lo[1], hi[1]);
+        check("6581: the glide rewrites the frequency every block (0.73 ms)", steps[0] > 600u && hi[0] == 1u);
+        check("C64: only at PAL frames (19656 cycles = 27.5 blocks): 50 writes a second", steps[1] >= 24u &&
+              steps[1] <= 26u && lo[1] == 27u && hi[1] == 28u);
+    }
+    /* MODEL C64 in POLY: the keys held are a chord on the one voice, a note a frame, one gate and envelope */
+    {
+        uint8_t ch[4] = {60, 64, 67, 72};
+        voice_t *g = &T->v[0];
+        sid_voice_t *s;
+        uint32_t i, k, cur, inc, notes = 0, incs = 0, order = 1, sync = 1, lo = ~0u, hi = 0, last = 0, attacks = 0;
+        uint32_t state, first, added, gated, seen = 0, in = 1, held[3], released, tail = 0, tail_ok = 1;
+        fresh(0); T->p[P_E0] = 2; T->p[P_REL] = 80;
+        T->p[P_SUS] = 100;
+        trk_note_on(T, 60, 100); trk_note_on(T, 64, 100); trk_note_on(T, 67, 100);
+        track_render(T, out, CTL);
+        s = sid_voice(T, g);
+        gated = 0;
+        for (i = 0; i < NVOICE; i++)
+            gated += T->v[i].active && T->v[i].gate;
+        first = g->note == 67 && gated == 1u;
+        cur = g->note; inc = s->inc_cache[0]; state = s->state;
+        for (i = 1; i <= FS / CTL; i++) {                /* 1 s */
+            track_render(T, out, CTL);
+            attacks += s->state == SID_ATTACK && state != SID_ATTACK;
+            state = s->state;
+            sync &= (g->note != cur) == (s->inc_cache[0] != inc);   /* the frequency moves with the note alone */
+            inc = s->inc_cache[0];
+            if (g->note == cur)
+                continue;
+            order &= g->note == chord_up(ch, 3, cur);
+            if (notes++) {
+                lo = i - last < lo ? i - last : lo;
+                hi = i - last > hi ? i - last : hi;
+            }
+            last = i; cur = g->note; incs++;
+        }
+        printf("SID:   C64 chord 60 64 67 over 1 s: %u notes (every %u..%u blocks), %u attacks after the first\n",
+               notes, lo, hi, attacks);
+        check("C64 POLY chord: one voice, the last key first", first);
+        check("C64 POLY chord: the next held note up at each PAL frame (27..28 blocks), past the top the lowest",
+              order && notes >= 49u && notes <= 51u && lo == 27u && hi == 28u);
+        check("C64 POLY chord: only the frequency changes, one gate and attack for the chord",
+              sync && incs == notes && !attacks && g->gate);
+        trk_note_on(T, 72, 100);                         /* a key into the sounding chord: its hard restart */
+        added = g->note == 72 && s->hr && s->state == SID_RELEASE;
+        inc = s->inc_cache[0];
+        cur = 72;
+        for (i = 0, k = 0; i < 5u * 28u; i++) {
+            track_render(T, out, CTL);
+            if (s->hr) {                                 /* the chord's last note fades out on its registers */
+                added &= g->note == 72 && s->inc_cache[0] == inc;
+                continue;
+            }
+            if (!k++)                                    /* then the gate: the new key first, its frames from it */
+                added &= g->note == 72 && s->inc_cache[0] != inc && s->state == SID_ATTACK && i < 12u;
+            if (g->note != cur) {
+                order &= g->note == chord_up(ch, 4, cur);
+                cur = g->note; seen++;
+            }
+        }
+        check("C64 POLY chord: a new key sounds first (after its hard restart), then joins the arpeggio",
+              added && order && seen >= 4u);
+        /* key up on the sounding note: the chord goes on over the others; the gate ends with the last key */
+        k = g->note;
+        trk_note_off(T, k);
+        for (i = 0, k = 0; i < 4u; i++)
+            if (ch[i] != cur)
+                held[k++] = ch[i];
+        released = g->gate;
+        for (i = 0, seen = 0; i < 2u * 28u; i++) {
+            track_render(T, out, CTL);
+            in &= g->note == cur || g->note == held[0] || g->note == held[1] || g->note == held[2];
+            seen += g->note != cur;
+            cur = g->note;
+        }
+        trk_note_off(T, held[0]); trk_note_off(T, held[1]);
+        released &= g->gate;
+        trk_note_off(T, held[2]);
+        released &= !g->gate && T->v[0].stage == 3;
+        track_render(T, out, CTL);
+        released &= s->state == SID_RELEASE;
+        for (i = 0; i < FS / 4u / CTL && g->active; i++) {   /* the release: the arpeggio over the chord last held */
+            track_render(T, out, CTL);
+            if (g->note != cur) {
+                tail_ok &= g->note == held[0] || g->note == held[1] || g->note == held[2];
+                cur = g->note; tail++;
+            }
+        }
+        check("C64 POLY chord: a key up keeps the gate while any is held, the voice moves to the others",
+              in && seen >= 2u && released);
+        check("C64 POLY chord: the arpeggio goes on in the release", tail >= 5u && tail_ok);
+        /* MONO: one note by PRIO; the 6581: a voice per note, neither arpeggiates */
+        for (k = 0, seen = 0; k < 2u; k++) {
+            fresh(0); T->p[P_E0] = (int16_t)(k ? 0 : 2); T->p[P_VOICE] = (int16_t)(k ? V_POLY : V_MONO);
+            trk_note_on(T, 60, 100); trk_note_on(T, 64, 100); trk_note_on(T, 67, 100);
+            for (i = 0; i < FS / 2u / CTL; i++) {
+                track_render(T, out, CTL);
+                seen += T->v[0].note != (k ? 60u : 67u) || (k && (T->v[1].note != 64u || T->v[2].note != 67u));
+            }
+        }
+        check("C64 MONO: the last key alone; 6581 POLY: a voice per note, no arpeggio", !seen);
+    }
+    /* a new gate on a voice whose envelope sits at 0xFF (INIT SID: SUS 127, held to its top). On the chip the
+     * attack wraps the counter to 0 and freezes it (reSID; tested above). 6581 MONO 60 -> 62 and POLY the same note
+     * off and on in one block: the attack is over, on to the decay. C64 a new key: a player's hard restart */
+    {
+        uint32_t k, top[3], low[3], last[3], zero = 0, held = 1, inc0 = 0, inc1 = 0;
+        for (k = 0; k < 3u; k++) {
+            uint32_t i, j;
+            voice_t *g = 0;
+            fresh(0); T->p[P_E0] = (int16_t)(k == 2u ? 2 : 0); T->p[P_VOICE] = k ? V_POLY : V_MONO;
+            trk_note_on(T, 60, 100);
+            for (i = 0; i < 300u; i++)
+                track_render(T, out, CTL);
+            for (j = 0; j < NVOICE; j++)
+                if (T->v[j].active && T->v[j].gate) g = &T->v[j];
+            top[k] = g ? sid_voice(T, g)->env : 0;
+            inc0 = g ? sid_voice(T, g)->inc_cache[0] : 0;
+            if (k == 1u)
+                trk_note_off(T, 60);
+            trk_note_on(T, k == 0u ? 62 : k == 1u ? 60 : 64, 100);
+            low[k] = 0xff; last[k] = 0;
+            for (i = 0; i < 300u; i++) {
+                track_render(T, out, CTL);
+                for (g = 0, j = 0; j < NVOICE; j++)
+                    if (T->v[j].active && T->v[j].gate) g = &T->v[j];
+                last[k] = g ? sid_voice(T, g)->env : 0;
+                low[k] = last[k] < low[k] ? last[k] : low[k];
+                /* the hard restart: the last note's registers; its zero falls inside a block (the attack goes on
+                 * from there, so the low a block ends on is a few steps up) */
+                if (k == 2u && g && sid_voice(T, g)->hr)
+                    held &= sid_voice(T, g)->inc_cache[0] == inc0;
+                else if (k == 2u && g && !zero) {
+                    zero = i + 1;
+                    inc1 = sid_voice(T, g)->inc_cache[0];
+                }
+            }
+        }
+        printf("SID:   new gate at env 0xFF, then 300 blocks (low/end): MONO %u/%u, POLY same note %u/%u, C64 %u/%u, "
+               "its hard restart %u blocks\n", low[0], last[0], low[1], last[1], low[2], last[2], zero);
+        check("6581 a new gate at env 0xFF (MONO, POLY same note): on to the decay, the counter stays at the top",
+              top[0] == 0xffu && top[1] == 0xffu && low[0] == 0xffu && low[1] == 0xffu &&
+              last[0] == 0xffu && last[1] == 0xffu);
+        check("C64 a new key at 0xFF: hard restart to zero in 6.9 ms on the last note's registers, then its attack",
+              top[2] == 0xffu && low[2] < 8u && zero >= 9u && zero <= 10u && held && inc1 != inc0 && last[2] == 0xffu);
     }
     /* every preset: deterministic, sounding, bounded, and over after its release */
     {

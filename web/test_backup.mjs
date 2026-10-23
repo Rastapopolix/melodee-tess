@@ -33,14 +33,15 @@ function device(objs, opt = {}) {
     }
     if (cmd === BACKUP_CMD.PUT) {
       const [op, id] = a;
-      if (op === 0) { d.staged = { id, size: bkR32(a, 2), crc: bkR32(a, 7), bytes: [] }; return [op, id, 0]; }
+      if (op === 0) { const size = bkR32(a, 2), rc = opt.refuse?.(id, size) || 0; if (!rc) d.staged = { id, size, crc: bkR32(a, 7), bytes: [], chunks: 0 }; return [op, id, rc]; }
       if (op === 1) {
+        d.staged.chunks++;
         if (opt.failChunk === id) return [op, id, 2];
         const off = bkR32(a, 2), p = a.slice(7), n = Math.min(256, d.staged.size - off);
         d.staged.bytes.push(...bkUnpack(p, n)); return [op, id, 0];
       }
       if (op === 2) { const s = Uint8Array.from(d.staged.bytes); const rc = bkCrc(s) === d.staged.crc ? 0 : 2; if (!rc) { d.objs.set(id, s); d.log.push(id); } return [op, id, rc]; }
-      if (op === 3) { d.log.push(`abort ${id}`); return [op, id, 0]; }
+      if (op === 3) { if (d.staged?.chunks) d.log.push(`abort ${id}`); return [op, id, 0]; }  /* (a preflight: no chunks) */
     }
     if (cmd === 11 || cmd === 12 || cmd === 13 || cmd === 14) { if (cmd === 13 || cmd === 14) d.log.push(32 + a[0]); return [a[0], 0]; }
     throw new Error(`unexpected ${cmd}`);
@@ -149,8 +150,51 @@ const badNative=JSON.parse(JSON.stringify(nativeFile)),invalidFM=nativeFM.slice(
 badNative.objects[21]={...badNative.objects[21],crc:bkCrc(invalidFM),data:Buffer.from(invalidFM).toString("base64")};
 const nativeProtected=device([],{ids:nativeIds});
 ok(await athrows(()=>restoreBackup(nativeProtected.request,badNative)) && !nativeProtected.log.length,"backup: malformed native voice refused before any restore writes");
-const oldOwnedTarget=device([],{ids:nativeIds});await restoreBackup(oldOwnedTarget.request,ownedFile);
-ok(oldOwnedTarget.log.includes(19) && !oldOwnedTarget.log.includes(21),"backup: old owned-voice archives reach firmware migration without clearing new objects");
+const oldOwnedTarget=device([],{ids:nativeIds,refuse:(id,size)=>id>=19&&id<=22&&size!==2060?1:0});
+ok(await athrows(()=>restoreBackup(oldOwnedTarget.request,ownedFile)) && !oldOwnedTarget.log.length,"backup: an archive the firmware refuses (old owned voices) writes nothing");
+
+{   /* melodee-tess: the generators, 28 (each saved slot's, as stored) and 29 (the live ones), in a 30-object archive */
+  const tessIds = Array.from({ length: 30 }, (_, i) => i), tessObjects = [[28, rnd(740, 30)], [29, rnd(180, 31)]];
+  const tessFile = await captureBackup(device([...bankObjects, ...tessObjects], { ids: tessIds }).request, "TESSERA");
+  const tessTarget = device([], { ids: tessIds }); await restoreBackup(tessTarget.request, tessFile);
+  ok(readBackup(tessFile).objects.length === 30 && tessObjects.every(([id, v]) => tessTarget.objs.get(id).every((x, i) => x === v[i])),
+     "backup: the generators (28, 29) round trip in a 30-object archive");
+  ok(tessTarget.log.indexOf(28) < tessTarget.log.indexOf(0) && tessTarget.log.indexOf(29) < tessTarget.log.indexOf(0) && tessTarget.log.at(-1) === 0,
+     "backup: the generators restore before the live music");
+  const olderFirmware = device([], { ids: Array.from({ length: 28 }, (_, i) => i) });
+  ok(await athrows(() => restoreBackup(olderFirmware.request, tessFile)) && !olderFirmware.log.length,
+     "backup: firmware without the generators' objects refuses the archive before any write");
+  const newerTarget = device([], { ids: tessIds }); await restoreBackup(newerTarget.request, ownedFile);
+  ok(!newerTarget.log.includes(28) && !newerTarget.log.includes(29) && newerTarget.log.at(-1) === 0,
+     "backup: an older archive (no generators) restores on this firmware, the generators left alone");
+}
+
+{   /* melodee-tess, the own project format: the projects (0, 2..5) are TSP1 records, of any length up to 32768 */
+  const tsp = (parts) => {                  // "TSP1", length, part count, 0, the parts, FNV-1a of the rest
+    const body = parts.flatMap(([id, bytes]) => [id, 1, bytes.length & 255, bytes.length >> 8, ...bytes]);
+    const n = 12 + body.length + 4, out = new Uint8Array(n), v = new DataView(out.buffer);
+    v.setUint32(0, 0x31505354, true); v.setUint32(4, n, true); v.setUint16(8, parts.length, true); out.set(body, 12);
+    let h = 0x811c9dc5; for (const b of out.subarray(0, n - 4)) h = Math.imul(h ^ b, 16777619) >>> 0;
+    v.setUint32(n - 4, h, true); return out;
+  };
+  const tessIds = Array.from({ length: 30 }, (_, i) => i);
+  const live = tsp([[1, rnd(40, 40)], [3, rnd(900, 41)]]), slot = tsp([[1, rnd(40, 42)], [3, rnd(9000, 43)]]);
+  const ownObjects = [[0, live], [1, rnd(1200, 44)], [3, slot], [29, rnd(602, 45)]];
+  const ownFile = await captureBackup(device(ownObjects, { ids: tessIds }).request, "OWN FORMAT");
+  ok(readBackup(ownFile).objects[3].size === slot.length, "backup (own format): TSP1 projects capture at their own lengths");
+  const ownTarget = device([[0, tsp([[1, rnd(40, 46)]])]], { ids: tessIds }); await restoreBackup(ownTarget.request, ownFile);
+  ok(ownTarget.objs.get(3).every((x, i) => x === slot[i]) && ownTarget.log.at(-1) === 0,
+     "backup (own format): a slot longer than the live record restores (no fixed-size check)");
+  const torn = JSON.parse(JSON.stringify(ownFile)), tb = slot.slice(); tb[100] ^= 1;
+  torn.objects[3] = { ...torn.objects[3], crc: bkCrc(tb), data: btoa(String.fromCharCode(...tb)) };
+  ok(throws(() => readBackup(torn)), "backup (own format): a damaged TSP1 record is refused when the file is read");
+  const oldOnOwn = device([[0, live.slice()]], { ids: tessIds });
+  ok(await athrows(() => restoreBackup(oldOnOwn.request, file)) && !oldOnOwn.log.length,
+     "backup (own format): an archive of older projects is refused before any write");
+  const ownOnOld = device([], { ids: tessIds });
+  ok(await athrows(() => restoreBackup(ownOnOld.request, ownFile)) && !ownOnOld.log.length,
+     "backup (own format): older firmware refuses an archive of TSP1 projects before any write");
+}
 
 console.log(fails ? `BACKUP WEB TESTS FAILED (${fails})` : "backup web tests passed");
 process.exit(fails ? 1 : 0);
