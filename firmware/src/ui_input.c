@@ -218,7 +218,7 @@ static void ui_leds(void)
     led_put(nl, panel.btn[B_OCTDN], (int)(k & 1u));
     led_put(nl, panel.btn[B_OCTUP], (int)(k >> 1));
     play = !pattern_keys_on() && !(name_on() && !ui.menu) && !ui.layer && !grid_on() && !awake_entry_on();
-    c = pattern_keys_on() ? pattern_leds(&pdim, &pbr) : name_on() && !ui.menu ? name_leds() : ui.layer ? layer_leds() :
+    c = pattern_keys_on() ? pattern_leds(&pdim, &pbr) : name_on() && !ui.menu ? name_leds() : ui.layer || mixer_live() ? layer_leds() :
         grid_on() ? grid_leds() : awake_entry_on() ? awake_leds() : fm1_in.notes & ~kb_layer;   /* the patterns, NAME's keys, the map, the grid, the keys held */
 #if MELODEE_SLICE
     if (!ui.layer && !ui.menu && !name_on() && slice_page_on())
@@ -311,33 +311,21 @@ static int32_t list_accel(uint32_t role, int32_t s, uint32_t total, uint32_t *fa
 
 /* MIXER page: KNOB 1 LEVEL, 2 PAN, 3 unused, 4 MUTE of the selected track (right = ON, left = OFF: the
  * track itself is ALGORITHM's, on every page). Pattern length stays on SEQ. */
+/* MIXER: KNOB k track k's LEVEL; OCT+ held, its PAN (OCT+ then a modifier: no octave). Mute and solo are its keys
+ * (ui_layer.c mixer_live), as GLO held */
 static void tracks_edit(uint32_t slot, int32_t steps)
 {
-    track_t *t = TSEL;
-    int16_t *vp;
-    const param_desc_t *d;
-    switch (slot) {
-    case 3:
-        t->p[P_MUTE] = (int16_t)(steps > 0);
-        if (t->p[P_MUTE]) {
-            seq_release(t);
-            uint32_t tr = trk_index(t);
-            if (tr < TESSERA_TRACKS) tessera.active_gate[tr] = 0;
-        }
-        return;
-    case 0:
-        vp = &t->p[P_LEVEL];
-        d = &TP[P_LEVEL];
-        break;
-    case 2:
-        return;
-    default:
-        vp = &t->p[P_PAN];
-        d = &TP[P_PAN];
-        break;
+    track_t *t = &trk[slot % NTRK];
+    uint32_t pan = (fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u, id = pan ? P_PAN : P_LEVEL;
+    int16_t *vp = &t->p[id];
+    const param_desc_t *d = &TP[id];
+    if (pan) {
+        oct_eat |= 2u;
+        ui.oct_t0 |= 2u;
+        oct_deferred = 0;
     }
     *vp = (int16_t)clamp(*vp + accel(EN_K1 + slot, steps, d->max - d->min), d->min, d->max);
-    motion_capture(t, (uint32_t)(vp - t->p), *vp);
+    motion_capture(t, id, *vp);
 }
 
 /* REC arms one pattern pass on the selected track without navigating. During

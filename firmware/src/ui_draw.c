@@ -759,17 +759,20 @@ static void draw_columns(void)
     uint32_t c;
     char val[12];
     const char *unit;
-    if (cur_page()->scope == SC_TRK) {                 /* LEVEL PAN MUTE of the selected track */
-        const track_t *t = TSEL;
-        uint32_t lvl = trk_level(song.sel);
-        param_format(&TP[P_LEVEL], (int32_t)lvl, val, &unit);   /* (0: OFF) */
-        col_mods(PID_TRACK(P_LEVEL));
-        draw_column(0, "LEVEL", val, unit, lvl && !t->p[P_MUTE] ? VAL(0u) : T_DIM, (int32_t)lvl * 1000 / 127, ICON_AUTO);
-        param_format(&TP[P_PAN], t->p[P_PAN], val, &unit);
-        col_mods(PID_TRACK(P_PAN));
-        draw_column(1, "PAN", val, unit, VAL(1u), RATIO(&TP[P_PAN], t->p[P_PAN]), param_icon(&TP[P_PAN], t->p[P_PAN]));
-        draw_column(2, "", "", "", T_DIM, -1, ICON_NONE);
-        draw_column(3, "MUTE", t->p[P_MUTE] ? "ON" : "OFF", "", t->p[P_MUTE] ? T_ACCENT : VAL(3u), -1, ICON_AUTO);
+    if (cur_page()->scope == SC_TRK) {                 /* MIXER: KNOB k track k's LEVEL, OCT+ held its PAN */
+        static const char *const NAME[2][4] = {{"T1 LVL", "T2 LVL", "T3 LVL", "T4 LVL"}, {"T1 PAN", "T2 PAN", "T3 PAN", "T4 PAN"}};
+        uint32_t pan = (fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u;
+        for (c = 0; c < 4u; c++) {
+            const track_t *t = &trk[c];
+            if (pan) {
+                param_format(&TP[P_PAN], t->p[P_PAN], val, &unit);
+                draw_column(c, NAME[1][c], val, unit, VAL(c), RATIO(&TP[P_PAN], t->p[P_PAN]), param_icon(&TP[P_PAN], t->p[P_PAN]));
+            } else {
+                uint32_t lvl = trk_level(c);
+                param_format(&TP[P_LEVEL], (int32_t)lvl, val, &unit);   /* (0: OFF) */
+                draw_column(c, NAME[0][c], val, unit, lvl && !t->p[P_MUTE] ? VAL(c) : T_DIM, (int32_t)lvl * 1000 / 127, ICON_AUTO);
+            }
+        }
         return;
     }
     if (cur_page()->graph == GR_SCALE_PICKER) {

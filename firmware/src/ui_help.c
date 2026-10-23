@@ -351,9 +351,9 @@ static void help_find(uint32_t k)
         else help_hp(HP_DRUM_SOUND + pg->id[k]);
         return;
     }
-    if (pg->scope == SC_TRK) {                          /* MIXER: LEVEL PAN, MUTE (ui_input.c tracks_edit) */
-        if (k == 2u) help_unused(k);
-        else help.pid = (uint16_t)PID_TRACK(k == 0u ? P_LEVEL : k == 1u ? P_PAN : P_MUTE);
+    if (pg->scope == SC_TRK) {                          /* MIXER: KNOB k track k's LEVEL, OCT+ held its PAN */
+        help.pid = (uint16_t)PID_TRACK(((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u) ? P_PAN : P_LEVEL);
+        help_tr = k;
         return;
     }
     if (pg->graph == GR_PATGRID) {                      /* PATTERNS: KNOB k track k's */

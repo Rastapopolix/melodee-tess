@@ -52,6 +52,10 @@ static const uint32_t LY_DTAP_MS=300u;
 
 
 static int layer_allowed(void) { return !ui.menu && !ui.confirm && !ui.uboot && !name_on(); }
+/* MIXER (Tessera 2.1, Theo): the page is the GLO layer without holding GLO. Its keys are the layer's (black keys
+ * mute, white keys solo while held, C4 unmutes all, F4 taps the tempo), its LEDs the layer's; its knobs are the four
+ * tracks' levels, OCT+ held their pans (ui_input.c tracks_edit). A layer button armed (GLO, SCL held) wins */
+static int mixer_live(void) { return !ui.home && !ui.ly && layer_allowed() && cur_page()->graph == GR_TRK; }
 static uint32_t ly_bit(uint32_t l) { return 1u << panel.btn[LAYERS[l].btn]; }
 static uint32_t ly_down(uint32_t l) { return l && ((fm1_in.buttons & ly_bit(l)) != 0u || ui.lock == l); }
 static uint32_t layer_bits(void)
@@ -83,7 +87,7 @@ static void layer_masks(void)
                : ui.ly ? ly_bit(ui.ly) : layer_bits() & ~fm1_in.buttons;
     kb_mask = m | (layer_allowed() && !ui.ly ? 1u << panel.btn[B_SEQ] : 0u);
 
-    kb_lock = m && ui.lock ? 1u : 0u;
+    kb_lock = (m && ui.lock) || mixer_live() ? 1u : 0u;  /* (MIXER: its keys the GLO layer's, no button held) */
 
 }
 
@@ -256,7 +260,7 @@ static void layer_key(uint32_t l, uint32_t k)
 /* each pass: the keys the layer got now; then GLO's solo: the tracks of its keys still held (perform.c) */
 static void layer_keys(uint32_t keys)
 {
-    uint32_t k, l = layer_open() ? layer_open() : ui.layer, s = 0;
+    uint32_t k, l = layer_open() ? layer_open() : ui.layer ? ui.layer : mixer_live() ? (uint32_t)LAYER_GLO : 0u, s = 0;
     for (k = 0; keys && k < 27u; k++)
         if ((keys >> k) & 1u)
             layer_key(l, k);
@@ -334,7 +338,7 @@ static const char W_NOTE[16];
 static int glo_sounding(uint32_t t) { return !trk[t].p[P_MUTE] && (!track_solo || ((track_solo >> t) & 1u)); }
 static uint32_t layer_leds(void)
 {
-    uint32_t k, m = 0, blink = ((fm1_ms / 250u) & 1u) == 0u, l = ui.layer;
+    uint32_t k, m = 0, blink = ((fm1_ms / 250u) & 1u) == 0u, l = ui.layer ? ui.layer : mixer_live() ? (uint32_t)LAYER_GLO : 0u;
     uint32_t mask = scale_mask(TSEL), root = (uint32_t)TSEL->p[P_ROOT] % 12u;
     for (k = 0; k < 27u; k++) {
         uint32_t p = key_place(k), b = (uint32_t)key_black(k), on = 0, e;

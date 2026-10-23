@@ -1931,23 +1931,54 @@ static int test_actions(void)
     return bad;
 }
 
+static void key_down(uint32_t k);
+static void key_up(uint32_t k);
+static void btn_down(uint32_t label);
+static void btn_up(uint32_t label);
+static uint32_t gates(void);
+/* MIXER (2.1): one 4-channel mixer, the GLO layer without holding GLO: KNOB k track k's LEVEL, OCT+ held its PAN;
+ * black keys mute, white keys solo while held, C4 unmutes all; the keys play no notes there; page buttons leave it */
 static int test_tracks(void)
 {
-    int bad = 0;
-    track_t before;
+    int bad = 0, ok;
+    track_t before[NTRK];
+    uint32_t k;
     ui_power_on();
     open_family(FAM_TRK);
-    before = trk[0];
+    memcpy(before, trk, sizeof before);
     turn(EN_PRESET, 1);
-    bad += check("TRACKS: the PRESETS knob does nothing", trk[0].preset == before.preset && !memcmp(trk[0].p, before.p, sizeof before.p));
-    turn(EN_K4, 1);
-    bad += check("MIXER KNOB 4 right: MUTE ON (the selected track stays)", trk[0].p[P_MUTE] == 1 && song.sel == 0);
-    turn(EN_K1, -3);
-    bad += check("KNOB 1 changes LEVEL only (MUTE stays)", trk[0].p[P_MUTE] == 1 && trk[0].p[P_LEVEL] == before.p[P_LEVEL] - 3);
-    turn(EN_K2, 2);
-    bad += check("KNOB 2 changes PAN", trk[0].p[P_PAN] == before.p[P_PAN] + 2);
-    turn(EN_K4, -1);
-    bad += check("MIXER KNOB 4 left: MUTE OFF", trk[0].p[P_MUTE] == 0);
+    bad += check("MIXER: the PRESETS knob does nothing", trk[0].preset == before[0].preset && !memcmp(trk[0].p, before[0].p, sizeof before[0].p));
+    for (k = 0; k < NTRK; k++) turn(EN_K1 + k, -(int32_t)(k + 1u));
+    ok = song.sel == 0u;
+    for (k = 0; k < NTRK; k++) ok &= trk[k].p[P_LEVEL] == before[k].p[P_LEVEL] - (int16_t)(k + 1u) && trk[k].p[P_PAN] == before[k].p[P_PAN];
+    bad += check("MIXER: KNOB 1..4 are tracks 1..4's LEVEL (the selected track stays)", ok);
+    {
+        int8_t oct = song.octave;
+        btn_down(B_OCTUP); frame();
+        turn(EN_K2, 3);
+        btn_up(B_OCTUP); frame();
+        bad += check("MIXER, OCT+ held: KNOB 2 is track 2's PAN; letting OCT+ go shifts no octave",
+                     trk[1].p[P_PAN] == before[1].p[P_PAN] + 3 && trk[1].p[P_LEVEL] == before[1].p[P_LEVEL] - 2 &&
+                     song.octave == oct);
+    }
+    key_down(key_at(1, 0)); frame(); key_up(key_at(1, 0)); frame();
+    ok = trk[0].p[P_MUTE] == 1 && !gates();
+    key_down(key_at(1, 2)); frame(); key_up(key_at(1, 2)); frame();
+    ok &= trk[2].p[P_MUTE] == 1;
+    bad += check("MIXER: a black key mutes its track (F#3 track 1, A#3 track 3), no note sounds", ok);
+    key_down(key_at(0, 1)); frame();
+    ok = track_solo == 2u && !gates();
+    key_up(key_at(0, 1)); frame();
+    bad += check("MIXER: a white key solos its track while held (G3: track 2)", ok && track_solo == 0u);
+    key_down(key_at(0, 4)); frame(); key_up(key_at(0, 4)); frame();
+    bad += check("MIXER: C4 unmutes every track", !trk[0].p[P_MUTE] && !trk[2].p[P_MUTE]);
+    press(B_ENV); frame();
+    ok = !ui.home && cur_page()->fam == FAM_ENV;
+    key_down(key_at(0, 0)); frame();
+    ok &= gates() && !trk[0].p[P_MUTE];
+    key_up(key_at(0, 0)); frame();
+    bad += check("MIXER is not modal: ENV leaves it, and the keys play notes again", ok);
+    open_family(FAM_TRK);
     turn(EN_ALGO, 1);
     bad += check("ALGORITHM selects the track", song.sel == 1);
     return bad;
@@ -3376,9 +3407,10 @@ static int test_product_ux(void)
                  ui.menu == 2 && !ui.menu_scroll && song.rec == 0 && !transport_req);
     ui_power_on(); press(B_GLO);
     bad += check("GLO directly opens the four-channel MIXER", cur_page()->graph == GR_TRK);
-    int16_t len = TSEL->p[P_SLEN], send = TSEL->p[P_RESERVED36];
-    turn(EN_K3, 1);
-    bad += check("MIXER K3 is inert, never changes sequence length", TSEL->p[P_SLEN] == len && TSEL->p[P_RESERVED36] == send);
+    int16_t len = TSEL->p[P_SLEN], send = TSEL->p[P_RESERVED36], lvl3 = trk[2].p[P_LEVEL];
+    turn(EN_K3, -1);
+    bad += check("MIXER K3 is track 3's LEVEL, never a sequence length or a send",
+                 trk[2].p[P_LEVEL] == lvl3 - 1 && TSEL->p[P_SLEN] == len && TSEL->p[P_RESERVED36] == send);
     press(B_GLO); ok = cur_page()->fam == FAM_GLO && str_eq(cur_page()->title, "GLOBAL");
     press(B_GLO); ok &= str_eq(cur_page()->title, "SYSTEM");
     press(B_GLO); ok &= str_eq(cur_page()->title, "MIDI OUT");
@@ -5064,28 +5096,32 @@ static int test_bughunt_ui2(void)
             }
         bad += check("STEP entry with CHRD: POLY the chord, MONO its root, as live recording writes", ok);
     }
-    {   /* 3. MIXER: the knob just turned is the control drawn in text (K1 the LEVEL ring, K2 PAN's value, K3 REV's,
-         * K4 the MUTE chip) in the selected track's strip (ui_pages.c pv_strip) */
-        uint32_t k, a[4][4], ok = 1;
+    {   /* 3. MIXER: KNOB k lights strip k's LEVEL ring in text (its own strip, none other); OCT+ held: its PAN value
+         * (ui_pages.c pv_strip) */
+        uint32_t k, j, ok = 1;
+        int32_t Y = PV_STRIP_TOP;
         for (k = 0; k < 4u; k++) {
-            int32_t X = CARD_X(song.sel), Y = PV_STRIP_TOP;
             ui_power_on();
             settings.palette = 1; palette_set(1);
             go_page(GR_TRK); frame(); frame();
-            X = CARD_X(song.sel);
-            turn(EN_K1 + k, 1);                                       /* (K4 right: MUTE on) */
+            turn(EN_K1 + k, 1);
             ui.force = 1; frame();
-            a[k][0] = text_in(X + 7, Y + 50, X + 15, Y + 90);         /* the LEVEL ring's left (its arc) */
-            a[k][1] = text_in(X + 5, Y + 145, X + 26, Y + 157);       /* PAN's value */
-            a[k][2] = text_in(X + 29, Y + 145, X + 50, Y + 157);      /* REV's */
-            a[k][3] = text_in(X + 6, Y + 168, X + 48, Y + 184);       /* the MUTE chip */
+            for (j = 0; j < 4u; j++) {
+                int32_t X = CARD_X(j);
+                uint32_t ring = text_in(X + 7, Y + 50, X + 15, Y + 90);
+                ok &= j == k ? ring > 0u : ring == 0u;
+            }
         }
-        for (k = 0; k < 4u; k++) {
-            uint32_t j;
-            for (j = 0; j < 4u; j++)
-                ok &= j == k && k!=2 ? a[k][j] > 0u : a[k][j] == 0u;
-        }
-        bad += check("MIXER: K1..K4 light the LEVEL ring / PAN / the MUTE chip, nothing else", ok);
+        ui_power_on();
+        settings.palette = 1; palette_set(1);
+        go_page(GR_TRK); frame(); frame();
+        btn_down(B_OCTUP); frame();
+        turn(EN_K3, 1);
+        ui.force = 1; frame();
+        ok &= text_in(CARD_X(2) + 5, Y + 145, CARD_X(2) + 26, Y + 157) > 0u &&
+              text_in(CARD_X(2) + 7, Y + 50, CARD_X(2) + 15, Y + 90) == 0u;
+        btn_up(B_OCTUP); frame();
+        bad += check("MIXER: KNOB k lights strip k's LEVEL ring, no other; OCT+ held, its PAN", ok);
     }
     {   /* 4. renaming the slot the music came from renames the music: the next SAVE prefills the new name */
         char pn[16];
