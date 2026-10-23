@@ -1252,7 +1252,7 @@ sys.stdout.buffer.write(b"".join(raw[i * 48:i * 48 + 47] for i in range(20)) + r
   const product = py(`import sys; sys.path.insert(0, "tools")
 from fm1_install import product_of
 print(product_of(open(sys.argv[1], "rb").read()), end="")`, pkg).toString();
-  ok(/^FM-1_9\d{2,4}$/.test(productOf(raw)) && productOf(raw) === product,
+  ok(/^FM-1_8377\d{4}$/.test(productOf(raw)) && productOf(raw) === product,
     "fm1pkg.js productOf == Python (development and release identities)");
 }
 
@@ -1541,6 +1541,8 @@ async function localBuild() {
   ok(r.asked.length === 1 && r.asked[0].includes("tessera-1.2.9-test.fwsc (FM-1_91029)") && r.installed.length === 1
     && r.installed[0][1] === "FM-1_91029" && r.installed[0][0].startsWith("image:") && r.unlocked,
     "local: confirmed test build installs with the identity read from the file");
+  r = await run(file("tessera-2.0.1.fwsc", "FM-1_83772001"));
+  ok(r.enabled && r.installed.length === 1 && r.installed[0][1] === "FM-1_83772001", "local: Tessera's own identity (FM-1_8377) installs");
   r = await run(file("t.fwsc", "FM-1_91029"), {answer:false});
   ok(r.enabled && r.installed.length === 0 && r.unlocked, "local: cancelling the confirmation never flashes");
   r = await run(file("FM-1.fwsc", "FM-1_015"));

@@ -348,7 +348,7 @@ async function flash(image, product) {
 }
 $("go").addEventListener("click", () => { if (!writing && image) return flash(image, selection().channel.product); });
 
-// a test build from this computer: only a Melodee package (fm1pkg_make.py: CRCs intact, an FM-1_9 identity and
+// a test build from this computer: only a Melodee package (fm1pkg_make.py: CRCs intact, an FM-1_8377 or FM-1_9 identity and
 // Melodee's loader, so never a vendor or patched official package), as web/make_site.py checks before publishing
 const LOADER_MARK = Array.from("FELUCCA-LOADER-1", (c) => c.charCodeAt(0));
 const hasLoader = (raw) => {
@@ -359,7 +359,7 @@ const hasLoader = (raw) => {
 function checkLocal(raw) {
   new Package(raw);
   const product = productOf(raw);
-  if (!/^FM-1_9\d{2,4}$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Tessera package`);
+  if (!/^(FM-1_8377\d{4}|FM-1_9\d{2,4})$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Tessera package`);
   if (!hasLoader(raw)) throw new Error("no Tessera loader in it (only tools/fm1pkg_make.py packages)");
   return {image: logicalImage(raw), product};
 }
