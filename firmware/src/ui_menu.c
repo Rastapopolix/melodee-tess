@@ -14,14 +14,18 @@ enum { MI_COLOR, MI_HOLD, MI_LIGHTS,
 #if MELODEE_USB_AUDIO
        MI_USB, MI_USB_INPUT,
 #endif
-       MI_MIDI_OUT, MI_CLOCK_OUT, MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_ACCEL, MI_TRACK_KNOB, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
+       MI_MIDI_OUT, MI_CLOCK_OUT, MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_ACCEL, MI_TRACK_KNOB, MI_SCREEN, MI_GAMMA, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
+/* TEMPORARY (feat/panel-gamma-test): MENU > PANEL GAMMA, lcd.c lcd_gamma_test's options; not saved */
+#define LCD_GAMMA_N 6u
+static const char *const LCD_GAMMA_NAME[LCD_GAMMA_N] = {"G2.2 DEFAULT", "G1.8", "G2.5", "G1.0", "TUNED", "TUNED+VCOM"};
+static uint8_t lcd_gamma_opt;
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
                                               "USB AUDIO", "USB INPUT",
 #endif
                                               "MIDI OUT", "CLOCK OUT", "AUDIO CLICK", "CLICK LEVEL", "COUNT-IN", "NOTE PREVIEW", "CHORD ENTRY",
-                                              "AUTOSAVE", "KNOB ACCEL", "TRACK KNOB", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
+                                              "AUTOSAVE", "KNOB ACCEL", "TRACK KNOB", "SCREEN OFF", "PANEL GAMMA", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
 /* USB AUDIO's four settings, as ua_off_want (UA_OFF_OUT | UA_OFF_IN) */
 static const char *const MI_USB_NAME[4] = {"IN+OUT", "IN", "OUT", "OFF"};
@@ -353,6 +357,7 @@ static void draw_menu(void)
             if (i == MI_CLOCK_OUT) value = settings_clock_out ? "ON" : "OFF";
             if (i == MI_AUTOSAVE) value = settings_autosave ? "ON" : "OFF";
             if (i == MI_SCREEN) value = (const char *const[]){"NEVER", "5 MIN", "15 MIN", "30 MIN", "60 MIN"}[scr_get()];
+            if (i == MI_GAMMA) value = LCD_GAMMA_NAME[lcd_gamma_opt % LCD_GAMMA_N];   /* (TEMPORARY: the gamma test) */
             if (i == MI_LIGHTS) value = LIGHTS_NAME[settings_lights % LIGHTS_N];
 #if MELODEE_USB_AUDIO
             if (i == MI_USB_INPUT) value = ua_tracks_want ? "4 TRACKS" : "STEREO";
@@ -492,6 +497,11 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
     if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_CLOCK_OUT) {  /* KNOB 2 right ON, left OFF; OCT+ toggles */
         settings_clock_out = (uint8_t)(s > 0 ? 1u : s < 0 ? 0u : !settings_clock_out);
         ui.force = 1; ok = 0;                          /* (on: from the next PLAY; off: STOP goes out now) */
+    }
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_GAMMA) {   /* TEMPORARY: KNOB 2 / OCT+ the next panel gamma */
+        lcd_gamma_opt = (uint8_t)((lcd_gamma_opt + (s < 0 ? LCD_GAMMA_N - 1u : 1u)) % LCD_GAMMA_N);
+        lcd_gamma_test(lcd_gamma_opt);                 /* (the panel black and on again: ui.force draws it all) */
+        ui.force = 1; ok = 0;
     }
     if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_SCREEN) {
         uint32_t value=scr_get(), top=4u;
