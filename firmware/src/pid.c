@@ -536,16 +536,18 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
 #if MELODEE_HELP_PACKED
 #include "pid_help_unpack.h"
 _Static_assert(NELEM(PIDS) == PID_HELP_N, "build/gen/pid_help.h is another pid.c's (tools/gen_help.py)");
-const char *pid_help(const pid_entry_t *e)
+/* packed text i expanded: PIDS entry i's, from PID_HELP_N on the help card's page texts (ui_help.c HELP_PAGE) */
+static const char *pid_help_at(uint32_t i)
 {
     static char text[PID_HELP_MAX + 1] __attribute__((section(".pool")));
-    static const pid_entry_t *last;
-    if (e != last) {
-        pid_help_unpack((uint32_t)(e - PIDS), text);
-        last = e;
+    static uint32_t last = 0xFFFFFFFFu;
+    if (i != last) {
+        pid_help_unpack(i, text);
+        last = i;
     }
     return text;
 }
+const char *pid_help(const pid_entry_t *e) { return pid_help_at((uint32_t)(e - PIDS)); }
 #else
 const char *pid_help(const pid_entry_t *e) { return e->help; }
 #endif

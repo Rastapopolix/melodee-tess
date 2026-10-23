@@ -34,6 +34,7 @@ static uint32_t host_slots[3u * 0x14000u / 4u];          /* USR1..3 (zero: empty
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
+#include "pid_help_unpack.h"                           /* (the packed help texts: test_help_all) */
 
 /* ------------------------------------------------------------ HAL stubs --- */
 #define FM1_NCOL 11u
@@ -1376,6 +1377,86 @@ static int test_mods_page(void)
     bad += check("a new project: no mods (all 16 free)", cord_count() == 0u);
     cord_clear();
     return bad;
+}
+
+/* help (ui_help.c): every knob of every page a track shows has a help text of its own, none falls through to
+ * help_find's fallback (Theo 2026-10-23: SONG, NOTES, PATTERN): every engine on STEP, ARP and every generator
+ * MODE (an FM6 track), a DRUM track on STEP and ATLAS; HOME's knobs too */
+static int help_all_track(const char *what, int *seen)
+{
+    uint32_t i, k, home;
+    int bad = 0;
+    for (home = 0; home < 2u; home++)
+        for (i = 0; i < (home ? 1u : NPAGES); i++) {
+            if (!home && !page_visible(i)) continue;
+            ui.home = (uint8_t)home;
+            ui.page = (uint8_t)i;
+            for (k = 0; k < 4u; k++) {
+                const pid_entry_t *e;
+                help_find(k);
+                e = help.pid != PID_NONE ? pid_find(help.pid) : 0;
+                if (e ? !pid_help(e) || !pid_help(e)[0] || !e->name : !help.name || help.hp == HP_NONE) {
+                    if (!seen[home ? NPAGES * 4u + k : i * 4u + k]++)
+                        printf("  no help: %s, %s KNOB %u (%s)\n", what, home ? "HOME" : PAGES[i].title, k + 1u,
+                               help.name ? help.name : "?");
+                    bad++;
+                } else if (text_w(&AF_S, e ? e->name : help.name) > 140) {   /* (help_strip: the name in 140 px) */
+                    if (!seen[home ? NPAGES * 4u + k : i * 4u + k]++)
+                        printf("  help name cut: %s, %s KNOB %u (%s)\n", what, home ? "HOME" : PAGES[i].title, k + 1u,
+                               e ? e->name : help.name);
+                    bad++;
+                }
+            }
+        }
+    ui.home = 0;
+    return bad;
+}
+static int test_help_all(void)
+{
+    static int seen[(NPAGES + 1u) * 4u];
+    static char text[PID_HELP_MAX + 1];
+    char what[48];
+    uint32_t e, m;
+    int bad = 0;
+    for (m = 0; m < HP_COUNT; m++) {                    /* (the page texts: each one there, and packed as written) */
+        int ok = HELP_PAGE[m].name && HELP_PAGE[m].text && HELP_PAGE[m].text[0] && HP_COUNT == HELP_PAGE_N;
+        if (ok) {
+            pid_help_unpack(PID_HELP_N + m, text);
+            ok = str_eq(text, HELP_PAGE[m].text);
+        }
+        if (!ok) printf("  HELP_PAGE[%u] (%s) is missing or packs otherwise (tools/gen_help.py)\n", m,
+                        HELP_PAGE[m].name ? HELP_PAGE[m].name : "?");
+        bad += !ok;
+    }
+    ui_power_on();
+    song.sel = 0;
+    for (e = 0; e < NENGINES; e++) {                    /* (every engine this build has, on STEP) */
+        if (!ENGINES[e] || !ENGINES[e]->name) continue;
+        set_engine_of(TSEL, e);
+        TSEL->engine = TSEL->eng_req;
+        seqm_set(0, 0);
+        snprintf(what, sizeof what, "%s STEP", ENGINES[e]->name);
+        bad += help_all_track(what, seen);
+    }
+    set_engine_of(TSEL, ENGI_FM6);
+    TSEL->engine = TSEL->eng_req;
+    for (m = 0; m <= TESS_ENG_COUNT; m++) {            /* (STEP, ARP, then every generator) */
+        seqm_set(0, (int32_t)m);
+        snprintf(what, sizeof what, "FM6 MODE %u", m);
+        bad += help_all_track(what, seen);
+    }
+    seqm_set(0, 0);
+    song.sel = 3;                                       /* (a DRUM track) */
+    set_engine_of(TSEL, ENGI_DRUM);
+    TSEL->engine = TSEL->eng_req;
+    seqm_set(3, 0);
+    bad += help_all_track("DRUM STEP", seen);
+    seqm_set(3, 1 + TESS_ENG_GRIDS);
+    bad += help_all_track("DRUM ATLAS", seen);
+    seqm_set(3, 0);
+    song.sel = 0;
+    ui_power_on();
+    return check("help: every knob of every page has a text of its own (none falls through), its name fits", !bad);
 }
 
 /* help (ui_help.c): ARP held, a knob turned shows its help and changes nothing; letting ARP go opens no page */
@@ -5641,6 +5722,7 @@ int main(void)
     bad += test_tweak2();
     bad += test_organic();
     bad += test_matrix();
+    bad += test_help_all();
     bad += test_help_gesture();
     bad += test_mods_page();
     bad += test_midi();
