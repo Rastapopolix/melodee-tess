@@ -15,6 +15,7 @@
  *   build/host/demo_projects log N SECS        demo N's notes as CSV (time, track, note, velocity)
  * Checks per demo: the record saves, reads back the same, restores and loads with every generator, cord and sound;
  * each track plays notes; no sample at full scale; the voices stay inside the budget. */
+#include <time.h>
 #define TESSERA_NOTE_HOOK dm_note
 #define main hostsim_main
 #include "hostsim.c"
@@ -540,6 +541,126 @@ static int archive_restore(const char *path)
     return bad;
 }
 
+/* render IN.json DIR SECS: a backup restored as archive_restore does, each used slot played SECS s into
+ * DIR/slot-<A..D>.wav, with the voices, the voices taken (stolen), clips, and the host time per block (max and
+ * mean, us; relative only: the device is far slower) - to find what a player hears in their own project */
+static int archive_render(const char *path, const char *dir, uint32_t secs)
+{
+    FILE *f = fopen(path, "rb");
+    long sz;
+    if (!f) return check(path, 0);
+    fseek(f, 0, SEEK_END); sz = ftell(f); fseek(f, 0, SEEK_SET);
+    json = malloc((size_t)sz + 1u);
+    if (fread(json, 1, (size_t)sz, f) != (size_t)sz) sz = 0;
+    json[sz] = 0;
+    fclose(f);
+    power_on();
+    for (uint32_t i = 0; i < 30u; i++) {                /* (as archive_restore: sizes accepted, then the objects) */
+        int32_t n = archive_obj(i);
+        uint8_t a[12] = {0, (uint8_t)i};
+        if (n <= 0) continue;
+        put32(a + 2, (uint32_t)n); put32(a + 7, st_crc32(obj_buf, (uint32_t)n));
+        call(ED_BACKUP_PUT, a, sizeof a);
+        a[0] = 3; call(ED_BACKUP_PUT, a, 2);
+    }
+    {
+        static const uint8_t ORDER[30] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                                          24, 25, 26, 27, 28, 29, 1, 0};
+        for (uint32_t i = 0; i < 30u; i++) {
+            int32_t n = archive_obj(ORDER[i]);
+            if (n > 0 && put_all(ORDER[i], obj_buf, (uint32_t)n)) printf("object %u: not restored\n", ORDER[i]);
+        }
+    }
+    memset(proj_meta, 0, sizeof proj_meta);
+    for (uint32_t slot = 0; slot < 4u; slot++) proj_fetch(slot);
+    for (uint32_t slot = 0; slot < 4u; slot++) {
+        char name[PROJ_NAME_LEN + 1u], wav[512];
+        if (!project_used(slot)) { printf("slot %c: empty\n", 'A' + slot); continue; }
+        project_new_blank();
+        project_load(slot);
+        project_cur_name(name);
+        snprintf(wav, sizeof wav, "%s/slot-%c.wav", dir, 'A' + slot);
+        memset(voice_kills_part, 0, sizeof voice_kills_part);
+        {
+            struct timespec t0, t1;
+            double mx = 0, sum = 0;
+            uint32_t blocks = 0, f2, i, kills0 = voice_kills, clips = 0, vmax = 0;
+            FILE *w = fopen(wav, "wb");
+            if (w) wav_hdr(w, secs * FS);
+            transport_req = 1;
+            for (f2 = 0; f2 < secs * FS; f2 += CTL) {
+                int32_t o[2 * CTL];
+                dm_f = f2;
+                clock_gettime(CLOCK_MONOTONIC, &t0);
+                mix_block(o, CTL);
+                clock_gettime(CLOCK_MONOTONIC, &t1);
+                double us = (t1.tv_sec - t0.tv_sec) * 1e6 + (t1.tv_nsec - t0.tv_nsec) / 1e3;
+                if (us > mx) mx = us;
+                sum += us; blocks++;
+                fm1_ms = f2 / (FS / 1000u);
+                if (busy_now() > vmax) vmax = busy_now();
+                for (i = 0; i < 2u * CTL; i++) if (o[i] >= 32700 || o[i] <= -32700) clips++;
+                if (w) for (i = 0; i < CTL; i++) wav_put(w, o[2 * i], o[2 * i + 1]);
+            }
+            if (w) fclose(w);
+            transport_req = 2;
+            printf("slot %c %-12s bpm %d  voices max %u of %u  taken %u (T1 %u T2 %u T3 %u T4 %u)  clips %u  "
+                   "block us mean %.1f max %.1f  (block %u samples = %.0f us)\n",
+                   'A' + slot, name, song.g[G_BPM], vmax, NVOICE, voice_kills - kills0, voice_kills_part[0],
+                   voice_kills_part[1], voice_kills_part[2], voice_kills_part[3], clips, sum / blocks, mx, CTL,
+                   CTL * 1e6 / FS);
+            for (uint32_t k = 0; k < NTRK; k++)
+                printf("    T%u engine %d preset %d level %d  mode %d ratch %u human %u\n", k + 1u, trk[k].engine,
+                       trk[k].preset, trk[k].p[P_LEVEL], k < TESSERA_TRACKS ? tessera.mode[k] : -1,
+                       k < TESSERA_TRACKS ? tessera.sub_ratch[k] + 1u : 0u, k < TESSERA_TRACKS ? tessera.evolve[k].human : 0u);
+            printf("    cords %u\n", cord_count());
+        }
+    }
+    {                                                   /* object 0, the music playing: through slot A, loaded */
+        int32_t n = archive_obj(0);
+        char name[PROJ_NAME_LEN + 1u];
+        if (n > 0 && restore_load(obj_buf, (uint32_t)n, name) == 0) {
+            char wav[512];
+            snprintf(wav, sizeof wav, "%s/live.wav", dir);
+            dm_play_t r = play(secs, wav);
+            printf("live %-12s bpm %d voices max %u taken %u clips %u peak %.2f\n", name, song.g[G_BPM], r.voices, r.taken,
+                   r.clips, r.peak / 32768.0);
+            for (uint32_t k = 0; k < NTRK; k++)
+                printf("    T%u engine %d preset %d  mode %d ratch %u human %u\n", k + 1u, trk[k].engine, trk[k].preset,
+                       k < TESSERA_TRACKS ? tessera.mode[k] : -1, k < TESSERA_TRACKS ? tessera.sub_ratch[k] + 1u : 0u,
+                       k < TESSERA_TRACKS ? tessera.evolve[k].human : 0u);
+            printf("    cords %u\n", cord_count());
+        } else printf("live: not loadable (%d B)\n", n);
+    }
+    free(json);
+    return 0;
+}
+
+/* pluck DIR SECS: one FM6 preset alone under a dense MARKOV at 1/16, 120 BPM, as the FM6 glitch reports describe:
+ * DIR/pluck-<variant>.wav for plain, HUMAN 75, RATCH x3, and GLASS BELL - to look for clicks between notes */
+static void pluck(const char *dir, uint32_t secs)
+{
+    static const struct { const char *name; uint32_t preset, human, ratch; } V[] = {
+        {"tine", 8, 0, 0}, {"tine-human75", 8, 75, 0}, {"tine-ratch3", 8, 0, 2}, {"bell", 1, 0, 0}};
+    for (uint32_t v = 0; v < sizeof V / sizeof V[0]; v++) {
+        char wav[512];
+        power_on();
+        song.g[G_BPM] = 120;
+        sound(0, ENGI_FM6, V[v].preset);
+        for (uint32_t k = 1; k < NTRK; k++) trk[k].p[P_LEVEL] = 0;
+        trk[0].p[P_SDIV] = DIV_16;
+        gen(0, TESS_ENG_MARKOV, 21);
+        tx(0, TX_MKV_DENS, 100); tx(0, TX_MKV_LEAP, 60);
+        tx(0, TX_TW_HUMAN, (int32_t)V[v].human);
+        tx(0, TX_SUB_RATCH, (int32_t)V[v].ratch); tx(0, TX_SUB_CHANCE, 100);
+        snprintf(wav, sizeof wav, "%s/pluck-%s.wav", dir, V[v].name);
+        memset(voice_kills_part, 0, sizeof voice_kills_part);
+        dm_play_t r = play(secs, wav);
+        printf("pluck %-14s preset %u: notes %u voices max %u taken %u clips %u peak %.2f\n", V[v].name, V[v].preset,
+               r.notes[0], r.voices, r.taken, r.clips, r.peak / 32768.0);
+    }
+}
+
 /* each track alone (the others' LEVEL 0) for secs s: its rms and peak, to balance the mix by */
 static void levels(uint32_t secs)
 {
@@ -574,6 +695,8 @@ int main(int argc, char **argv)
         bad = check("a whole archive written as the backup page writes it", archive_write(argv[2]) == 0);
     }
     else if (argc >= 3 && !strcmp(argv[1], "restore")) bad = archive_restore(argv[2]);
+    else if (argc >= 4 && !strcmp(argv[1], "pluck")) { pluck(argv[2], (uint32_t)atoi(argv[3])); return 0; }
+    else if (argc >= 5 && !strcmp(argv[1], "render")) { archive_render(argv[2], argv[3], (uint32_t)atoi(argv[4])); return 0; }
     else if (argc >= 2 && !strcmp(argv[1], "levels")) { levels(argc > 2 ? (uint32_t)atoi(argv[2]) : 60u); return 0; }
     else { fprintf(stderr, "demo_projects make DIR [SECS] | check DIR\n"); return 2; }
     printf(bad ? "demos: %d FAILED\n" : "demos passed\n", bad);
