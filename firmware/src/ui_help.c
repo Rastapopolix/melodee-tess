@@ -9,6 +9,7 @@
 static struct {
     uint8_t on, knob;
     uint8_t zoom, top;                                  /* the text's size (HELP_FONT) and its first line shown */
+    uint8_t card;                                       /* 1: only the card changed (a scroll, a size): drawn alone */
     uint16_t pid;                                       /* PID_NONE: name and text below (CORDS, FORM's CLEAR) */
     const char *name, *text;
 } help;
@@ -160,8 +161,9 @@ static void help_find(uint32_t k)
     }
 }
 
-/* The card: 228 x 214 under the header, over the page. Its text in one of three sizes, the largest it was turned to
- * that shows all of it; a text longer than the card at the smallest scrolls instead */
+/* The card: 228 x 214 under the header, over the page. Its text in one of two sizes: it opens at the larger one when
+ * all of it fits there (Theo 2026-10-23: the old smallest, 10 px, was too small to read), else at the smaller, where a
+ * longer text scrolls */
 #define HELP_X 6
 #define HELP_Y 22
 #define HELP_W 228
@@ -169,8 +171,8 @@ static void help_find(uint32_t k)
 #define HELP_TW 204                                     /* (the text's width) */
 #define HELP_T0 34                                      /* (the text's first line, its last above HELP_T1) */
 #define HELP_T1 188
-#define HELP_LINES 16                                   /* (the most a card holds: the smallest's) */
-static const aafont_t *const HELP_FONT[3] = {&AF_X, &AF_S, &AF_M};
+#define HELP_ZOOMS 2u
+static const aafont_t *const HELP_FONT[HELP_ZOOMS] = {&AF_S, &AF_M};
 static uint32_t help_lh(uint32_t z) { return HELP_FONT[z]->h + 2u; }
 static uint32_t help_rows(uint32_t z) { return (HELP_T1 - HELP_T0) / help_lh(z); }
 
@@ -215,9 +217,10 @@ static uint32_t help_count(uint32_t z)
     return help_wrap(HELP_FONT[z], help_text(), at, len, 0);
 }
 
-/* ui_input.c: knob k turned s with ARP held; 1 = its help shown (the turn does nothing else). The first turn shows it;
- * turning on the same knob makes the text larger while it all still fits (or scrolls a text longer than the card),
- * back smaller again. The card is drawn again only when what it shows changes */
+/* ui_input.c: knob k turned s with ARP held; 1 = its help shown (the turn does nothing else). The first turn shows it,
+ * at the larger size if all of it fits there; turning on the same knob makes the text larger while it all still fits
+ * (or scrolls a text longer than the card), back smaller again. A scroll or a size draws the card alone (help.card),
+ * not the page under it again: drawing that first showed the page for a moment, a flicker */
 static int help_knob(uint32_t k, int32_t s)
 {
     if (!(fm1_in.buttons & (1u << panel.btn[B_ARP])) || ui.menu || ui.confirm || ui.layer)   /* (a popup: ui_input.c) */
@@ -225,14 +228,15 @@ static int help_knob(uint32_t k, int32_t s)
     if (!help.on || help.knob != k) {
         help_find(k);
         help.knob = (uint8_t)k;
-        help.zoom = help.top = 0;
+        help.top = 0;
+        help.zoom = help_count(HELP_ZOOMS - 1u) <= help_rows(HELP_ZOOMS - 1u) ? (uint8_t)(HELP_ZOOMS - 1u) : 0u;
         help.on = 1;
         ui.force = 1;
         return 1;
     }
     if (s > 0) {
         uint32_t n = help_count(help.zoom);
-        if (help.zoom < 2u && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u)) help.zoom++;
+        if (help.zoom + 1u < HELP_ZOOMS && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u)) help.zoom++;
         else if (help.top + help_rows(help.zoom) < n) help.top++;
         else return 1;
     } else if (s < 0) {
@@ -242,7 +246,7 @@ static int help_knob(uint32_t k, int32_t s)
     } else {
         return 1;
     }
-    ui.force = 1;
+    help.card = 1;
     return 1;
 }
 
@@ -275,7 +279,7 @@ static void help_strip(int32_t top, int32_t h, const char *name, const char *val
     }
     if (n > rows && help.top + rows < n) hint = "Clockwise: more.  Back: up.";
     else if (help.top) hint = "Back: up.";
-    else if (help.zoom < 2u && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u))
+    else if (help.zoom + 1u < HELP_ZOOMS && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u))
         hint = help.zoom ? "Clockwise: larger.  Back: smaller." : "Clockwise: larger.";
     else hint = help.zoom ? "Back: smaller." : "ARP held: turn a knob for its help";
     cv_rect(12, HELP_H - 24, HELP_W - 24, 1, T_LINE);
@@ -305,8 +309,9 @@ static void help_draw(void)
 {
     const pid_entry_t *e = help.pid != PID_NONE ? pid_find(help.pid) : 0;
     char val[24];
-    if (!ui.force)
+    if (!ui.force && !help.card)
         return;
+    help.card = 0;
     help_value(e, val, sizeof val);
     help_strip(0, 124, e ? e->name : help.name, val, e ? pid_help(e) : help.text);
     help_strip(124, HELP_H - 124, e ? e->name : help.name, val, e ? pid_help(e) : help.text);

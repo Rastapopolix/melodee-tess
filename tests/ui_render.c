@@ -1393,7 +1393,7 @@ static void setup(int s)
         help.knob = 0;
         help_find(0);
         help.zoom = help.top = 0;
-        if (s == S_HELP_ZOOM) while (help.zoom < 2u && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u)) help.zoom++;
+        if (s == S_HELP_ZOOM) while (help.zoom + 1u < HELP_ZOOMS && help_count(help.zoom + 1u) <= help_rows(help.zoom + 1u)) help.zoom++;
         break;
     case S_HELP:                                    /* ARP held, KNOB 1 on EVOLVE (tessera-notes/docs/design/phase2/help.png) */
         tessera_reset();

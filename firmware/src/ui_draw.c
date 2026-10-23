@@ -1706,6 +1706,8 @@ static void ui_draw_frame(void)
             ui.force = 1;
             help_draw();
             ui.force = 0;
+        } else if (help.card) {
+            help_draw();                                /* (a scroll or a size: the card alone, no flicker) */
         }
         draw_head();
         return;
