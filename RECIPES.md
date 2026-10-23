@@ -239,7 +239,8 @@ groove that keeps changing, which is the other use.
 ## Driving another synth (MIDI OUT)
 
 1. Hold **HOME** for the menu: **MIDI OUT** to **ALL**. The steps, the ARP and every generator now go out over USB
-   MIDI, each track on its own channel (1 to 4 with GLO > SYSTEM ROUT at CH1-4; the drum track on its DRUM channel).
+   MIDI, each track on its own channel: AUTO gives 1 to 4 (GLO > SYSTEM ROUT at CH1-4; the drum track on its DRUM
+   channel), or pick each track's channel, or OFF, on **GLO > MIDI OUT**.
 2. **CLOCK OUT** on: the other synth or DAW follows Tessera's tempo, START and STOP included.
 3. Turn the track's **LEVEL** down on the MIXER if you only want to hear the other synth.
 
