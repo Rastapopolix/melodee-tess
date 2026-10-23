@@ -6,7 +6,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Melodee (tess)</title>
+<title>Tessera</title>
 <style>
   :root { --bg: #fff; --fg: #000; --dim: #777; }
   @media (prefers-color-scheme: dark) {
@@ -30,7 +30,7 @@
 <body>
 <main>
   <button class="lang" id="lang"></button>
-  <h1>Melodee (tess)</h1>
+  <h1>Tessera</h1>
   <p data-t="intro"></p>
   <p data-t="warn"></p>
   <p class="small" data-t="direct"></p>
@@ -76,7 +76,7 @@
   <p id="status"></p>
   <pre id="log"></pre>
   <p><a href="../editor/" style="color:inherit" data-t="editor"></a></p>
-  <p class="small">Melodee (tess) is a fork of Melodee by Theo Dainis, adding the Tessera note engines and project save. <a href="https://github.com/Rastapopolix/melodee-tess" target="_blank" rel="noopener" style="color:inherit">github.com/Rastapopolix/melodee-tess</a><br>
+  <p class="small">Tessera is firmware for the FM-1 by Theo Dainis (Rastapopolix), a fork of Melodee: it adds the Tessera generators and a project format of its own. <a href="https://github.com/Rastapopolix/tessera" target="_blank" rel="noopener" style="color:inherit">github.com/Rastapopolix/tessera</a><br>
     Melodee by Ellic Studio, based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener" style="color:inherit">Felucca</a>
     by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener" style="color:inherit">Hügelton Instruments</a>, with its CrispyZebra waveforms and Fukiai icons (MIT).<br>
     Font: Inter Tight (The Inter Project Authors, SIL OFL 1.1). Samples: Versilian Studios VSCO-2 Community Edition and VCSL (CC0 1.0).<br>
@@ -464,7 +464,7 @@ class Updater {
     const outs = [...this.access.outputs.values()];
     for (const input of this.access.inputs.values()) {
       if (input.state === "disconnected") continue;
-      if (!/fm-1|melodee|felucca|ota|composite|sinco|usb-midi/i.test(input.name || "")) continue;   // never probe other gear
+      if (!/fm-1|tessera|melodee|felucca|ota|composite|sinco|usb-midi/i.test(input.name || "")) continue;   // never probe other gear
       const output = outs.find((o) => o.name === input.name && o.state !== "disconnected");
       if (!output) continue;
       try { await input.open(); await output.open(); } catch (_) { continue; }
@@ -585,9 +585,26 @@ const BACKUP_IDS_OWN = Array.from({length:21},(_,i)=>i);
 const BACKUP_IDS_NATIVE = Array.from({length:23},(_,i)=>i);
 const BACKUP_IDS_P5 = Array.from({length:28},(_,i)=>i);
 const BACKUP_IDS_TESS = Array.from({length:30},(_,i)=>i);   // melodee-tess: 28 the generators of the saved slots, 29 the live ones
-const maxSize = id => id >= 32 ? 81920 : (id === 0 || (id >= 2 && id <= 5)) ? 27904 : id>=23&&id<=27?3600:3840;
+const maxSize = id => id >= 32 ? 81920 : (id === 0 || (id >= 2 && id <= 5)) ? 32768 : id>=23&&id<=27?3600:3840;
 const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : n === 30 ? BACKUP_IDS_TESS : null);
 const BACKUP_CMD = { LIST: 65, GET: 66, PUT: 67 };
+// melodee-tess, the own project format: the projects (0 the live music, 2..5 the slots) are TSP1 records (project_tsp.c):
+// "TSP1", u32 length, u16 part count, u16 0, the parts (u8 id, u8 version, u16 length, bytes), u32 FNV-1a of the rest.
+// Firmware of the own format reads no older project, and older firmware reads no TSP1 one: no converter either way.
+const TSP_MAGIC = 0x31505354, TSP_HEAD = 12;
+const isProject = (id) => id === 0 || (id >= 2 && id <= 5);
+const fnv = (bytes) => { let s = 0x811c9dc5; for (const b of bytes) s = Math.imul(s ^ b, 16777619) >>> 0; return s; };
+const isTsp = (bytes) => bytes.length >= TSP_HEAD + 4 && new DataView(bytes.buffer, bytes.byteOffset, bytes.length).getUint32(0, true) === TSP_MAGIC;
+function tspCheck(bytes) {                    // the record whole: its length, every part inside it, its checksum
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.length), n = bytes.length;
+  if (v.getUint32(4, true) !== n || fnv(bytes.subarray(0, n - 4)) !== v.getUint32(n - 4, true)) throw new Error("Damaged project record");
+  let at = TSP_HEAD;
+  for (let k = v.getUint16(8, true); k > 0; k--) {
+    if (at + 4 > n - 4) throw new Error("Damaged project record");
+    at += 4 + v.getUint16(at + 2, true);
+  }
+  if (at !== n - 4) throw new Error("Damaged project record");
+}
 const BACKUP_CHUNK = 256;
 const bkU32 = (n) => Array.from({ length: 5 }, (_, i) => (n >>> (i * 7)) & (i === 4 ? 15 : 127));
 const bkR32 = (a, off = 0) => {
@@ -644,7 +661,7 @@ function readBackup(file) {
   if (typeof file === "string") file = JSON.parse(file);
   const ids = file && Array.isArray(file.objects) ? idsOf(file.objects.length) : null;
   if (!file || file.format !== "felucca-backup" || file.version !== 1 || !ids)
-    throw new Error("Not a complete Melodee backup");
+    throw new Error("Not a complete backup file");
   const objects = file.objects.map((o, i) => {
     if (!o || o.id !== ids[i] || !Number.isInteger(o.size) || o.size < 0 || o.size > maxSize(o.id) ||
         !Number.isInteger(o.crc) || o.crc < 0 || o.crc > 0xffffffff || typeof o.data !== "string" ||
@@ -652,6 +669,7 @@ function readBackup(file) {
       throw new Error("Invalid backup object");
     const bytes = Uint8Array.from(atob(o.data), (c) => c.charCodeAt(0));
     if (bytes.length !== o.size || bkCrc(bytes) !== o.crc) throw new Error("Backup checksum mismatch");
+    if (isProject(o.id) && isTsp(bytes)) tspCheck(bytes);
     if(o.id>=23&&o.id<=27&&o.size){
       if(o.size!==3600)throw Error("Invalid Prophet bank size");const v=new DataView(bytes.buffer),used=v.getUint32(4,true),fav=v.getUint32(8,true),mask=(1<<(o.id===27?24:26))-1;
       if(v.getUint32(0,true)!==0x31553550||(used&~mask)||(fav&~(mask|(o.id===23?0x80000000:0))))throw Error("Invalid Prophet bank");
@@ -710,9 +728,20 @@ async function restoreBackup(request, file, onProgress = () => {}) {
   const ask = async (r, o = {}) => request(r, { timeout: 4000, retries: 0, ...o });
   const supported = bkManifest(await ask([BACKUP_CMD.LIST, []]));
   const liveSize = supported.find(o => o.id === 0)?.size || 0;
-  for (const o of archive.objects) if ((o.id === 0 || o.id >= 2 && o.id <= 5) && o.size > liveSize && !(liveSize >= 19008 && [19084,19092,20224].includes(o.size)))
-    throw new Error("This backup needs firmware with larger recording storage");
   for (const o of archive.objects) if (!supported.some(x => x.id === o.id) && o.size) throw new Error("This firmware does not support a nonempty object in this backup");
+  let own = false;                            // the device's live music a TSP1 record: firmware of the own format
+  if (liveSize >= TSP_HEAD + 4) {
+    const a = await ask([BACKUP_CMD.GET, [0, ...bkU32(0), 4, 0]]); bkCheck(a[1]);
+    if (a[0] !== 0 || bkR32(a, 2) !== 0 || (a[7] | a[8] << 7) !== 4) throw new Error("Unexpected backup reply");
+    own = new DataView(bkUnpack(a.slice(9), 4).buffer).getUint32(0, true) === TSP_MAGIC;
+  }
+  const oldProjects = archive.objects.some(o => isProject(o.id) && o.size && !isTsp(o.bytes));
+  const tspProjects = archive.objects.some(o => isProject(o.id) && o.size && isTsp(o.bytes));
+  if (own && oldProjects)
+    throw new Error("This backup's projects are in the format before Tessera's own; this firmware does not read them. Restore it with the firmware that made it.");
+  if (!own && tspProjects) throw new Error("This backup's projects are in Tessera's own format; update the firmware first.");
+  if (!own) for (const o of archive.objects) if (isProject(o.id) && o.size > liveSize && !(liveSize >= 19008 && [19084,19092,20224].includes(o.size)))
+    throw new Error("This backup needs firmware with larger recording storage");   // (fixed-size records; TSP1's vary)
   const put = async (args) => { const a = await ask([BACKUP_CMD.PUT, args]); bkCheck(a[2]); return a; };
   // The firmware accepts or refuses each object's size before the first write (2.0 reads only the formats of
   // 1.0 and later: an older archive restores on 1.2 first), so a refused archive writes nothing.
@@ -794,26 +823,26 @@ const TEXT = {
     synthWhy: "パソコンで演奏・録音するための 1 トラックの音源版です。すべてのシンセと音色エディット、ARP・CHORD・SCALES、エフェクト（ドライブ、コーラス、ディレイ、リバーブ）、USB オーディオのステレオ録音を備えます。シーケンサー、ソング、プロジェクトの保存はありません。PLAY は ARP のホールドです。本体に保存したプロジェクトとプリセットはそのまま残り、標準を選んでインストールすると戻ります。インストール前にエディタで全体バックアップを保存してください。",
     synthEditor: "シンセ専用版のエディタ（音色・エフェクト・設定をパソコンから編集）",
     dual: "標準（デュアルコア）", single: "シングルコア", dualTag: "標準", singleTag: "シングルコア",
-    singleWhy: "シングルコア版は、標準版でクラッシュする FM-1 のためのものです（赤い MELODEE CRASH 画面、フリーズ、書き込みモードでの再起動）。FM-1 の 2 つ目のコアを起動しません（公式ファームウェアも使っていません）。PROPHET の最大発音数は 8 から 5 になり、重い FM6・PROPHET の音色は早めに処理の上限に達します。標準版に戻すには、標準を選んでインストールしてください。",
+    singleWhy: "シングルコア版は、標準版でクラッシュする FM-1 のためのものです（赤い TESSERA CRASH 画面、フリーズ、書き込みモードでの再起動）。FM-1 の 2 つ目のコアを起動しません（公式ファームウェアも使っていません）。PROPHET の最大発音数は 8 から 5 になり、重い FM6・PROPHET の音色は早めに処理の上限に達します。標準版に戻すには、標準を選んでインストールしてください。",
     editor: "エディタ（インストール後、パソコンから音色やシーケンスを編集）",
     direct: "USB ケーブルはパソコンに直接つないでください。Probe や Transporter などの機材は不要です。",
     brick: "起動保護付きファームウェアの更新が中断した場合は、電源を入れ直すか、OCT− だけを押しながら電源を入れてください。キーのライトが短く3回点滅したら更新モードです。USB を接続し直して、もう一度インストールしてください。以前のファームウェアや長い1回の点滅の場合は、USB 復旧手順を確認してください:",
     recoveryLink: "USB 復旧手順とダウンロード",
-    beta: "Melodee (tess) は Melodee の実験的フォークです。不具合は github.com/Rastapopolix/melodee-tess へ知らせてください（本家には送らないでください）。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
+    beta: "Tessera は Melodee から生まれた実験的なファームウェアです。不具合は github.com/Rastapopolix/tessera へ知らせてください（本家には送らないでください）。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
     back: "M-VAVEから公式FM-1 V15を取得し、未変更のFM-1.fwscを選んでください。ファイルはこのブラウザ内で検証し、サーバーへ送りません。",
     localTitle: "テストビルド（パソコンのファイル）", localFile: "テスト用ファームウェア（.fwsc）", localGo: "テストビルドをインストール",
-    localWhy: "テスト用の Melodee (tess) ビルドです。パソコンに保存した .fwsc（build/ や テストページのもの）を選んでください。tools/fm1pkg_make.py で作ったパッケージだけを受け付けます。ファイルはこのブラウザ内で確認し、サーバーへ送りません。テストビルドは未リリースで、正しく動かないことがあります。標準を選んでインストールするとリリース版に戻せます。",
+    localWhy: "テスト用の Tessera ビルドです。パソコンに保存した .fwsc（build/ や テストページのもの）を選んでください。tools/fm1pkg_make.py で作ったパッケージだけを受け付けます。ファイルはこのブラウザ内で確認し、サーバーへ送りません。テストビルドは未リリースで、正しく動かないことがあります。標準を選んでインストールするとリリース版に戻せます。",
     localValid: "テストビルドを確認しました: ", localError: "このファイルは使えません: ",
     localConfirm: "このテストビルドをインストールしますか？ リリース版ではなく、正しく動かないことがあります。\n",
     stockTitle: "公式V15に戻す", stockFile: "公式FM-1.fwsc", stockGo: "バックアップして公式V15へ戻す",
-    stockBackup: "現在の曲・保存曲・音色バンク・サンプル・設定を先に保存します。バックアップできない場合は、Melodeeを更新するか、データ消失を了承してバックアップを省略できます。復元はMelodeeを再インストールしてエディタから行います。",
-    stockSkipBackup: "バックアップを省略する（Melodeeの曲・音色・設定が失われる可能性があります）",
+    stockBackup: "現在の曲・保存曲・音色バンク・サンプル・設定を先に保存します。バックアップできない場合は、Tessera を更新するか、データ消失を了承してバックアップを省略できます。復元は Tessera を再インストールしてエディタから行います。",
+    stockSkipBackup: "バックアップを省略する（Tessera の曲・音色・設定が失われる可能性があります）",
     stockGoNoBackup: "バックアップせず公式V15へ戻す",
-    stockConfirmNoBackup: "バックアップを作成せず公式V15へ戻します。Melodeeの曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
+    stockConfirmNoBackup: "バックアップを作成せず公式V15へ戻します。Tessera の曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
     stockRecovery: "更新中断の再開：全体バックアップはすでにパソコンへ保存済み",
-    stockValid: "公式V15を確認しました", stockConfirm: "全体バックアップファイルをパソコンに保存できましたか？ 続けると公式V15へ戻します。Melodeeの曲は公式V15では開けません。",
+    stockValid: "公式V15を確認しました", stockConfirm: "全体バックアップファイルをパソコンに保存できましたか？ 続けると公式V15へ戻します。Tessera の曲は公式V15では開けません。",
     stockNeedBackup: "書き込みモードからはバックアップできません。保存済みバックアップがある場合は更新中断の再開にチェックするか、データ消失を了承してバックアップを省略してください。",
-    stockUnsupported: "このMelodeeは全体バックアップに未対応です。先に最新版をインストールするか、データ消失を了承して「バックアップを省略する」を選び、もう一度押してください。",
+    stockUnsupported: "このファームウェアは全体バックアップに未対応です。先に最新版をインストールするか、データ消失を了承して「バックアップを省略する」を選び、もう一度押してください。",
     backup: "全体バックアップ保存中 ", stockError: "公式ファイルを確認できません: ",
     nomidi: "このブラウザでは使えません。Chrome か Edge で開いてください。", loadfail: "読み込めませんでした: ",
     start: "開始します", verify: "確認中", loader: "書き込みモードに切り替え中", write: "書き込み中",
@@ -842,26 +871,26 @@ const TEXT = {
     synthWhy: "A one-track sound module for playing and recording into a computer: every synth and its sound editing, ARP, CHORD and SCALES, the effects (drive, chorus, delay, reverb) and stereo recording over USB audio. There is no sequencer, song or project saving; PLAY holds the ARP. Projects and presets saved on the FM-1 stay where they are and come back when you choose Standard and install again. Save a complete backup in the editor before installing.",
     synthEditor: "Synth-only editor (sounds, effects and settings from the computer)",
     dual: "Standard (dual core)", single: "Single core", dualTag: "standard", singleTag: "single core",
-    singleWhy: "The single-core build is for FM-1s that crash with the standard build (a red MELODEE CRASH screen, freezes, or restarts into update mode). It never starts the FM-1's second core, which the official firmware does not use either. PROPHET then plays up to five voices instead of eight, and heavy FM6 and PROPHET sounds reach the CPU limit sooner. To go back, choose Standard and install again.",
+    singleWhy: "The single-core build is for FM-1s that crash with the standard build (a red TESSERA CRASH screen, freezes, or restarts into update mode). It never starts the FM-1's second core, which the official firmware does not use either. PROPHET then plays up to five voices instead of eight, and heavy FM6 and PROPHET sounds reach the CPU limit sooner. To go back, choose Standard and install again.",
     editor: "Editor (after installing: edit sounds and sequences from the computer)",
     direct: "Connect the USB cable directly to the computer. No probe or Transporter is needed.",
     brick: "If an update is interrupted on firmware with boot protection, switch the FM-1 on again (or hold OCT− alone while switching on). Three short key-light flashes mean update mode: reconnect USB and press Install again. Older firmware and one long flash need the USB recovery instructions:",
     recoveryLink: "USB recovery instructions and downloads",
-    beta: "Melodee (tess) is an experimental fork of Melodee; please report problems at github.com/Rastapopolix/melodee-tess, not to upstream. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
+    beta: "Tessera is an experimental firmware grown out of Melodee; please report problems at github.com/Rastapopolix/tessera, not to upstream. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
     back: "Get official FM-1 V15 from M-VAVE and select the unmodified FM-1.fwsc. The browser validates it locally; it is not sent to a server.",
     localTitle: "Test build from this computer", localFile: "Test firmware (.fwsc)", localGo: "Install test build",
-    localWhy: "For testing: pick a Melodee (tess) .fwsc saved on this computer, such as one from build/ or a test page. Only packages made by tools/fm1pkg_make.py are accepted. The browser checks the file locally; it is not sent to a server. Test builds are unreleased and may not work; choose Standard and install again to go back to the release.",
+    localWhy: "For testing: pick a Tessera .fwsc saved on this computer, such as one from build/ or a test page. Only packages made by tools/fm1pkg_make.py are accepted. The browser checks the file locally; it is not sent to a server. Test builds are unreleased and may not work; choose Standard and install again to go back to the release.",
     localValid: "Test build checked: ", localError: "Cannot use this file: ",
     localConfirm: "Install this test build? It is not a release and may not work.\n",
     stockTitle: "Return to official V15", stockFile: "Official FM-1.fwsc", stockGo: "Back up and return to official V15",
-    stockBackup: "Current music, saved music, sound banks, samples and settings are saved first. If backups are unavailable, update Melodee or choose to skip the backup and accept possible data loss. To restore an archive later, reinstall Melodee and use the editor.",
-    stockSkipBackup: "Skip backup (Melodee music, sounds and settings may be lost)",
+    stockBackup: "Current music, saved music, sound banks, samples and settings are saved first. If backups are unavailable, update Tessera or choose to skip the backup and accept possible data loss. To restore an archive later, reinstall Tessera and use the editor.",
+    stockSkipBackup: "Skip backup (Tessera music, sounds and settings may be lost)",
     stockGoNoBackup: "Return to official V15 without backup",
-    stockConfirmNoBackup: "Return to official V15 without creating a backup? Melodee music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
+    stockConfirmNoBackup: "Return to official V15 without creating a backup? Tessera music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
     stockRecovery: "Resume an interrupted update: I already saved a complete backup to this computer",
-    stockValid: "Official V15 verified", stockConfirm: "Has the complete backup file been saved to this computer? Continue to return to official V15. Official V15 cannot open Melodee music.",
+    stockValid: "Official V15 verified", stockConfirm: "Has the complete backup file been saved to this computer? Continue to return to official V15. Official V15 cannot open Tessera music.",
     stockNeedBackup: "An update loader cannot export a backup. Select resume if you already saved a complete backup, or choose Skip backup to continue and accept possible data loss.",
-    stockUnsupported: "This Melodee does not support complete backups. Install the current Melodee first, or select Skip backup to accept possible data loss and try again.",
+    stockUnsupported: "This firmware does not support complete backups. Install the current Tessera first, or select Skip backup to accept possible data loss and try again.",
     backup: "Saving complete backup ", stockError: "Cannot validate official firmware: ",
     nomidi: "This browser cannot do it. Open the page in Chrome or Edge.", loadfail: "Could not load: ",
     start: "Starting", verify: "Verifying", loader: "Switching to update mode", write: "Writing",
@@ -901,10 +930,10 @@ const selection = () => {     /* the release, or a channel ("nightly-dual": meta
   const kind = build(), dash = kind.indexOf("-");
   return dash < 0 ? {kind, channel: meta, key: kind} : {kind, channel: meta[kind.slice(0, dash)], key: kind.slice(dash + 1)};
 };
-const ready = () => { lastKey = "ready"; $("status").textContent = `Melodee (tess) ${selection().channel.version} (${t(build() + "Tag")})`; };
+const ready = () => { lastKey = "ready"; $("status").textContent = `Tessera ${selection().channel.version} (${t(build() + "Tag")})`; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "1.3.3", "product": "FM-1_91033", "pkg": {"dual": "../../firmware/melodee-tess-1.3.3.fwsc", "single": "../../firmware/melodee-tess-1.3.3-1core.fwsc"}, "nightly": null, "synth": null};
+const meta = {"version": "2.0", "product": "FM-1_920", "pkg": {"dual": "../../firmware/tessera-2.0.fwsc", "single": "../../firmware/tessera-2.0-1core.fwsc"}, "nightly": null, "synth": null};
 $("nightly-options").hidden = !meta.nightly;
 if (meta.nightly) $("nightly-info").textContent = `next · ${meta.nightly.commit.slice(0, 7)} · ${meta.nightly.builtAt}`;
 $("synth-options").hidden = !meta.synth;
@@ -982,8 +1011,8 @@ const hasLoader = (raw) => {
 function checkLocal(raw) {
   new Package(raw);
   const product = productOf(raw);
-  if (!/^FM-1_9\d{2,4}$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Melodee package`);
-  if (!hasLoader(raw)) throw new Error("no Melodee loader in it (only tools/fm1pkg_make.py packages)");
+  if (!/^FM-1_9\d{2,4}$/.test(product)) throw new Error(`identity ${JSON.stringify(product)} is not a Tessera package`);
+  if (!hasLoader(raw)) throw new Error("no Tessera loader in it (only tools/fm1pkg_make.py packages)");
   return {image: logicalImage(raw), product};
 }
 $("local-file").addEventListener("change", async () => {
@@ -1013,7 +1042,7 @@ $("stock-file").addEventListener("change", async () => {
 });
 function saveArchive(archive) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], {type:"application/json"}));
-  const a = document.createElement("a"); a.href = url; a.download = `Melodee-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const a = document.createElement("a"); a.href = url; a.download = `Tessera-backup-${new Date().toISOString().slice(0,10)}.json`;
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function archiveInfo(a) {
@@ -1022,7 +1051,7 @@ function archiveInfo(a) {
   const engines = a[pos]; pos += 5;
   for (let i = 0; i < engines; i++) { const end = a.indexOf(0,pos); if (end < 0) throw new Error("Invalid INFO"); pos = end + 1; }
   const ext = a.slice(pos + 1);
-  const supported = /^(MELODEE|FELUCCA) /i.test(version) && ext[0] === 16 && ext[1] === 0x55 && ext[2] === 1 &&
+  const supported = /^(TESSERA|MELODEE|FELUCCA) /i.test(version) && ext[0] === 16 && ext[1] === 0x55 && ext[2] === 1 &&
     ext[4] === 0x4d && ext[5] === 1 && ext[8] === 0x42 && ext[9] === 1 && (ext[10] & 1);
   return {version,supported};
 }
