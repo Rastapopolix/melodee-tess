@@ -5,6 +5,9 @@
   assets/brand/logo.svg            the mark: 3 x 3 lapis tiles, the gold tessera top right (firmware/src/splash.c)
   assets/brand/banner.png          README header, 1280 x 400: the mark, TESSERA, the line, three screens
   assets/brand/social-preview.png  GitHub's social preview (Settings > General), 1280 x 640
+  assets/brand/profile.png         a profile picture (the Firmware Hub, forums), 1080 x 1080: the mark, TESSERA, the
+                                   line and the four tracks' colours, no screens and no version
+  assets/brand/profile-wide.png    the same, 1280 x 640
 
   python3 tools/gen_brand.py [assets/gallery]   (the screens: tests/gallery_render.c's PNGs)
 
@@ -12,7 +15,7 @@ The mark's colours are the splash's (SPL_LAPIS, SPL_GOLD_C), the rest gen_ui_pal
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 FONTS = ROOT / "assets/fonts"
@@ -112,13 +115,38 @@ def social(gallery):
     return img
 
 
+def centred(d, w, y, text, f, fill):
+    d.text(((w - d.textlength(text, font=f)) / 2, y), text, font=f, fill=fill)
+
+
+def profile(w, h):
+    """the mark over TESSERA, the line and the tracks' colours, centred"""
+    img = Image.new("RGB", (w, h), BG)
+    d = ImageDraw.Draw(img)
+    k = min(w, h) / 1080                              # (1080 square: the sizes below)
+    u = round(92 * k)
+    mark(d, w // 2, round(h * 0.30), u)
+    name, line = font("SemiBold", round(176 * k)), font("Medium", round(37 * k))
+    centred(d, w, round(h * 0.30 + 1.9 * u), "TESSERA", name, TEXT)
+    y = round(h * 0.30 + 1.9 * u + 176 * k * 1.22)
+    centred(d, w, y, TAGLINE, line, MID)
+    bw = round(d.textlength(TAGLINE, font=line))
+    tracks_bar(d, (w - bw) // 2, y + round(80 * k), bw, max(6, round(10 * k)))
+    box = ImageChops.difference(img, Image.new("RGB", (w, h), BG)).getbbox()   # then the whole group centred
+    out = Image.new("RGB", (w, h), BG)
+    out.paste(img.crop((0, box[1], w, box[3])), (0, (h - (box[3] - box[1])) // 2))
+    return out
+
+
 def main():
     gallery = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "assets/gallery"
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "logo.svg").write_text(logo_svg(), encoding="utf-8")
     banner(gallery).save(OUT / "banner.png", optimize=True)
     social(gallery).save(OUT / "social-preview.png", optimize=True)
-    print(f"brand: {OUT}: logo.svg, banner.png, social-preview.png")
+    profile(1080, 1080).save(OUT / "profile.png", optimize=True)
+    profile(1280, 640).save(OUT / "profile-wide.png", optimize=True)
+    print(f"brand: {OUT}: logo.svg, banner.png, social-preview.png, profile.png, profile-wide.png")
 
 
 if __name__ == "__main__":
