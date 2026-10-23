@@ -403,7 +403,13 @@ place. Hold EDIT to undo, which puts the generator back.
 
 ---
 
-## Harmony: CHORD and QNT CHRD
+## Harmony: one key, CHORD and QNT CHRD
+
+**One key for the project.** The scale (SCL), QNT and the MPC degree are always the same on every track. The key
+note, ROOT, is too while **SCL > Key link** is **LINKED** (the default in a new project): change ROOT on any melodic
+track, from SCL's list or with SCL held and a key, and every melodic track follows; drum tracks keep their own.
+**OWN** gives each track its own ROOT again; turning LINKED back on gives every track the selected track's key. Key
+link is saved with the project (a project saved before it loads as OWN). TRN still moves a single track.
 
 A **CHORD** track plays a progression; with **QNT CHRD** the other tracks follow it.
 

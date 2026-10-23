@@ -3003,11 +3003,36 @@ static int test_popups(void)
         turn(EN_K1, 1); press(B_OCTUP);
         bad += check("LISTS: KNOB 1 the next name, OCT+ takes it", !pop.on && TSEL->p[P_VOICE] == o + 1);
         go_title("SCL"); frame();
-        turn(EN_K1, 1); press(B_OCTUP);
-        bad += check("LISTS: SCL's Scale row, OCT+: the SCALES page", str_eq(cur_page()->title, "SCALES"));
+        turn(EN_K1, 2); press(B_OCTUP);
+        bad += check("LISTS: SCL's Scale row (after Root and Key link), OCT+: the SCALES page", str_eq(cur_page()->title, "SCALES"));
         go_title("SCL"); frame();
         press(B_OCTDN);
         bad += check("LISTS: OCT- on a list: Stage", ui.home);
+    }
+    {   /* KEY LINK (SCL's Key link row, the project's): one ROOT for every melodic track; a drum track keeps its own */
+        uint32_t d = NTRK, m = NTRK, k;
+        int ok;
+        ui_power_on();
+        for (k = 0; k < NTRK; k++) {
+            if (drum_track(&trk[k])) { if (d == NTRK) d = k; }
+            else if (k != song.sel && m == NTRK) m = k;
+        }
+        go_title("SCL"); frame();
+        lst.row = 0;                                    /* (the list's row: the last test's kept) */
+        ok = tessera.key_link == 1u && !page_visible(page_titled("KEY"));
+        trk[d < NTRK ? d : 0].p[P_ROOT] = 3;
+        turn(EN_K2, 2);                                 /* (row 0: Root, up two) */
+        ok &= m < NTRK && trk[m].p[P_ROOT] == TSEL->p[P_ROOT] && TSEL->p[P_ROOT] == 2 &&
+              (d == NTRK || trk[d].p[P_ROOT] == 3);
+        bad += check("KEY LINK: on in a new project, a row of SCL (not a page of its own); Root on one melodic "
+                     "track sets them all, the drum track keeps its own", ok);
+        turn(EN_K1, 1); turn(EN_K2, -1);                /* (row 1: Key link, OWN) */
+        turn(EN_K1, -1); turn(EN_K2, 3);
+        ok = !tessera.key_link && TSEL->p[P_ROOT] == 5 && trk[m].p[P_ROOT] == 2;
+        bad += check("  OWN: Root is the selected track's alone", ok);
+        turn(EN_K1, 1); turn(EN_K2, 1);                 /* (Key link: LINKED again) */
+        bad += check("  LINKED again: every melodic track takes the selected track's key",
+                     tessera.key_link && trk[m].p[P_ROOT] == 5 && (d == NTRK || trk[d].p[P_ROOT] == 3));
     }
     {   /* sections (ui_sections.c): PRESETS the next section and back to the page last used; EDIT: the map */
         uint32_t f;
@@ -4472,6 +4497,11 @@ static int test_quick_layers(void)
     TSEL->p[P_ROOT] = 0; TSEL->p[P_SCALE] = 1;                     /* C MAJ */
     lay_combo(B_SCL, black(4));                                    /* D#4 */
     ok = TSEL->p[P_ROOT] == 3 && ui.layer == LAYER_SCL && !gates();
+    {
+        uint32_t k, same = 1;                                      /* (KEY LINK, on at power-on: every melodic track) */
+        for (k = 0; k < NTRK; k++) if (!drum_track(&trk[k]) && trk[k].p[P_ROOT] != 3) same = 0;
+        bad += check("SCL + a key with KEY LINK on: the root on every melodic track", same);
+    }
     key_up(black(4)); frame();
     key_down(white(1)); key_up(white(1)); frame();                  /* G3 */
     ok &= TSEL->p[P_ROOT] == 7;

@@ -49,7 +49,7 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 | **GLO** + C4 / F4 | Unmute all / tap the tempo (three taps or more; INT clock) |
 | **GLO** + KNOB 1 to 4 | Level of track 1 to 4 |
 | **GLO** + PLAY | Restart from the top without stopping |
-| **SCL** + any key | ROOT: that key's note name |
+| **SCL** + any key | ROOT: that key's note name (every melodic track while SCL > Key link is LINKED) |
 | **SCL** + KNOB 1 to 4 | ROOT, SCALE, CHRD, VOIC |
 | **GLO** / **SCL** + OCT- | Puts back what the layer changed since it opened |
 | **GLO** or **SCL** tapped twice | Locks the layer open; press it again to close |

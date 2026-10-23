@@ -250,6 +250,7 @@ static void layer_key(uint32_t l, uint32_t k)
         }
     } else if (l == LAYER_SCL) {
         TSEL->p[P_ROOT] = (int16_t)((k + 5u) % 12u);    /* the key's note name (F3 = F) */
+        if (tessera.key_link) scale_share(TSEL);       /* (KEY LINK: every melodic track's) */
     }
 }
 /* each pass: the keys the layer got now; then GLO's solo: the tracks of its keys still held (perform.c) */

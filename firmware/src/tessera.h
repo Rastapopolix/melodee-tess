@@ -167,6 +167,9 @@ typedef struct {
     /* MIDI OUT (midi_out.c; GLO > MIDI OUT): each track's channel. 0 AUTO (ROUT, a drum track the DRUM channel, as
      * before), 1..16 that channel, TESS_MIDI_OFF none; not in the packed block: the record's MIDI part */
     uint8_t          midi_ch[TESSERA_TRACKS];
+    /* KEY LINK (ui.c scale_share; SCL's sheet), the project's: 1 one ROOT for every melodic track, shared as SCL and
+     * QNT always are; 0 each track its own ROOT (as before). On in a new project; a record without its part: off */
+    uint8_t          key_link;
     /* CHORD's BREATH (HIT HOLD): its voices on slow cycles of their own, one now and then sitting out */
     uint8_t          ch_breath[TESSERA_TRACKS];  /* 0..100: 0 off (as before) */
     /* ENERGY (energy.c; the ENERGY page), the project's, not a track's: its slow tide and its rests */
@@ -296,6 +299,7 @@ enum {
     TX_AN_VARY, TX_AN_ECHO, TX_AN_FADE, TX_AN_ORDER, TX_AN_SHIFT, TX_AN_SPACE, TX_AN_LEN,
     TX_SUB_SHAPE,                                   /* (0x262: SUB's SHAPE, any track's) */
     TX_MIDI_CH,                                     /* (0x263: MIDI OUT's channel, any track's) */
+    TX_KEY_LINK,                                    /* (0x264: KEY LINK, the project's: one value, whichever track) */
     TX_COUNT
 };
 #define TESS_MIDI_OFF 17u                           /* TX_MIDI_CH: 0 AUTO, 1..16, 17 OFF */

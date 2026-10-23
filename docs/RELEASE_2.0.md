@@ -51,6 +51,8 @@ Seven Japanese and Okinawan scales after **SIKAH** in SCL: **IN**, **YO**, **HIR
   plays the step x1 to x8 in equal parts and **Nudge** moves it up to 8/16 of a step early or 7/16 late.
 * **ANSWER** generator (after Zen-1's call and response): play a phrase on the keys and it answers with variations
   that change a little more each time and fade (VARY, ECHO, FADE; OCT+: ORDER, SHIFT, SPACE, LEN).
+* **One key for the project**: SCL > **Key link** (LINKED in a new project) sets ROOT on every melodic track at
+  once, as the scale already was; OWN keeps a key per track. Saved with the project.
 * **MIDI OUT** page (GLO, after SYSTEM): each track's notes on a MIDI channel of its own, 1 to 16, so each track can
   play its own instrument; AUTO works as before (ROUT, the DRUM channel), OFF sends nothing. Saved with the project.
 * **HUMAN** (TWEAK) now moves timing too: a generator's step lands up to 20 ms behind the beat at 100, never early,
