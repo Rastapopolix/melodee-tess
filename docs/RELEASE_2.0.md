@@ -72,6 +72,11 @@ Seven Japanese and Okinawan scales after **SIKAH** in SCL: **IN**, **YO**, **HIR
   instead of stopping dead on short steps.
 * Tracks stay on the beat after a DIV or tempo change.
 
+### 🎚️ Good to know
+* **Voices are shared.** All tracks draw on one pool of voices (GLO > GLOBAL > BUDGET, 16). Two or more busy FM6
+  tracks with long releases (for example TINE EP at full density, 1/16) are past what the FM-1 can render and start
+  to crackle; thin one, shorten its notes, or lower BUDGET. The manual's "How many voices at once" has the details.
+
 ### 🏷️ New names
 Other makers' product names are no longer used on screen; the credits still name the originals.
 * **GRIDS → ATLAS** (inspired by Émilie Gillet's Grids, Mutable Instruments; mod destinations AT X, AT Y, AT DENS,
