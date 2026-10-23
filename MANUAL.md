@@ -4,7 +4,7 @@
 
 Tessera is a generative firmware for the M-Vave FM-1. It grew out of Melodee (Tess), a fork of
 [Melodee](https://github.com/keremimo/melodee) by keremimo (itself built on *Felucca* by Leo Kuroshita / Hügelton
-Instruments). Each of the four tracks can play its own steps, an arpeggio, or one of twelve generators, and the
+Instruments). Each of the four tracks can play its own steps, an arpeggio, or one of thirteen generators, and the
 pages around them evolve the phrases, build song forms, pass hits between tracks and modulate anything from
 anything.
 
