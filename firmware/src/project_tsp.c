@@ -15,9 +15,10 @@
 #define TSP_HEAD 12u
 #define TSP_STEP_BYTES 10u                      /* step v2: 80 bits */
 enum { TSP_META = 1, TSP_TRACKS, TSP_STEPS, TSP_TIMING, TSP_SONG, TSP_MOTION, TSP_FM6, TSP_DRUM, TSP_REC, TSP_NAME,
-       TSP_TESSERA, TSP_CORDS, TSP_SUB, TSP_MIDI, TSP_KEY, TSP_SEED, TSP_PARTS };   /* (TSP_SUB: each track's SHAPE; none: EVEN;
+       TSP_TESSERA, TSP_CORDS, TSP_SUB, TSP_MIDI, TSP_KEY, TSP_SEED, TSP_HUMAN, TSP_PARTS };   /* (TSP_SUB: each track's SHAPE; none: EVEN;
                                               * TSP_MIDI: each track's MIDI OUT channel; none: AUTO; TSP_KEY: KEY LINK; none: OWN;
-                                              * TSP_SEED: each track's SOURCE, then each one's KEEP; none: OFF, FREE) */
+                                              * TSP_SEED: each track's SOURCE, then each one's KEEP; none: OFF, FREE;
+                                              * TSP_HUMAN: each track's HUMAN TIME; none: TWEAK HUMAN's timing, as it was) */
 #if MELODEE_FLASH
 _Static_assert(TSP_MAX <= ST_PROJ_MAX, "a record fits one project copy");
 #endif
@@ -263,6 +264,9 @@ static uint32_t tsp_pack(uint8_t *raw, const project_t *q, int runtime)
         tsp_bytes(&w, tessera.sd_src, NTRK);
         tsp_bytes(&w, tessera.sd_keep, NTRK);
         tsp_end(&w);
+        tsp_begin(&w, TSP_HUMAN, 1);                   /* (HUMAN TIME: each track's) */
+        tsp_bytes(&w, tessera.sub_human, NTRK);
+        tsp_end(&w);
     }
     motion_unguard(f);
     if (!w.ok) return 0;
@@ -421,6 +425,10 @@ static int tsp_valid(const uint8_t *raw, uint32_t len)
         if (tsp_seen.ver[TSP_SEED] != 1u || tsp_seen.len[TSP_SEED] != 2u * NTRK) return 0;
         for (uint32_t k = 0; k < NTRK; k++) if (p[k] > TESSERA_TRACKS || p[NTRK + k] >= TESS_SD_KEEPS) return 0;
     }
+    if (tsp_seen.at[TSP_HUMAN]) {
+        if (tsp_seen.ver[TSP_HUMAN] != 1u || tsp_seen.len[TSP_HUMAN] != NTRK) return 0;
+        for (uint32_t k = 0; k < NTRK; k++) if (raw[tsp_seen.at[TSP_HUMAN] + k] > TESS_HUMAN_MS) return 0;
+    }
     if (tsp_seen.at[TSP_CORDS]) {
         if (tsp_seen.ver[TSP_CORDS] != 1u || tsp_seen.len[TSP_CORDS] != CORD_PK_BYTES ||
             !cord_check(raw + tsp_seen.at[TSP_CORDS])) return 0;
@@ -462,6 +470,14 @@ static void tsp_restore(const uint8_t *raw)
         memcpy(tessera.sd_src, raw + tsp_seen.at[TSP_SEED], NTRK);
         memcpy(tessera.sd_keep, raw + tsp_seen.at[TSP_SEED] + NTRK, NTRK);
     }
+    if (tsp_seen.at[TSP_HUMAN])
+        memcpy(tessera.sub_human, raw + tsp_seen.at[TSP_HUMAN], NTRK);
+    else                                               /* (saved before HUMAN TIME: TWEAK HUMAN timed a generator's
+                                                        * steps, up to 20 ms at 100; a STEP track's HUMAN did nothing) */
+        for (t = 0; t < TESSERA_TRACKS; t++) {
+            if (tessera.mode[t] == TESS_ENG_OFF) tessera.evolve[t].human = 0;
+            else tessera.sub_human[t] = (uint8_t)((tessera.evolve[t].human + 2u) / 5u);
+        }
 }
 
 /* a record's length as its header gives it (0: not a TSP1 record or one longer than TSP_MAX) */

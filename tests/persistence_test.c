@@ -213,6 +213,35 @@ static int test_tsp_record(void)
     tsp_resum(raw);
     bad += check("TSP1: a SEED part with a SOURCE or a KEEP out of range is refused", ok && !tsp_valid(raw, len));
 
+    reset();                                           /* HUMAN TIME: the record's HUMAN part; a record without it */
+    song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
+    tessera_param_set(1, TX_TW_HUMAN, 60); tessera_param_set(0, TX_TW_HUMAN, 40);   /* (track 0: a STEP track) */
+    tessera_param_set(2, TX_SUB_HUMAN, 45);
+    project_capture(&proj_scratch);
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok = len && tsp_valid(raw, len) && tsp_seen.at[TSP_HUMAN];
+    tessera_reset();
+    ok = ok && !project_restore_runtime(&proj_scratch);
+    tsp_restore(raw);
+    bad += check("TSP1: HUMAN TIME comes back from its part, TWEAK HUMAN as set", ok && tessera.sub_human[2] == 45u &&
+                 tessera.sub_human[1] == 0u && tessera.evolve[1].human == 60u && tessera.evolve[0].human == 40u);
+    raw[tsp_seen.at[TSP_HUMAN] - 4u] = (uint8_t)(TSP_PARTS + 1u);   /* (its id one this build does not know: skipped) */
+    tsp_resum(raw);
+    tessera_reset();
+    ok = tsp_valid(raw, len) && !tsp_seen.at[TSP_HUMAN] && !project_restore_runtime(&proj_scratch);
+    tsp_restore(raw);
+    bad += check("TSP1: a record without the HUMAN part (saved before it, or a part unknown) loads: a generator's TWEAK "
+                 "HUMAN 60 times it 12 ms, a STEP track's HUMAN cleared",
+                 ok && tessera.mode[1] != TESS_ENG_OFF && tessera.sub_human[1] == 12u && tessera.evolve[1].human == 60u &&
+                 tessera.sub_human[0] == 0u && tessera.evolve[0].human == 0u && tessera.sub_human[2] == 0u);
+    tessera_param_set(2, TX_SUB_HUMAN, 45);
+    project_capture(&proj_scratch);
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok = len && tsp_valid(raw, len) && tsp_seen.at[TSP_HUMAN];
+    raw[tsp_seen.at[TSP_HUMAN] + 3u] = (uint8_t)(TESS_HUMAN_MS + 1u);   /* (track 4's past 60 ms) */
+    tsp_resum(raw);
+    bad += check("TSP1: a HUMAN part past 60 ms is refused", ok && !tsp_valid(raw, len));
+
     reset();                                           /* the largest: every step of every pattern full, 1,024 notes */
     for (k = 0; k < NTRK; k++) {
         for (b = 0; b < NPAT; b++)

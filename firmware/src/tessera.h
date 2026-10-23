@@ -164,6 +164,8 @@ typedef struct {
     uint8_t          sub_chance[TESSERA_TRACKS]; /* 0..100: the chance a step ratchets (100: every step) */
     uint8_t          sub_shape[TESSERA_TRACKS];  /* SUB_EVEN / ACCEL / DECEL: where a ratchet's hits fall, any track's
                                                   * (STEP ones too); not in the packed block: the record's SUB part */
+    uint8_t          sub_human[TESSERA_TRACKS];  /* 0..TESS_HUMAN_MS: HUMAN TIME, a step up to this many ms late, any
+                                                  * track's (STEP ones too); not in the packed block: the HUMAN part */
     /* MIDI OUT (midi_out.c; GLO > MIDI OUT): each track's channel. 0 AUTO (ROUT, a drum track the DRUM channel, as
      * before), 1..16 that channel, TESS_MIDI_OFF none; not in the packed block: the record's MIDI part */
     uint8_t          midi_ch[TESSERA_TRACKS];
@@ -304,8 +306,10 @@ enum {
     TX_MIDI_CH,                                     /* (0x263: MIDI OUT's channel, any track's) */
     TX_KEY_LINK,                                    /* (0x264: KEY LINK, the project's: one value, whichever track) */
     TX_SD_SOURCE, TX_SD_KEEP,                       /* (0x265, 0x266: STEP as seed's SOURCE and KEEP, any track's) */
+    TX_SUB_HUMAN,                                   /* (0x267: TIMING's HUMAN TIME, any track's) */
     TX_COUNT
 };
+#define TESS_HUMAN_MS 60u                           /* TX_SUB_HUMAN: a step up to 60 ms late */
 enum { TESS_SD_FREE, TESS_SD_RHYTHM, TESS_SD_PITCH, TESS_SD_KEEPS };   /* TX_SD_KEEP */
 void tessera_sd_play(void);                         /* seq.c, PLAY: STEP as seed's loops from their sources again */
 void tessera_sd_layer_knob(uint32_t k, int32_t s);  /* TURING / EUCLID on GEN, OCT+ held: KNOB 1 SOURCE, 2 KEEP */

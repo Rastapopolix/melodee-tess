@@ -179,6 +179,7 @@ static void s_tweak(void)
     knob(tessera_tweak_knob, 0, 3);                   /* SHIFT +3 */
     knob(tessera_tweak_knob, 1, 15);                  /* DROP 30 */
     knob(tessera_tweak_knob, 2, 30);                  /* HUMAN 60 */
+    tessera_param_set(0, TX_SUB_HUMAN, 12);           /* (HUMAN TIME 12 ms: HUMAN 60's timing before it had its own) */
     gen(1, TESS_ENG_MARKOV);
     turns(tessera_tweak_knob, 3, 1);                  /* FOLLOW track 1 */
     knob(tessera_tweak_knob, 0, 7);                   /* a fifth above it */
@@ -476,6 +477,7 @@ static void s_grids_var(void)
     knob(tessera_evolve_knob, 0, -20);                /* LOCK 60: CHAOS 40 */
     knob(tessera_tweak_knob, 1, 10);                  /* DROP 20 */
     knob(tessera_tweak_knob, 2, 15);                  /* HUMAN 30 */
+    tessera_param_set(0, TX_SUB_HUMAN, 6);            /* (HUMAN TIME 6 ms: HUMAN 30's timing before) */
 }
 static void s_evolve_grids(void)
 {
@@ -592,6 +594,7 @@ static void s_poly_var(void)
     knob(tessera_knob, 2, 7);                         /* its DIV 7 */
     knob(tessera_knob, 3, 1);                         /* SPAN 2 */
     knob(tessera_tweak_knob, 2, 20);                  /* HUMAN 40 */
+    tessera_param_set(0, TX_SUB_HUMAN, 8);            /* (HUMAN TIME 8 ms: HUMAN 40's timing before) */
 }
 static void s_evolve_poly(void)
 {
@@ -1144,9 +1147,47 @@ static uint32_t sub_nudge_play(int32_t nudge, uint32_t ratch, uint32_t shape, ui
     for (f = 0; f < 4u; f++) mix_block(o, CTL);
     return n;
 }
-/* Euclid on track 0 for two bars at 1/16 (a step 172 blocks) with TWEAK HUMAN human: each note's block into blk[], up to
+/* a STEP track's note on every fourth step (1/16, 120 BPM: a step 172 blocks), each RATCH x2, with TWEAK HUMAN hum and
+ * HUMAN TIME ms: the blocks its voices started at in the first bar into at[] (up to 8: each step's hit, then its
+ * repeat), the repeats' velocities (the log's) into vel[] (up to 8, *nv of them); returns how many starts */
+static uint32_t sub_step_human(uint32_t hum, uint32_t ms, uint32_t *at, uint32_t *vel, uint32_t *nv)
+{
+    uint32_t f, bar, n = 0, a0, i;
+    int32_t o[2 * CTL];
+    const uint8_t note = 60;
+    host_tracks_init();
+    tessera_reset();
+    song.g[G_BPM] = 120;
+    for (i = 0; i < NTRK; i++) tt_open[i] = -1;
+    tt_n = tt_blk = 0;
+    trk[0].p[P_SDIV] = 2;
+    memset(trk[0].step, 0, sizeof trk[0].step);         /* (no NUDGE left from another test) */
+    for (i = 0; i < 16u; i += 4u) {
+        put_step(&trk[0], i, 1, &note, ST_NOTE, 0);
+        step_set_ratch(&trk[0].step[i], 2);
+    }
+    tessera_param_set(0, TX_TW_HUMAN, (int32_t)hum);
+    tessera_param_set(0, TX_SUB_HUMAN, (int32_t)ms);
+    rng_state = 0x4855u;                                /* (the SEED as before: a replay) */
+    bar = 4u * seq_beat_samples() / CTL;
+    transport_req = 1;
+    a0 = vage;
+    for (f = 0; f < bar; f++) {
+        mix_block(o, CTL);
+        tt_blk++;
+        if (started_since(&trk[0], a0) && n < 8u) at[n++] = f;
+        a0 = vage;
+    }
+    transport_req = 2;
+    for (f = 0; f < 4u; f++) mix_block(o, CTL);
+    for (*nv = 0, i = 0; i < tt_n && *nv < 8u; i++)
+        if (tt_ev[i].tr == 0u) vel[(*nv)++] = tt_ev[i].vel;
+    memset(trk[0].step, 0, sizeof trk[0].step);         /* (none left for the next test) */
+    return n;
+}
+/* Euclid on track 0 for two bars at 1/16 (a step 172 blocks) with HUMAN TIME ms: each note's block into blk[], up to
  * max; returns how many */
-static uint32_t sub_human_play(uint32_t human, uint32_t *blk, uint32_t max)
+static uint32_t sub_human_play(uint32_t ms, uint32_t *blk, uint32_t max)
 {
     uint32_t f, total, i, n = 0;
     int32_t o[2 * CTL];
@@ -1156,7 +1197,7 @@ static uint32_t sub_human_play(uint32_t human, uint32_t *blk, uint32_t max)
     for (i = 0; i < NTRK; i++) tt_open[i] = -1;
     tt_n = tt_blk = 0;
     gen(0, TESS_ENG_EUCLID);
-    tessera_param_set(0, TX_TW_HUMAN, (int32_t)human);
+    tessera_param_set(0, TX_SUB_HUMAN, (int32_t)ms);
     rng_state = 0x4855u;
     total = 2u * 4u * seq_beat_samples();
     transport_req = 1;
@@ -1173,7 +1214,8 @@ static uint32_t sub_human_play(uint32_t human, uint32_t *blk, uint32_t max)
  * ratchet, 50 some, the same ones again; NOTE LENGTH FIXED's held notes play once; Grids' parts all repeat; nothing held
  * after STOP. A STEP track's per-step RATCH: x4 and x8 repeat each of its 8 notes 3 and 7 times, a drum hit's too; its
  * NUDGE moves a step 4/16 late or early, a ratchet with it; SHAPE ACCEL / DECEL place a x4's hits as it says;
- * HUMAN 100 plays a generator's notes 0..20 ms late */
+ * HUMAN TIME 20 plays a generator's notes 0..20 ms late, 60 up to a quarter of the step, a STEP track's too; TWEAK
+ * HUMAN varies a STEP track's velocity, not its timing */
 static int sub_near(uint32_t got, uint32_t want) { return got + 2u >= want && got <= want + 2u; }
 static void sub_check(char *res, size_t cap)
 {
@@ -1207,17 +1249,53 @@ static void sub_check(char *res, size_t cap)
             ok &= n == RT[k] && sub_near(at[0], WANT[k][0]) && (n < 2u || sub_near(at[1], WANT[k][1]));
         }
     }
-    {   /* HUMAN: the same notes, each 0..20 ms (28 blocks) behind its line, some late, none early; the same again */
-        uint32_t a[16], b[16], c[16], na = sub_human_play(0, a, 16), nb = sub_human_play(100, b, 16), nc, k, late = 0, most = 0;
-        nc = sub_human_play(100, c, 16);
+    {   /* HUMAN TIME: the same notes, each 0..20 ms (28 blocks) behind its line, some late, none early; the same again.
+         * 60 ms: up to a quarter of the step (43 blocks), some past 20 ms */
+        uint32_t a[16], b[16], c[16], na = sub_human_play(0, a, 16), nb = sub_human_play(20, b, 16), nc, k, late = 0, most = 0;
+        nc = sub_human_play(20, c, 16);
         ok &= na == nb && nb == nc && na > 0u;
         for (k = 0; k < na && k < nb; k++) {
             ok &= b[k] >= a[k] && b[k] - a[k] <= 28u && b[k] == c[k];
             late += b[k] > a[k];
             if (b[k] - a[k] > most) most = b[k] - a[k];
         }
-        printf("sub: HUMAN 100: %u notes, %u late, at most %u blocks\n", (unsigned)nb, (unsigned)late, (unsigned)most);
+        printf("sub: HUMAN TIME 20 ms: %u notes, %u late, at most %u blocks\n", (unsigned)nb, (unsigned)late, (unsigned)most);
         ok &= late > 0u;
+        nb = sub_human_play(60, b, 16);
+        ok &= na == nb;
+        for (most = 0, k = 0; k < na && k < nb; k++) {
+            ok &= b[k] >= a[k] && b[k] - a[k] <= 44u;
+            if (b[k] - a[k] > most) most = b[k] - a[k];
+        }
+        printf("sub: HUMAN TIME 60 ms: at most %u blocks late\n", (unsigned)most);
+        ok &= most > 28u;
+    }
+    {   /* a STEP track: HUMAN TIME 60 moves each step's hit 0..43 blocks late (its ratchet with it), the same again; TWEAK
+         * HUMAN 100 leaves the timing, varies the repeats' velocity (the step's 100) +-20, the same again */
+        uint32_t a[8], b[8], c[8], va[8], vb[8], vc[8], na, nb, nc, nva, nvb, nvc, k, late = 0, odd = 0;
+        na = sub_step_human(0, 0, a, va, &nva);
+        nb = sub_step_human(0, 60, b, vb, &nvb);
+        nc = sub_step_human(0, 60, c, vc, &nvc);
+        ok &= na == 8u && nb == 8u && nc == 8u;
+        for (k = 0; k < 8u && k < nb; k += 2u) {
+            ok &= b[k] >= a[k] && b[k] - a[k] <= 44u && b[k] == c[k];
+            late += b[k] > a[k];
+        }
+        for (k = 0; k < nva; k++) ok &= va[k] == 100u;
+        printf("sub: STEP track HUMAN TIME 60 ms: %u of 4 steps late (%u %u %u %u blocks)\n", (unsigned)late,
+               (unsigned)(b[0] - a[0]), (unsigned)(b[2] - a[2]), (unsigned)(b[4] - a[4]), (unsigned)(b[6] - a[6]));
+        ok &= late > 0u;
+        nb = sub_step_human(100, 0, b, vb, &nvb);
+        nc = sub_step_human(100, 0, c, vc, &nvc);
+        ok &= nb == na && nvb == nva && nvb > 0u && nvc == nvb;
+        for (k = 0; k < nb && k < na; k++) ok &= b[k] == a[k];
+        for (k = 0; k < nvb; k++) {
+            ok &= vb[k] >= 80u && vb[k] <= 120u && vb[k] == vc[k];
+            odd += vb[k] != 100u;
+        }
+        printf("sub: STEP track TWEAK HUMAN 100: %u repeats, %u of them not 100 (first %u)\n", (unsigned)nvb, (unsigned)odd,
+               (unsigned)vb[0]);
+        ok &= odd > 0u;
     }
     {   /* SHAPE, x4 on step 4 (its line at 689, the step 172 blocks): ACCEL 7/16 12/16 15/16 of it, DECEL 1/16 4/16 9/16 */
         uint32_t at[4], k, s;
