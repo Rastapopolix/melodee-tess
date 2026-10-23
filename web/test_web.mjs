@@ -1361,14 +1361,14 @@ async function stockRestore() {
   const installer = readFileSync(join(HERE, "index_pkg.html"), "utf8");
   const script = installer.match(/<script type="module">([\s\S]*?)<\/script>/)[1]
     .replace("/*META*/", JSON.stringify({version:"0.10",product:"FM-1_9010",pkg:{dual:"test.fwsc",single:"test-1core.fwsc"}}));
-  async function run({skip = false, loader = false, recovery = false, supported = false, confirm = true, backupError = false} = {}) {
+  async function run({skip = false, loader = false, recovery = false, supported = false, confirm = true, backupError = false, version = "MELODEE 0.9"} = {}) {
     const calls = [], elements = new Map();
     const element = (id) => {
       if (!elements.has(id)) elements.set(id, {checked:false, disabled:false, textContent:"", value:0, listeners:{},
         addEventListener(k, fn) { this.listeners[k] = fn; }});
       return elements.get(id);
     };
-    const info = [...Buffer.from("MELODEE 0.9"),0,0,92,0,64,84,4,
+    const info = [...Buffer.from(version),0,0,92,0,64,84,4,
       ...(supported ? [16,0x55,1,0,0x4d,1,64,1,0x42,1,1] : [])];
     const context = vm.createContext({
       navigator:{language:"en", requestMIDIAccess:async () => ({})},
@@ -1418,6 +1418,10 @@ async function stockRestore() {
   ok(r.calls.indexOf("backup") < r.calls.indexOf("save") && r.calls.indexOf("save") < r.calls.indexOf("confirm")
     && r.calls.indexOf("confirm") < r.calls.indexOf("install") && r.label.startsWith("Back up"),
     "stock: default flow saves the backup before confirmation and flashing");
+  r = await run({supported:true, version:"TESSERA v2.0"});
+  ok(r.calls.indexOf("backup") < r.calls.indexOf("save") && r.calls.indexOf("save") < r.calls.indexOf("install") &&
+    !r.status.includes("select Skip backup"),
+    "stock: a Tessera (INFO \"TESSERA ...\") backs up before going back to V15, not refused as unsupported");
   r = await run({supported:true, backupError:true});
   ok(!r.calls.includes("install") && !r.calls.includes("confirm") && r.calls.includes("backup-close") && r.unlocked,
     "stock: a failed backup never silently falls through to flashing");

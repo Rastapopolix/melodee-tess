@@ -11,8 +11,8 @@
  * MELODEE_CDC=1 adds a CDC-ACM serial function (IAD composite: EP2 notify,
  * EP3 bulk data) for the console in console.c.
  * MELODEE_USB_AUDIO=1 instead adds two UAC1 functions (usb_audio.c), a stereo
- * output device "Melodee Out" (EP2 OUT, explicit feedback on EP3) and a separate
- * stereo master or four-track input device "Melodee In" (EP2 IN), 16 or 24 bit at 44.1 kHz.
+ * output device "Tessera Out" (EP2 OUT, explicit feedback on EP3) and a separate
+ * stereo master or four-track input device "Tessera In" (EP2 IN), 16 or 24 bit at 44.1 kHz.
  * Their endpoints are served from the TIMER5 ISR by elapsed time (ua_service,
  * main.c), nested in the render too; usb_poll never runs nested, so the two
  * never interleave. Either can be left out of the configuration (ua_off, the
@@ -134,19 +134,20 @@ static void midi_out_event(uint32_t pkt)            /* from the audio ISR */
 
 /* ------------------------------------------------------- descriptors --- */
 /* interfaces: 0 audio control, 1 MIDI streaming, then CDC's two, or the USB audio functions' four (usb_audio_desc.h).
- * bcdDevice: 3.00 MIDI, 3.01 with CDC, 3.06 with USB audio (hosts cache descriptors per version) */
+ * bcdDevice: 3.00 MIDI, 3.02 with CDC, 3.07 with USB audio (hosts cache descriptors per version: 3.01 / 3.06 named
+ * the device Melodee; Tessera, 2026-10-23, needs the hosts to read the names again) */
 #if MELODEE_USB_AUDIO
 #include "usb_audio_stream.c"
 #define CFG_LEN 411
-static const uint8_t DEV_DESC[18] = {18, 1, 0x00, 0x02, 0xEF, 0x02, 0x01, 64, 0x09, 0x12, 0x01, 0x00, 0x06, 0x03,
-                                     1, 2, 0, 1};        /* misc/IAD, bcdDevice 3.06: native 44.1 kHz only */
+static const uint8_t DEV_DESC[18] = {18, 1, 0x00, 0x02, 0xEF, 0x02, 0x01, 64, 0x09, 0x12, 0x01, 0x00, 0x07, 0x03,
+                                     1, 2, 0, 1};        /* misc/IAD, bcdDevice 3.07: native 44.1 kHz only */
 static const uint8_t CFG_DESC[] = {
     9, 2, 0x9B, 0x01, 6, 1, 0, 0x80, 50,                /* 411 bytes, six interfaces */
     8, 0x0B, 0, 2, 1, 1, 0, 0,                          /* IAD: MIDI (IF 0-1) */
 #elif MELODEE_CDC
 #define CFG_LEN 175
-static const uint8_t DEV_DESC[18] = {18, 1, 0x00, 0x02, 0xEF, 0x02, 0x01, 64, 0x09, 0x12, 0x01, 0x00, 0x01, 0x03,
-                                     1, 2, 0, 1};        /* misc/IAD, bcdDevice 3.01 */
+static const uint8_t DEV_DESC[18] = {18, 1, 0x00, 0x02, 0xEF, 0x02, 0x01, 64, 0x09, 0x12, 0x01, 0x00, 0x02, 0x03,
+                                     1, 2, 0, 1};        /* misc/IAD, bcdDevice 3.02 */
 static const uint8_t CFG_DESC[] = {
     9, 2, 175, 0, 4, 1, 0, 0x80, 50,
     8, 0x0B, 0, 2, 1, 1, 0, 0,                          /* IAD: MIDI (IF 0-1) */
@@ -196,13 +197,12 @@ static const uint8_t STR1[] = {26, 3, 'E', 0, 'l', 0, 'l', 0, 'i', 0, 'c', 0, ' 
 #ifdef MELODEE_LOADER
 static const uint8_t STR2[] = {30, 3, 'M', 0, 'e', 0, 'l', 0, 'o', 0, 'd', 0, 'e', 0, 'e', 0, ' ', 0, 'U', 0, 'p', 0,
                                'd', 0, 'a', 0, 't', 0, 'e', 0};
-#else
-static const uint8_t STR2[] = {16, 3, 'M', 0, 'e', 0, 'l', 0, 'o', 0, 'd', 0, 'e', 0, 'e', 0};
+#else                                                   /* (the update loader stays "Melodee Update": the tools find it so) */
+static const uint8_t STR2[] = {16, 3, 'T', 0, 'e', 0, 's', 0, 's', 0, 'e', 0, 'r', 0, 'a', 0};
 #endif
 #if MELODEE_USB_AUDIO                                   /* the audio functions: host device names */
-static const uint8_t STR3[] = {24, 3, 'M', 0, 'e', 0, 'l', 0, 'o', 0, 'd', 0, 'e', 0, 'e', 0, ' ', 0, 'O', 0, 'u', 0,
-                               't', 0};
-static const uint8_t STR4[] = {22, 3, 'M', 0, 'e', 0, 'l', 0, 'o', 0, 'd', 0, 'e', 0, 'e', 0, ' ', 0, 'I', 0, 'n', 0};
+static const uint8_t STR3[] = {24, 3, 'T', 0, 'e', 0, 's', 0, 's', 0, 'e', 0, 'r', 0, 'a', 0, ' ', 0, 'O', 0, 'u', 0, 't', 0};
+static const uint8_t STR4[] = {22, 3, 'T', 0, 'e', 0, 's', 0, 's', 0, 'e', 0, 'r', 0, 'a', 0, ' ', 0, 'I', 0, 'n', 0};
 static uint8_t ua_cfg[sizeof CFG_DESC];                 /* the configuration as sent (usb_audio.c ua_cfg_build) */
 static uint16_t ua_cfg_len;
 #endif

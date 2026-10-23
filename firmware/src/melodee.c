@@ -25,7 +25,7 @@
 #define MELODEE_OTA_DRYRUN 0     /* 1 = stage, ask "success", then undo: no record, no reset */
 #endif
 #ifndef MELODEE_USB_AUDIO
-#define MELODEE_USB_AUDIO 1      /* USB audio (usb_audio.c): "Melodee Out" plays through the FM-1, "Melodee In"
+#define MELODEE_USB_AUDIO 1      /* USB audio (usb_audio.c): "Tessera Out" plays through the FM-1, "Tessera In"
                                   * records stereo master or four tracks; 16 / 24 bit, 44.1 kHz. Needs EP2 / EP3: no CDC */
 #endif
 #ifndef MELODEE_CDC
