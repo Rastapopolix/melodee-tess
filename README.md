@@ -10,7 +10,7 @@
 </p>
 
 **Tessera** is a generative firmware for the M-Vave FM-1. Each of the four tracks can play its own steps, an
-arpeggio, or one of twelve generators, and the pages around them evolve the phrases, build song forms, pass hits
+arpeggio, or one of thirteen generators, and the pages around them evolve the phrases, build song forms, pass hits
 between tracks and modulate anything from anything. GPL-3.0-only. **Status: Experimental.**
 By **Theo Dainis** ([Rastapopolix](https://github.com/Rastapopolix)).
 

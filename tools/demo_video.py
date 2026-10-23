@@ -7,11 +7,13 @@
   python3 tools/demo_video.py build/video OUT.mp4  (needs Pillow and imageio-ffmpeg, or ffmpeg on the PATH)
 
 Each clip's frames (240 x 240, a frame every 1472 samples: 44100/1472 frames a second) are drawn 3x, nearest, on a
-1080 x 1080 card in Tessera's colours with its caption under the screen; a title card, a "More modes" card before
-the tour and an end card are added. The audio of every clip is padded to its frames x 1472 samples, so picture and
-sound stay together end to end.
+1080 x 1080 card in Tessera's colours with its caption under the screen; a title card, a "Shaping" card before the
+shaping pages (clip 3-), a "More modes" card before the tour (clip 9-) and an end card are added. The audio of every clip is padded to its frames x 1472 samples, so picture and
+sound stay together end to end. The shaping and tour clips, one generator each, are levelled to the demos (LEVEL_RMS,
+peaks under LEVEL_PEAK): a gain, nothing else; the demos play as made.
 """
 import array
+import math
 import shutil
 import subprocess
 import sys
@@ -29,6 +31,15 @@ BG, SURF, TEXT, MID, GOLD = (13, 19, 38), (24, 33, 60), (246, 240, 224), (179, 1
 MARK = [(44, 64, 120), (58, 84, 150), GOLD, (66, 96, 170), (50, 74, 136), (40, 60, 112), (62, 90, 160), (46, 68, 126),
         (54, 80, 146)]                                  # (the splash's tesserae, firmware/src/splash.c)
 FONT = ROOT / "assets/fonts"
+LEVEL_RMS, LEVEL_PEAK = -24.0, -3.0                     # dBFS: the demos' RMS; the highest peak a levelled clip may reach
+
+
+def level(a):
+    """a clip's samples at LEVEL_RMS, or as loud as LEVEL_PEAK allows"""
+    peak = max(abs(v) for v in a) or 1
+    rms = math.sqrt(sum(v * v for v in a) / len(a)) or 1
+    gain = min(10 ** (LEVEL_RMS / 20) * 32768 / rms, 10 ** (LEVEL_PEAK / 20) * 32768 / peak)
+    return array.array("h", (max(-32768, min(32767, round(v * gain))) for v in a)), 20 * math.log10(gain)
 
 
 def font(weight, size):
@@ -127,26 +138,34 @@ def main(src, dst):
 
     title = card([("TESSERA 2.0", "SemiBold", 86, GOLD), ("Generative firmware for the M-Vave FM-1", "Medium", 40, TEXT),
                   ("Every sound and screen here is the firmware's own", "Regular", 30, MID)])
+    shaping = card([("Shaping", "SemiBold", 72, GOLD), ("EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, TIMING", "Medium", 32, TEXT),
+                    ("Any generator, any track", "Regular", 30, MID)])
     more = card([("More modes", "SemiBold", 72, GOLD), ("TURING, EUCLID, MORPH, ATLAS, CONSTELLATION, ANSWER", "Medium", 32, TEXT)])
+    before = {"3-": shaping, "9-": more}                # (the clip a card comes before)
     end = card([("TESSERA 2.0", "SemiBold", 72, GOLD), ("rastapopolix.github.io/tessera", "Medium", 40, TEXT),
                 ("Free, GPL-3.0. Installs from the browser.", "Regular", 30, MID)])
     secs = lambda s: round(s * FS / SPF)
     segments.append(("card", title, secs(3.5)))
     silence(secs(3.5))
     for i, (d, w, caps) in enumerate(clips(src)):
-        if d.name.startswith("3-"):
-            segments.append(("card", more, secs(2.5)))
+        c = before.get(d.name.split("-")[0] + "-")
+        if c:
+            segments.append(("card", c, secs(2.5)))
             silence(secs(2.5))
         frames = len(list(d.glob("f*.ppm")))
         with wave.open(str(w)) as r:
             a = array.array("h", r.readframes(r.getnframes()))
+        gain = 0.0
+        if d.parent == src:                             # (a shaping or tour clip; the demos are in a/ and b/)
+            a, gain = level(a)
         need = frames * SPF * 2
         if len(a) > need:
             raise SystemExit(f"{w}: {len(a) // 2} samples, more than {frames} frames x {SPF}")
         a.extend([0] * (need - len(a)))                 # (the last frame's tail: silence, so the clip ends in step)
         audio.extend(a)
         segments.append(("clip", d, caps, frames))
-        print(f"{d.name:16s} {frames} frames, {len(a) // 2} samples ({len(a) // 2 == frames * SPF and 'in step'})")
+        print(f"{d.name:16s} {frames} frames, {len(a) // 2} samples ({len(a) // 2 == frames * SPF and 'in step'}), "
+              f"gain {gain:+.1f} dB")
     segments.append(("card", end, secs(4)))
     silence(secs(4))
     total = sum(s[-1] for s in segments)

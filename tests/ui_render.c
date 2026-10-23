@@ -1347,11 +1347,16 @@ static void setup(int s)
             tessera_tweak2_knob(0, 15);             /* BRANCH 30 */
             tessera_tweak2_knob(1, 1);              /* TO T2 COIN */
         }
-        if (s == S_GEN_TWEAK2) {
-            tessera_tweak2_knob(0, 30);             /* BRANCH 60 */
-            for (int i = 0; i < 5; i++) tessera_tweak2_knob(1, 1);   /* TO T3 TOGGLE */
-            for (int i = 0; i < 6; i++) tessera_tweak2_knob(2, 1);   /* LOGIC OR T4 */
-            for (int i = 0; i < 3; i++) tessera_tweak2_knob(3, 1);   /* COND 1:4 */
+        if (s == S_GEN_TWEAK2) {                    /* all four set (the gallery's and the project page's picture):
+                                                     * BRANCH 90 TO T2 COIN, LOGIC XOR T4, COND 1:4 */
+            tessera_param_set(1, TX_MODE, TESS_ENG_EUCLID);
+            tessera_param_set(3, TX_MODE, TESS_ENG_EUCLID);
+            tessera_param_set(0, TX_TW_BRANCH, 90);
+            tessera_param_set(0, TX_TW_BR_TO, 2);
+            tessera_param_set(0, TX_TW_BR_MODE, 0);
+            tessera_param_set(0, TX_TW_LOGIC, 3);
+            tessera_param_set(0, TX_TW_LG_WITH, 4);
+            tessera_param_set(0, TX_TW_COND, 3);
         }
         go_title("TWEAK 2");
         if (s == S_MODS_LIVE_GEN) {

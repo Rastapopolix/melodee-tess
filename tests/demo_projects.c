@@ -611,6 +611,7 @@ static int archive_restore(const char *path)
  * the demos leave out. Audio and screen from one pass, a frame every V_BLOCKS blocks. OUTDIR/<clip>.wav,
  * OUTDIR/<clip>/f00000.ppm .., OUTDIR/captions.txt (tools/demo_video.py: the video) */
 typedef struct { uint32_t ms, key, down; } vkey_t;
+typedef struct { uint32_t ms, tr, x; int32_t v; } vset_t;   /* a Tessera setting changed at ms, as a knob would */
 static const vstep_t V_STILL[] = {
     {0, 1, V_KEEP, 0, "STILL TIDE: an ambient demo, four tracks that keep changing on their own"},
     {7000, 0, 0, "GEN", "Track 1, CHORD: a drone in YO on D, each voice breathing on its own slow cycle"},
@@ -661,12 +662,13 @@ static void v_ppm(const char *dir, uint32_t n)
     }
     fclose(f);
 }
-/* a tour clip: the project set up now, played secs s with its steps and keys, frames and audio */
+/* a tour clip: the project set up now, played secs s with its steps, keys and setting changes, frames and audio */
 static void v_clip(const char *out, const char *name, uint32_t secs, const vstep_t *st, uint32_t nst, const vkey_t *keys,
-                   uint32_t nkeys)
+                   uint32_t nkeys, const vset_t *sets, uint32_t nsets)
 {
     char dir[600], wav[600];
-    uint32_t frames = secs * FS, f, si = 0, ki = 0, b = 0, n = 0;
+    uint32_t frames = secs * FS, f, si = 0, ki = 0, xi = 0, b = 0, n = 0;
+    memset(dm_notes, 0, sizeof dm_notes);
     snprintf(dir, sizeof dir, "%s/%s", out, name);
     mkdir(dir, 0755);
     snprintf(wav, sizeof wav, "%s/%s.wav", out, name);
@@ -688,6 +690,11 @@ static void v_clip(const char *out, const char *name, uint32_t secs, const vstep
             keyboard_block();
             ki++;
         }
+        while (xi < nsets && ms >= sets[xi].ms) {
+            tx(sets[xi].tr, sets[xi].x, sets[xi].v);
+            ui.force = 1;
+            xi++;
+        }
         dm_f = f;
         mix_block(o, CTL);
         fm1_ms = f / (FS / 1000u);
@@ -697,7 +704,8 @@ static void v_clip(const char *out, const char *name, uint32_t secs, const vstep
     fclose(w);
     transport_req = 2;
     for (f = 0; f < FS; f += CTL) { int32_t o[2 * CTL]; mix_block(o, CTL); }
-    printf("video: %s %u s, %u frames\n", dir, secs, n);
+    printf("video: %s %u s, %u frames; notes %u %u %u %u\n", dir, secs, n, dm_notes[0], dm_notes[1], dm_notes[2],
+           dm_notes[3]);
     v_t0 += secs;
 }
 static void v_scene(uint32_t bpm, uint32_t engine, uint32_t preset, uint32_t mode, uint32_t div)
@@ -713,6 +721,66 @@ static void v_scene(uint32_t bpm, uint32_t engine, uint32_t preset, uint32_t mod
     mixer(0, 104, 0, 70, 0);
 }
 enum { V_TINE = 0, V_BELL = 1, V_MARIMBA = 5, V_PLUCK = 7 };   /* FM6 presets (eng_fm6.c FM6_PRESETS) */
+static void v_voice(uint32_t tr, uint32_t preset, uint32_t mode, uint32_t div, int32_t level)   /* another track */
+{
+    sound(tr, ENGI_FM6, preset);
+    trk[tr].p[P_SDIV] = (int16_t)div;
+    gen(tr, mode, 41);
+    mixer(tr, level, 0, 60, 0);
+}
+#define V_SET_S(c) (sizeof c / sizeof c[0])
+/* the shaping pages, one clip each: the generator plain, then the page's settings turned, captioned before and after */
+static void v_shaping(const char *out)
+{
+    {
+        v_scene(100, ENGI_FM6, V_TINE, TESS_ENG_TURING, DIV_16);
+        tx(0, TX_EV_LOCK, 100);
+        static const vstep_t S[] = {{0, 0, 0, "EVOLVE", "EVOLVE: a TURING phrase that loops as it is"},
+                                    {3500, 0, 0, "EVOLVE", "EVERY 1 bar, LOCK 40 %: now it mutates each bar, keeping part of itself"}};
+        static const vset_t X[] = {{3500, 0, TX_EV_EVERY, 1}, {3500, 0, TX_EV_LOCK, 40}, {3500, 0, TX_EV_AMOUNT, 70}};
+        v_clip(out, "3-evolve", 11, S, V_SET_S(S), 0, 0, X, V_SET_S(X));
+    }
+    {
+        v_scene(100, ENGI_FM6, V_PLUCK, TESS_ENG_MARKOV, DIV_16);
+        static const vstep_t S[] = {{0, 0, 0, "FORM", "FORM: phrases strung into a song form"},
+                                    {1200, 0, 0, "FORM", "AABA, a bar each: B moves away by CONTRAST, A comes back exactly; a fifth up on each phrase's last beat"}};
+        static const vset_t X[] = {{0, 0, TX_EV_EVERY, 1}, {0, 0, TX_FM_FORM, 4}, {0, 0, TX_FM_CONTRAST, 80},
+                                   {0, 0, TX_FM_FLOURISH, 7}};
+        v_clip(out, "4-form", 12, S, V_SET_S(S), 0, 0, X, V_SET_S(X));
+    }
+    {
+        v_scene(96, ENGI_FM6, V_PLUCK, TESS_ENG_TURING, DIV_8);
+        v_voice(1, V_MARIMBA, TESS_ENG_EUCLID, DIV_16, 96);
+        static const vstep_t S[] = {{0, 0, 1, "TWEAK", "TWEAK on track 2: a EUCLID rhythm on its own note, under track 1's melody"},
+                                    {4500, 0, 1, "TWEAK", "FOLLOW T1, SHIFT -5: it plays track 1's notes an octave down; DROP leaves some out"}};
+        static const vset_t X[] = {{4500, 1, TX_TW_FOLLOW, 1}, {4500, 1, TX_TW_SHIFT, -5}, {4500, 1, TX_TW_DROP, 25}};
+        v_clip(out, "5-tweak", 12, S, V_SET_S(S), 0, 0, X, V_SET_S(X));
+    }
+    {
+        v_scene(100, ENGI_FM6, V_MARIMBA, TESS_ENG_EUCLID, DIV_16);
+        sound(1, ENGI_FM6, V_BELL);
+        mixer(1, 100, 0, 80, 0);
+        static const vstep_t S[] = {{0, 0, 0, "TWEAK 2", "TWEAK 2: a EUCLID rhythm on a marimba"},
+                                    {3500, 0, 0, "TWEAK 2", "BRANCH 50 % TO T2: each hit tosses a coin, marimba or track 2's bell"}};
+        static const vset_t X[] = {{3500, 0, TX_TW_BR_TO, 2}, {3500, 0, TX_TW_BRANCH, 50}};
+        v_clip(out, "6-tweak2", 10, S, V_SET_S(S), 0, 0, X, V_SET_S(X));
+    }
+    {
+        v_scene(84, ENGI_FM6, FX_KUGO_HARP, TESS_ENG_TURING, DIV_8);
+        tx(0, TX_TW_DROP, 25);
+        static const vstep_t S[] = {{0, 0, 0, "LENGTH", "LENGTH STEP: each note as long as the step's gate"},
+                                    {5000, 0, 0, "LENGTH", "HIT: a note holds until the next one, so the rests ring"}};
+        static const vset_t X[] = {{5000, 0, TX_NL_MODE, 2}};
+        v_clip(out, "7-length", 12, S, V_SET_S(S), 0, 0, X, V_SET_S(X));
+    }
+    {
+        v_scene(92, ENGI_FM6, FX_KALIMBA, TESS_ENG_TURING, DIV_8);
+        static const vstep_t S[] = {{0, 0, 0, "TIMING", "TIMING: eighth notes, one hit a step"},
+                                    {3500, 0, 0, "TIMING", "RATCH x4, CHANCE 50 %, ACCEL: some steps roll, faster and faster"}};
+        static const vset_t X[] = {{3500, 0, TX_SUB_RATCH, 3}, {3500, 0, TX_SUB_CHANCE, 50}, {3500, 0, TX_SUB_SHAPE, 1}};
+        v_clip(out, "8-timing", 10, S, V_SET_S(S), 0, 0, X, V_SET_S(X));
+    }
+}
 static int make(const char *dir, uint32_t secs);
 static int video(const char *out)
 {
@@ -744,24 +812,25 @@ static int video(const char *out)
         v_cap = fopen(cap, "a");
     }
     v_t0 = 104.0;
+    v_shaping(out);
     static const struct { const char *name, *caption; uint32_t bpm, engine, preset, mode, div; } T[] = {
-        {"3-turing", "TURING: a looping shift register that locks or drifts", 100, ENGI_FM6, V_TINE, TESS_ENG_TURING, DIV_16},
-        {"4-euclid", "EUCLID: hits spread as evenly as they go", 100, ENGI_FM6, V_MARIMBA, TESS_ENG_EUCLID, DIV_16},
-        {"5-morph", "MORPH: a rhythm blended between two patterns", 100, ENGI_FM6, V_PLUCK, TESS_ENG_MORPH, DIV_16},
-        {"6-atlas", "ATLAS: kick, snare and hat from a map of drum patterns", 100, ENGI_DRUM, DK_808_KIT, TESS_ENG_GRIDS, DIV_16},
-        {"7-constellation", "CONSTELLATION: stars play as they cross the ship's crosshair", 90, ENGI_FM6, V_BELL, TESS_ENG_CONSTEL, DIV_8},
+        {"9-turing", "TURING: a looping shift register that locks or drifts", 100, ENGI_FM6, V_TINE, TESS_ENG_TURING, DIV_16},
+        {"10-euclid", "EUCLID: hits spread as evenly as they go", 100, ENGI_FM6, V_MARIMBA, TESS_ENG_EUCLID, DIV_16},
+        {"11-morph", "MORPH: a rhythm blended between two patterns", 100, ENGI_FM6, V_PLUCK, TESS_ENG_MORPH, DIV_16},
+        {"12-atlas", "ATLAS: kick, snare and hat from a map of drum patterns", 100, ENGI_DRUM, DK_808_KIT, TESS_ENG_GRIDS, DIV_16},
+        {"13-constellation", "CONSTELLATION: stars play as they cross the ship's crosshair", 90, ENGI_FM6, V_BELL, TESS_ENG_CONSTEL, DIV_8},
     };
     for (uint32_t i = 0; i < sizeof T / sizeof T[0]; i++) {
         v_scene(T[i].bpm, T[i].engine, T[i].preset, T[i].mode, T[i].div);
         vstep_t S[1] = {{0, 0, 0, "GEN", T[i].caption}};
-        v_clip(out, T[i].name, 9, S, 1, 0, 0);
+        v_clip(out, T[i].name, 9, S, 1, 0, 0, 0, 0);
     }
     v_scene(96, ENGI_FM6, V_TINE, TESS_ENG_ANSWER, DIV_8);   /* ANSWER: C D E G on the keys, then its answers */
     static const vkey_t K[] = {{400, 7, 1}, {700, 7, 0}, {1025, 9, 1}, {1325, 9, 0}, {1650, 11, 1}, {1950, 11, 0},
                                {2275, 14, 1}, {2700, 14, 0}};
     static const vstep_t S[] = {{0, 0, 0, "GEN", "ANSWER: play a phrase on the keys..."},
                                 {4500, 0, 0, "GEN", "...and it answers, a little different each time, softer as it goes"}};
-    v_clip(out, "8-answer", 14, S, 2, K, sizeof K / sizeof K[0]);
+    v_clip(out, "14-answer", 14, S, 2, K, sizeof K / sizeof K[0], 0, 0);
     fclose(v_cap);
     printf("video: %.0f s in %s\n", v_t0, out);
     return 0;
