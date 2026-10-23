@@ -12,9 +12,11 @@
  *   build/host/demo_projects restore IN.json   such a backup restored as the editor restores it, then each slot loaded
  *                                              and played (tools/demo_backup.py's test: the demos put into a backup)
  *   build/host/demo_projects levels [SECS]     each track alone: its level, to balance a demo by
+ *   build/host/demo_projects video OUTDIR      the demo video's audio, screens and captions (tools/demo_video.py)
  *   build/host/demo_projects log N SECS        demo N's notes as CSV (time, track, note, velocity)
  * Checks per demo: the record saves, reads back the same, restores and loads with every generator, cord and sound;
  * each track plays notes; no sample at full scale; the voices stay inside the budget. */
+#include <sys/stat.h>
 #define TESSERA_NOTE_HOOK dm_note
 #define main hostsim_main
 #include "hostsim.c"
@@ -24,14 +26,48 @@ static int32_t fm1_enc_take(uint32_t e) { (void)e; return 0; }
 static void fm1_irq_off(void) {}
 static void fm1_irq_on(void) {}
 static void lcd_sync(void) {}
-static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c) { (void)x; (void)y; (void)w; (void)h; (void)c; }
+static uint16_t dm_screen[240 * 240];                  /* the display as drawn (video: its frames) */
+static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
+{
+    for (uint32_t j = 0; j < h && y + j < 240u; j++)
+        for (uint32_t i = 0; i < w && x + i < 240u; i++) dm_screen[(y + j) * 240u + x + i] = (uint16_t)((c >> 8) | (c << 8));
+}
 static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *p)
-{ (void)x; (void)y; (void)w; (void)h; (void)p; }
+{
+    for (uint32_t j = 0; j < h && y + j < 240u; j++)
+        for (uint32_t i = 0; i < w && x + i < 240u; i++) dm_screen[(y + j) * 240u + x + i] = p[j * w + i];
+}
+/* (what the drawing needs beside: tests/ui_test.c's HAL stubs) */
+#define FM1_NCOL 11u
+static const int8_t FM1_KEYMAP[6][FM1_NCOL];
+static uint8_t fm1_led[FM1_NCOL];
+static uint8_t fm1_led_dim[3][FM1_NCOL], fm1_led_dim_mask[3];
+#define FM1_TICKS_PER_US 1u
+static uint32_t host_ticks;
+static uint32_t fm1_ticks(void) { return host_ticks; }
+static uint32_t fm1_input_edges(int x) { (void)x; return 0; }
+static uint32_t fm1_input_note_edges(void) { return 0; }
+static void fm1_wdt_feed(void) {}
+#define SCOPE_N 512u                                     /* audio.c: the HOME oscilloscope */
+static int16_t scope_buf[SCOPE_N];
+static uint32_t scope_w;
+static struct { uint32_t stage, crash_magic, crash_audio, crash_stage, crash_page; } melodee_dbg;
+#define DBG_CRASH_MAGIC 0x43524831u
+#define FM1_CRASH_MAGIC 0x43525348u
+static struct { uint32_t magic, count, vec, pc, rets, emu, dbg, sp, psr, icfg, uptime_ms, etm[4], early; } fm1_crash;
+#ifndef MELODEE_VERSION
+#define MELODEE_VERSION "v2.0"
+#endif
 #define MELODEE_FLASH 1
 #include "../firmware/src/gfx.c"
 #include "../firmware/src/panel.c"
 #include "../firmware/src/ui.c"
-static void panel_setup(void) {}
+#include "../firmware/src/icons.c"                       /* (the drawing: the video mode's screens) */
+#include "../firmware/src/ui_graph.c"
+#include "../firmware/src/ui_draw.c"
+#include "../firmware/src/ui_menu.c"
+#include "../firmware/src/ui_input.c"
+#include "../firmware/src/ui_layer.c"
 
 static uint8_t nor[0x100000], flash_ok = 1;
 static int st_read(uint32_t off, void *dst, uint32_t n) { memcpy(dst, nor + off, n); return 0; }
@@ -66,7 +102,6 @@ static uint32_t ed_unpack7(const uint8_t *a, uint32_t na, uint8_t *out, uint32_t
     return na ? 0u : n;
 }
 static uint8_t ed_smp_buf[512] __attribute__((aligned(4)));
-static void fm1_wdt_feed(void) {}
 static int ed_flash_stop(void) { return transport_busy(); }
 #include "../firmware/src/editor_backup.c"
 
@@ -303,6 +338,16 @@ static const struct { const char *name, *file; void (*make)(void); } DEMOS[] = {
 /* PLAY for secs s (wav: written there, 0 none): the notes each track played, the samples near full scale, the most
  * voices sounding; returns the peak */
 typedef struct { uint32_t notes[NTRK], clips, voices, taken; int32_t peak; double rms; } dm_play_t;
+/* the video mode (video OUTDIR): make's play that writes a demo's WAV also draws its screens on a timeline */
+typedef struct { uint32_t ms; int home; uint8_t sel; const char *page, *caption; } vstep_t;
+static const char *v_root;                              /* (0: no video) */
+static int v_want = -1, v_on;                           /* (the demo filmed in this make; v_on: its final play now) */
+static FILE *v_cap;
+static double v_t0;
+static void v_page(int home, uint32_t sel, const char *title);
+static void v_ppm(const char *dir, uint32_t n);
+static const vstep_t *v_steps_of(const char *wav, uint32_t *n, char *dir, uint32_t cap);
+#define V_BLOCKS 46u                                    /* control blocks a frame: 1472 samples, 29.96 frames a second */
 static dm_play_t play(uint32_t secs, const char *wav)
 {
     dm_play_t r;
@@ -313,12 +358,25 @@ static dm_play_t play(uint32_t secs, const char *wav)
     memset(dm_notes, 0, sizeof dm_notes);
     if (wav && !(w = fopen(wav, "wb"))) fprintf(stderr, "demos: cannot write %s\n", wav);
     if (w) wav_hdr(w, frames);
+    char vdir[600];
+    uint32_t vn = 0, vsi = 0, vf = 0, vb = 0;
+    const vstep_t *vst = v_on && wav ? v_steps_of(wav, &vn, vdir, sizeof vdir) : 0;
     transport_req = 1;
-    for (f = 0; f < frames; f += CTL) {
+    for (f = 0; f < frames; f += CTL, vb++) {
         int32_t o[2 * CTL];
+        if (vst) {
+            uint32_t ms = (uint32_t)((uint64_t)f * 1000u / FS);
+            while (vsi < vn && ms >= vst[vsi].ms) {      /* (pages only: the sound is untouched) */
+                v_page(vst[vsi].home, vst[vsi].sel, vst[vsi].page);
+                fprintf(v_cap, "%s\t%.3f\t%.3f\t%s\n", strrchr(vdir, '/') + 1, v_t0 + vst[vsi].ms / 1000.0,
+                        v_t0 + (vsi + 1u < vn ? vst[vsi + 1u].ms / 1000.0 : (double)secs), vst[vsi].caption);
+                vsi++;
+            }
+        }
         dm_f = f;
         mix_block(o, CTL);
         fm1_ms = f / (FS / 1000u);
+        if (vst && vb % V_BLOCKS == 0) { ui_draw(); v_ppm(vdir, vf++); }
         if (busy_now() > r.voices) r.voices = busy_now();
         for (i = 0; i < 2u * CTL; i++) {
             int32_t a = o[i] < 0 ? -o[i] : o[i];
@@ -329,6 +387,7 @@ static dm_play_t play(uint32_t secs, const char *wav)
         if (w) for (i = 0; i < CTL; i++) wav_put(w, o[2 * i], o[2 * i + 1]);
     }
     if (w) fclose(w);
+    if (vst) { printf("video: %s %u s, %u frames\n", vdir, secs, vf); v_t0 += secs; }
     transport_req = 2;                                /* STOP */
     for (f = 0; f < FS; f += CTL) { int32_t o[2 * CTL]; mix_block(o, CTL); }
     memcpy(r.notes, dm_notes, sizeof r.notes);
@@ -409,7 +468,9 @@ static int make(const char *dir, uint32_t secs)
         bad += check(what, !memcmp(a.notes, b.notes, sizeof a.notes));
         restore_load(rec, len, name);
         snprintf(path, sizeof path, "%s/%s.wav", dir, DEMOS[d].file);
-        a = play(secs, path);
+        v_on = v_root && v_want == (int)d;              /* (video: the demo filmed plays long, the others as the tests do) */
+        a = play(v_root ? (v_on ? 52u : 20u) : secs, path);
+        v_on = 0;
         bad += report(DEMOS[d].name, &a);
     }
     return bad;
@@ -540,6 +601,154 @@ static int archive_restore(const char *path)
     return bad;
 }
 
+/* ------------------------------------------------------------- the video --- */
+/* video OUTDIR: the demo video's material. The demos as make makes them (make OUTDIR 52: the same steps, so the
+ * same audio as make's WAVs, only longer), each drawing its screens on a timeline; then a short tour of the modes
+ * the demos leave out. Audio and screen from one pass, a frame every V_BLOCKS blocks. OUTDIR/<clip>.wav,
+ * OUTDIR/<clip>/f00000.ppm .., OUTDIR/captions.txt (tools/demo_video.py: the video) */
+typedef struct { uint32_t ms, key, down; } vkey_t;
+static const vstep_t V_STILL[] = {
+    {0, 1, 0, 0, "STILL TIDE: an ambient demo, four tracks that keep changing on their own"},
+    {7000, 0, 0, "GEN", "Track 1, CHORD: a drone in YO on D, each voice breathing on its own slow cycle"},
+    {15000, 0, 1, "GEN", "Track 2, AWAKE: two loops of different lengths on a warm TRIO pad"},
+    {23000, 0, 2, "GEN", "Track 3, FALL: leaves land and play bells; a TIDE source leans the wind"},
+    {31000, 0, 3, "GEN", "Track 4, MARKOV: a sub bass that mostly rests"},
+    {38000, 0, 0, "ENERGY", "ENERGY: the project's slow tide thins the generators over minutes"},
+    {45000, 0, 0, "MATRIX", "MATRIX: every modulation cord, track by track"},
+};
+static const vstep_t V_GARDEN[] = {
+    {0, 1, 0, 0, "KOTO GARDEN: Zen-1's FM voices in HIRA on C"},
+    {7000, 0, 0, "GEN", "Track 1, QUAD: a koto on a grid the tracks share, notes travelling between them"},
+    {15000, 0, 1, "GEN", "Track 2, QUAD: the second koto, in triplets, on the same grid"},
+    {23000, 0, 2, "GEN", "Track 3, SERIES: a breath flute on Per Norgard's infinity series"},
+    {31000, 0, 3, "GEN", "Track 4, POLY: a mokugyo on three rhythms"},
+    {38000, 0, 0, "MODS", "MODS: sixteen cords, any source to any destination"},
+    {45000, 1, 0, 0, "KOTO GARDEN on Stage: every track's sound and level"},
+};
+static const vstep_t *v_steps_of(const char *wav, uint32_t *n, char *dir, uint32_t cap)
+{
+    const char *base = strrchr(wav, '/');
+    base = base ? base + 1 : wav;
+    snprintf(dir, cap, "%.*s", (int)(strlen(wav) - 4u), wav);   /* (OUTDIR/<file>) */
+    mkdir(dir, 0755);
+    if (!strncmp(base, "still-tide", 10)) { *n = sizeof V_STILL / sizeof V_STILL[0]; return V_STILL; }
+    if (!strncmp(base, "koto-garden", 11)) { *n = sizeof V_GARDEN / sizeof V_GARDEN[0]; return V_GARDEN; }
+    *n = 0;
+    return 0;
+}
+static void v_page(int home, uint32_t sel, const char *title)
+{
+    song.sel = (uint8_t)sel;
+    if (home) go_home();
+    else { ui.home = 0; ui.page = (uint8_t)page_titled(title); page_entered(); }
+    ui.force = 1;
+}
+static void v_ppm(const char *dir, uint32_t n)
+{
+    char path[700];
+    snprintf(path, sizeof path, "%s/f%05u.ppm", dir, n);
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    fprintf(f, "P6\n240 240\n255\n");
+    for (uint32_t i = 0; i < 240u * 240u; i++) {
+        uint16_t c = (uint16_t)((dm_screen[i] >> 8) | (dm_screen[i] << 8));
+        uint8_t b[3] = {(uint8_t)((c >> 11) * 255u / 31u), (uint8_t)(((c >> 5) & 63u) * 255u / 63u), (uint8_t)((c & 31u) * 255u / 31u)};
+        fwrite(b, 1, 3, f);
+    }
+    fclose(f);
+}
+/* a tour clip: the project set up now, played secs s with its steps and keys, frames and audio */
+static void v_clip(const char *out, const char *name, uint32_t secs, const vstep_t *st, uint32_t nst, const vkey_t *keys,
+                   uint32_t nkeys)
+{
+    char dir[600], wav[600];
+    uint32_t frames = secs * FS, f, si = 0, ki = 0, b = 0, n = 0;
+    snprintf(dir, sizeof dir, "%s/%s", out, name);
+    mkdir(dir, 0755);
+    snprintf(wav, sizeof wav, "%s/%s.wav", out, name);
+    FILE *w = fopen(wav, "wb");
+    if (!w) return;
+    wav_hdr(w, frames);
+    transport_req = 1;
+    for (f = 0; f < frames; f += CTL, b++) {
+        int32_t o[2 * CTL];
+        uint32_t ms = (uint32_t)((uint64_t)f * 1000u / FS);
+        while (si < nst && ms >= st[si].ms) {
+            v_page(st[si].home, st[si].sel, st[si].page);
+            fprintf(v_cap, "%s\t%.3f\t%.3f\t%s\n", name, v_t0 + st[si].ms / 1000.0,
+                    v_t0 + (si + 1u < nst ? st[si + 1u].ms / 1000.0 : (double)secs), st[si].caption);
+            si++;
+        }
+        while (ki < nkeys && ms >= keys[ki].ms) {
+            if (keys[ki].down) fm1_in.notes |= 1u << keys[ki].key; else fm1_in.notes &= ~(1u << keys[ki].key);
+            keyboard_block();
+            ki++;
+        }
+        dm_f = f;
+        mix_block(o, CTL);
+        fm1_ms = f / (FS / 1000u);
+        for (uint32_t i = 0; i < CTL; i++) wav_put(w, o[2 * i], o[2 * i + 1]);
+        if (b % V_BLOCKS == 0) { ui_draw(); v_ppm(dir, n++); }
+    }
+    fclose(w);
+    transport_req = 2;
+    for (f = 0; f < FS; f += CTL) { int32_t o[2 * CTL]; mix_block(o, CTL); }
+    printf("video: %s %u s, %u frames\n", dir, secs, n);
+    v_t0 += secs;
+}
+static void v_scene(uint32_t bpm, uint32_t engine, uint32_t preset, uint32_t mode, uint32_t div)
+{
+    power_on();
+    song.g[G_BPM] = (int16_t)bpm;
+    scale(9, 6, 0);                                     /* A minor pentatonic */
+    for (uint32_t k = 1; k < NTRK; k++) trk[k].p[P_LEVEL] = 0;
+    sound(0, engine, preset);
+    trk[0].p[P_SDIV] = (int16_t)div;
+    gen(0, mode, 23);
+    sends(90, 70, 70, 50);
+    mixer(0, 104, 0, 70, 0);
+}
+enum { V_TINE = 0, V_BELL = 1, V_MARIMBA = 5, V_PLUCK = 7 };   /* FM6 presets (eng_fm6.c FM6_PRESETS) */
+static int make(const char *dir, uint32_t secs);
+static int video(const char *out)
+{
+    char cap[600];
+    mkdir(out, 0755);
+    snprintf(cap, sizeof cap, "%s/captions.txt", out);
+    if (!(v_cap = fopen(cap, "w"))) return 1;
+    v_root = out;
+    {   /* the demos, one make each: the one filmed plays 52 s, the one before it 20 s as in the tests, so each starts
+         * where the tests' run starts it (a load keeps a little of what played before: FALL's leaves) */
+        char a[600], b[600];
+        snprintf(a, sizeof a, "%s/a", out); snprintf(b, sizeof b, "%s/b", out);
+        mkdir(a, 0755); mkdir(b, 0755);
+        v_want = 0; make(a, 20);                        /* OUTDIR/a/still-tide.wav and frames */
+        v_want = 1; make(b, 20);                        /* OUTDIR/b/koto-garden.wav and frames */
+        v_want = -1;
+    }
+    static const struct { const char *name, *caption; uint32_t bpm, engine, preset, mode, div; } T[] = {
+        {"3-turing", "TURING: a looping shift register that locks or drifts", 100, ENGI_FM6, V_TINE, TESS_ENG_TURING, DIV_16},
+        {"4-euclid", "EUCLID: hits spread as evenly as they go", 100, ENGI_FM6, V_MARIMBA, TESS_ENG_EUCLID, DIV_16},
+        {"5-morph", "MORPH: a rhythm blended between two patterns", 100, ENGI_FM6, V_PLUCK, TESS_ENG_MORPH, DIV_16},
+        {"6-atlas", "ATLAS: kick, snare and hat from a map of drum patterns", 100, ENGI_DRUM, DK_808_KIT, TESS_ENG_GRIDS, DIV_16},
+        {"7-constellation", "CONSTELLATION: stars play as they cross the ship's crosshair", 90, ENGI_FM6, V_BELL, TESS_ENG_CONSTEL, DIV_8},
+    };
+    for (uint32_t i = 0; i < sizeof T / sizeof T[0]; i++) {
+        v_scene(T[i].bpm, T[i].engine, T[i].preset, T[i].mode, T[i].div);
+        vstep_t S[1] = {{0, 0, 0, "GEN", T[i].caption}};
+        v_clip(out, T[i].name, 9, S, 1, 0, 0);
+    }
+    v_scene(96, ENGI_FM6, V_TINE, TESS_ENG_ANSWER, DIV_8);   /* ANSWER: C D E G on the keys, then its answers */
+    static const vkey_t K[] = {{400, 7, 1}, {700, 7, 0}, {1025, 9, 1}, {1325, 9, 0}, {1650, 11, 1}, {1950, 11, 0},
+                               {2275, 14, 1}, {2700, 14, 0}};
+    static const vstep_t S[] = {{0, 0, 0, "GEN", "ANSWER: play a phrase on the keys..."},
+                                {4500, 0, 0, "GEN", "...and it answers, a little different each time, softer as it goes"}};
+    v_clip(out, "8-answer", 14, S, 2, K, sizeof K / sizeof K[0]);
+    fclose(v_cap);
+    printf("video: %.0f s in %s\n", v_t0, out);
+    return 0;
+}
+
 /* each track alone (the others' LEVEL 0) for secs s: its rms and peak, to balance the mix by */
 static void levels(uint32_t secs)
 {
@@ -574,6 +783,7 @@ int main(int argc, char **argv)
         bad = check("a whole archive written as the backup page writes it", archive_write(argv[2]) == 0);
     }
     else if (argc >= 3 && !strcmp(argv[1], "restore")) bad = archive_restore(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "video")) return video(argv[2]);
     else if (argc >= 2 && !strcmp(argv[1], "levels")) { levels(argc > 2 ? (uint32_t)atoi(argv[2]) : 60u); return 0; }
     else { fprintf(stderr, "demo_projects make DIR [SECS] | check DIR\n"); return 2; }
     printf(bad ? "demos: %d FAILED\n" : "demos passed\n", bad);
