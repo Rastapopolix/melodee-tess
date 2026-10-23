@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-melodee-tess: a fork of Melodee (FM-1 alternative firmware, GPL-3.0) where the Tessera
+Tessera (repo `tessera`, formerly `melodee-tess`): a fork of Melodee (FM-1 alternative firmware, GPL-3.0) where the Tessera
 generators (Turing, Euclid, Markov, Morph, Grids; `firmware/src/gen.c`, `tessera.c`) were built.
 It becomes the Tessera firmware, a hard fork. Plan, phases and tasks: `ROADMAP.md` in the private
 notes repo `~/src/tessera-notes` (github.com/Rastapopolix/tessera-notes), with `docs/analysis/` and
@@ -15,7 +15,7 @@ Read `~/src/tessera-notes/ROADMAP.md` first (`git -C ~/src/tessera-notes pull`).
 ## Build
 
 ```
-./build.sh                       # build/melodee.bin, build/loader/ota.bin, build/melodee-tess.fwsc
+./build.sh                       # build/melodee.bin, build/loader/ota.bin, build/tessera.fwsc
 ./build.sh --release X.Y[.Z]     # release package and build/release-X.Y/
 MELODEE_DUAL_CORE=0 ./build.sh   # serial (one-core) variant
 ```

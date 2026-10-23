@@ -8,7 +8,7 @@
   tools/build.py [--release X.Y[.Z][-suffix]]
 
 Outputs in build/: melodee.bin (app), loader/ota.bin (update loader),
-melodee-tess.fwsc (package). A release build (--release X.Y) writes melodee-tess-X.Y.fwsc and a folder
+tessera.fwsc (package). A release build (--release X.Y) writes tessera-X.Y.fwsc and a folder
 release-X.Y/ with the package, the app, SHA256SUMS, the licence files.
 See BUILDING.md for the toolchain and the SDK.
 
@@ -522,7 +522,7 @@ def main():
     mode.add_argument("--release", metavar="X.Y[.Z]", help="release build: identity FM-1_9XY[Z], version string vX.Y[.Z]")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     a = ap.parse_args()
-    name = "melodee-tess.fwsc"
+    name = "tessera.fwsc"
     variant = "-1core" if os.environ.get("MELODEE_DUAL_CORE") == "0" else ""
     if a.release:                   # X one digit, Y one or two (1.0: FM-1_910; 1.0.0: FM-1_91000),
         m = re.fullmatch(r"(\d)\.(\d{1,2})(?:\.(\d))?(-[A-Za-z0-9]+)?", a.release)   # Z one (Y two with it)
@@ -530,11 +530,11 @@ def main():
             raise SystemExit(f"--release {a.release}: use X.Y[.Z] or X.Y[.Z]-suffix (X one digit, Y one or two, Z one)")
         PRODUCT = "FM-1_9" + m[1] + (m[2].zfill(2) + m[3] if m[3] else m[2])
         VERSION = "v" + a.release.lower()      # e.g. v1.0, v1.1-rc1
-        name = f"melodee-tess-{a.release}{variant}.fwsc"
+        name = f"tessera-{a.release}{variant}.fwsc"
     if a.nightly:
         revision = subprocess.check_output(["git", "rev-parse", "--short=7", "HEAD"], cwd=SRC, text=True).strip()
         VERSION = "next-" + revision
-        name = f"melodee-tess-nightly{variant}.fwsc"
+        name = f"tessera-nightly{variant}.fwsc"
     fm1pkg_make.SDK = a.sdk
     for rel, sha in SDK_SHA256.items():          # fail early without the SDK
         if hashlib.sha256(fm1pkg_make.sdk_file(rel)).hexdigest() != sha:
@@ -567,7 +567,7 @@ def main():
         rel = OUT / f"release-{a.release}{variant}"
         shutil.rmtree(rel, ignore_errors=True)
         (rel / "LICENSES").mkdir(parents=True)
-        app = f"melodee-tess-{a.release}{variant}-app.bin"
+        app = f"tessera-{a.release}{variant}-app.bin"
         (rel / name).write_bytes(pkg)
         (rel / app).write_bytes(img)
         (rel / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(b).hexdigest()}  {n}\n"
