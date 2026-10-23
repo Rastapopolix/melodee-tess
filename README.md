@@ -46,12 +46,14 @@ page also has a way back to the official V15 firmware, with a backup first.
   builds sections such as AABA; TWEAK shifts, drops, humanises or follows another track; TWEAK 2 branches hits
   to another track's sound, combines tracks with logic, and plays only on certain bars; LENGTH sets how long notes
   hold.
-* **Harmony**: a CHORD track plays a progression (or your own), and **QNT CHRD** makes the other tracks follow it.
+* **Harmony**: one key and scale for the whole project (**Key link**); a CHORD track plays a progression (or your
+  own), and **QNT CHRD** makes the other tracks follow it.
 * **Modulation**: 16 cords from any source to any destination on any track, generators included; slow organic
   sources (TIDE, SWARM); live marks on every knob a cord moves, and **MATRIX** to see the whole patch.
 * **Print**: hold REC to turn what a generator played into ordinary steps.
 * **Sounds**: FM6 (six-operator FM, three engine models), TRIO and DRUM (808, 909, SID KIT).
-* **MIDI OUT** of every track and the generators, and **CLOCK OUT**, over USB.
+* **MIDI OUT** of every track and the generators, each on a channel of its own (GLO > MIDI OUT), and **CLOCK OUT**,
+  over USB.
 * **Its own look**: the SMALTI palette, square tiles, Chakra Petch, and an animated mosaic splash.
 
 The **[manual](MANUAL.md)** covers every page, knob and shortcut; **[RECIPES.md](RECIPES.md)** has step-by-step
