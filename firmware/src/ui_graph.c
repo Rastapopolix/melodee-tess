@@ -283,17 +283,19 @@ void graph_tessera_viz(uint32_t tr, int is_panel) {
             int hb = (mo->snap_b >> i) & 1u;
             int is_head = (song.playing && i == cur);
 
-            /* top lane = snapshot B, bottom lane = snapshot A */
-            if (hb) cv_rrect(sx, y_base, step_w, lane, 1, T_ACCENT, bg);
+            /* top lane = snapshot B, bottom lane = snapshot A; the playhead's hits lit, each lane in the other's colour (B's
+             * ACCENT reads as TEXT in most palettes: B lit THEME, as TURING's head, A lit TEXT, as GRIDS') */
+            if (hb) cv_rrect(sx, y_base, step_w, lane, 1, is_head ? c : T_ACCENT, bg);
             else cv_rect(sx, y_base + lane - 1, step_w, 1, dim);
-            if (ha) cv_rrect(sx, y_base + lane + 2, step_w, lane, 1, c, bg);
+            if (ha) cv_rrect(sx, y_base + lane + 2, step_w, lane, 1, is_head ? T_TEXT : c, bg);
             else cv_rect(sx, y_base + h - 1, step_w, 1, dim);
 
             cv_rect(sx, y_base + h + 2, step_w, is_head ? 2 : 1, is_head ? T_TEXT : dim);
         }
         /* morph position: left = A, right = B */
         cv_rect(x0, y_base + h + 9, sw, 1, dim);
-        cv_rect(x0 + ((int32_t)mo->morph_pos * (sw - 4)) / 127, y_base + h + 6, 4, 7, c);    } else if (mode == TESS_ENG_GRIDS) {
+        cv_rect(x0 + ((int32_t)mo->morph_pos * (sw - 4)) / 127, y_base + h + 6, 4, 7, c);
+    } else if (mode == TESS_ENG_GRIDS) {
         /* three lanes, hat on top, snare, kick at the bottom (with TOMS a fourth, the toms', above the kick): the bar's
          * hits at X, Y, DENSITY and the parts' shares (without this bar's CHAOS), an accent in the accent colour; the
          * playhead under them */
