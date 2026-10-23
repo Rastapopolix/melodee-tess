@@ -76,6 +76,7 @@ static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
             host_screen[(y + j) * 240u + x + i] = (uint16_t)((c >> 8) | (c << 8));
 }
 static void lcd_sync(void) {}
+static void lcd_gamma_test(uint32_t opt) { (void)opt; }   /* (lcd.c: the device's panel) */
 #define SCOPE_N 512u                              /* audio.c: the HOME oscilloscope */
 static int16_t scope_buf[SCOPE_N];
 static uint32_t scope_w;
