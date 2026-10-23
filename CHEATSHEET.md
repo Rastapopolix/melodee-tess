@@ -37,6 +37,7 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 | **PRESETS** on an EDIT page | The next / previous section (FM6: Algo, OP1 to OP6, Pitch, LFO, Ctrl, Store) |
 | **FX** | The insert and send effects |
 | **GLO** | MIXER, GLOBAL (BUDGET: the shared voices), SYSTEM, MIDI OUT |
+| On **MIXER**: **KNOB 1** to **4** / with **OCT+** held | Level / pan of track 1 to 4; the keys mute and solo as with GLO held |
 | **SAVE** | USER (save the sound), PROJECT, PRESETS |
 
 ## Quick layers: hold GLO or SCL

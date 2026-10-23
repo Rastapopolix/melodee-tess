@@ -200,6 +200,7 @@ enum { LAYER_NONE, LAYER_RESERVED, LAYER_GLO, LAYER_SCL, LAYER_N };
 static void draw_layer(void);
 static const char *layer_head(void);
 static uint32_t layer_leds(void);
+static int mixer_live(void);                            /* (ui_layer.c: MIXER's keys are the GLO layer's) */
 static uint32_t layer_btn(void);
 
 /* FM operator pages belonged to DIGITAL (retired): they never appear. SLICES:

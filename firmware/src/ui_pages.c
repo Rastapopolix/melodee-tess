@@ -871,17 +871,19 @@ static void pv_strip(uint32_t k)
 {
     track_t *t = &trk[k];
     uint32_t sel = k == song.sel, mute = t->p[P_MUTE] != 0, arm = (song.rec >> k) & 1u, lvl = trk_level(k), sig;
-    uint32_t hot = sel && ui.hot_t ? ui.hot_col + 1u : 0u;   /* 1 LEVEL, 2 PAN, 3 unused, 4 MUTE */
+    uint32_t octp = (fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u;   /* (OCT+ held: the knobs are the pans) */
+    uint32_t solo = (track_solo >> k) & 1u, quiet = mute || (track_solo && !solo);   /* (another's solo: silent) */
+    uint32_t hot = ui.hot_t && ui.hot_col == k ? (octp ? 2u : 1u) : 0u;   /* this strip's knob: 1 LEVEL, 2 PAN */
     int32_t pk = t->peak, m, pan = clamp(t->p[P_PAN], -64, 63);
-    uint16_t tc = mute ? T_DIM : T_TRK(k), bg = sel ? T_LIFT : T_PANEL;
+    uint16_t tc = quiet ? T_DIM : T_TRK(k), bg = sel ? T_LIFT : T_PANEL;
     char nm[16], l1[16], l2[16], b[8];
     t->peak = 0;
-    m = mute ? 0 : meter_px(pk);
+    m = quiet ? 0 : meter_px(pk);
     if (m < pvm.meter[k] - 1)
         m = pvm.meter[k] - 1;                           /* (falls ~2 dB a frame) */
     trk_short_name(k, nm);
-    sig = str_hash(1u + sel * 2u + mute * 4u + arm * 8u + hot * 16u, nm) + lvl * 7919u +
-          (uint32_t)(pan + 128) * 104729u;
+    sig = str_hash(1u + sel * 2u + mute * 4u + arm * 8u + hot * 16u + octp * 64u + solo * 128u + quiet * 256u, nm) +
+          lvl * 7919u + (uint32_t)(pan + 128) * 104729u;
     if (!ui.force && sig == pvm.strip[k]) {
         if (m != pvm.meter[k]) {                        /* the meter alone */
             pvm.meter[k] = (uint8_t)(m < 0 ? 0 : m);
@@ -900,9 +902,9 @@ static void pv_strip(uint32_t k)
     }
     cv_rect(3, 0, CARD_W - 6, 3, tc);                   /* the bar */
     stage_two_lines(nm, l1, l2, CARD_W - 10);
-    cv_free_text(6, 7, &AF_S, l1, mute ? T_DIM : T_TEXT, bg, CARD_W - 8);
+    cv_free_text(6, 7, &AF_S, l1, quiet ? T_DIM : T_TEXT, bg, CARD_W - 8);
     if (l2[0])
-        cv_free_text(6, 20, &AF_S, l2, mute ? T_DIM : T_TEXT, bg, CARD_W - 8);
+        cv_free_text(6, 20, &AF_S, l2, quiet ? T_DIM : T_TEXT, bg, CARD_W - 8);
     pv_knob(27 - KNOB_LEVEL_R, 70 - KNOB_LEVEL_R, KNOB_LEVEL_R, KNOB_LEVEL_COV, KNOB_LEVEL_ANG, (int32_t)lvl, 0, 127,
             hot == 1u ? T_TEXT : tc, bg);
     if (lvl) {
@@ -911,11 +913,11 @@ static void pv_strip(uint32_t k)
     } else {
         str_cpy(b, "OFF", sizeof b);
     }
-    cv_text_c(27, 63, &AF_S, b, hot == 1u ? T_TEXT : mute ? T_DIM : T_TEXT, bg);
+    cv_text_c(27, 63, &AF_S, b, hot == 1u ? T_TEXT : quiet ? T_DIM : T_TEXT, bg);
     if (lvl)
         cv_text_c(27, 76, &AF_X, "dB", T_MID, bg);
     cv_rrect(48, 50, 3, 44, 1, T_LINE, bg);             /* (the meter: pv_meter) */
-    cv_text_c(15, 104, &AF_X, "PAN", T_MID, bg);
+    cv_text_c(15, 104, &AF_X, "PAN", octp ? T_TEXT : T_MID, bg);
     pv_knob(15 - KNOB_SMALL_R, 130 - KNOB_SMALL_R, KNOB_SMALL_R, KNOB_SMALL_COV, KNOB_SMALL_ANG, pan, -64, 63,
             hot == 2u ? T_TEXT : tc, bg);
     if (pan) {
@@ -925,12 +927,15 @@ static void pv_strip(uint32_t k)
         str_cpy(b, "C", sizeof b);
     }
     cv_text_c(15, 145, &AF_X, b, hot == 2u ? T_TEXT : T_SEC, bg);
-    if (mute) {                                         /* MUTE: lit when muted */
-        cv_rrect(6, 168, 42, 16, 5, hot == 4u ? T_TEXT : ux_mix(T_SURF, T_MID, 50), bg);
-        cv_text_c(27, 170, &AF_X, "MUTE", T_BG, hot == 4u ? T_TEXT : ux_mix(T_SURF, T_MID, 50));
+    if (solo) {                                         /* SOLO (a white key held): lit in the track's colour */
+        cv_rrect(6, 168, 42, 16, 5, T_TRK(k), bg);
+        cv_text_c(27, 170, &AF_X, "SOLO", T_BG, T_TRK(k));
+    } else if (mute) {                                  /* MUTE (its black key): lit when muted */
+        cv_rrect(6, 168, 42, 16, 5, ux_mix(T_SURF, T_MID, 50), bg);
+        cv_text_c(27, 170, &AF_X, "MUTE", T_BG, ux_mix(T_SURF, T_MID, 50));
     } else {
-        cv_rrect(6, 168, 42, 16, 5, hot == 4u ? T_TEXT : T_LINE, bg);
-        cv_rrect(7, 169, 40, 14, 4, T_SURF, hot == 4u ? T_TEXT : T_LINE);
+        cv_rrect(6, 168, 42, 16, 5, T_LINE, bg);
+        cv_rrect(7, 169, 40, 14, 4, T_SURF, T_LINE);
         cv_text_c(27, 170, &AF_X, "MUTE", T_DIM, T_SURF);
     }
     if (arm)                                            /* armed: a REC dot, else its ring */
