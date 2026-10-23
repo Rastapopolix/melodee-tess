@@ -26,10 +26,10 @@ class NightlySite(unittest.TestCase):
     def test_publish(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            dual = package(root / "release.fwsc", "FM-1_91010", 1)
-            single = package(root / "single.fwsc", "FM-1_91010", 2)
-            normal = package(root / "next.fwsc", "FM-1_900", 3)
-            slow = package(root / "slow.fwsc", "FM-1_900", 4)   # (the single-core nightly)
+            dual = package(root / "release.fwsc", "FM-1_83771100", 1)
+            single = package(root / "single.fwsc", "FM-1_83771100", 2)
+            normal = package(root / "next.fwsc", "FM-1_83770000", 3)
+            slow = package(root / "slow.fwsc", "FM-1_83770000", 4)   # (the single-core nightly)
             site = root / "site"
             main(dual, single, "1.1.0", site)
             home = (site / "index.html").read_text()   # the project page names the release and its packages
@@ -45,14 +45,15 @@ class NightlySite(unittest.TestCase):
             self.assertEqual((site / "firmware/tessera-1.1.0.fwsc").read_bytes(), dual.read_bytes())
             self.assertEqual((site / "firmware/tessera-1.1.0-1core.fwsc").read_bytes(), single.read_bytes())
             manifest = json.loads((site / "firmware/nightly.json").read_text())
-            self.assertEqual((manifest["product"], manifest["branch"]), ("FM-1_900", "next"))
+            self.assertEqual((manifest["product"], manifest["branch"]), ("FM-1_83770000", "next"))
             # Regenerating a release keeps both published nightly variants.
             main(dual, single, "1.1.0", site, installer_only=True)
             self.assertIn('"single": "../../firmware/melodee-nightly-1core.fwsc"', (site / "webapp/installer/index.html").read_text())
             self.assertEqual((site / "firmware/melodee-nightly-1core.fwsc").read_bytes(), slow.read_bytes())
             before = hashlib.sha256((site / "webapp/installer/index.html").read_bytes()).digest()
-            wrong = package(root / "wrong.fwsc", "FM-1_9010", 5)
-            for other in (wrong, normal):
+            wrong = package(root / "wrong.fwsc", "FM-1_83771000", 5)
+            official = package(root / "official.fwsc", "FM-1_015", 9)   # not a Tessera identity
+            for other in (wrong, normal, official):
                 with self.assertRaises(SystemExit):
                     publish(site, str(normal), str(other), "next-abcdef0", "abcdef0" * 5 + "abcde", "2026-10-11T02:00:00Z")
                 self.assertEqual(hashlib.sha256((site / "webapp/installer/index.html").read_bytes()).digest(), before)

@@ -22,8 +22,8 @@
   web/make_site.py build/tessera-X.Y.fwsc build/tessera-X.Y-1core.fwsc X.Y OUT_DIR [build/sim]
 
 The packages must be ones made by tools/fm1pkg_make.py (Melodee's own loader, no vendor files), from one
-release: their identity (FM-1_9xx, FM-1_9xxx from 0.10, FM-1_9xxxx for X.Y.Z) is read from them and must be
-the same; the device must report it after the install.
+release: their identity (FM-1_8377XYYZ from 2.0.1; FM-1_9 and two to four digits before, Melodee's numbering) is
+read from them and must be the same; the device must report it after the install.
 """
 import json
 import re
@@ -49,8 +49,9 @@ def check_package(pkg):
     """the package's bytes and identity; refuses anything that is not a Melodee package"""
     raw = pkg.read_bytes()
     product = product_of(raw)
-    if not re.fullmatch(r"FM-1_9\d{2,4}", product):
-        raise SystemExit(f"{pkg}: identity {product!r} is not a Melodee package (FM-1_9 and two to four digits)")
+    if not re.fullmatch(r"FM-1_8377\d{4}|FM-1_9\d{2,4}", product):
+        raise SystemExit(f"{pkg}: identity {product!r} is not a Tessera package (FM-1_8377 and four digits, "
+                         "or FM-1_9 and two to four digits before 2.0.1)")
     if b"FELUCCA-LOADER-1" not in raw:              # Melodee loader marker: never publish a package with vendor files
         raise SystemExit(f"{pkg}: no Melodee loader in it; the site ships only fm1pkg_make.py packages "
                          "(a package patched from an official one carries vendor files)")
