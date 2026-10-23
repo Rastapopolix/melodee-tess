@@ -1,0 +1,327 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Tessera's project page (GitHub Pages root). web/make_site.py copies it to the site's index.html, with the
+     gallery (assets/gallery) in media/gallery and the brand pictures (assets/brand) in media/brand, and fills in
+     the release (its version, and its packages for both cores and for one) where marked. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tessera · FM-1 firmware</title>
+<meta name="description" content="Tessera: a generative firmware for the M-Vave FM-1. Twelve generators, song forms, harmony and modulation on four tracks.">
+<meta property="og:title" content="Tessera">
+<meta property="og:description" content="Generative firmware for the M-Vave FM-1.">
+<meta property="og:image" content="https://rastapopolix.github.io/tessera/media/brand/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="media/brand/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* SMALTI (tools/gen_ui_palettes.py) and the mark's lapis and gold (firmware/src/splash.c) */
+  --bg: #0d1326; --surf: #18213c; --raise: #2b3249; --line: #343b51; --text: #f6f0e0; --mid: #b3b2b0;
+  --dim: #73747a; --accent: #ffe296; --gold: #ecb848;
+  --t1: #deca60; --t2: #40c8d6; --t3: #6ed668; --t4: #d67cec;
+  --gap: 6px; --max: 1120px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 400 17px/1.55 "Chakra Petch", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { color: var(--gold); }
+img { display: block; max-width: 100%; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
+h1, h2, h3 { font-weight: 600; letter-spacing: .02em; line-height: 1.15; margin: 0; }
+h2 { font-size: clamp(26px, 4vw, 36px); text-transform: uppercase; }
+h3 { font-size: 18px; text-transform: uppercase; letter-spacing: .06em; }
+p { margin: 0 0 1em; }
+.kicker { color: var(--mid); text-transform: uppercase; letter-spacing: .12em; font-size: 13px; font-weight: 500; }
+.bar { display: flex; gap: var(--gap); margin: 18px 0 0; }
+.bar span { flex: 1; height: 6px; }
+.bar span:nth-child(1) { background: var(--t1); } .bar span:nth-child(2) { background: var(--t2); }
+.bar span:nth-child(3) { background: var(--t3); } .bar span:nth-child(4) { background: var(--t4); }
+
+/* top */
+nav { position: sticky; top: 0; z-index: 5; background: rgba(13, 19, 38, .92); backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--line); }
+nav .wrap { display: flex; align-items: center; gap: 20px; height: 56px; }
+nav .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none;
+             font-weight: 600; letter-spacing: .14em; }
+nav .brand svg { width: 26px; height: 26px; }
+nav .links { margin-left: auto; display: flex; gap: 18px; font-size: 15px; }
+nav .links a { color: var(--mid); text-decoration: none; }
+nav .links a:hover { color: var(--text); }
+@media (max-width: 680px) { nav .links a.opt { display: none; } }
+
+/* hero */
+.hero { padding: 72px 0 56px; }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+.mark { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5.5%; width: min(150px, 40vw); aspect-ratio: 1; }
+.mark i { display: block; background: var(--line); }
+.mark.laid i { animation: lay .18s ease-out both; }
+@keyframes lay { from { background: var(--line); } to { background: var(--c); } }
+.mark i.gold { --c: var(--gold); }
+.mark.laid i.gold { animation: lay .12s ease-out both, press .24s ease-out both; }
+@keyframes press { 0% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.hero h1 { font-size: clamp(56px, 10vw, 112px); letter-spacing: .04em; margin: 28px 0 6px; }
+.hero .tag { color: var(--mid); text-transform: uppercase; letter-spacing: .12em; font-size: clamp(13px, 1.8vw, 18px); }
+@media (max-width: 480px) { .hero .tag { letter-spacing: .04em; } }
+.hero .lede { font-size: 19px; margin: 22px 0 28px; max-width: 34em; }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { display: inline-block; padding: 12px 18px; background: var(--surf); color: var(--text); text-decoration: none;
+       font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 15px;
+       border: 1px solid var(--raise); }
+.btn:hover { background: var(--raise); color: var(--text); }
+.btn.main { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+.btn.main:hover { background: var(--accent); color: var(--bg); }
+.screens { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.screen { background: var(--surf); padding: 7px; }
+.screen img { width: 100%; height: auto; }
+@media (max-width: 860px) {
+  .hero .wrap { grid-template-columns: 1fr; gap: 36px; }
+  .hero { padding-top: 40px; }
+}
+
+section { padding: 64px 0; border-top: 1px solid var(--line); }
+section > .wrap > header { margin-bottom: 28px; }
+section > .wrap > header p { color: var(--mid); max-width: 44em; margin-top: 10px; }
+
+/* features: square tiles with grout */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--gap); }
+.tile { background: var(--surf); padding: 20px 20px 18px; border-top: 4px solid var(--c, var(--gold)); }
+.tile h3 { margin-bottom: 8px; }
+.tile p { color: var(--mid); margin: 0; font-size: 16px; }
+
+/* generators */
+.gens { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px var(--gap); }
+.gen figure { margin: 0; }
+.gen .screen { padding: 5px; }
+.gen figcaption { padding: 10px 2px 0; }
+.gen figcaption b { display: block; letter-spacing: .08em; font-weight: 600; }
+.gen figcaption span { color: var(--mid); font-size: 15px; line-height: 1.4; display: block; }
+
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--gap); counter-reset: s; }
+.step { background: var(--surf); padding: 20px; counter-increment: s; }
+.step::before { content: counter(s); display: inline-grid; place-items: center; width: 30px; height: 30px;
+                background: var(--gold); color: var(--bg); font-weight: 600; margin-bottom: 12px; }
+.step p { color: var(--mid); margin: 6px 0 0; font-size: 16px; }
+
+/* recipes list */
+.recipes { columns: 2 280px; column-gap: 32px; padding: 0; margin: 0; list-style: none; }
+.recipes li { break-inside: avoid; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.recipes a { color: var(--text); text-decoration: none; }
+.recipes a:hover { color: var(--accent); }
+.recipes small { color: var(--dim); display: block; font-size: 14px; }
+
+/* links: one card each, as tiles */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--gap); margin-top: 28px; }
+.card { display: block; background: var(--surf); padding: 18px 20px; color: var(--text); text-decoration: none;
+        border-left: 4px solid var(--c, var(--gold)); }
+a.card:hover { background: var(--raise); color: var(--text); }
+.card b { display: block; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.card span { color: var(--mid); font-size: 15px; line-height: 1.4; display: block; margin-top: 4px; }
+.card a { color: var(--accent); }
+code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: var(--bg); padding: 1px 5px;
+       overflow-wrap: anywhere; }
+.note { margin-top: 28px; padding: 16px 20px; border: 1px solid var(--line); color: var(--mid); font-size: 16px; }
+.note b { color: var(--text); }
+.about { max-width: 46em; }
+.about p { margin: 0; }
+.about .note { margin-top: 20px; }
+
+footer { border-top: 1px solid var(--line); padding: 36px 0 48px; color: var(--mid); font-size: 15px; }
+footer p { max-width: 52em; }
+@media (prefers-reduced-motion: reduce) { .mark.laid i { animation: none; background: var(--c); } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Tessera">
+      <svg viewBox="0 0 78 78" aria-hidden="true"><rect x="2" y="3" width="22" height="22" fill="#2c4078"/><rect x="29" y="1" width="22" height="22" fill="#3a5496"/><rect x="53" y="2" width="22" height="22" fill="#ecb848"/><rect x="3" y="28" width="22" height="22" fill="#4260aa"/><rect x="28" y="28" width="22" height="22" fill="#324a88"/><rect x="53" y="29" width="22" height="22" fill="#283c70"/><rect x="2" y="53" width="22" height="22" fill="#3e5aa0"/><rect x="29" y="55" width="22" height="22" fill="#2e447e"/><rect x="53" y="53" width="22" height="22" fill="#365092"/></svg>
+      TESSERA
+    </a>
+    <div class="links">
+      <a class="opt" href="#generators">Generators</a>
+      <a class="opt" href="#recipes">Recipes</a>
+      <a href="#install">Install</a>
+      <a class="opt" href="#about">About</a>
+      <a href="https://github.com/Rastapopolix/tessera">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+<div class="hero">
+  <div class="wrap">
+    <div>
+      <div class="mark" id="mark" aria-hidden="true">
+        <i style="--c:#2c4078"></i><i style="--c:#3a5496"></i><i class="gold"></i>
+        <i style="--c:#4260aa"></i><i style="--c:#324a88"></i><i style="--c:#283c70"></i>
+        <i style="--c:#3e5aa0"></i><i style="--c:#2e447e"></i><i style="--c:#365092"></i>
+      </div>
+      <h1>TESSERA</h1>
+      <div class="tag">Generative firmware for the M-Vave FM-1</div>
+      <p class="lede">Four tracks, twelve generators. Evolve the phrases, build them into song forms, let the tracks
+        answer and follow each other, and modulate anything from anything. Small tiles, set into a larger pattern.</p>
+      <div class="cta">
+        <a class="btn main" href="webapp/installer/">Install 2.0-rc3</a>
+        <a class="btn" href="webapp/sim/">Try it in your browser</a>
+        <a class="btn" href="https://github.com/Rastapopolix/tessera/blob/HEAD/MANUAL.md">Manual</a>
+      </div>
+    </div>
+    <div class="screens">
+      <div class="screen"><img src="media/gallery/gen_constel.png" alt="CONSTELLATION: stars play as they cross the crosshair" width="480" height="480"></div>
+      <div class="screen"><img src="media/gallery/gen_grids.png" alt="ATLAS: the drum map" width="480" height="480"></div>
+      <div class="screen"><img src="media/gallery/gen_chord.png" alt="CHORD: a progression" width="480" height="480"></div>
+      <div class="screen"><img src="media/gallery/matrix.png" alt="MATRIX: the mods track by track" width="480" height="480"></div>
+    </div>
+  </div>
+</div>
+
+<section id="inside">
+  <div class="wrap">
+    <header>
+      <div class="kicker">What's inside</div>
+      <h2>A sequencer that writes with you</h2>
+      <p>Each track can play its own steps, an arpeggio, or a generator. Everything else is there to shape what they
+        play, and every automatic layer starts off, so nothing moves until you ask it to.</p>
+    </header>
+    <div class="tiles">
+      <div class="tile" style="--c:var(--t1)"><h3>Twelve generators</h3><p>Turing, Euclid, Markov, Morph, Atlas, Bounce and Fall, Awake, Poly, Quad, Constellation, Series and Chord.</p></div>
+      <div class="tile" style="--c:var(--t2)"><h3>Evolve and form</h3><p>Mutate a phrase every few bars, or build sections A, B and C into forms such as AABA. STEP EVOLVE varies the steps you wrote.</p></div>
+      <div class="tile" style="--c:var(--t3)"><h3>Tracks that talk</h3><p>Branch hits to another track's sound, combine tracks with AND, OR and XOR, follow another track's pitch, play only on certain bars.</p></div>
+      <div class="tile" style="--c:var(--t4)"><h3>Harmony</h3><p>A Chord track plays a progression, or your own played in on the keys, and QNT CHRD makes every other track follow it.</p></div>
+      <div class="tile" style="--c:var(--t1)"><h3>Sixteen cords</h3><p>Any source to any destination on any track, generators included. Slow organic sources, live marks on the knobs, and a MATRIX to see the patch.</p></div>
+      <div class="tile" style="--c:var(--t2)"><h3>Print</h3><p>Hold REC and what a generator just played becomes ordinary steps, ready to edit.</p></div>
+      <div class="tile" style="--c:var(--t3)"><h3>Sounds</h3><p>Six-operator FM with three engine models, the three-oscillator TRIO, and 808, 909 and SID drum kits.</p></div>
+      <div class="tile" style="--c:var(--t4)"><h3>MIDI out</h3><p>Every track and generator, and the clock, over USB: Tessera can drive the rest of your setup.</p></div>
+    </div>
+    <div class="bar" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+  </div>
+</section>
+
+<section id="generators">
+  <div class="wrap">
+    <header>
+      <div class="kicker">The generators</div>
+      <h2>Pick a MODE, turn three knobs</h2>
+      <p>Each generator plays in the track's scale and takes its random choices from the track's seed, so a line you
+        like is always one number away. The screens are drawn by the firmware's own code.</p>
+    </header>
+    <div class="gens">
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_turing.png" alt="TURING" loading="lazy" width="480" height="480"></div><figcaption><b>TURING</b><span>A looping shift register that locks or drifts.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_euclid.png" alt="EUCLID" loading="lazy" width="480" height="480"></div><figcaption><b>EUCLID</b><span>Hits spread as evenly as they go.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_markov.png" alt="MARKOV" loading="lazy" width="480" height="480"></div><figcaption><b>MARKOV</b><span>A random walk over eight scale degrees.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_morph.png" alt="MORPH" loading="lazy" width="480" height="480"></div><figcaption><b>MORPH</b><span>A rhythm blended between two patterns.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_grids.png" alt="ATLAS" loading="lazy" width="480" height="480"></div><figcaption><b>ATLAS</b><span>Inspired by Émilie Gillet's Grids (Mutable Instruments), with a fourth part for fills.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_bounce.png" alt="BOUNCE" loading="lazy" width="480" height="480"></div><figcaption><b>BOUNCE</b><span>Balls in a box: a note at every wall.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_fall.png" alt="FALL" loading="lazy" width="480" height="480"></div><figcaption><b>FALL</b><span>Leaves in the wind, playing where they land. After the norns script Fall.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_awake.png" alt="AWAKE" loading="lazy" width="480" height="480"></div><figcaption><b>AWAKE</b><span>Two loops of their own lengths, after the norns script Awake.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_poly.png" alt="POLY" loading="lazy" width="480" height="480"></div><figcaption><b>POLY</b><span>Four notes stepped on by four rhythms.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_quad.png" alt="QUAD" loading="lazy" width="480" height="480"></div><figcaption><b>QUAD</b><span>A grid the tracks share, notes travelling between them. Inspired by the norns script initenere.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_constel.png" alt="CONSTELLATION" loading="lazy" width="480" height="480"></div><figcaption><b>CONSTELLATION</b><span>Stars play as they cross the ship's crosshair. After the norns script Constellation.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_series.png" alt="SERIES" loading="lazy" width="480" height="480"></div><figcaption><b>SERIES</b><span>Per Nørgård's infinity series.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/gen_chord.png" alt="CHORD" loading="lazy" width="480" height="480"></div><figcaption><b>CHORD</b><span>Progressions the other tracks can follow.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/step_evolve.png" alt="STEP EVOLVE" loading="lazy" width="480" height="480"></div><figcaption><b>STEP EVOLVE</b><span>Your own steps, varied as they play.</span></figcaption></figure></div>
+      <div class="gen"><figure><div class="screen"><img src="media/gallery/cords.png" alt="MODS" loading="lazy" width="480" height="480"></div><figcaption><b>MODS</b><span>Sixteen cords, any source to any destination.</span></figcaption></figure></div>
+    </div>
+  </div>
+</section>
+
+<section id="recipes">
+  <div class="wrap">
+    <header>
+      <div class="kicker">Recipes</div>
+      <h2>Somewhere to start</h2>
+      <p>Step-by-step patches that use only what's on the device. All of them, and the tips, are in
+        <a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md">RECIPES.md</a>.</p>
+    </header>
+    <ul class="recipes">
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#a-first-generative-patch-in-a-minute">A first generative patch in a minute<small>Turing on the bells, Atlas on the 808</small></a></li>
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#a-drone-that-breathes">A drone that breathes<small>Chord DRONE, TIDE on the filter</small></a></li>
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#chords-that-lead-melodies-that-follow-qnt-chrd">Chords that lead, melodies that follow<small>QNT CHRD</small></a></li>
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#two-tracks-answering-each-other-branch">Two tracks answering each other<small>BRANCH: COIN, TOGGLE, LATCH</small></a></li>
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#atlas-a-groove-with-fills">Atlas: a groove with fills<small>TOMS and the fourth part</small></a></li>
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#polyrhythms-poly-and-quad">Polyrhythms<small>POLY inside a track, QUAD across tracks</small></a></li>
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#a-melody-you-can-come-back-to-constellation">A melody you can come back to<small>Constellation's LOCK, LEN and FILL</small></a></li>
+      <li><a href="https://github.com/Rastapopolix/tessera/blob/HEAD/RECIPES.md#from-generator-to-pattern-print-then-step-evolve">From generator to pattern<small>Print, then STEP EVOLVE</small></a></li>
+    </ul>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <header>
+      <div class="kicker">Install</div>
+      <h2>From your browser, in a few minutes</h2>
+      <p>No FM-1 to hand? <a href="webapp/sim/">Try the firmware in your browser</a>, running on an on-screen FM-1.</p>
+    </header>
+    <div class="steps">
+      <div class="step"><h3>Connect</h3><p>Plug the FM-1 straight into your computer by USB, and open the installer in Chrome or Edge.</p></div>
+      <div class="step"><h3>Flash</h3><p>Start with the standard build. If your FM-1 crashes with it, use the single-core build from the same release.</p></div>
+      <div class="step"><h3>Play</h3><p>Tap SEQ, pick a MODE, press PLAY. Edit sounds from the computer with the <a href="webapp/editor/">web editor</a>.</p></div>
+    </div>
+    <p style="margin-top:22px;color:var(--mid)">Do not unplug the FM-1 while it is writing. This is experimental firmware: use it at your own risk.</p>
+    <div class="cards">
+      <a class="card" style="--c:var(--t1)" href="webapp/installer/"><b>Install 2.0-rc3</b><span>The web installer, in Chrome or Edge.</span></a>
+      <a class="card" style="--c:var(--t2)" href="webapp/sim/"><b>Try it in your browser</b><span>The same firmware on an on-screen FM-1, with sound.</span></a>
+      <div class="card" style="--c:var(--t3)"><b>Download .fwsc</b><span><a href="firmware/tessera-2.0-rc3.fwsc">Standard</a> ·
+        <a href="firmware/tessera-2.0-rc3-1core.fwsc">single core</a> ·
+        <a href="https://github.com/Rastapopolix/tessera/releases">all releases</a>. From a terminal:
+        <code>python3 tools/fm1_install.py tessera-2.0-rc3.fwsc</code> (<a href="https://github.com/Rastapopolix/tessera/blob/HEAD/tools/fm1_install.py">fm1_install.py</a>, needs mido and python-rtmidi).</span></div>
+      <a class="card" style="--c:var(--t4)" href="https://github.com/Rastapopolix/tessera/blob/HEAD/MANUAL.md"><b>Manual</b><span>Every page, knob and mode.</span></a>
+      <a class="card" style="--c:var(--t1)" href="https://github.com/Rastapopolix/tessera/blob/HEAD/docs/cheatsheet/tessera-cheatsheet.pdf"><b>Cheatsheet</b><span>The buttons and combinations on one printable page.</span></a>
+      <a class="card" style="--c:var(--t2)" href="webapp/editor/"><b>Web editor</b><span>Edit sounds and sequences from the computer.</span></a>
+      <a class="card" style="--c:var(--t3)" href="https://github.com/Rastapopolix/tessera"><b>Source</b><span>GPL-3.0, on GitHub, with the changes in every release.</span></a>
+    </div>
+    <div class="note"><b>Back to the stock firmware.</b> Open the installer and choose <i>Return to official V15</i>, or
+      install M-Vave's own <code>FM-1.fwsc</code> with <code>fm1_install.py</code>. If an update is cut off, see the
+      <a href="https://github.com/Rastapopolix/tessera/blob/HEAD/docs/RECOVERY.md">recovery guide</a>.</div>
+  </div>
+</section>
+<section id="about">
+  <div class="wrap">
+    <header>
+      <div class="kicker">About</div>
+      <h2>Who makes Tessera</h2>
+    </header>
+    <div class="about">
+      <div>
+        <p>I'm Theo Dainis, from New Zealand. I've been using and building synthesisers for the past 15 years, and I'm passionate about modular and open source. Elektron and Mutable Instruments are big influences on me. I love the DIY side: building things, and learning how music hardware works on the inside. Tessera is the sequencer I wanted on the FM-1: modular in a box, a small instrument that writes with you.</p>
+        <div class="note"><b>Built with Claude Code.</b> Tessera's code is written with <a href="https://claude.com/claude-code">Claude Code</a>, Anthropic's AI coding tool. I designed it, made the decisions, and test every release on my own FM-1 before it goes out. The source is open, so you can read every line and every change. Like any firmware, it comes with no warranty: save a <b>Complete backup</b> from the <a href="webapp/editor/">web editor</a> before you flash.</div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Tessera is by Theo Dainis (Rastapopolix). It grew out of Melodee (Tess), a fork of <a href="https://github.com/keremimo/melodee">Melodee</a> by keremimo,
+      itself built on Felucca by Leo Kuroshita / Hügelton Instruments. ATLAS uses the drum map of Grids by
+      Émilie Gillet / Mutable Instruments; FALL, CONSTELLATION, QUAD, AWAKE and SERIES are inspired by the norns
+      scripts Fall (ambalek), Constellation (timothy-taylor), initenere, Awake (tehn) and nørgård; TIDE and SWARM are inspired
+      by Triple Sloth (Nonlinear Circuits, Andrew Fitch) and ochd (Instruō, DivKid). GPL-3.0-only:
+      <a href="https://github.com/Rastapopolix/tessera">source on GitHub</a>,
+      <a href="firmware/LICENSES/">licence texts</a>. Tessera is an independent project, not affiliated with or
+      endorsed by M-Vave; M-Vave and FM-1 are trademarks of their respective owners.</p>
+  </div>
+</footer>
+
+<script>
+/* the splash's laying order: from the middle outwards, the gold tessera last (firmware/src/splash.c SPL_ORDER) */
+(function () {
+  var m = document.getElementById('mark'), tiles = m.children, order = [4, 1, 3, 5, 7, 0, 6, 8, 2];
+  for (var k = 0; k < 9; k++) tiles[order[k]].style.animationDelay = (k * 70 + (k === 8 ? 90 : 0)) + 'ms';
+  m.classList.add('laid');
+})();
+</script>
+</body>
+</html>

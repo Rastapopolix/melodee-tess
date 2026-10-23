@@ -1,0 +1,8 @@
+{
+  "version": "1.2.8",
+  "product": "FM-1_91028",
+  "pkg": {
+    "dual": "../../firmware/melodee-tess-1.2.8.fwsc",
+    "single": "../../firmware/melodee-tess-1.2.8-1core.fwsc"
+  }
+}

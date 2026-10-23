@@ -1,0 +1,8 @@
+{
+  "version": "2.0-rc5",
+  "product": "FM-1_920",
+  "pkg": {
+    "dual": "../../firmware/tessera-2.0-rc5.fwsc",
+    "single": "../../firmware/tessera-2.0-rc5-1core.fwsc"
+  }
+}
