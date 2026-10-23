@@ -141,6 +141,22 @@ generator turns the arpeggiator off; choosing ARP again brings back its last set
 
 <p align="center"><img src="assets/gallery/seq_mode.png" alt="GEN with MODE STEP" width="320"></p>
 
+### The pattern's sheet: Double, Half, Euclid
+
+Hold **OCT+** on NOTES, PATTERN or the drum grid for the pattern's sheet. Besides Quantize, Clear pattern and
+Clear motion it has:
+
+- **Double**: the pattern twice as long (up to 64 steps). Its steps, recorded notes and motion are copied after
+  themselves; a playing pattern carries on into the copy.
+- **Half**: LEN halved (15 steps become 8). The steps past it stay, hidden, as when LEN is turned down.
+- **Euclid**: KNOB 2 sets the hits ("5 of 16 BD"), and OCT+ spreads them over LEN as evenly as they go, the first
+  on step 1. On the drum grid it writes the selected lane. On NOTES it writes one note row: the note at the
+  cursor, else the pattern's first note, else ROOT. A step with a hit gets the note, and a step without one loses
+  it. Other lanes and notes stay as they are. **Euclid turn** (KNOB 2) starts the hits that many steps later.
+  It does not work on a pattern with recorded notes.
+
+Each one is undone with **EDIT** held, one at a time.
+
 ---
 
 ## The generators
