@@ -10,7 +10,8 @@
  *          28 tagged AUTOSAVE OFF, 29 the PRESETS LIST (browse.c),
  *          30 bit 0 retired, bit 1 KNOB ACCEL OFF (ui.c PREF_BITS), bits 2..4 retired (OVERCLOCK until 1.3.4),
  *             bits 5..6 MIDI OUT, bit 7 CLOCK OUT (midi_out.c, settings_persist.c),
- *          31 the quick layers seen (ui_layer.c), 25 tagged TRACK KNOB LEFT (panel.c); free: 24 bits 1..7
+ *          31 the quick layers seen (ui_layer.c), 25 tagged TRACK KNOB LEFT (panel.c), 24 bits 1..3 PANEL GAMMA (gamma_get);
+ *          free: 24 bits 4..7
  *   row 0 bytes 2..27 hold all 201 Prophet factory stars, tagged in bytes 28..31;
  *         bytes 0..1 held retired ANALOG's stars.
  *   row 1 bytes 28..31 mark validated Melodee settings (MDS + version 1).
@@ -21,6 +22,20 @@ typedef struct {
 } favorites_t;
 static favorites_t favorites;
 static uint32_t favorites_user_hi;
+/* MENU > PANEL GAMMA (lcd.c lcd_gamma): favorites row 15 byte 24 bits 1..3 (above; bit 0 is a CZ-1 star).
+ * 0 is TUNED+VCOM, the default, so settings saved before it get it; n the option n - 1 */
+#define GAMMA_N 6u
+#define GAMMA_DEF 5u                                   /* TUNED+VCOM */
+static uint32_t gamma_get(void)
+{
+    uint32_t v = (favorites.factory[15][24] >> 1) & 7u;
+    return v && v <= GAMMA_DEF ? v - 1u : GAMMA_DEF;
+}
+static void gamma_put(uint32_t opt)
+{
+    favorites.factory[15][24] = (uint8_t)((favorites.factory[15][24] & ~0x0Eu) | (opt < GAMMA_DEF ? (opt + 1u) << 1 : 0u));
+}
+
 /* Scale favorites use the upper half of retired engine 14's PER5 row. Keep
  * old preset bits 0..127 intact; tagged storage ignores unrecognized bytes.
  * No settings/template layout change. */

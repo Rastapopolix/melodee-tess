@@ -565,6 +565,7 @@ Hold **HOME** for the menu. Tessera's additions:
 | **COLOR** | The palette: SMALTI (Tessera's own), MARMO, VITRO, NIGHT or CONTRAST. |
 | **MIDI OUT** | What goes out over USB MIDI: **KEYS** (the notes you play, as Melodee sent them), **ALL** (also the steps, the ARP, recordings and every generator) or **OFF**. Each track on its own channel: see [MIDI OUT channels](#midi-out-channels). |
 | **CLOCK OUT** | 24 pulses a beat with START and STOP over USB, while the clock is INT. |
+| **PANEL GAMMA** | The screen's contrast curve: **TUNED+VCOM** (the default), TUNED, or the panel chip's own G2.2, G1.8, G2.5 and G1.0. The screen goes black for a moment and redraws. Saved. |
 | **TRACK KNOB** | RIGHT: the ALGORITHM knob picks the track and PRESETS browses sounds, as printed. LEFT: the two swap. |
 | **ABOUT** | Version, credits and, after a crash, LAST CRASH (until power-off). |
 
