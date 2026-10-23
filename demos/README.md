@@ -85,3 +85,8 @@ python3 tools/demo_video.py build/video build/tessera-2.0-demo.mp4   # needs Pil
 ```
 
 The pages shown and the captions are the timelines in `tests/demo_projects.c` (V_STILL, V_GARDEN, the tour).
+
+The project page plays the copy in `assets/video/` (`tessera-2.0-demo.mp4`, and `tessera-2.0-demo.jpg`, its title card
+as the poster); `web/make_site.py` puts both in the site's `media/video/`. After making a new video, copy it there
+and make the poster again:
+`ffmpeg -ss 1 -i assets/video/tessera-2.0-demo.mp4 -frames:v 1 -vf scale=720:720 -q:v 3 assets/video/tessera-2.0-demo.jpg`.
