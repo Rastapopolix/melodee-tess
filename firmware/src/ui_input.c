@@ -971,6 +971,14 @@ static void edit_param(uint32_t slot, int32_t steps)
             ui.force = 1;
             return;
         }
+        if (sd_layer_on()) {                            /* TURING, EUCLID, OCT+ held: SOURCE, KEEP */
+            tessera_sd_layer_knob(slot, steps);
+            oct_eat |= 2u;
+            ui.oct_t0 |= 2u;
+            oct_deferred = 0;
+            ui.force = 1;
+            return;
+        }
         if (an_layer_on()) {                            /* ANSWER, OCT+ held: ORDER, SHIFT, SPACE, LEN */
             tessera_answer_layer_knob(slot, steps);
             oct_eat |= 2u;

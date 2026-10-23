@@ -406,6 +406,25 @@ static void s_follow_step(void)
     knob(tessera_tweak_knob, 0, 2);                   /* SHIFT +2: a third */
 }
 
+/* STEP as seed (step_seed.c): track 2 plays from track 1's STEP melody (FOLLOW_MELODY, C major), SOURCE T1 */
+static void s_seed(uint32_t mode, uint32_t keep, int32_t prob_turns)
+{
+    s_follow_step();                                  /* (track 1's melody; track 2's MARKOV and FOLLOW undone below) */
+    tessera_reset();
+    gen(1, mode);
+    if (mode == TESS_ENG_TURING) {
+        knob(tessera_knob, 1, -8);                    /* LEN 8: the melody's */
+        knob(tessera_knob, 2, prob_turns);            /* PROB 2 a turn */
+    }
+    tessera_sd_layer_knob(0, 1);                      /* SOURCE T1 */
+    turns(tessera_sd_layer_knob, 1, (int32_t)keep);
+}
+static void s_seed_turing(void) { s_seed(TESS_ENG_TURING, TESS_SD_FREE, 0); }
+static void s_seed_turing_drift(void) { s_seed(TESS_ENG_TURING, TESS_SD_RHYTHM, 25); }
+static void s_seed_turing_hits(void) { s_seed(TESS_ENG_TURING, TESS_SD_PITCH, 25); }
+static void s_seed_euclid(void) { s_seed(TESS_ENG_EUCLID, TESS_SD_FREE, 0); }
+static void s_seed_euclid_rhythm(void) { s_seed(TESS_ENG_EUCLID, TESS_SD_RHYTHM, 0); }
+
 typedef struct {
     const char *name;
     uint32_t bars, seed;
@@ -760,6 +779,11 @@ static const scen_t SCEN[] = {
     {"answer_heard_reverse", 8, 0x1046u, s_answer_rev, s_answer_bar},
     {"answer_loops_shuffle_echo", 8, 0x1047u, s_answer_loops, s_answer_bar},
     {"chord_form_ab_evolve", 8, 0x1044u, s_chord_form, 0},
+    {"seed_turing_t1", 4, 0x1048u, s_seed_turing, 0},
+    {"seed_turing_t1_prob50_keep_rhythm", 4, 0x1049u, s_seed_turing_drift, 0},
+    {"seed_turing_t1_prob50_keep_pitch", 4, 0x104Au, s_seed_turing_hits, 0},
+    {"seed_euclid_t1", 4, 0x104Bu, s_seed_euclid, 0},
+    {"seed_euclid_t1_keep_rhythm", 4, 0x104Cu, s_seed_euclid_rhythm, 0},
 };
 #define NSCEN (sizeof SCEN / sizeof SCEN[0])
 
@@ -900,6 +924,24 @@ static void follow_run(char *res, size_t cap)
         n2++;
     }
     snprintf(res, cap, "%u %u", n2, bad);
+}
+
+/* STEP as seed: scenario name's track 2 notes: "count, in the melody's order, of the melody's notes, steps" (the
+ * melody's notes without its rests: 60 62 64 67 65 72) */
+static void seed_run(const char *name, char *res, size_t cap)
+{
+    static const uint8_t MEL[6] = {60, 62, 64, 67, 65, 72};
+    const scen_t *sc = 0;
+    uint32_t i, j, n = 0, order = 0, of = 0;
+    for (i = 0; i < NSCEN; i++) if (!strcmp(SCEN[i].name, name)) sc = &SCEN[i];
+    scen_run(sc, 0, res, cap);
+    for (i = 0; i < tt_n; i++) {
+        if (tt_ev[i].tr != 1u) continue;
+        order += tt_ev[i].note == MEL[n % 6u];
+        for (j = 0; j < 6u; j++) of += tt_ev[i].note == MEL[j];
+        n++;
+    }
+    snprintf(res, cap, "%u %u %u", n, order, of);
 }
 
 /* ROOT: the notes of key_e_minor, all four tracks: "notes outside E minor, E minor's notes heard (a bit each)" */
@@ -2636,6 +2678,39 @@ int main(int argc, char **argv)
         }
         snprintf(line, sizeof line, "FOLLOW a STEP melody: all %u notes a third above it (in C major)", n2);
         bad += check(line, n2 > 16u && !wrong);
+    }
+    for (int which = 0; which < 5; which++) {   /* STEP as seed, in a child as the scenarios (4 bars: 64 steps) */
+        static const char *const NAME[5] = {"seed_turing_t1", "seed_turing_t1_prob50_keep_rhythm",
+                                            "seed_turing_t1_prob50_keep_pitch", "seed_euclid_t1",
+                                            "seed_euclid_t1_keep_rhythm"};
+        static const char *const WHAT[5] = {
+            "STEP as seed: TURING, SOURCE T1, PROB 0: the melody as written, LEN 8 a loop (6 notes in 8)",
+            "  PROB 50 KEEP RHYTHM: its rhythm kept, only its own notes, in another order",
+            "  PROB 50 KEEP PITCH: the hits come and go, each one a note of the melody's",
+            "STEP as seed: EUCLID 5 of 16, SOURCE T1: the melody's notes in order on its hits",
+            "  KEEP RHYTHM: the melody's rhythm (6 notes in 8 steps), EUCLID's pitches"};
+        unsigned n = 0, order = 0, of = 0;
+        pid_t pid;
+        int fd[2], ok;
+        if (!pipe(fd) && (pid = fork()) >= 0) {
+            if (!pid) {
+                close(fd[0]);
+                seed_run(NAME[which], res, sizeof res);
+                if (write(fd[1], res, strlen(res) + 1u) < 0) _exit(1);
+                _exit(0);
+            }
+            close(fd[1]);
+            if (read(fd[0], res, sizeof res - 1u) > 0) sscanf(res, "%u %u %u", &n, &order, &of);
+            close(fd[0]);
+            waitpid(pid, 0, 0);
+        }
+        ok = which == 0 ? (n == 48u || n == 49u) && order == n :   /* (49: the step at the stop's block too) */
+             which == 1 ? (n == 48u || n == 49u) && of == n && order < n :
+             which == 2 ? n > 24u && n < 48u && of == n :
+             which == 3 ? n == 20u && order == n :
+                          (n == 48u || n == 49u) && of < n;
+        snprintf(line, sizeof line, "%s (%u notes, %u in order, %u its)", WHAT[which], n, order, of);
+        bad += check(line, ok);
     }
     for (int which = 0; which < 3; which++) {   /* ANSWER, in a child as the scenarios */
         static const uint8_t FWD[12] = {60, 62, 64, 67, 60, 62, 64, 67, 60, 62, 64, 67};

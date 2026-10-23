@@ -38,6 +38,7 @@ static const char *const TX_N_MIDICH[] = {"AUTO", "1", "2", "3", "4", "5", "6", 
                                           "14", "15", "16", "OFF"};   /* (TESS_MIDI_OFF) */
 static const char *const TX_N_ANORDER[] = {"PLAYED", "REVERSE", "SHUFFLE"};   /* (TESS_AN_*) */
 static const char *const TX_N_ANLEN[] = {"SHORT", "MID", "LONG"};
+static const char *const TX_N_SDKEEP[] = {"FREE", "RHYTHM", "PITCH"};   /* (TESS_SD_*) */
 static const char *const TX_N_QEVERY[] = {"/1", "/2", "/3", "/4", "/6", "/8", "/16"};   /* (every n steps, as TX_N_DIV) */
 
 /* the ranges tessera_param_set keeps (PULSES and ROT: at most STEPS, below STEPS, as it says) */
@@ -140,6 +141,8 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_SUB_SHAPE] = PE("SHAPE", TX_N_SHAPE, 0),
     [TX_MIDI_CH] = PE("MIDI CH", TX_N_MIDICH, 0),
     [TX_KEY_LINK] = PE("KEY", TX_N_KEYLINK, 1),
+    [TX_SD_SOURCE] = PE("SOURCE", TX_N_FOLLOW, 0),
+    [TX_SD_KEEP] = PE("KEEP", TX_N_SDKEEP, 0),
 };
 
 #if MELODEE_HELP_PACKED                          /* the texts stay here, tools/gen_help.py packs them */
@@ -514,6 +517,14 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
                                 "the others too, as the scale always is; drum tracks keep theirs. OWN: each track its "
                                 "own ROOT. Turning it on gives every track the selected track's key. SCL's Key link row; "
                                 "on in a new project, saved with it."),
+    X_(TX_SD_SOURCE, "SOURCE", "A STEP pattern for TURING or EUCLID to play from: T1 to T4 is that track's pattern "
+                               "playing now (this track's own too), which stays as written. TURING loops its first "
+                               "LEN steps and PROB changes them a step at a time; EUCLID plays its notes in order "
+                               "on its hits. OFF, or a pattern without notes: the generator's own. OCT+ held on GEN, "
+                               "KNOB 1."),
+    X_(TX_SD_KEEP, "KEEP", "With a SOURCE, what stays as written. FREE: TURING may change a step's pitch or its hit. "
+                           "RHYTHM: only the pitches change (EUCLID: the source's own rhythm, on EUCLID's pitches). "
+                           "PITCH: only the hits come and go. OCT+ held on GEN, KNOB 2."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

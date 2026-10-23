@@ -121,6 +121,10 @@ static void help_find(uint32_t k)
             help.pid = (uint16_t)PID_TESS(TX_GRD_KICK + (k & 3u));
             return;
         }
+        if (sd_layer_on()) {                            /* (TURING, EUCLID, OCT+ held: SOURCE, KEEP) */
+            if (k < 2u) help.pid = (uint16_t)PID_TESS(TX_SD_SOURCE + k);
+            return;
+        }
         if (an_layer_on()) {                            /* (ANSWER, OCT+ held: ORDER, SHIFT, SPACE, LEN) */
             help.pid = (uint16_t)PID_TESS(TX_AN_ORDER + (k & 3u));
             return;

@@ -84,8 +84,20 @@ static int an_layer_on(void)
            cur_page()->graph == GR_STEPS && tessera.mode[song.sel] == TESS_ENG_ANSWER &&
            ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
 }
-/* a generator's OCT+ layer is on (QUAD's, CONSTELLATION's, CHORD's, GRIDS' or ANSWER's): no octave, no sheet */
-static int gen_layer_on(void) { return quad_cols_on() || cs_layer_on() || ch_layer_on() || gr_layer_on() || an_layer_on(); }
+/* TURING or EUCLID on GEN with OCT+ held: the knobs are SOURCE and KEEP (step_seed.c tessera_sd_layer_knob) */
+static int sd_layer_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && song.sel < TESSERA_TRACKS && cur_page()->fam == FAM_GEN &&
+           cur_page()->graph == GR_STEPS &&
+           (tessera.mode[song.sel] == TESS_ENG_TURING || tessera.mode[song.sel] == TESS_ENG_EUCLID) &&
+           ((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u);
+}
+/* a generator's OCT+ layer is on (QUAD's, CONSTELLATION's, CHORD's, GRIDS', ANSWER's, TURING's or EUCLID's): no octave,
+ * no sheet */
+static int gen_layer_on(void)
+{
+    return quad_cols_on() || cs_layer_on() || ch_layer_on() || gr_layer_on() || an_layer_on() || sd_layer_on();
+}
 /* QUAD's LINK as its card shows it: OFF, or "T" and the linked tracks ("T24") */
 static void quad_link_text(uint32_t m, char *b)
 {
