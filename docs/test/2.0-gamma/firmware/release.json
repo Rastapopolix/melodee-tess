@@ -1,0 +1,8 @@
+{
+  "version": "2.0-gamma",
+  "product": "FM-1_83772000",
+  "pkg": {
+    "dual": "../../firmware/tessera-2.0-gamma.fwsc",
+    "single": "../../firmware/tessera-2.0-gamma-1core.fwsc"
+  }
+}
