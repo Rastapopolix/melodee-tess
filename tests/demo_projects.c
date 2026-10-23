@@ -17,6 +17,8 @@
  * Checks per demo: the record saves, reads back the same, restores and loads with every generator, cord and sound;
  * each track plays notes; no sample at full scale; the voices stay inside the budget. */
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #define TESSERA_NOTE_HOOK dm_note
 #define main hostsim_main
 #include "hostsim.c"
@@ -347,6 +349,7 @@ static double v_t0;
 static void v_page(int home, uint32_t sel, const char *title);
 static void v_ppm(const char *dir, uint32_t n);
 static const vstep_t *v_steps_of(const char *wav, uint32_t *n, char *dir, uint32_t cap);
+#define V_KEEP 255u                                     /* (vstep_t sel: the track the record selected, unchanged) */
 #define V_BLOCKS 46u                                    /* control blocks a frame: 1472 samples, 29.96 frames a second */
 static dm_play_t play(uint32_t secs, const char *wav)
 {
@@ -608,7 +611,7 @@ static int archive_restore(const char *path)
  * OUTDIR/<clip>/f00000.ppm .., OUTDIR/captions.txt (tools/demo_video.py: the video) */
 typedef struct { uint32_t ms, key, down; } vkey_t;
 static const vstep_t V_STILL[] = {
-    {0, 1, 0, 0, "STILL TIDE: an ambient demo, four tracks that keep changing on their own"},
+    {0, 1, V_KEEP, 0, "STILL TIDE: an ambient demo, four tracks that keep changing on their own"},
     {7000, 0, 0, "GEN", "Track 1, CHORD: a drone in YO on D, each voice breathing on its own slow cycle"},
     {15000, 0, 1, "GEN", "Track 2, AWAKE: two loops of different lengths on a warm TRIO pad"},
     {23000, 0, 2, "GEN", "Track 3, FALL: leaves land and play bells; a TIDE source leans the wind"},
@@ -617,13 +620,13 @@ static const vstep_t V_STILL[] = {
     {45000, 0, 0, "MATRIX", "MATRIX: every modulation cord, track by track"},
 };
 static const vstep_t V_GARDEN[] = {
-    {0, 1, 0, 0, "KOTO GARDEN: Zen-1's FM voices in HIRA on C"},
+    {0, 1, V_KEEP, 0, "KOTO GARDEN: Zen-1's FM voices in HIRA on C"},
     {7000, 0, 0, "GEN", "Track 1, QUAD: a koto on a grid the tracks share, notes travelling between them"},
     {15000, 0, 1, "GEN", "Track 2, QUAD: the second koto, in triplets, on the same grid"},
     {23000, 0, 2, "GEN", "Track 3, SERIES: a breath flute on Per Norgard's infinity series"},
     {31000, 0, 3, "GEN", "Track 4, POLY: a mokugyo on three rhythms"},
     {38000, 0, 0, "MODS", "MODS: sixteen cords, any source to any destination"},
-    {45000, 1, 0, 0, "KOTO GARDEN on Stage: every track's sound and level"},
+    {45000, 1, V_KEEP, 0, "KOTO GARDEN on Stage: every track's sound and level"},
 };
 static const vstep_t *v_steps_of(const char *wav, uint32_t *n, char *dir, uint32_t cap)
 {
@@ -638,7 +641,7 @@ static const vstep_t *v_steps_of(const char *wav, uint32_t *n, char *dir, uint32
 }
 static void v_page(int home, uint32_t sel, const char *title)
 {
-    song.sel = (uint8_t)sel;
+    if (sel != V_KEEP) song.sel = (uint8_t)sel;
     if (home) go_home();
     else { ui.home = 0; ui.page = (uint8_t)page_titled(title); page_entered(); }
     ui.force = 1;
@@ -717,15 +720,29 @@ static int video(const char *out)
     snprintf(cap, sizeof cap, "%s/captions.txt", out);
     if (!(v_cap = fopen(cap, "w"))) return 1;
     v_root = out;
-    {   /* the demos, one make each: the one filmed plays 52 s, the one before it 20 s as in the tests, so each starts
-         * where the tests' run starts it (a load keeps a little of what played before: FALL's leaves) */
-        char a[600], b[600];
-        snprintf(a, sizeof a, "%s/a", out); snprintf(b, sizeof b, "%s/b", out);
-        mkdir(a, 0755); mkdir(b, 0755);
-        v_want = 0; make(a, 20);                        /* OUTDIR/a/still-tide.wav and frames */
-        v_want = 1; make(b, 20);                        /* OUTDIR/b/koto-garden.wav and frames */
-        v_want = -1;
+    for (int d = 0; d < 2; d++) {                       /* the demos, one make each, each in a fresh process as the
+                                                         * tests' run is (a load keeps a little of what played before,
+                                                         * FALL's leaves, and power_on does not clear it): the one
+                                                         * filmed plays 52 s, the one before it 20 s as in the tests */
+        char sub[600];
+        snprintf(sub, sizeof sub, "%s/%c", out, 'a' + d);
+        mkdir(sub, 0755);
+        fflush(stdout);
+        fclose(v_cap);
+        pid_t pid = fork();
+        if (pid == 0) {
+            v_cap = fopen(cap, "a");
+            v_t0 = 52.0 * d;
+            v_want = d;
+            make(sub, 20);                              /* OUTDIR/a/still-tide.wav, OUTDIR/b/koto-garden.wav, frames */
+            fclose(v_cap);
+            fflush(stdout);
+            _exit(0);
+        }
+        waitpid(pid, 0, 0);
+        v_cap = fopen(cap, "a");
     }
+    v_t0 = 104.0;
     static const struct { const char *name, *caption; uint32_t bpm, engine, preset, mode, div; } T[] = {
         {"3-turing", "TURING: a looping shift register that locks or drifts", 100, ENGI_FM6, V_TINE, TESS_ENG_TURING, DIV_16},
         {"4-euclid", "EUCLID: hits spread as evenly as they go", 100, ENGI_FM6, V_MARIMBA, TESS_ENG_EUCLID, DIV_16},
