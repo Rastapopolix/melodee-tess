@@ -928,8 +928,12 @@ static int param_kept(uint32_t i)
 }
 
 /* SCL, QNT and the MPC degree are the song's: one scale for every part, kept the same in each track's own slots
- * (the formats and the editor keep them per track). ROOT and TRN stay the track's */
-static int scale_shared(uint32_t id) { return id == P_SCALE || id == P_QUANT || id == P_MPCDEG; }
+ * (the formats and the editor keep them per track). ROOT too while KEY LINK is on (Tessera: tessera.key_link), on
+ * every melodic track (a drum track keeps its own); otherwise ROOT, and TRN always, stay the track's */
+static int scale_shared(uint32_t id)
+{
+    return id == P_SCALE || id == P_QUANT || id == P_MPCDEG || (id == P_ROOT && tessera.key_link);
+}
 static void scale_share(const track_t *from)
 {
     uint32_t k;
@@ -937,6 +941,8 @@ static void scale_share(const track_t *from)
         trk[k].p[P_SCALE] = from->p[P_SCALE];
         trk[k].p[P_QUANT] = from->p[P_QUANT];
         trk[k].p[P_MPCDEG] = (int16_t)clamp(from->p[P_MPCDEG], 1, (int32_t)scale_count(from));
+        if (tessera.key_link && !drum_track(&trk[k]) && !drum_track(from))
+            trk[k].p[P_ROOT] = from->p[P_ROOT];
     }
 }
 

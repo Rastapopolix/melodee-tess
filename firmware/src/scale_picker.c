@@ -62,6 +62,7 @@ static void scale_picker_edit(uint32_t slot, int32_t steps)
     } else if (slot == 2u) {
         TSEL->p[P_ROOT] = (int16_t)clamp(TSEL->p[P_ROOT] + steps, TP[P_ROOT].min, TP[P_ROOT].max);
         motion_capture(TSEL, P_ROOT, TSEL->p[P_ROOT]);
+        if (tessera.key_link) scale_share(TSEL);       /* (KEY LINK: every melodic track's) */
     } else {
         TSEL->p[P_QUANT] = (int16_t)clamp(TSEL->p[P_QUANT] + steps, TP[P_QUANT].min, TP[P_QUANT].max);
         motion_capture(TSEL, P_QUANT, TSEL->p[P_QUANT]);

@@ -157,6 +157,7 @@ static int test_tsp_record(void)
     song.sel = 1; tessera_knob(0, TESS_ENG_EUCLID);
     tessera_param_set(1, TX_SUB_SHAPE, SUB_DECEL); tessera_param_set(0, TX_SUB_SHAPE, SUB_ACCEL);   /* (the record's SUB part) */
     tessera_param_set(2, TX_MIDI_CH, 9); tessera_param_set(3, TX_MIDI_CH, (int32_t)TESS_MIDI_OFF);   /* (its MIDI part) */
+    tessera_param_set(0, TX_KEY_LINK, 0);                                    /* (its KEY part: OWN, not the default) */
     tessera.en_arc = 40u; tessera.en_rests = 60u;     /* (ENERGY: the block's project tail, TS18) */
     {
         cord_t c = {CS_LFO, 0, CD_CUTOFF, 1, 30, 0};
@@ -171,7 +172,8 @@ static int test_tsp_record(void)
                  tessera.mode[1] == TESS_ENG_EUCLID && cord_count() == 1u && cord_get(0)->amount == 30 &&
                  tessera.en_arc == 40u && tessera.en_rests == 60u &&
                  tessera.sub_shape[1] == SUB_DECEL && tessera.sub_shape[0] == SUB_ACCEL && tessera.sub_shape[2] == SUB_EVEN &&
-                 tessera.midi_ch[2] == 9u && tessera.midi_ch[3] == TESS_MIDI_OFF && tessera.midi_ch[0] == 0u);
+                 tessera.midi_ch[2] == 9u && tessera.midi_ch[3] == TESS_MIDI_OFF && tessera.midi_ch[0] == 0u &&
+                 tessera.key_link == 0u);
     ok = project_rename(0, "TSP TWO") == 0;
     memset(trk[0].step, 0, sizeof trk[0].step);
     project_load(0);
@@ -193,6 +195,11 @@ static int test_tsp_record(void)
     raw[tsp_seen.at[TSP_MIDI] + 1u] = (uint8_t)(TESS_MIDI_OFF + 1u);   /* (track 2's channel past OFF) */
     tsp_resum(raw);
     bad += check("TSP1: a MIDI part with a channel out of range is refused", ok && !tsp_valid(raw, len));
+    len = tsp_pack(raw, &proj_scratch, 1);
+    ok = len && tsp_valid(raw, len) && tsp_seen.at[TSP_KEY];
+    raw[tsp_seen.at[TSP_KEY]] = 2u;                     /* (KEY LINK past LINKED) */
+    tsp_resum(raw);
+    bad += check("TSP1: a KEY part out of range is refused", ok && !tsp_valid(raw, len));
 
     reset();                                           /* the largest: every step of every pattern full, 1,024 notes */
     for (k = 0; k < NTRK; k++) {

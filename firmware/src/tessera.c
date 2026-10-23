@@ -112,6 +112,7 @@ void tessera_init(void)
     for (uint32_t b = 0; b < sizeof(tessera); b++) p[b] = 0;
     memset(&tess_sv, 0, sizeof tess_sv);
     memset(&tess_an, 0, sizeof tess_an);
+    tessera.key_link = 1;                               /* (a new project: one key for every track) */
 
     for (uint32_t i = 0; i < TESSERA_TRACKS; i++) {
         tessera.mode[i] = TESS_ENG_OFF;
@@ -2460,6 +2461,7 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_SUB_CHANCE: return tessera.sub_chance[tr];
     case TX_SUB_SHAPE: return tessera.sub_shape[tr];
     case TX_MIDI_CH: return tessera.midi_ch[tr];
+    case TX_KEY_LINK: return tessera.key_link;          /* (the project's, whichever track) */
     case TX_CH_BREATH: return tessera.ch_breath[tr];
     case TX_EN_ARC: return tessera.en_arc;              /* (the project's, whichever track) */
     case TX_EN_RESTS: return tessera.en_rests;
@@ -2611,6 +2613,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_SUB_CHANCE: tessera.sub_chance[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_SUB_SHAPE: tessera.sub_shape[tr] = (uint8_t)tess_clampi(v, 0, SUB_SHAPES - 1); return;
     case TX_MIDI_CH: tessera.midi_ch[tr] = (uint8_t)tess_clampi(v, 0, (int32_t)TESS_MIDI_OFF); return;
+    case TX_KEY_LINK: tessera.key_link = (uint8_t)tess_clampi(v, 0, 1); return;
     case TX_CH_BREATH: tessera.ch_breath[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_AN_VARY: tessera.answer[tr].vary = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_AN_ECHO: tessera.answer[tr].echo = (uint8_t)tess_clampi(v, 0, 100); return;

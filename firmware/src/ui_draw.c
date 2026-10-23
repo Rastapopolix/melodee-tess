@@ -851,6 +851,11 @@ static void draw_columns(void)
         draw_column(3, "", "", "", T_DIM, -1, ICON_NONE);
         return;
     }
+    if (cur_page()->graph == GR_KEYLINK) {               /* KEY (SCL's row): KEY LINK, the project's */
+        draw_column(0, "KEY", tessera.key_link ? "LINKED" : "OWN", "", VAL(0u), tessera.key_link ? 1000 : 0, ICON_AUTO);
+        for (uint32_t k = 1; k < 4u; k++) draw_column(k, "", "", "", T_DIM, -1, ICON_NONE);
+        return;
+    }
     if (cur_page()->graph == GR_MIDICH) {                /* MIDI OUT: each track's channel (AUTO, 1..16, OFF) */
         static const char *const NAME[TESSERA_TRACKS] = {"TRACK 1", "TRACK 2", "TRACK 3", "TRACK 4"};
         const param_desc_t *d = pid_desc(PID_TESS(TX_MIDI_CH), 0);

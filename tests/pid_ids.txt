@@ -218,3 +218,4 @@
 0x261 ANSWER LEN               track 0..2 def 1
 0x262 TIMING SHAPE             track 0..2 def 0
 0x263 MIDI OUT CHANNEL         track 0..17 def 0
+0x264 KEY LINK                 global 0..1 def 1
