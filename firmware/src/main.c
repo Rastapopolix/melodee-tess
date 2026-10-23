@@ -188,6 +188,8 @@ static void fm1_main(void)
         ota_boot_cleanup();                             /* staging area left by an update */
 #endif
     settings_init();
+    if (gamma_get() != GAMMA_DEF)
+        lcd_gamma_switch(gamma_get());                 /* MENU > PANEL GAMMA, saved (lcd_init: the default) */
     clock_boot();                             /* the voice budget at the clock found (never changed) */
     if (boot_work.state != 2u)
         splash("FM-1 FIRMWARE");

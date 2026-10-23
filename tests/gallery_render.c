@@ -23,7 +23,7 @@ static const gshot_t SHOTS[] = {
     {"gen_series", G_SCENE, S_GEN_SERIES}, {"gen_chord", G_SCENE, S_GEN_CHORD},
     {"gen_chord_oct", G_SCENE, S_GEN_CHORD_OCT}, {"gen_chord_user", G_SCENE, S_GEN_CHORD_USER},
     {"gen_evolve", G_SCENE, S_GEN_EVOLVE}, {"step_evolve", G_SCENE, S_GEN_STEP_EVOLVE},
-    {"form", G_FORM, 0}, {"gen_tweak", G_SCENE, S_GEN_TWEAK}, {"gen_tweak2", G_SCENE, S_GEN_TWEAK2_COIN},
+    {"form", G_FORM, 0}, {"gen_tweak", G_SCENE, S_GEN_TWEAK}, {"gen_tweak2", G_SCENE, S_GEN_TWEAK2},
     {"gen_length", G_SCENE, S_GEN_LENGTH},
     {"cords", G_SCENE, S_CORDS}, {"mods_live", G_SCENE, S_MODS_LIVE_GEN}, {"matrix", G_SCENE, S_MATRIX},
     {"organic", G_SCENE, S_ORGANIC}, {"mod_shortcut", G_SCENE, S_MOD_SHORTCUT},

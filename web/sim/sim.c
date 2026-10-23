@@ -21,6 +21,21 @@ static const int8_t FM1_KEYMAP[6][FM1_NCOL] = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 };
 
+#include "sim_demos.h"                       /* (web/sim/build.sh: demos/koto-garden.tsp, still-tide.tsp) */
+
+/* the demos in the slots, as the backup page would put them there: A KOTO GARDEN (the second in the demo video),
+ * B STILL TIDE; then A loaded, so the simulator starts with KOTO GARDEN (SAVE > PROJECT loads B) */
+static void web_demos_load(void)
+{
+    memcpy(proj_bank_slot[0], SIM_DEMO_A, sizeof SIM_DEMO_A);
+    proj_bank_len[0] = sizeof SIM_DEMO_A;
+    memcpy(proj_bank_slot[1], SIM_DEMO_B, sizeof SIM_DEMO_B);
+    proj_bank_len[1] = sizeof SIM_DEMO_B;
+    proj_fetch(0);
+    proj_fetch(1);
+    project_load(0);
+}
+
 #undef __attribute__                         /* (tests/hostsim.c defines it away) */
 #define EXPORT __attribute__((used, visibility("default")))
 
@@ -35,6 +50,7 @@ static void web_power_on(void)
     for (i = 0; i < NTRK; i++)
         if (TRK_DEF[i][0] != ENGI_DRUM)
             trk[i].p[P_SCALE] = TRK_DEF_SCALE;
+    web_demos_load();                        /* (KOTO GARDEN loaded, stopped: the demo button, or PLAY, starts it) */
     settings.palette = UI_DEFAULT_INDEX;     /* (ui_power_on: the tests' GRAY) */
     palette_set(settings.palette);
     song.master_q12 = 2048;                  /* until the page sends MASTER */
@@ -201,28 +217,17 @@ EXPORT uint32_t web_screen_draws(void) { return (uint32_t)host_sent; }
 EXPORT uint32_t web_now_ms(void) { return fm1_ms; }
 EXPORT uint32_t web_playing(void) { return song.playing; }
 EXPORT uint32_t web_sample_rate(void) { return FS; }
-/* (web/sim/test_sim.mjs) track tr's EVOLVE: EVERY << 8 | AMOUNT */
-EXPORT uint32_t web_test_evolve(uint32_t tr)
-{
-    return tr < TESSERA_TRACKS ? (uint32_t)tessera.evolve[tr].every << 8 | tessera.evolve[tr].amount : 0u;
-}
+/* (web/sim/test_sim.mjs) track tr's MODE (tessera.mode) */
+EXPORT uint32_t web_test_mode(uint32_t tr) { return tr < TESSERA_TRACKS ? tessera.mode[tr] : 0u; }
 
-/* melodee-tess: the demo, a Tessera generator on each track (as KNOB 1 on SEQ > PATTERN sets it), EVOLVE on
- * track 1, then PLAY */
+/* the demo button: KOTO GARDEN (slot A) loaded again, from its start, and PLAY */
 EXPORT void web_demo(void)
 {
-    static const uint8_t GEN[4] = {TESS_ENG_TURING, TESS_ENG_MORPH, TESS_ENG_MARKOV, TESS_ENG_EUCLID};
-    uint32_t tr, sel = song.sel;
-    for (tr = 0; tr < 4u; tr++) {
-        song.sel = (uint8_t)tr;
-        if (tessera.mode[tr] == TESS_ENG_OFF)
-            tessera_knob(0, GEN[tr]);
+    if (song.playing) {
+        transport_req = 2;
+        return;                              /* (a second press stops it) */
     }
-    song.sel = 0;
-    tessera_evolve_knob(1, 1);               /* EVERY: one setting a turn, OFF -> 1 -> 2 bars; AMOUNT stays 30 % */
-    tessera_evolve_knob(1, 1);
-    song.sel = (uint8_t)sel;
+    project_load(0);
     ui.force = 1;
-    if (!song.playing)
-        transport_req = 1;
+    transport_req = 1;
 }

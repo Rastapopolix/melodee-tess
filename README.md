@@ -10,7 +10,7 @@
 </p>
 
 **Tessera** is a generative firmware for the M-Vave FM-1. Each of the four tracks can play its own steps, an
-arpeggio, or one of twelve generators, and the pages around them evolve the phrases, build song forms, pass hits
+arpeggio, or one of thirteen generators, and the pages around them evolve the phrases, build song forms, pass hits
 between tracks and modulate anything from anything. GPL-3.0-only. **Status: Experimental.**
 By **Theo Dainis** ([Rastapopolix](https://github.com/Rastapopolix)).
 
@@ -40,8 +40,8 @@ page also has a way back to the official V15 firmware, with a backup first.
 
 ## What's inside
 
-* **Twelve generators** on SEQ > GEN: TURING, EUCLID, MARKOV, MORPH, ATLAS (with a fourth drum part), BOUNCE (and
-  FALL), AWAKE, POLY, QUAD, CONSTELLATION, SERIES and CHORD, besides the step sequencer and the arpeggiator.
+* **Thirteen generators** on SEQ > GEN: TURING, EUCLID, MARKOV, MORPH, ATLAS (with a fourth drum part), BOUNCE (and
+  FALL), AWAKE, POLY, QUAD, CONSTELLATION, SERIES, CHORD and ANSWER, besides the step sequencer and the arpeggiator.
 * **Shaping**: EVOLVE mutates a phrase every few bars, and **STEP EVOLVE** does the same to steps you wrote; FORM
   builds sections such as AABA; TWEAK shifts, drops, humanises or follows another track; TWEAK 2 branches hits
   to another track's sound, combines tracks with logic, and plays only on certain bars; LENGTH sets how long notes
