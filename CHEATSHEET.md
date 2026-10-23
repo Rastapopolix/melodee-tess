@@ -26,7 +26,7 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 
 | Tap (again: the next page) | Pages |
 |---|---|
-| **SEQ** | GEN, then the MODE's pages. STEP: EVOLVE, TIMING, NOTES. ARP: ARP, ARP 2, NOTES. A generator: EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, TIMING, ENERGY. All: PATTERN, TEMPO, PATTERNS, SONG |
+| **SEQ** | GEN, then the MODE's pages. STEP: EVOLVE, TWEAK, TIMING, NOTES. ARP: ARP, ARP 2, NOTES. A generator: EVOLVE, FORM, TWEAK, TWEAK 2, LENGTH, TIMING, ENERGY. All: PATTERN, TEMPO, PATTERNS, SONG |
 | **SEQ** held | PATTERNS |
 | **ARP** | STEP track: switches it to ARP, the ARP page (again: ARP 2). Generator track: GEN ("ARP: MODE ON GEN") |
 | **LFO** | MODS, MATRIX, LFO, LFO 2, ORGANIC, LFO DEST; on FM6 then FM LFO |

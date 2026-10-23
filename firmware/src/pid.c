@@ -143,6 +143,7 @@ static const param_desc_t TX_DESC[TX_COUNT] = {
     [TX_KEY_LINK] = PE("KEY", TX_N_KEYLINK, 1),
     [TX_SD_SOURCE] = PE("SOURCE", TX_N_FOLLOW, 0),
     [TX_SD_KEEP] = PE("KEEP", TX_N_SDKEEP, 0),
+    [TX_SUB_HUMAN] = {"HUMAN", F_INT, 0, TESS_HUMAN_MS, 0, 0, "ms"},
 };
 
 #if MELODEE_HELP_PACKED                          /* the texts stay here, tools/gen_help.py packs them */
@@ -351,8 +352,9 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_TW_SHIFT, "TWEAK SHIFT", "Transposes the notes by semitones; while following, by scale steps from the "
                                    "followed note."),
     X_(TX_TW_DROP, "TWEAK DROP", "The chance a hit is left out, whatever the generator."),
-    X_(TX_TW_HUMAN, "TWEAK HUMAN", "Varies velocity, gate and timing a little, as a player would: at 100 a note up to "
-                                   "20 ms behind the beat, never early; the same each time the piece plays."),
+    X_(TX_TW_HUMAN, "TWEAK HUMAN", "Varies each note's velocity and length a little, as a player would: at 100 up "
+                                   "to 20 softer or louder and up to half as long; the same each time the piece "
+                                   "plays. STEP tracks too. The timing: TIMING's HUMAN."),
     X_(TX_TW_FOLLOW, "TWEAK FOLLOW", "Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own."),
     X_(TX_GRD_X, "ATLAS X", "Where on the map of drum patterns, left to right; between two, a blend of both."),
     X_(TX_GRD_Y, "ATLAS Y", "Where on the map of drum patterns, top to bottom; between two, a blend of both."),
@@ -525,6 +527,10 @@ static const pid_entry_t PIDS[] = {             /* in id order (pid_test checks 
     X_(TX_SD_KEEP, "KEEP", "With a SOURCE, what stays as written. FREE: TURING may change a step's pitch or its hit. "
                            "RHYTHM: only the pitches change (EUCLID: the source's own rhythm, on EUCLID's pitches). "
                            "PITCH: only the hits come and go. OCT+ held on GEN, KNOB 2."),
+    X_(TX_SUB_HUMAN, "TIMING HUMAN", "Plays each step a little late, as a player behind the beat: up to this many ms, "
+                                     "a new amount each step, never early and never more than a quarter of the step. "
+                                     "The same each time the piece plays. 0 on the grid. STEP tracks too (with a "
+                                     "step's NUDGE). TWEAK's HUMAN varies velocity and length."),
 #undef QD_MOVE_TEXT
 #undef QD_EVERY_TEXT
 };

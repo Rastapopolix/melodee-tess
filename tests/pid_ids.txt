@@ -221,3 +221,4 @@
 0x264 KEY LINK                 global 0..1 def 1
 0x265 SOURCE                   track 0..4 def 0
 0x266 KEEP                     track 0..2 def 0
+0x267 TIMING HUMAN             track 0..60 def 0

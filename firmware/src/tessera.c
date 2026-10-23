@@ -2465,6 +2465,7 @@ int32_t tessera_param_get(uint32_t tr, uint32_t x)
     case TX_SUB_RATCH: return tessera.sub_ratch[tr];
     case TX_SUB_CHANCE: return tessera.sub_chance[tr];
     case TX_SUB_SHAPE: return tessera.sub_shape[tr];
+    case TX_SUB_HUMAN: return tessera.sub_human[tr];
     case TX_MIDI_CH: return tessera.midi_ch[tr];
     case TX_KEY_LINK: return tessera.key_link;          /* (the project's, whichever track) */
     case TX_SD_SOURCE: return tessera.sd_src[tr];
@@ -2619,6 +2620,7 @@ static void tess_param_set_body(uint32_t tr, uint32_t x, int32_t v)
     case TX_SUB_RATCH: tessera.sub_ratch[tr] = (uint8_t)tess_clampi(v, 0, SUB_HITS_MAX - 1); return;
     case TX_SUB_CHANCE: tessera.sub_chance[tr] = (uint8_t)tess_clampi(v, 0, 100); return;
     case TX_SUB_SHAPE: tessera.sub_shape[tr] = (uint8_t)tess_clampi(v, 0, SUB_SHAPES - 1); return;
+    case TX_SUB_HUMAN: tessera.sub_human[tr] = (uint8_t)tess_clampi(v, 0, (int32_t)TESS_HUMAN_MS); return;
     case TX_MIDI_CH: tessera.midi_ch[tr] = (uint8_t)tess_clampi(v, 0, (int32_t)TESS_MIDI_OFF); return;
     case TX_KEY_LINK: tessera.key_link = (uint8_t)tess_clampi(v, 0, 1); return;
     case TX_SD_SOURCE:                                  /* (the loop filled again from the new source) */
@@ -2739,6 +2741,7 @@ void tessera_param_poke(uint32_t tr, uint32_t x, int32_t v)
     case TX_SV_LOCK: tessera.sv_lock[tr] = (uint8_t)tess_clampi(v, 0, 100); break;
     case TX_SV_AMOUNT: tessera.sv_amount[tr] = (uint8_t)tess_clampi(v, 0, 100); break;
     case TX_GRD_PART4: tessera.grids[tr].part4 = (uint8_t)tess_clampi(v, 0, GEN_GRIDS_P4_N - 1); break;
+    case TX_SUB_HUMAN: tessera.sub_human[tr] = (uint8_t)tess_clampi(v, 0, (int32_t)TESS_HUMAN_MS); break;
     case TX_BNC_SPEED: tessera.bounce[tr].speed = (uint8_t)tess_clampi(v, 1, 64); break;
     case TX_BNC_ANGLE: tessera.bounce[tr].angle = (uint8_t)tess_clampi(v, 0, 90); break;
     case TX_AWK_PROB: tessera.awake[tr].prob = (uint8_t)tess_clampi(v, 0, 100); break;

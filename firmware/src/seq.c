@@ -998,18 +998,23 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
         seq_release(t);
         return;
     }
+    uint32_t cut;
+    int32_t hv = seq_human_vel(trk_index(t), &cut);  /* (TWEAK's HUMAN: the step's velocity and length, seq_sub.c) */
+#define HV(v) (uint8_t)((int32_t)(v) + hv < 1 ? 1 : (int32_t)(v) + hv > 127 ? 127 : (int32_t)(v) + hv)
     for (i = 0; i < s->n && i < 4u; i++, m++) {
         nn[m] = s->note[i];
-        vv[m] = (uint8_t)vel;
+        vv[m] = HV(vel);
         sk |= ((skip >> i) & 1u) << m;
     }
     for (i = 0; i < NLANE; i++)
         if ((s->hit >> i) & 1u) {
             nn[m] = DRUM_LANE_NOTE[i];
-            vv[m] = (uint8_t)((s->acc >> i) & 1u ? 127u : vel);
+            vv[m] = HV((s->acc >> i) & 1u ? 127u : vel);
             sk |= ((skip >> (8u + i)) & 1u) << m;
             m++;
         }
+#undef HV
+    if (cut) gate = gate * (100u - cut) / 100u;
     t->slide_glide = (uint8_t)slide_in;
     if (!slide_in)
         seq_release(t);

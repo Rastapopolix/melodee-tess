@@ -74,6 +74,7 @@ static const cord_dest_t CORD_DESTS[CD_N] = {
     [CD_GRD_HAT] = S_(CD_GRD_HAT, TX_GRD_HAT, "AT HAT", "Atlas' HAT: how much of its density the hat gets"),
     [CD_GRD_TOMS] = S_(CD_GRD_TOMS, TX_GRD_TOMS, "AT TOMS", "Atlas' TOMS: how many of the near misses play the tom"),
     [CD_AN_VARY] = S_(CD_AN_VARY, TX_AN_VARY, "AN VARY", "Answer's VARY: how much each answer changes the phrase"),
+    [CD_SUB_HUMAN] = S_(CD_SUB_HUMAN, TX_SUB_HUMAN, "H TIME", "TIMING's HUMAN: how late a step may play"),
 };
 #undef V_
 #undef B_
@@ -497,4 +498,14 @@ static __attribute__((noinline)) void cord_step_end(uint32_t tr)
                                                now - (cord_held.set[j] - cord_held.base[j]));
     }
     cord_held.n = 0;
+}
+/* a Tessera setting of track tr as its cords make it now (seq_sub.c: HUMAN, outside the generator's step) */
+static int32_t cord_tess_get(uint32_t tr, uint32_t x)
+{
+    int32_t v;
+    if (tr >= TESSERA_TRACKS || !cord_smask[tr]) return tessera_param_get(tr, x);
+    cord_step_begin(tr);
+    v = tessera_param_get(tr, x);
+    cord_step_end(tr);
+    return v;
 }

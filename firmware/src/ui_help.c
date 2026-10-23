@@ -403,7 +403,7 @@ static void help_find(uint32_t k)
     else if (pg->graph == GR_TWEAK) x = TW[k];
     else if (pg->graph == GR_TWEAK2) x = TW2[k];
     else if (pg->graph == GR_NOTELEN) x = NL[k];
-    else if (pg->graph == GR_TIMING && k < 3u) x = k == 2u ? TX_SUB_SHAPE : k ? TX_SUB_CHANCE : TX_SUB_RATCH;
+    else if (pg->graph == GR_TIMING) x = k == 3u ? TX_SUB_HUMAN : k == 2u ? TX_SUB_SHAPE : k ? TX_SUB_CHANCE : TX_SUB_RATCH;
     else if (pg->graph == GR_ENERGY && k < 2u) x = k ? TX_EN_RESTS : TX_EN_ARC;
     else if (pg->graph == GR_MIDICH) { x = TX_MIDI_CH; help_tr = k; }   /* (KNOB k: track k's) */
     else if (pg->graph == GR_KEYLINK && k == 0u) x = TX_KEY_LINK;

@@ -161,7 +161,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x213 | FORM FLOURISH | -12 to 12 semitones | 0 | Semitones added on the last beat of every phrase; 0 is off. |
 | 0x214 | TWEAK SHIFT | -24 to 24 semitones | 0 | Transposes the notes by semitones; while following, by scale steps from the followed note. |
 | 0x215 | TWEAK DROP | 0 to 100 % | 0 | The chance a hit is left out, whatever the generator. |
-| 0x216 | TWEAK HUMAN | 0 to 100 % | 0 | Varies velocity, gate and timing a little, as a player would: at 100 a note up to 20 ms behind the beat, never early; the same each time the piece plays. |
+| 0x216 | TWEAK HUMAN | 0 to 100 % | 0 | Varies each note's velocity and length a little, as a player would: at 100 up to 20 softer or louder and up to half as long; the same each time the piece plays. STEP tracks too. The timing: TIMING's HUMAN. |
 | 0x217 | TWEAK FOLLOW | OFF, T1, T2, T3, T4 | OFF | Plays another track's pitch, SHIFT away, in this track's scale; OFF is its own. |
 | 0x218 | ATLAS X | 0 to 255 | 128 | Where on the map of drum patterns, left to right; between two, a blend of both. |
 | 0x219 | ATLAS Y | 0 to 255 | 128 | Where on the map of drum patterns, top to bottom; between two, a blend of both. |
@@ -239,6 +239,7 @@ The engine's eight (ENGINE 1 to 8) are named by the track's engine; their ranges
 | 0x264 | KEY LINK | OWN, LINKED | LINKED | LINKED: one key for the whole project. Changing ROOT on any melodic track sets it on the others too, as the scale always is; drum tracks keep theirs. OWN: each track its own ROOT. Turning it on gives every track the selected track's key. SCL's Key link row; on in a new project, saved with it. |
 | 0x265 | SOURCE | OFF, T1, T2, T3, T4 | OFF | A STEP pattern for TURING or EUCLID to play from: T1 to T4 is that track's pattern playing now (this track's own too), which stays as written. TURING loops its first LEN steps and PROB changes them a step at a time; EUCLID plays its notes in order on its hits. OFF, or a pattern without notes: the generator's own. OCT+ held on GEN, KNOB 1. |
 | 0x266 | KEEP | FREE, RHYTHM, PITCH | FREE | With a SOURCE, what stays as written. FREE: TURING may change a step's pitch or its hit. RHYTHM: only the pitches change (EUCLID: the source's own rhythm, on EUCLID's pitches). PITCH: only the hits come and go. OCT+ held on GEN, KNOB 2. |
+| 0x267 | TIMING HUMAN | 0 to 60 ms | 0 | Plays each step a little late, as a player behind the beat: up to this many ms, a new amount each step, never early and never more than a quarter of the step. The same each time the piece plays. 0 on the grid. STEP tracks too (with a step's NUDGE). TWEAK's HUMAN varies velocity and length. |
 
 ## Mods
 
@@ -335,3 +336,4 @@ A mod (the MODS page, under LFO) moves a destination on any track by a source on
 | AT HAT | the generator's step | Atlas' HAT: how much of its density the hat gets |
 | AT TOMS | the generator's step | Atlas' TOMS: how many of the near misses play the tom |
 | AN VARY | the generator's step | Answer's VARY: how much each answer changes the phrase |
+| H TIME | the generator's step | TIMING's HUMAN: how late a step may play |
