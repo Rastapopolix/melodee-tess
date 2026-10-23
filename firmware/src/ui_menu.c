@@ -54,14 +54,14 @@ static void crash_where(char *b, uint32_t audio, uint32_t stage, uint32_t page, 
     str_cpy(b + str_len(b), " S IN", 6);
 }
 
-/* https://github.com/Rastapopolix/melodee-tess, QR version 3, correction L (segno; 44 bytes, over M's 42).
+/* https://github.com/Rastapopolix/tessera, QR version 3, correction M (segno; 38 bytes of M's 42).
  * One row per word, leftmost module in bit 0; the constant matrix needs no encoder or RAM. */
 static const uint32_t ABOUT_QR[29] = {
-    0x1FC26E7Fu, 0x10515841u, 0x174D0E5Du, 0x1743AD5Du, 0x175D155Du, 0x10544641u,
-    0x1FD5557Fu, 0x00015200u, 0x030276E3u, 0x0DA8C4A5u, 0x0105DBF4u, 0x022D4C2Eu,
-    0x10C9C6C1u, 0x19D7B596u, 0x0733C4E9u, 0x15881788u, 0x06AA70D8u, 0x1DC9C08Fu,
-    0x130EB5DBu, 0x00558DADu, 0x1DFA7FE1u, 0x0317D300u, 0x075AD37Fu, 0x01185541u,
-    0x03F81E5Du, 0x163FD05Du, 0x0FF9A05Du, 0x16C51941u, 0x05CA617Fu,
+    0x1FC26A7Fu, 0x10515D41u, 0x174C495Du, 0x1742295Du, 0x175D505Du, 0x10552E41u,
+    0x1FD5557Fu, 0x00009F00u, 0x0E63E741u, 0x0DA8D501u, 0x0105806Fu, 0x022D5327u,
+    0x10C9FFDEu, 0x19D79A3Cu, 0x07328FF3u, 0x1588551Bu, 0x06AB8CF1u, 0x1DC9B0ADu,
+    0x130E82C7u, 0x0055B0B5u, 0x1DFA5AD1u, 0x0317CD00u, 0x075A8A7Fu, 0x19184841u,
+    0x13F86C5Du, 0x163FFC5Du, 0x0FF9C05Du, 0x16C53641u, 0x05CA377Fu,
 };
 
 static void draw_about_qr(int32_t x, int32_t y)
@@ -85,7 +85,7 @@ static const menu_credit_t MENU_CREDITS[] = {
     {"Tessera by Theo Dainis (Rastapopolix): the generators, engines and project format; a fork of Melodee / GPL-3.0", MC_TEXT},
     {"Thanks: Inputsignwave", MC_TEXT},
     {"A tessera is the small tile of a mosaic: short phrases set side by side into a larger form", MC_TEXT},
-    {"https://github.com/Rastapopolix/melodee-tess", MC_URL},
+    {"https://github.com/Rastapopolix/tessera", MC_URL},
     {"", MC_TEXT},
     {"MELODEE / ORIGINAL", MC_TITLE},                  /* Tessera is a modified Melodee */
     {"Kerem Kilic (keremimo), Ellic Studio / GPL-3.0", MC_TEXT},
@@ -191,7 +191,7 @@ static int32_t menu_document(int32_t y, int draw)
         cv_text(6, y + 166, &AF_S, "and Felucca by Leo Kuroshita,", T_TEXT);
         cv_text(6, y + 184, &AF_S, "H\xFCgelton Instruments", T_SEC);
         cv_text(6, y + 202, &AF_S, "GPL-3.0-only", T_TEXT);
-        cv_text(6, y + 220, &AF_S, "github.com/Rastapopolix/melodee-tess", T_MID);
+        cv_text(6, y + 220, &AF_S, "github.com/Rastapopolix/tessera", T_MID);
     }
     y += 246;
 #ifdef FM1_CRASH_MAGIC
@@ -239,7 +239,7 @@ static int32_t menu_document(int32_t y, int draw)
     y = menu_text("Fonts and icons: their licences travel with the source and the release files.", y, T_TEXT, draw);
     y = menu_text("NO WARRANTY", y, T_TEXT, draw);
     y = menu_text("Full notices in source:", y + 8, T_TEXT, draw);
-    y = menu_text("github.com/Rastapopolix/melodee-tess", y, T_MID, draw);
+    y = menu_text("github.com/Rastapopolix/tessera", y, T_MID, draw);
     return y + 4;
 }
 static int32_t menu_scroll_max(void)

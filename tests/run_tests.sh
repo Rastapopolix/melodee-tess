@@ -97,7 +97,7 @@ case $SOUND in 0 | 1 | only) ;; *) echo "SOUND=0, 1 or only"; exit 2 ;; esac
 [ "$PARALLEL" -ge 1 ] 2>/dev/null || { echo "PARALLEL=n, n >= 1"; exit 2; }
 python3 tools/gen_scales.py --check || exit 1
 python3 tools/audio_contract.py --check || exit 1
-[ -f build/melodee-tess.fwsc ] || { echo "run ./build.sh first"; exit 1; }
+[ -f build/tessera.fwsc ] || { echo "run ./build.sh first"; exit 1; }
 TABLES=0; [ -f build/gen/melodee_tables.h ] && TABLES=1
 PIL=0; python3 -c "import PIL" 2>/dev/null && PIL=1
 mkdir -p "$OUT" "$LOG"
@@ -183,11 +183,11 @@ demo_tests() {                                    # the demos made again, the sh
 old_to_new() {                                    # a package of another app (this one cut short) -> this build
     head -c 200000 build/melodee.bin > "$OUT/old_app.bin" &&
         python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null &&
-        "$OUT/ldr_test" "$OUT/old.fwsc" build/melodee-tess.fwsc
+        "$OUT/ldr_test" "$OUT/old.fwsc" build/tessera.fwsc
 }
 powercut_tests() {
     python3 tests/boot_fixtures.py &&
-        "$OUT/loader_powercut_test" build/host/boot-fixtures/legacy.fwsc build/melodee-tess.fwsc \
+        "$OUT/loader_powercut_test" build/host/boot-fixtures/legacy.fwsc build/tessera.fwsc \
         build/host/boot-fixtures/same-stub.fwsc build/host/boot-fixtures/other-legacy.fwsc \
         build/host/boot-fixtures/old-stub.fwsc
 }
@@ -279,7 +279,7 @@ if core; then
     t "boot stub: CRCs, rescue keys, damaged staging and retry fallback" boot_stub_test -O2
     run "boot packages: constant entry sector and valid directory CRCs" python3 tests/boot_stub_pkg_test.py
     t "power cuts: every erase/page, resume and unchanged boot sector" loader_powercut_test -O2 -- powercut_tests
-    t "M-UPGRADE entry (own loader)" ota_test -DOWN_PKG=1 -- "$OUT/ota_test" build/melodee-tess.fwsc
+    t "M-UPGRADE entry (own loader)" ota_test -DOWN_PKG=1 -- "$OUT/ota_test" build/tessera.fwsc
     t "update loader: other app -> this build" ldr_test -- old_to_new
     run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/install_test.py
     run "ROM USB recovery: backup, protected regions, interrupted writes and transport failures" python3 tests/recovery_test.py

@@ -68,13 +68,13 @@ jobs:
         run: |
           mkdir -p build/release-assets
           ./build.sh --release "$V" 2>&1 | tee dual.log
-          cp "build/melodee-tess-$V.fwsc" build/release-assets/
+          cp "build/tessera-$V.fwsc" build/release-assets/
           MELODEE_DUAL_CORE=0 ./build.sh --release "$V" 2>&1 | tee single.log
-          cp "build/melodee-tess-$V-1core.fwsc" build/release-assets/
+          cp "build/tessera-$V-1core.fwsc" build/release-assets/
       - name: Check the packages as the site does, checksums
         run: |
-          python web/make_site.py "build/release-assets/melodee-tess-$V.fwsc" \
-            "build/release-assets/melodee-tess-$V-1core.fwsc" "$V" build/site-check
+          python web/make_site.py "build/release-assets/tessera-$V.fwsc" \
+            "build/release-assets/tessera-$V-1core.fwsc" "$V" build/site-check
           (cd build/release-assets && sha256sum *.fwsc > SHA256SUMS && cat SHA256SUMS)
           {
             echo "### Tessera $V"

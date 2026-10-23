@@ -7,7 +7,7 @@
 //   the user preset bank / librarian, library files, live pushes, older-firmware fallback, the v3 tracks
 //   and the mixer, the v5 drum grid in steps and user presets), its tab layout and ja/en strings,
 //   and the user-sample pipeline byte for byte against tools/sampleio.py
-// - fm1pkg.js: productOf and logicalImage on build/melodee-tess.fwsc (skipped without a build)
+// - fm1pkg.js: productOf and logicalImage on build/tessera.fwsc (skipped without a build)
 // - fm1ota.js: a full install and an unplug during the write against a simulated FM-1
 
 import { execFileSync } from "node:child_process";
@@ -1240,7 +1240,7 @@ function samplesMatch() {
 
 /* ------------------------------------------------------- packages: JS == Python --- */
 async function packages() {
-  const pkg = join(HERE, "../build/melodee-tess.fwsc");
+  const pkg = join(HERE, "../build/tessera.fwsc");
   if (!existsSync(pkg)) {
     console.log("packages: skipped (run ./build.sh first)");
     return;
@@ -1531,10 +1531,10 @@ async function localBuild() {
     await element("local-go").listeners.click();
     return {before, status, enabled, installed, asked, unlocked:!element("local-file").disabled && !element("go").disabled};
   }
-  let r = await run(file("melodee-tess-1.2.9-test.fwsc", "FM-1_91029"));
-  ok(r.before && r.enabled && r.status === "Test build checked: melodee-tess-1.2.9-test.fwsc (FM-1_91029)",
+  let r = await run(file("tessera-1.2.9-test.fwsc", "FM-1_91029"));
+  ok(r.before && r.enabled && r.status === "Test build checked: tessera-1.2.9-test.fwsc (FM-1_91029)",
     "local: Install test build stays off until a picked file checks out");
-  ok(r.asked.length === 1 && r.asked[0].includes("melodee-tess-1.2.9-test.fwsc (FM-1_91029)") && r.installed.length === 1
+  ok(r.asked.length === 1 && r.asked[0].includes("tessera-1.2.9-test.fwsc (FM-1_91029)") && r.installed.length === 1
     && r.installed[0][1] === "FM-1_91029" && r.installed[0][0].startsWith("image:") && r.unlocked,
     "local: confirmed test build installs with the identity read from the file");
   r = await run(file("t.fwsc", "FM-1_91029"), {answer:false});

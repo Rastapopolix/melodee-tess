@@ -34,7 +34,7 @@ class NightlySite(unittest.TestCase):
             main(dual, single, "1.1.0", site)
             home = (site / "index.html").read_text()   # the project page names the release and its packages
             self.assertIn("Install 1.1.0", home)
-            self.assertIn("firmware/melodee-tess-1.1.0-1core.fwsc", home)
+            self.assertIn("firmware/tessera-1.1.0-1core.fwsc", home)
             self.assertNotRegex(home, r"@[A-Z0-9]+@")
             self.assertTrue((site / "media/about/setup.jpg").exists())   # the About photo
             editor = site / "webapp/editor/index.html"
@@ -43,8 +43,8 @@ class NightlySite(unittest.TestCase):
             (site / "firmware/release.json").unlink()
             publish(site, str(normal), str(slow), "next-abcdef0", "abcdef0" * 5 + "abcde", "2026-10-11T02:00:00Z")
             self.assertEqual(editor.read_text(), "existing published editor")
-            self.assertEqual((site / "firmware/melodee-tess-1.1.0.fwsc").read_bytes(), dual.read_bytes())
-            self.assertEqual((site / "firmware/melodee-tess-1.1.0-1core.fwsc").read_bytes(), single.read_bytes())
+            self.assertEqual((site / "firmware/tessera-1.1.0.fwsc").read_bytes(), dual.read_bytes())
+            self.assertEqual((site / "firmware/tessera-1.1.0-1core.fwsc").read_bytes(), single.read_bytes())
             manifest = json.loads((site / "firmware/nightly.json").read_text())
             self.assertEqual((manifest["product"], manifest["branch"]), ("FM-1_900", "next"))
             # Regenerating a release keeps both published nightly variants.

@@ -54,7 +54,7 @@ static int reference(FILE *f)
     static const char *const PART[3] = {"Track settings (one value per track)", "Global settings", "Tessera (one value per track)"};
     uint32_t part, i;
     char r[512], df[64];
-    fprintf(f, "# Parameters\n\nEvery setting of melodee-tess with its number, generated from `firmware/src/pid.c` by "
+    fprintf(f, "# Parameters\n\nEvery setting of Tessera with its number, generated from `firmware/src/pid.c` by "
                "`tests/pid_test.c` (`PID_UPDATE=1 sh tests/run_tests.sh` rewrites it; the suite fails when it is out of "
                "date). The numbers are fixed: mods and saved projects keep them.\n\nThe engine's eight (ENGINE 1 to 8) "
                "are named by the track's engine; their ranges here are the first track's default engine's.\n");

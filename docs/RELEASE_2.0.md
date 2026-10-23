@@ -86,10 +86,10 @@ turn a knob). MARMO, VITRO, NIGHT and CONTRAST are in MENU > COLOR. Lists: KNOB 
 MENU > TRACK KNOB sets which knob picks the track.
 
 ### 📦 Installation
-Flash it with the [web installer](https://rastapopolix.github.io/melodee-tess/webapp/installer/) (Chrome or Edge), or
+Flash it with the [web installer](https://rastapopolix.github.io/tessera/webapp/installer/) (Chrome or Edge), or
 download a `.fwsc` from the assets below:
-* `melodee-tess-2.0.fwsc`: the standard (dual-core) build. Start here.
-* `melodee-tess-2.0-1core.fwsc`: single core, for FM-1s that crash with the standard build (red TESSERA CRASH
+* `tessera-2.0.fwsc`: the standard (dual-core) build. Start here.
+* `tessera-2.0-1core.fwsc`: single core, for FM-1s that crash with the standard build (red TESSERA CRASH
   screen, freezes, or restarts into update mode).
 
 Do not unplug the FM-1 while it is writing. This is experimental firmware: use it at your own risk.

@@ -167,10 +167,10 @@ Or, to install your own build from the web installer, make a local copy of the s
 
 ```
 # Build both variants from the same source (copy the first away: the second build starts afresh).
-./build.sh --release 2.0 && cp build/melodee-tess-2.0.fwsc /tmp/
-MELODEE_DUAL_CORE=0 ./build.sh --release 2.0 && cp build/melodee-tess-2.0-1core.fwsc /tmp/
+./build.sh --release 2.0 && cp build/tessera-2.0.fwsc /tmp/
+MELODEE_DUAL_CORE=0 ./build.sh --release 2.0 && cp build/tessera-2.0-1core.fwsc /tmp/
 web/sim/build.sh                                 # optional: the simulator (Emscripten)
-python3 web/make_site.py /tmp/melodee-tess-2.0.fwsc /tmp/melodee-tess-2.0-1core.fwsc 2.0 /tmp/tessera-site build/sim
+python3 web/make_site.py /tmp/tessera-2.0.fwsc /tmp/tessera-2.0-1core.fwsc 2.0 /tmp/tessera-site build/sim
 cd /tmp/tessera-site && python3 -m http.server 8000
 # open http://localhost:8000/ (the project page) or http://localhost:8000/webapp/installer/
 ```

@@ -1,12 +1,12 @@
 <p align="center"><img src="assets/brand/banner.png" alt="Tessera: generative firmware for the M-Vave FM-1" width="100%"></p>
 
 <p align="center">
-<b><a href="https://rastapopolix.github.io/melodee-tess/">Project page</a></b> ·
-<b><a href="https://rastapopolix.github.io/melodee-tess/webapp/installer/">Install</a></b> ·
-<b><a href="https://rastapopolix.github.io/melodee-tess/webapp/sim/">Try it in your browser</a></b> ·
+<b><a href="https://rastapopolix.github.io/tessera/">Project page</a></b> ·
+<b><a href="https://rastapopolix.github.io/tessera/webapp/installer/">Install</a></b> ·
+<b><a href="https://rastapopolix.github.io/tessera/webapp/sim/">Try it in your browser</a></b> ·
 <b><a href="MANUAL.md">Manual</a></b> ·
 <b><a href="RECIPES.md">Recipes</a></b> ·
-<b><a href="https://github.com/Rastapopolix/melodee-tess/releases/latest">Releases</a></b>
+<b><a href="https://github.com/Rastapopolix/tessera/releases/latest">Releases</a></b>
 </p>
 
 **Tessera** is a generative firmware for the M-Vave FM-1. Each of the four tracks can play its own steps, an
@@ -27,11 +27,11 @@ tiles arranged into a larger pattern. The word also meant a die, which suits the
 ## Install
 
 Flash it from your browser (Chrome or Edge, FM-1 connected directly by USB):
-**[Web installer](https://rastapopolix.github.io/melodee-tess/webapp/installer/)**. Afterwards you can edit sounds
-and sequences from the computer with the [web editor](https://rastapopolix.github.io/melodee-tess/webapp/editor/).
+**[Web installer](https://rastapopolix.github.io/tessera/webapp/installer/)**. Afterwards you can edit sounds
+and sequences from the computer with the [web editor](https://rastapopolix.github.io/tessera/webapp/editor/).
 
-Each release has two builds: `melodee-tess-X.Y.fwsc` (standard, dual core: start here) and
-`melodee-tess-X.Y-1core.fwsc` (single core, for FM-1s that crash with the standard build).
+Each release has two builds: `tessera-X.Y.fwsc` (standard, dual core: start here) and
+`tessera-X.Y-1core.fwsc` (single core, for FM-1s that crash with the standard build).
 
 Do not unplug the FM-1 while it is writing. This is experimental firmware: use it at your own risk. The installer
 page also has a way back to the official V15 firmware, with a backup first.

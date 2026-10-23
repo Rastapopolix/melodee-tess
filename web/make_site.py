@@ -7,9 +7,9 @@
                                     stays at webapp/installer/)
   media/gallery/, media/brand/      its pictures: assets/gallery (tests/gallery_render.c), assets/brand (tools/gen_brand.py)
   media/about/                      the About photo (assets/about)
-  firmware/melodee-tess-VER.fwsc    the package, both cores (+ LICENSE, LICENSING.md, LICENSES/: the
+  firmware/tessera-VER.fwsc    the package, both cores (+ LICENSE, LICENSING.md, LICENSES/: the
                                     packages hold JieLi SDK files under Apache-2.0, see LICENSING.md)
-  firmware/melodee-tess-VER-1core.fwsc the same release built with MELODEE_DUAL_CORE=0, for FM-1s that crash
+  firmware/tessera-VER-1core.fwsc the same release built with MELODEE_DUAL_CORE=0, for FM-1s that crash
                                     with the dual-core build; the installer offers both
   firmware/melodee-nightly*.fwsc    next's development builds (nightly.json; publish_nightly.py), kept as published
   firmware/melodee-synth*.fwsc      the synth-only firmware, both cores (synth.json; publish_synth.py: the
@@ -20,7 +20,7 @@
   webapp/sim/                       the web simulator (web/sim/build.sh: build/sim/), when given; else kept as published
   src/                              not touched
 
-  web/make_site.py build/melodee-tess-X.Y.fwsc build/melodee-tess-X.Y-1core.fwsc X.Y OUT_DIR [build/sim]
+  web/make_site.py build/tessera-X.Y.fwsc build/tessera-X.Y-1core.fwsc X.Y OUT_DIR [build/sim]
 
 The packages must be ones made by tools/fm1pkg_make.py (Melodee's own loader, no vendor files), from one
 release: their identity (FM-1_9xx, FM-1_9xxx from 0.10, FM-1_9xxxx for X.Y.Z) is read from them and must be
@@ -127,7 +127,7 @@ def main(pkg, single, version, out, nightly=None, installer_only=False, synth=No
         strip_module((HERE / "fm1ota.js").read_text(encoding="utf-8")) + "\n" + \
         strip_module((HERE / "fm1backup.js").read_text(encoding="utf-8"))
     v = re.sub(r'[^A-Za-z0-9.-]', '-', version)
-    name, name1 = f"melodee-tess-{v}.fwsc", f"melodee-tess-{v}-1core.fwsc"
+    name, name1 = f"tessera-{v}.fwsc", f"tessera-{v}-1core.fwsc"
     release_meta = {"version": version, "product": product,
                     "pkg": {"dual": "../../firmware/" + name, "single": "../../firmware/" + name1}}
     meta = json.dumps({**release_meta, "nightly": nightly_meta, "synth": synth_meta})
@@ -140,7 +140,7 @@ def main(pkg, single, version, out, nightly=None, installer_only=False, synth=No
         d.mkdir(parents=True, exist_ok=True)
     keep = {name, name1, "melodee-nightly.fwsc", "melodee-nightly-1core.fwsc", "melodee-synth.fwsc",
             "melodee-synth-1core.fwsc"}
-    for old in fw.glob("melodee-*.fwsc"):
+    for old in [*fw.glob("melodee-*.fwsc"), *fw.glob("tessera-*.fwsc")]:   # (melodee-tess-*: the releases before 2.0)
         if old.name not in keep:
             old.unlink()
     (inst / "index.html").write_text(html, encoding="utf-8")
