@@ -27,7 +27,7 @@ static const gshot_t SHOTS[] = {
     {"gen_length", G_SCENE, S_GEN_LENGTH},
     {"cords", G_SCENE, S_CORDS}, {"mods_live", G_SCENE, S_MODS_LIVE_GEN}, {"matrix", G_SCENE, S_MATRIX},
     {"organic", G_SCENE, S_ORGANIC}, {"mod_shortcut", G_SCENE, S_MOD_SHORTCUT},
-    {"help", G_SCENE, S_HELP_ZOOM},
+    {"help", G_SCENE, S_HELP},
     {"edit_fm6", G_SCENE, S_FM6_ALG5}, {"fm6_eg", G_SCENE, S_FM6_EG}, {"edit_trio", G_TRIO, 0},
     {"drum", G_SCENE, S_DRUM}, {"patterns", G_SCENE, S_PATGRID}, {"mixer", G_SCENE, S_MIXER},
     {"gen_timing", G_TIMING, 0}, {"gen_energy", G_SCENE, S_GEN_ENERGY}, {"gen_answer", G_SCENE, S_GEN_ANSWER},

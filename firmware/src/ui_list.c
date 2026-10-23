@@ -135,6 +135,18 @@ static void list_capture(uint32_t c, const char *label, const char *val, const c
     lcap[c].on = label[0] || val[0];
 }
 
+/* the help card (ui_help.c): the page shown is a list: its picked row's page and column */
+static int list_help_row(uint32_t *page, uint32_t *slot)
+{
+    const list_t *l = list_on();
+    const lrow_t *rw;
+    if (!l)
+        return 0;
+    rw = list_at(l, lst.row);
+    *page = page_titled(rw->page);
+    *slot = rw->slot & 3u;
+    return *page < NPAGES;
+}
 /* KNOB 1 the row, KNOB 2 its value (the row's page edits it, as if it were shown) */
 static void list_knob(uint32_t k, int32_t s)
 {

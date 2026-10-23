@@ -34,6 +34,7 @@ static uint32_t host_slots[3u * 0x14000u / 4u];          /* USR1..3 (zero: empty
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
+#include "pid_help_unpack.h"                           /* (the packed help texts: test_help_all) */
 
 /* ------------------------------------------------------------ HAL stubs --- */
 #define FM1_NCOL 11u
@@ -1378,6 +1379,86 @@ static int test_mods_page(void)
     return bad;
 }
 
+/* help (ui_help.c): every knob of every page a track shows has a help text of its own, none falls through to
+ * help_find's fallback (Theo 2026-10-23: SONG, NOTES, PATTERN): every engine on STEP, ARP and every generator
+ * MODE (an FM6 track), a DRUM track on STEP and ATLAS; HOME's knobs too */
+static int help_all_track(const char *what, int *seen)
+{
+    uint32_t i, k, home;
+    int bad = 0;
+    for (home = 0; home < 2u; home++)
+        for (i = 0; i < (home ? 1u : NPAGES); i++) {
+            if (!home && !page_visible(i)) continue;
+            ui.home = (uint8_t)home;
+            ui.page = (uint8_t)i;
+            for (k = 0; k < 4u; k++) {
+                const pid_entry_t *e;
+                help_find(k);
+                e = help.pid != PID_NONE ? pid_find(help.pid) : 0;
+                if (e ? !pid_help(e) || !pid_help(e)[0] || !e->name : !help.name || help.hp == HP_NONE) {
+                    if (!seen[home ? NPAGES * 4u + k : i * 4u + k]++)
+                        printf("  no help: %s, %s KNOB %u (%s)\n", what, home ? "HOME" : PAGES[i].title, k + 1u,
+                               help.name ? help.name : "?");
+                    bad++;
+                } else if (text_w(&AF_S, e ? e->name : help.name) > 140) {   /* (help_strip: the name in 140 px) */
+                    if (!seen[home ? NPAGES * 4u + k : i * 4u + k]++)
+                        printf("  help name cut: %s, %s KNOB %u (%s)\n", what, home ? "HOME" : PAGES[i].title, k + 1u,
+                               e ? e->name : help.name);
+                    bad++;
+                }
+            }
+        }
+    ui.home = 0;
+    return bad;
+}
+static int test_help_all(void)
+{
+    static int seen[(NPAGES + 1u) * 4u];
+    static char text[PID_HELP_MAX + 1];
+    char what[48];
+    uint32_t e, m;
+    int bad = 0;
+    for (m = 0; m < HP_COUNT; m++) {                    /* (the page texts: each one there, and packed as written) */
+        int ok = HELP_PAGE[m].name && HELP_PAGE[m].text && HELP_PAGE[m].text[0] && HP_COUNT == HELP_PAGE_N;
+        if (ok) {
+            pid_help_unpack(PID_HELP_N + m, text);
+            ok = str_eq(text, HELP_PAGE[m].text);
+        }
+        if (!ok) printf("  HELP_PAGE[%u] (%s) is missing or packs otherwise (tools/gen_help.py)\n", m,
+                        HELP_PAGE[m].name ? HELP_PAGE[m].name : "?");
+        bad += !ok;
+    }
+    ui_power_on();
+    song.sel = 0;
+    for (e = 0; e < NENGINES; e++) {                    /* (every engine this build has, on STEP) */
+        if (!ENGINES[e] || !ENGINES[e]->name) continue;
+        set_engine_of(TSEL, e);
+        TSEL->engine = TSEL->eng_req;
+        seqm_set(0, 0);
+        snprintf(what, sizeof what, "%s STEP", ENGINES[e]->name);
+        bad += help_all_track(what, seen);
+    }
+    set_engine_of(TSEL, ENGI_FM6);
+    TSEL->engine = TSEL->eng_req;
+    for (m = 0; m <= TESS_ENG_COUNT; m++) {            /* (STEP, ARP, then every generator) */
+        seqm_set(0, (int32_t)m);
+        snprintf(what, sizeof what, "FM6 MODE %u", m);
+        bad += help_all_track(what, seen);
+    }
+    seqm_set(0, 0);
+    song.sel = 3;                                       /* (a DRUM track) */
+    set_engine_of(TSEL, ENGI_DRUM);
+    TSEL->engine = TSEL->eng_req;
+    seqm_set(3, 0);
+    bad += help_all_track("DRUM STEP", seen);
+    seqm_set(3, 1 + TESS_ENG_GRIDS);
+    bad += help_all_track("DRUM ATLAS", seen);
+    seqm_set(3, 0);
+    song.sel = 0;
+    ui_power_on();
+    return check("help: every knob of every page has a text of its own (none falls through), its name fits", !bad);
+}
+
 /* help (ui_help.c): ARP held, a knob turned shows its help and changes nothing; letting ARP go opens no page */
 static int test_help_gesture(void)
 {
@@ -1395,36 +1476,41 @@ static int test_help_gesture(void)
                  help.on && help.pid == PID_TESS(TX_EV_AMOUNT) && tessera_param_get(0, TX_EV_AMOUNT) == was);
     turn(EN_K1, 1);
     bad += check("...another knob while held: its help instead (LOCK)", help.on && help.pid == PID_TESS(TX_EV_LOCK));
-    {   /* LOCK opens at the largest size all of it fits (12 px: at 15 px it would scroll); it fits: turning on or back
-         * changes nothing, and draws nothing again */
-        uint32_t big = help_count(HELP_ZOOMS - 1u) <= help_rows(HELP_ZOOMS - 1u) ? HELP_ZOOMS - 1u : 0u;
-        int ok = help.zoom == big && !help.top && help_count(help.zoom) <= help_rows(help.zoom);
-        help.card = 0; ui.force = 0;
-        help_knob(0, 1);
-        ok &= help.zoom == big && !help.top && !help.card && !ui.force;
-        help_knob(0, -1);
-        if (big) {                                      /* (a text that fit at 15 px: back to 12, the card alone redrawn) */
-            ok &= help.zoom == 0u && help.card && !ui.force;
+    {   /* one size, 15 px (Theo 2026-10-23): no larger / smaller any more. On EVOLVE, a text that fits the card: turning
+         * on or back changes nothing and draws nothing again; one longer than the card scrolls (the card alone) */
+        uint32_t k, fits = 0, longer = 0;
+        int ok = 1;
+        for (k = 0; k < 4u; k++) {
+            help.on = 0;                                /* (the knob's first turn: its card, at the top) */
+            turn(EN_K1 + k, 1);
+            ok &= help.on && help.knob == k && !help.top;
+            help.card = 0; ui.force = 0;
+            help_knob(k, 1);
+            if (help_count() <= HELP_ROWS) fits++, ok &= !help.top && !help.card && !ui.force;
+            else longer++, ok &= help.top == 1u && help.card && !ui.force;
             frame();
+            help.card = 0; ui.force = 0;
+            help_knob(k, -1);
+            help_knob(k, -1);
+            ok &= !help.top && !ui.force;
         }
-        help.card = 0; ui.force = 0;
-        help_knob(0, -1);
-        bad += check("..LOCK's help opens at the largest size it fits (12 px or 15 px, no longer 10), then turning changes "
-                     "nothing", ok && help.zoom == 0u && !help.card && !ui.force);
+        bad += check("..EVOLVE's help cards in the one size (15 px): one that fits stays, one longer scrolls, back to its top",
+                     ok && fits && longer);
+        help_find(0);
     }
     fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
     frame();
     frame();
     bad += check("ARP let go: the help closes, and no page opens (still EVOLVE)", !help.on && str_eq(cur_page()->title, "EVOLVE"));
-    {   /* GEN's MODE: longer than the card even at the smallest, so turning on scrolls it, to its end; back to the top */
+    {   /* GEN's MODE: longer than the card, so turning on scrolls it, to its end; back to the top */
         uint32_t k, n, most = 0;
         int ok;
         go_title("GEN");
         fm1_in.buttons |= 1u << panel.btn[B_ARP];
         frame();
         turn(EN_K1, 1);
-        n = help_count(0);
-        ok = help.on && help.pid == PID_TESS(TX_MODE) && help.zoom == 0u && n > help_rows(0);
+        n = help_count();
+        ok = help.on && help.pid == PID_TESS(TX_MODE) && n > HELP_ROWS;
         frame();
         help.card = 0; ui.force = 0;
         help_knob(0, 1);                                /* (a scroll: the card alone, not the page under it) */
@@ -1436,10 +1522,10 @@ static int test_help_gesture(void)
             help_knob(0, 1);
             most = help.top > most ? help.top : most;
         }
-        ok &= help.zoom == 0u && most == n - help_rows(0) && help.top == most;
+        ok &= most == n - HELP_ROWS && help.top == most;
         for (k = 0; k < 40u; k++) help_knob(0, -1);
-        bad += check("GEN's MODE help, longer than the card: turning on scrolls to its last line, back to its first",
-                     ok && !help.top && !help.zoom);
+        bad += check("GEN's MODE help, longer than the card at 15 px: turning on scrolls to its last line, back to its first",
+                     ok && !help.top);
         fm1_in.buttons &= ~(1u << panel.btn[B_ARP]);
         frame();
         frame();
@@ -5636,6 +5722,7 @@ int main(void)
     bad += test_tweak2();
     bad += test_organic();
     bad += test_matrix();
+    bad += test_help_all();
     bad += test_help_gesture();
     bad += test_mods_page();
     bad += test_midi();

@@ -58,7 +58,7 @@ ARP, FX, LFO and OCT+ on GEN work as soon as they are down. Page buttons act whe
 
 | Do this | And this happens |
 |---|---|
-| **ARP** + a knob | The help card for that knob; turn on: larger text, or scroll |
+| **ARP** + a knob | The help card for that knob; turn on: scroll |
 | **FX** + a knob | Mod shortcut: a cord from the track's LFO to that parameter, the turn sets its amount |
 | **FX** + SELECT | The mod shortcut's source |
 | **LFO** + a knob | A momentary change: back as it was when LFO is let go |

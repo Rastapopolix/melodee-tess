@@ -91,7 +91,7 @@ Saved projects and mods keep working across the renames: only the names on scree
 
 ### 🎨 The look
 Tessera's own palette **SMALTI** (lapis and gold), square tiles, Elektron-style dials, the Chakra Petch typeface, a
-mosaic splash, page tabs, a colour per track, bigger GEN pictures, and a help card that zooms and scrolls (hold ARP,
+mosaic splash, page tabs, a colour per track, bigger GEN pictures, and a help card for every knob that scrolls (hold ARP,
 turn a knob). MARMO, VITRO, NIGHT and CONTRAST are in MENU > COLOR. Lists: KNOB 1 picks the row, KNOB 2 changes it.
 MENU > TRACK KNOB sets which knob picks the track.
 
