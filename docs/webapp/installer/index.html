@@ -6,83 +6,153 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tessera</title>
+<title>Tessera · Installer</title>
+<link rel="icon" href="../../media/brand/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #fff; --fg: #000; --dim: #777; }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #000; --fg: #fff; --dim: #888; }
+  /* the project page's look (web/home/index.html): SMALTI, the mark's lapis and gold, Chakra Petch */
+  :root {
+    --bg: #0d1326; --surf: #18213c; --raise: #2b3249; --line: #343b51; --text: #f6f0e0; --mid: #b3b2b0;
+    --dim: #73747a; --accent: #ffe296; --gold: #ecb848; --bad: #ff8a7a;
+    --t1: #deca60; --t2: #40c8d6; --t3: #6ed668; --t4: #d67cec; --gap: 6px;
+    color-scheme: dark;
   }
-  :root[data-theme="dark"] { --bg: #000; --fg: #fff; --dim: #888; }
-  body { margin: 0; background: var(--bg); color: var(--fg);
-         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
-  main { max-width: 520px; margin: 0 auto; padding: 48px 16px; }
-  h1 { font-size: 24px; font-weight: 600; margin: 0 0 24px; }
-  .lang { float: right; font-size: 13px; color: var(--dim); cursor: pointer; text-decoration: underline; background: none; padding: 0; color: var(--dim); }
-  p { margin: 0 0 16px; }
-  button { font: inherit; background: var(--fg); color: var(--bg); border: 0; padding: 8px 20px; cursor: pointer; }
-  button:disabled { opacity: .3; cursor: default; }
-  #status { margin-top: 16px; min-height: 1.6em; }
-  .small { color: var(--dim); font-size: 13px; }
-  progress { width: 100%; height: 4px; margin-top: 16px; }
-  pre { color: var(--dim); font-size: 12px; white-space: pre-wrap; margin-top: 16px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 400 16px/1.6 "Chakra Petch", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:hover { color: var(--gold); }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 16px; }
+  nav { border-bottom: 1px solid var(--line); background: rgba(13, 19, 38, .92); }
+  nav .wrap { display: flex; align-items: center; gap: 16px; height: 56px; }
+  nav .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none;
+               font-weight: 600; letter-spacing: .14em; }
+  nav .brand svg { width: 26px; height: 26px; }
+  .lang { margin-left: auto; font: inherit; font-size: 14px; color: var(--mid); background: none; border: 0;
+          padding: 4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .lang:hover { color: var(--text); }
+  main.wrap { padding-top: 40px; padding-bottom: 56px; }
+  .kicker { color: var(--mid); text-transform: uppercase; letter-spacing: .12em; font-size: 13px; font-weight: 500; }
+  h1 { font-size: clamp(40px, 9vw, 64px); font-weight: 600; letter-spacing: .04em; line-height: 1.1; margin: 6px 0 0; }
+  .bar { display: flex; gap: var(--gap); margin: 16px 0 28px; }
+  .bar span { flex: 1; height: 6px; }
+  .bar span:nth-child(1) { background: var(--t1); } .bar span:nth-child(2) { background: var(--t2); }
+  .bar span:nth-child(3) { background: var(--t3); } .bar span:nth-child(4) { background: var(--t4); }
+  p { margin: 0 0 14px; }
+  .small { color: var(--mid); font-size: 14px; line-height: 1.5; }
+  .panel { background: var(--surf); padding: 18px 20px 6px; margin: 0 0 var(--gap); border-left: 4px solid var(--c, var(--gold)); }
+  .warn { color: var(--text); font-weight: 500; }
+  .panel strong { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  label { cursor: pointer; }
+  .choice label { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+  input[type=radio], input[type=checkbox] { accent-color: var(--gold); width: 18px; height: 18px; margin: 0; flex: none; }
+  input[type=file] { font: inherit; font-size: 14px; color: var(--mid); margin-top: 6px; max-width: 100%; }
+  input[type=file]::file-selector-button { font: inherit; background: var(--raise); color: var(--text); border: 0;
+    padding: 6px 12px; margin-right: 10px; cursor: pointer; }
+  button { font: inherit; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 15px;
+           background: var(--raise); color: var(--text); border: 1px solid var(--raise); padding: 11px 18px; cursor: pointer; }
+  button:hover { background: var(--line); }
+  button:disabled { opacity: .35; cursor: default; }
+  #go { background: var(--gold); color: var(--bg); border-color: var(--gold); padding: 14px 28px; margin-top: 18px; }
+  #go:hover:not(:disabled) { background: var(--accent); }
+  details { background: var(--surf); margin: var(--gap) 0 0; padding: 0 20px; }
+  details[open] { padding-bottom: 6px; }
+  summary { cursor: pointer; padding: 14px 0; color: var(--mid); text-transform: uppercase; letter-spacing: .08em;
+            font-size: 14px; font-weight: 500; }
+  summary:hover, details[open] summary { color: var(--text); }
+  .run { margin-top: 28px; }
+  progress { appearance: none; -webkit-appearance: none; width: 100%; height: 6px; border: 0; background: var(--surf); display: block; }
+  progress::-webkit-progress-bar { background: var(--surf); }
+  progress::-webkit-progress-value { background: var(--gold); }
+  progress::-moz-progress-bar { background: var(--gold); }
+  #status { margin-top: 14px; min-height: 1.6em; font-weight: 500; }
+  pre { color: var(--dim); font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; margin: 12px 0 0;
+        max-height: 14em; overflow: auto; }
+  pre:empty { display: none; }
+  .next { display: block; background: var(--surf); padding: 16px 20px; margin-top: 28px; color: var(--text);
+          text-decoration: none; border-left: 4px solid var(--t2); }
+  a.next:hover { background: var(--raise); color: var(--text); }
+  footer { border-top: 1px solid var(--line); margin-top: 40px; padding-top: 24px; }
+  footer p { color: var(--dim); font-size: 13px; }
+  footer a { color: var(--mid); }
 </style>
 </head>
 <body>
-<main>
-  <button class="lang" id="lang"></button>
-  <h1>Tessera</h1>
-  <p data-t="intro"></p>
-  <p data-t="warn"></p>
-  <p class="small" data-t="direct"></p>
-  <p class="small" data-t="beta"></p>
-  <p class="small"><span data-t="brick"></span>
-    <a href="https://github.com/keremimo/melodee/blob/next/docs/RECOVERY.md" target="_blank" rel="noopener" style="color:inherit" data-t="recoveryLink"></a></p>
-  <p><label><input type="radio" name="build" id="build-dual" checked> <span data-t="dual"></span></label><br>
-    <label><input type="radio" name="build" id="build-single"> <span data-t="single"></span></label></p>
-  <p class="small" data-t="singleWhy"></p>
-  <section id="nightly-options" hidden>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../../" aria-label="Tessera">
+      <svg viewBox="0 0 78 78" aria-hidden="true"><rect x="2" y="3" width="22" height="22" fill="#2c4078"/><rect x="29" y="1" width="22" height="22" fill="#3a5496"/><rect x="53" y="2" width="22" height="22" fill="#ecb848"/><rect x="3" y="28" width="22" height="22" fill="#4260aa"/><rect x="28" y="28" width="22" height="22" fill="#324a88"/><rect x="53" y="29" width="22" height="22" fill="#283c70"/><rect x="2" y="53" width="22" height="22" fill="#3e5aa0"/><rect x="29" y="55" width="22" height="22" fill="#2e447e"/><rect x="53" y="53" width="22" height="22" fill="#365092"/></svg>
+      TESSERA
+    </a>
+    <button class="lang" id="lang"></button>
+  </div>
+</nav>
+<main class="wrap">
+  <div class="kicker" id="ver">FM-1</div>
+  <h1>TESSERA</h1>
+  <div class="bar" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+  <div class="panel">
+    <p data-t="intro"></p>
+    <p class="warn" data-t="warn"></p>
+    <p class="small" data-t="direct"></p>
+  </div>
+  <div class="panel choice" style="--c:var(--t2)">
+    <p><label><input type="radio" name="build" id="build-dual" checked> <span data-t="dual"></span></label>
+      <label><input type="radio" name="build" id="build-single"> <span data-t="single"></span></label></p>
+    <p class="small" data-t="singleWhy"></p>
+  </div>
+  <section id="nightly-options" class="panel choice" style="--c:var(--t3)" hidden>
     <p><strong data-t="nightlyTitle"></strong></p>
-    <p><label><input type="radio" name="build" id="build-nightly-dual"> <span data-t="nightly-dual"></span></label><br>
+    <p><label><input type="radio" name="build" id="build-nightly-dual"> <span data-t="nightly-dual"></span></label>
       <label><input type="radio" name="build" id="build-nightly-single"> <span data-t="nightly-single"></span></label></p>
     <p class="small" data-t="nightlyWhy"></p>
     <p class="small" id="nightly-info"></p>
   </section>
-  <section id="synth-options" hidden>
+  <section id="synth-options" class="panel choice" style="--c:var(--t4)" hidden>
     <p><strong data-t="synthTitle"></strong></p>
-    <p><label><input type="radio" name="build" id="build-synth-dual"> <span data-t="synth-dual"></span></label><br>
+    <p><label><input type="radio" name="build" id="build-synth-dual"> <span data-t="synth-dual"></span></label>
       <label><input type="radio" name="build" id="build-synth-single"> <span data-t="synth-single"></span></label></p>
     <p class="small" data-t="synthWhy"></p>
     <p class="small" id="synth-info"></p>
-    <p class="small"><a id="synth-editor" href="../synth-editor/" style="color:inherit" data-t="synthEditor"></a></p>
+    <p class="small"><a id="synth-editor" href="../synth-editor/" data-t="synthEditor"></a></p>
   </section>
   <p><button id="go" disabled data-t="install"></button></p>
-  <details style="margin-top:24px">
+  <div class="run">
+    <progress id="bar" max="100" value="0"></progress>
+    <p id="status"></p>
+    <pre id="log"></pre>
+  </div>
+  <p class="small" data-t="beta"></p>
+  <p class="small"><span data-t="brick"></span>
+    <a href="https://github.com/keremimo/melodee/blob/next/docs/RECOVERY.md" target="_blank" rel="noopener" data-t="recoveryLink"></a></p>
+  <details>
     <summary data-t="localTitle"></summary>
     <p class="small" data-t="localWhy"></p>
     <p><label><span data-t="localFile"></span><br><input id="local-file" type="file" accept=".fwsc"></label></p>
     <p><button id="local-go" disabled data-t="localGo"></button></p>
   </details>
-  <details style="margin-top:24px">
+  <details>
     <summary data-t="stockTitle"></summary>
     <p class="small" data-t="back"></p>
-    <p class="small"><a href="https://www.m-vave.com/download" target="_blank" rel="noopener" style="color:inherit">M-VAVE Downloads</a></p>
+    <p class="small"><a href="https://www.m-vave.com/download" target="_blank" rel="noopener">M-VAVE Downloads</a></p>
     <p><label><span data-t="stockFile"></span><br><input id="stock-file" type="file" accept=".fwsc"></label></p>
     <p><button id="stock-go" disabled data-t="stockGo"></button></p>
     <p class="small" data-t="stockBackup"></p>
-    <p class="small"><label><input id="stock-skip-backup" type="checkbox"> <span data-t="stockSkipBackup"></span></label></p>
-    <p class="small"><label><input id="stock-recovery" type="checkbox"> <span data-t="stockRecovery"></span></label></p>
+    <p class="small choice"><label><input id="stock-skip-backup" type="checkbox"> <span data-t="stockSkipBackup"></span></label></p>
+    <p class="small choice"><label><input id="stock-recovery" type="checkbox"> <span data-t="stockRecovery"></span></label></p>
   </details>
-  <progress id="bar" max="100" value="0"></progress>
-  <p id="status"></p>
-  <pre id="log"></pre>
-  <p><a href="../editor/" style="color:inherit" data-t="editor"></a></p>
-  <p class="small">Tessera is firmware for the FM-1 by Theo Dainis (Rastapopolix), a fork of Melodee: it adds the Tessera generators and a project format of its own. <a href="https://github.com/Rastapopolix/tessera" target="_blank" rel="noopener" style="color:inherit">github.com/Rastapopolix/tessera</a><br>
-    Melodee by Ellic Studio, based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener" style="color:inherit">Felucca</a>
-    by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener" style="color:inherit">Hügelton Instruments</a>, with its CrispyZebra waveforms and Fukiai icons (MIT).<br>
+  <a class="next" href="../editor/" data-t="editor"></a>
+  <footer>
+  <p>Tessera is firmware for the FM-1 by Theo Dainis (Rastapopolix), a fork of Melodee: it adds the Tessera generators and a project format of its own. <a href="https://github.com/Rastapopolix/tessera" target="_blank" rel="noopener">github.com/Rastapopolix/tessera</a><br>
+    Melodee by Ellic Studio, based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener">Felucca</a>
+    by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener">Hügelton Instruments</a>, with its CrispyZebra waveforms and Fukiai icons (MIT).<br>
     Font: Inter Tight (The Inter Project Authors, SIL OFL 1.1). Samples: Versilian Studios VSCO-2 Community Edition and VCSL (CC0 1.0).<br>
-    FM6 engine: msfa from Dexed (Google Inc., Pascal Gauthier, Apache-2.0). The package also holds three JieLi AC79 SDK files, uboot.boot, cfg_tool.bin and eq_cfg_hw.bin (JieLi Technology, Apache-2.0). <a href="../../firmware/LICENSING.md" style="color:inherit">Licences</a>: <a href="../../firmware/LICENSE" style="color:inherit">GPL-3.0</a>, <a href="../../firmware/LICENSES/Apache-2.0.txt" style="color:inherit">Apache-2.0</a>, <a href="../../firmware/LICENSES/" style="color:inherit">all</a>.<br>
+    FM6 engine: msfa from Dexed (Google Inc., Pascal Gauthier, Apache-2.0). The package also holds three JieLi AC79 SDK files, uboot.boot, cfg_tool.bin and eq_cfg_hw.bin (JieLi Technology, Apache-2.0). <a href="../../firmware/LICENSING.md">Licences</a>: <a href="../../firmware/LICENSE">GPL-3.0</a>, <a href="../../firmware/LICENSES/Apache-2.0.txt">Apache-2.0</a>, <a href="../../firmware/LICENSES/">all</a>.<br>
     M-VAVE and FM-1 are trademarks of their respective owners.<br>
-    <span data-t="license"></span> <a href="https://github.com/keremimo/melodee" target="_blank" rel="noopener" style="color:inherit">github.com/keremimo/melodee</a></p>
+    <span data-t="license"></span> <a href="https://github.com/keremimo/melodee" target="_blank" rel="noopener">github.com/keremimo/melodee</a></p>
+  </footer>
 </main>
 <script type="module">
 // SPDX-License-Identifier: GPL-3.0-only
@@ -934,6 +1004,7 @@ const ready = () => { lastKey = "ready"; $("status").textContent = `Tessera ${se
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
 const meta = {"version": "2.0", "product": "FM-1_920", "pkg": {"dual": "../../firmware/tessera-2.0.fwsc", "single": "../../firmware/tessera-2.0-1core.fwsc"}, "nightly": null, "synth": null};
+$("ver").textContent = `FM-1 · ${meta.version}`;
 $("nightly-options").hidden = !meta.nightly;
 if (meta.nightly) $("nightly-info").textContent = `next · ${meta.nightly.commit.slice(0, 7)} · ${meta.nightly.builtAt}`;
 $("synth-options").hidden = !meta.synth;
