@@ -1,8 +1,33 @@
 # Recording and performance controls
 
+(Written for Melodee before Tessera. Tessera's device build plays FM6, TRIO and DRUM: the CZ-1 and Prophet
+engines are retired, and SID and PHYS are out of device builds, so the parts about those engines describe them as
+they were.)
+
 REC taps arm or disarm the selected track. They leave the transport alone.
-PLAY starts/stops playback; an armed track records while playback runs.
-REC + PLAY still arms and starts in one gesture. Holding REC opens the mixer.
+PLAY starts/stops playback. A track armed before PLAY records from the first
+step. While stopped and armed, playing the first key or MIDI note also starts
+playback and recording immediately at step zero, skipping the configured
+count-in. The triggering note is included in the take. PLAY still uses count-in
+normally, including its held-note pickup behavior.
+Arming while playing waits for that track's next pattern start; REC
+breathes while waiting and stays lit during recording. Keys and MIDI audition
+while waiting, and notes still held at the start enter the take there.
+Recording covers one complete pattern pass, then automatically disarms at its
+end while playback continues. Notes still held have their recorded lengths
+finished at that boundary; their live sound continues until release. Tap REC
+again for another pass, or tap it while waiting to cancel. Notes and knob motion
+share these boundaries, with either internal or external MIDI clock and any QNT.
+**SEQ > TEMPO > QNT** chooses an automatic quantization pass when recording
+finishes, including an early STOP or REC disarm. OFF keeps the captured timing;
+a division snaps only the new take's onsets to that swung grid. Independent
+note lengths, velocities and drum properties stay intact, and the piano roll
+shows the committed timing. Changing QNT later affects the next take only.
+An occupied manual step prevents the pass: the take is retained unchanged and
+the device shows **QNT STEP OCCUPIED**. Existing recorded notes and other banks
+are preserved.
+REC + PLAY arms and starts in one gesture (or waits for the next pattern start
+if already playing). Holding REC opens the mixer.
 
 Hold HOME to open the menu. The following device preferences also appear in
 the web editor's settings and survive power-off:
@@ -51,9 +76,8 @@ USB and TRS MIDI share these controls, using the existing channel routing:
 | 71 | Resonance, or Q where the engine exposes it |
 | 72 / 73 / 75 | Release / attack / decay |
 | 74 | Engine cutoff or brightness |
-| 91 / 93 | Reverb / chorus send |
 
-Cutoff/brightness uses ANALOG CUT, PHASE DCW, SID CUT, DRUM TONE, NOISE FREQ,
+Cutoff/brightness uses PHASE DCW, SID CUT, DRUM TONE, NOISE FREQ,
 FM6 MLVL and PROPHET CUT. CZ-1 uses its filter-envelope amount. Engines without
 a resonance control ignore CC71. Native FM6 envelope messages change all six
 operators' corresponding rates. CZ-1 changes both amplitude envelopes' first,

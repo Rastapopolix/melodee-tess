@@ -8,9 +8,27 @@ const BACKUP_IDS_CZ = Array.from({length:17},(_,i)=>i);
 const BACKUP_IDS_OWN = Array.from({length:21},(_,i)=>i);
 const BACKUP_IDS_NATIVE = Array.from({length:23},(_,i)=>i);
 const BACKUP_IDS_P5 = Array.from({length:28},(_,i)=>i);
-const maxSize = id => id >= 32 ? 81920 : (id === 0 || (id >= 2 && id <= 5)) ? 27904 : id>=23&&id<=27?3600:3840;
-const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : null);
+const BACKUP_IDS_TESS = Array.from({length:30},(_,i)=>i);   // melodee-tess: 28 the generators of the saved slots, 29 the live ones
+const maxSize = id => id >= 32 ? 81920 : (id === 0 || (id >= 2 && id <= 5)) ? 32768 : id>=23&&id<=27?3600:3840;
+const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : n === 30 ? BACKUP_IDS_TESS : null);
 export const BACKUP_CMD = { LIST: 65, GET: 66, PUT: 67 };
+// melodee-tess, the own project format: the projects (0 the live music, 2..5 the slots) are TSP1 records (project_tsp.c):
+// "TSP1", u32 length, u16 part count, u16 0, the parts (u8 id, u8 version, u16 length, bytes), u32 FNV-1a of the rest.
+// Firmware of the own format reads no older project, and older firmware reads no TSP1 one: no converter either way.
+const TSP_MAGIC = 0x31505354, TSP_HEAD = 12;
+const isProject = (id) => id === 0 || (id >= 2 && id <= 5);
+const fnv = (bytes) => { let s = 0x811c9dc5; for (const b of bytes) s = Math.imul(s ^ b, 16777619) >>> 0; return s; };
+export const isTsp = (bytes) => bytes.length >= TSP_HEAD + 4 && new DataView(bytes.buffer, bytes.byteOffset, bytes.length).getUint32(0, true) === TSP_MAGIC;
+function tspCheck(bytes) {                    // the record whole: its length, every part inside it, its checksum
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.length), n = bytes.length;
+  if (v.getUint32(4, true) !== n || fnv(bytes.subarray(0, n - 4)) !== v.getUint32(n - 4, true)) throw new Error("Damaged project record");
+  let at = TSP_HEAD;
+  for (let k = v.getUint16(8, true); k > 0; k--) {
+    if (at + 4 > n - 4) throw new Error("Damaged project record");
+    at += 4 + v.getUint16(at + 2, true);
+  }
+  if (at !== n - 4) throw new Error("Damaged project record");
+}
 const BACKUP_CHUNK = 256;
 export const bkU32 = (n) => Array.from({ length: 5 }, (_, i) => (n >>> (i * 7)) & (i === 4 ? 15 : 127));
 export const bkR32 = (a, off = 0) => {
@@ -67,7 +85,7 @@ export function readBackup(file) {
   if (typeof file === "string") file = JSON.parse(file);
   const ids = file && Array.isArray(file.objects) ? idsOf(file.objects.length) : null;
   if (!file || file.format !== "felucca-backup" || file.version !== 1 || !ids)
-    throw new Error("Not a complete Melodee backup");
+    throw new Error("Not a complete backup file");
   const objects = file.objects.map((o, i) => {
     if (!o || o.id !== ids[i] || !Number.isInteger(o.size) || o.size < 0 || o.size > maxSize(o.id) ||
         !Number.isInteger(o.crc) || o.crc < 0 || o.crc > 0xffffffff || typeof o.data !== "string" ||
@@ -75,6 +93,7 @@ export function readBackup(file) {
       throw new Error("Invalid backup object");
     const bytes = Uint8Array.from(atob(o.data), (c) => c.charCodeAt(0));
     if (bytes.length !== o.size || bkCrc(bytes) !== o.crc) throw new Error("Backup checksum mismatch");
+    if (isProject(o.id) && isTsp(bytes)) tspCheck(bytes);
     if(o.id>=23&&o.id<=27&&o.size){
       if(o.size!==3600)throw Error("Invalid Prophet bank size");const v=new DataView(bytes.buffer),used=v.getUint32(4,true),fav=v.getUint32(8,true),mask=(1<<(o.id===27?24:26))-1;
       if(v.getUint32(0,true)!==0x31553550||(used&~mask)||(fav&~(mask|(o.id===23?0x80000000:0))))throw Error("Invalid Prophet bank");
@@ -133,10 +152,29 @@ export async function restoreBackup(request, file, onProgress = () => {}) {
   const ask = async (r, o = {}) => request(r, { timeout: 4000, retries: 0, ...o });
   const supported = bkManifest(await ask([BACKUP_CMD.LIST, []]));
   const liveSize = supported.find(o => o.id === 0)?.size || 0;
-  for (const o of archive.objects) if ((o.id === 0 || o.id >= 2 && o.id <= 5) && o.size > liveSize && !(liveSize >= 19008 && [19084,19092,20224].includes(o.size)))
-    throw new Error("This backup needs firmware with larger recording storage");
   for (const o of archive.objects) if (!supported.some(x => x.id === o.id) && o.size) throw new Error("This firmware does not support a nonempty object in this backup");
+  let own = false;                            // the device's live music a TSP1 record: firmware of the own format
+  if (liveSize >= TSP_HEAD + 4) {
+    const a = await ask([BACKUP_CMD.GET, [0, ...bkU32(0), 4, 0]]); bkCheck(a[1]);
+    if (a[0] !== 0 || bkR32(a, 2) !== 0 || (a[7] | a[8] << 7) !== 4) throw new Error("Unexpected backup reply");
+    own = new DataView(bkUnpack(a.slice(9), 4).buffer).getUint32(0, true) === TSP_MAGIC;
+  }
+  const oldProjects = archive.objects.some(o => isProject(o.id) && o.size && !isTsp(o.bytes));
+  const tspProjects = archive.objects.some(o => isProject(o.id) && o.size && isTsp(o.bytes));
+  if (own && oldProjects)
+    throw new Error("This backup's projects are in the format before Tessera's own; this firmware does not read them. Restore it with the firmware that made it.");
+  if (!own && tspProjects) throw new Error("This backup's projects are in Tessera's own format; update the firmware first.");
+  if (!own) for (const o of archive.objects) if (isProject(o.id) && o.size > liveSize && !(liveSize >= 19008 && [19084,19092,20224].includes(o.size)))
+    throw new Error("This backup needs firmware with larger recording storage");   // (fixed-size records; TSP1's vary)
   const put = async (args) => { const a = await ask([BACKUP_CMD.PUT, args]); bkCheck(a[2]); return a; };
+  // The firmware accepts or refuses each object's size before the first write (2.0 reads only the formats of
+  // 1.0 and later: an older archive restores on 1.2 first), so a refused archive writes nothing.
+  for (const o of archive.objects) if (o.id < 32 && o.size && supported.some(x => x.id === o.id)) {
+    const a = await ask([BACKUP_CMD.PUT, [0, o.id, ...bkU32(o.size), ...bkU32(o.crc)]]);
+    await ask([BACKUP_CMD.PUT, [3, o.id]]);
+    if (a[2] === 1) throw new Error("This backup holds an older format. Restore it with Melodee 1.2 first.");
+    bkCheck(a[2]);
+  }
   // Restore live music last. Other objects commit individually; a disconnect can leave a partial restore.
   for (const o of [...archive.objects.slice(2), archive.objects[1], archive.objects[0]]) {
     if (!supported.some(x => x.id === o.id)) continue;

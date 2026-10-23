@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Host test of firmware/src/ota.c: a fake M-UPGRADE serves a real .fwsc over
  * the SysEx protocol (pack7, cmd 0x30 reads, 0xE0000000 -> "success") and a
  * simulated NOR plays the flash.
@@ -18,8 +19,26 @@ static uint8_t *logical;
 static size_t logical_len;
 static uint8_t rx[1024];                 /* one pending host frame (7-bit bytes) */
 static uint32_t rx_len, rx_full;
-static uint32_t now_ms, requests, ident_replies, mute_after = 0xFFFFFFFFu, bad_erase;
+static uint32_t now_ms, requests, ident_replies, mute_after = 0xFFFFFFFFu, bad_erase, erases;
 static int committed;
+static uint32_t maintenance_begins, maintenance_total, maintenance_done, maintenance_bad;
+static uint8_t maintenance_active, maintenance_failed, testing_cleanup;
+static int cleanup_fail_after = -1, cleanup_read_error;
+static void maintenance_begin(const char *title, uint32_t total)
+{
+    maintenance_begins++;
+    maintenance_total=total;maintenance_done=0;maintenance_active=1;maintenance_failed=0;
+    if(strcmp(title,"FINISHING UPDATE"))maintenance_bad++;
+}
+static void maintenance_progress(uint32_t done)
+{
+    if(!maintenance_active || done!=maintenance_done+1u || done>maintenance_total)maintenance_bad++;
+    maintenance_done=done;
+}
+static void maintenance_end(int failed){maintenance_active=0;maintenance_failed=(uint8_t)failed;}
+#define BOOT_WORK_BEGIN(title,total) maintenance_begin(title,total)
+#define BOOT_WORK_PROGRESS(done) maintenance_progress(done)
+#define BOOT_WORK_END(failed) maintenance_end(failed)
 static uint8_t committed_parm[112];
 static int32_t last_code;
 static uint8_t *corrupt_at;              /* flip a served byte (loader body) */
@@ -97,6 +116,10 @@ static void ota_idle(void) { now_ms += 1; }
 static int ota_erase(uint32_t off)
 {
     if (off < 0xE0000u || off >= 0xE5000u || (off & 0xFFFu)) { bad_erase++; return -8; }
+    erases++;
+    if(testing_cleanup && !maintenance_active)maintenance_bad++;
+    if(cleanup_fail_after==0)return -8;
+    if(cleanup_fail_after>0)cleanup_fail_after--;
     memset(nor + off, 0xFF, 4096);
     return 0;
 }
@@ -108,11 +131,12 @@ static int ota_prog(uint32_t off, const void *src, uint32_t n)
     for (i = 0; i < n; i++) nor[off + i] &= s[i];
     return 0;
 }
-static int ota_fread(uint32_t off, void *dst, uint32_t n) { memcpy(dst, nor + off, n); return 0; }
+static int ota_fread(uint32_t off, void *dst, uint32_t n) { if(cleanup_read_error)return -1;memcpy(dst, nor + off, n); return 0; }
 static void ota_show(uint32_t step, int32_t code) { if (step == 9) last_code = code; }
 static void ota_commit(const uint8_t *parm) { committed = 1; memcpy(committed_parm, parm, 112); }
 
 #include "../firmware/src/ota.c"
+#include "../firmware/stub/stub_core.h"
 
 static uint32_t ota_body_off(void)                  /* ota.bin data + 0x20 in the logical image */
 {
@@ -147,7 +171,7 @@ static void reset_dev(void)
     memset(nor, 0xFF, sizeof nor);
     memcpy(nor, logical + 0x400, 0x4000);                 /* device flash head = package flash.bin head */
     rx_full = 0; requests = 0; ident_replies = 0; committed = 0; last_code = 0;
-    mute_after = 0xFFFFFFFFu; corrupt_at = NULL; bad_erase = 0;
+    mute_after = 0xFFFFFFFFu; corrupt_at = NULL; bad_erase = 0; erases = 0;
 }
 
 int main(int argc, char **argv)
@@ -178,13 +202,23 @@ int main(int argc, char **argv)
                      ota_msg[2] == 0x11 && !memcmp(ota_msg + 6, MELODEE_ID, sizeof MELODEE_ID - 1));
     }
 
-    {   /* A valid UFW entry with an older Melodee's smaller flash partition (0x89000). */
+    {   /* flash.bin's size in the UFW entry: an older Melodee's (0x89000) installs with its own loader; another
+         * board's (an SMK-37's 0x9D000) or a byte short of the FM-1's is refused (-15) before anything is erased */
+        static const uint32_t SZ[3] = {0x89000u, 0x9D000u, 0x93000u - 1u};
         uint8_t saved[0x400];memcpy(saved,logical,sizeof saved);uint8_t *h=logical;
-        uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
-        for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,0x89000u);ota_jl_enc(e,0x50);}
-        ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
-        reset_dev();rc=ota_session();bad+=check("an older Melodee partition (0x89000) still installs (its own loader)",rc==0&&committed);
-        memcpy(logical,saved,sizeof saved);
+        for (uint32_t z = 0; z < 3u; z++) {
+            uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
+            for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,SZ[z]);ota_jl_enc(e,0x50);}
+            ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
+            reset_dev();rc=ota_session();
+            if (!z)
+                bad+=check("an older Melodee partition (0x89000) still installs (its own loader)",rc==0&&committed);
+            else
+                bad+=check(z == 1u ? "another board's size (0x9D000): -15, nothing erased" :
+                                     "a byte short of 0x93000: -15, nothing erased",
+                           rc==-15&&!committed&&!erases&&area_erased());
+            memcpy(logical,saved,sizeof saved);
+        }
     }
     /* full session */
     reset_dev();
@@ -203,9 +237,43 @@ int main(int argc, char **argv)
                      (p[6] | p[7] << 8) == 0x5441 && ota_rd32(p + 72) == 0xE0000);
         bad += check("nothing written outside 0xE0000..0xE4FFF", bad_erase == 0);
     }
-    /* boot cleanup erases it */
+    /* The streaming app check and the stub's XIP check must agree. Include
+     * damage to headers, block metadata, payloads and the unused tail. */
+    {
+        int mismatch=0;
+        bad += check("app and stub accept the actual staged loader",ota_staged() && stub_loader_check(nor+OTA_AREA)==STUB_LD_OK);
+        for (uint32_t off=0;off<OTA_AREA_LEN;off++) {
+            uint8_t bit=(uint8_t)(1u<<(off&7u));
+            nor[OTA_AREA+off]^=bit;
+            mismatch |= (ota_staged()!=0)!=(stub_loader_check(nor+OTA_AREA)==STUB_LD_OK);
+            nor[OTA_AREA+off]^=bit;
+        }
+        bad += check("app/stub loader checks agree on 20,480 damaged copies",!mismatch);
+    }
+    /* A successful install retains its loader for the boot stub. */
+    testing_cleanup=1;
+    bad += check("boot retains loader, erases only record", ota_boot_cleanup()==2 && ota_staged() && nor[OTA_RES]==0xFFu);
+    bad += check("record cleanup reports one completed sector",maintenance_begins==1u && maintenance_done==1u && !maintenance_failed && !maintenance_bad);
+    bad += check("next boot keeps loader without erasing",ota_boot_cleanup()==0 && maintenance_begins==1u);
+    nor[OTA_RES]=0;cleanup_fail_after=0;
+    bad += check("record erase failure keeps loader for retry",ota_boot_cleanup()<0 && ota_staged() && maintenance_failed);
+    cleanup_fail_after=-1;
+    bad += check("record erase retry keeps loader",ota_boot_cleanup()==2 && ota_staged());
+    /* Damaged staging is erased, with existing progress and retry behavior. */
+    nor[OTA_AREA]^=1u;maintenance_begins=0;
+    /* boot cleanup erases it, visibly, and detects incomplete erases on retry. */
+    testing_cleanup=1;
     bad += check("boot cleanup erases the area", ota_boot_cleanup() == 1 && area_erased());
-    bad += check("second boot: nothing to do", ota_boot_cleanup() == 0);
+    bad += check("cleanup shows progress before every erase",maintenance_begins==1u && maintenance_done==5u && !maintenance_active && !maintenance_failed && !maintenance_bad);
+    bad += check("second boot skips writes and maintenance display", ota_boot_cleanup() == 0 && maintenance_begins==1u);
+    nor[0xE3001]=0;
+    cleanup_fail_after=2;
+    bad += check("cleanup error stops at its last completed sector",ota_boot_cleanup()<0 && maintenance_failed && maintenance_done==2u && nor[0xE3001]==0);
+    cleanup_fail_after=-1;
+    bad += check("retry finds dirty data even with erased loader headers",ota_boot_cleanup()==1 && area_erased() && maintenance_done==5u && !maintenance_failed && !maintenance_bad);
+    cleanup_read_error=1;
+    bad += check("cleanup read error is visible",ota_boot_cleanup()<0 && maintenance_failed && maintenance_done==0u);
+    cleanup_read_error=0;testing_cleanup=0;
 
     /* host disappears in the middle */
     reset_dev();

@@ -24,6 +24,7 @@ static uint32_t ngated(const track_t *t)
 static void reset(void)
 {
     ui_power_on();
+    set_engine_of(&trk[0], HOST_SYNTH);             /* (NPOLY voices: the chords, not a voice cap, are tested) */
     memset(kb_chn, 0, sizeof kb_chn); memset(mchord, 0, sizeof mchord); memset(chord_last, 0, sizeof chord_last);
     fm1_in.notes = kb_prev = 0; mo_w = mo_r = 0; usb.config = 1;
     trk[0].p[P_VOICE] = V_POLY; trk[0].p[P_SCALE] = 1; trk[0].p[P_ROOT] = 0;   /* C major, POLY */

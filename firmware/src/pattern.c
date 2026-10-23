@@ -3,8 +3,11 @@
  * the established editor/recording paths; switching commits it and loads one
  * bounded 64-step copy. No flash work runs in the audio interrupt. */
 typedef struct { step_t step[NSTEP]; int16_t timing[4]; } pattern_t;
-static pattern_t pattern_retained[2][NPAT] __attribute__((section(".noinit")));
-static pattern_t pattern_ram[2][NPAT];
+/* 12 B steps (step v2) no longer fit one RAM area: tracks 1-2 in the pool, 3 in static RAM, 4 in .noinit (cleared at
+ * boot by pattern_init, not retained), so each bank of the audio arena and static RAM keep their headroom */
+static pattern_t pattern_pool[2][NPAT] __attribute__((section(".pool")));
+static pattern_t pattern_bss[NPAT];
+static pattern_t pattern_noinit[NPAT] __attribute__((section(".noinit")));
 static uint8_t chain_patterns[CHAIN_ROWS][NTRK];
 static uint8_t motion_pattern[MOTION_MAX];
 static void seq_release(track_t *t);
@@ -14,7 +17,7 @@ static int recording_owns(const track_t *t, uint32_t note);
 static void motion_restore(track_t *t);
 static pattern_t *pattern_at(uint32_t track, uint32_t bank)
 {
-    return track < 2u ? &pattern_retained[track][bank] : &pattern_ram[track - 2u][bank];
+    return track < 2u ? &pattern_pool[track][bank] : track == 2u ? &pattern_bss[bank] : &pattern_noinit[bank];
 }
 static void pattern_commit(track_t *t)
 {
@@ -25,6 +28,8 @@ static void pattern_commit(track_t *t)
 static void pattern_apply(track_t *t, uint32_t bank)
 {
     const pattern_t *p = pattern_at(t - trk, bank);
+    extern void tessera_len_stop(track_t *t);
+    tessera_len_stop(t);                            /* (a generator's FIXED / HIT notes: note_len.c) */
     seq_release(t);
     recording_stop(t);
     motion_restore(t);
@@ -34,13 +39,15 @@ static void pattern_apply(track_t *t, uint32_t bank)
     t->pattern_next = 0xff;
     t->rh_n = t->rskip_n = 0;
     t->pattern_gen++;
+    tessera_step_clear((uint32_t)(t - trk));        /* (STEP EVOLVE: the new steps as written) */
 }
 static void pattern_init(void)
 {
     uint32_t k, b, i;
     recording_reset();
-    memset(pattern_retained, 0, sizeof pattern_retained);
-    memset(pattern_ram, 0, sizeof pattern_ram);
+    memset(pattern_pool, 0, sizeof pattern_pool);
+    memset(pattern_bss, 0, sizeof pattern_bss);
+    memset(pattern_noinit, 0, sizeof pattern_noinit);
     memset(chain_patterns, 0, sizeof chain_patterns);
     memset(motion_pattern, 0, sizeof motion_pattern);
     for (k = 0; k < NTRK; k++) {

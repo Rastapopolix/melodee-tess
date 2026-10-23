@@ -4,8 +4,9 @@
 int main(void)
 {
     int bad=0; reset(); up_boot();
-    bad+=check("engine and native collection IDs remain unchanged",NENGINES==20 && USER_GENERAL==16 && USER_NATIVE_FM==17 && USER_NATIVE_CZ==18 && ENGI_PROPHET==19 && USER_NATIVE_P5==20);
-    const uint8_t retired[]={2,5,6,7,9,11};
+    /* (melodee-tess 2026-10-16: MACRO appended at 21, 20 reserved for USER_NATIVE_P5; the others as they were) */
+    bad+=check("engine and native collection IDs remain unchanged",NENGINES==22 && USER_GENERAL==16 && USER_NATIVE_FM==17 && USER_NATIVE_CZ==18 && ENGI_PROPHET==19 && USER_NATIVE_P5==20 && ENGI_MACRO==21 && !eng_ok(20));
+    const uint8_t retired[]={2,5,7,11};   /* (TRIO and PHYS back 2026-10-17: MELODEE_TRIO, MELODEE_PHYS) */
     for(uint32_t j=0;j<NELEM(retired);j++) {
         uint32_t e=retired[j];
         bad+=check("retired engine absent from browser and DSP resources",!eng_ok(e) && !ENGINES[e]->npresets && !eng_state_size(e));

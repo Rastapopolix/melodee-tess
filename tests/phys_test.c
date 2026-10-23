@@ -13,8 +13,8 @@
  *    6 s torture render: every parameter and the pitch swept over their whole range with a retrigger every
  *    0.1 s and the model switching under the notes.
  * 2. cost: the heaviest settings of each model (8 notes asked, the engine's 3 voices, as regress.c's CPU
- *    check: instructions per sample of the whole mix less the idle mix) against PHASE WIRE, the heaviest
- *    factory preset (tests/cpu_baseline.txt): at most that; the models added in 1.0 (MEMB, SYMP) at
+ *    check: instructions per sample of the whole mix less the idle mix) against FM6 DRAWBARS with its 8 notes,
+ *    the heaviest synth preset (tests/cpu_baseline.txt; PHASE WIRE until PHASE was retired, 2026-10-22): at most that; the models added in 1.0 (MEMB, SYMP) at
  *    most MODAL struck (the cost measured on the device, ~13 % per voice).
  * 3. demos: each factory preset playing a phrase, each model over C1 .. C7, into DEMODIR. (The drums, PHYS's
  *    MODEL DRUM before 1.0, are the DRUM engine: tests/drum_test.c.) */
@@ -261,13 +261,13 @@ static void cost(void)
         {"SYMP, curved bridge", PM_SYMP, {PM_SYMP, 127, 127, 127, 127, 127, 127, 127}},
     };
     uint32_t i, ok = 1;
-    double idle = cpu(0, 0, 0, 0), wire = cpu(2, 5, 0, 8) - idle, worst = 0, modal = 0;
+    double idle = cpu(0, 0, 0, 0), wire = cpu(ENGI_FM6, 14, 0, 8) - idle, worst = 0, modal = 0;
     if (idle <= 0) {
         printf("phys_test: cost: no instruction counter on this host (proc_pid_rusage); not checked\n");
         return;
     }
     printf("phys_test: cost, instructions per sample over the idle mix (%.0f), 8 notes asked (PHYS plays 3):\n", idle);
-    printf("phys_test:   %-34s %6.0f  (the limit)\n", "PHASE WIRE (heaviest preset)", wire);
+    printf("phys_test:   %-34s %6.0f  (the limit)\n", "FM6 DRAWBARS (heaviest preset)", wire);
     for (i = 0; i < sizeof W / sizeof W[0]; i++) {
         double c = cpu(9, 0, W[i].e, 8) - idle, lim = wire;
         if (!i)
@@ -280,7 +280,7 @@ static void cost(void)
                c <= lim * 1.02 ? "ok" : "OVER");
         ok &= c <= lim * 1.02;                           /* (the count varies ~1 % run to run) */
     }
-    printf("phys_test: cost: worst PHYS %.0f vs PHASE WIRE %.0f; MEMB, SYMP <= MODAL struck: %s\n", worst,
+    printf("phys_test: cost: worst PHYS %.0f vs FM6 DRAWBARS %.0f; MEMB, SYMP <= MODAL struck: %s\n", worst,
            wire, ok ? "ok" : "FAIL");
     fails += !ok;
 }

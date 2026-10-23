@@ -1,0 +1,80 @@
+name: Device build size
+
+# Builds the device image of a pull request and of its base branch (the JieLi toolchain, as the nightly does) and
+# writes their flash and RAM figures to the run summary. Nothing is published or released.
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  size:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    env:
+      JIELI_TOOLCHAIN: ${{ github.workspace }}/.nightly-deps/jieli/toolchain
+      AC79_SDK: ${{ github.workspace }}/.nightly-deps/sdk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libharfbuzz-dev libfribidi-dev libraqm-dev
+          python -m pip install Pillow fonttools
+      - uses: actions/cache@v4
+        with:
+          path: .nightly-deps
+          key: jieli-linux-sdk-d179b448-v1
+      - name: Fetch pinned SDK and toolchain
+        run: |
+          if [ ! -x "$JIELI_TOOLCHAIN/pi32v2/bin/clang" ]; then
+            tools/get_toolchain.sh "$GITHUB_WORKSPACE/.nightly-deps/jieli"
+          fi
+          if [ ! -d "$AC79_SDK/.git" ]; then
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git "$AC79_SDK"
+          fi
+      - name: Build this branch (dual core)
+        env:
+          MELODEE_DUAL_CORE: '1'
+        run: ./build.sh 2>&1 | tee head.log
+      - name: Flash report (this branch)
+        run: |
+          python tools/flash_report.py build/melodee.elf --csv flash_symbols.csv | tee flash_report.md
+          cat flash_report.md >> "$GITHUB_STEP_SUMMARY"
+          echo '----- flash_symbols.csv'
+          cat flash_symbols.csv
+      - name: Build the base branch (dual core)
+        if: github.event_name == 'pull_request'
+        env:
+          MELODEE_DUAL_CORE: '1'
+        run: |
+          git worktree add ../base "origin/${{ github.base_ref }}"
+          cd ../base && ./build.sh 2>&1 | tee "$GITHUB_WORKSPACE/base.log"
+      - name: Summary
+        if: always()
+        run: |
+          for f in head base; do
+            [ -f $f.log ] || continue
+            echo "### $f" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            grep -E -i "image [0-9]+ B|\.data\+\.bss|arena|total audio resources|overflow|error" $f.log >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: device-build-${{ github.run_number }}
+          path: |
+            build/*.fwsc
+            head.log
+            base.log
+            flash_report.md
+            flash_symbols.csv

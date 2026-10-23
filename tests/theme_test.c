@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The palettes and the real canvas/text renderer (src/gfx.c): NIGHT DAY CONTRAST with each track's colour as THEME,
+/* The palettes and the real canvas/text renderer (src/gfx.c): every palette with each track's colour as THEME,
  * the test-only GRAY stays gray in every token and blend, every palette's text contrast, the alpha blend, the ramp
  * cache (palette and track), the fonts' metrics (Rubik) and the ellipsis.
  * Optional: a palette sheet (PPM). */
@@ -44,8 +44,10 @@ int main(int argc, char **argv)
     static const uint8_t pd[] = {0x08, 0xf0};
     const aafont_t probe = {1, 1, 'A', 'A', 0, 0, pg, pd, 0, 0, 0};
     double worst = 100;
-    assert(NPALETTES == 3u && !strcmp(UI_PALETTES[0].name, "NIGHT") && !strcmp(UI_PALETTES[1].name, "DAY") &&
-           !strcmp(UI_PALETTES[2].name, "CONTRAST") && !strcmp(UI_PALETTES[UI_GRAY_INDEX].name, "GRAY"));
+    assert(NPALETTES == 5u && !strcmp(UI_PALETTES[0].name, "NIGHT") && !strcmp(UI_PALETTES[1].name, "CONTRAST") &&
+           !strcmp(UI_PALETTES[2].name, "SMALTI") && !strcmp(UI_PALETTES[3].name, "MARMO") &&
+           !strcmp(UI_PALETTES[4].name, "VITRO") &&
+           UI_DEFAULT_INDEX == 2u && !strcmp(UI_PALETTES[UI_GRAY_INDEX].name, "GRAY"));
     for (unsigned pt = 0; pt < UI_PAL_ENTRIES * 4u; pt++) {
         unsigned p = pt / 4u, t = pt % 4u;
         uint16_t *tok = &ux.bg;
@@ -71,7 +73,6 @@ int main(int argc, char **argv)
         if (min < worst) worst = min;
         printf("%-8s T%u text %.1f:1, labels %.1f:1, track %.1f:1, selection %.1f:1\n", UI_PALETTES[p].name, t + 1,
                contrast(T_TEXT, T_BG), contrast(T_MID, T_BG), contrast(T_THEME, T_BG), contrast(T_INK, T_SEL));
-        assert((p == 1u) == ux.light);                         /* DAY is the light one */
         assert(T_REC == (p == UI_GRAY_INDEX ? T_ACCENT : ux.light ? UI_REC_LIGHT : UI_REC_DARK));
         /* the blend: transparent, solid and an edge between the two, on two backgrounds */
         for (unsigned b = 0; b < 2; b++) {
@@ -85,7 +86,13 @@ int main(int argc, char **argv)
             }
             if (p == UI_GRAY_INDEX) assert(gray(swap16(cv_px[1])));
         }
-        assert(text_w(&AF_S, UI_PALETTES[p].name) <= 60);     /* the COLOR row's value */
+        {   /* the COLOR row's value, as ui_menu.c menu_words writes it ("CONTRAST" -> "Contrast") */
+            char w[16];
+            unsigned k;
+            snprintf(w, sizeof w, "%s", UI_PALETTES[p].name);
+            for (k = 1; w[k]; k++) if (w[k] >= 'A' && w[k] <= 'Z') w[k] = (char)(w[k] + 32);
+            assert(text_w(&AF_S, w) <= 60);
+        }
         cv_begin(240, 124, T_BG);
         cv_text(4, 2, &AF_M, UI_PALETTES[p].name, T_TEXT);
         for (unsigned k = 0; k < 5; k++) cv_rect(150 + k * 16, 4, 12, 12, tok[k]);
@@ -122,7 +129,8 @@ int main(int argc, char **argv)
     assert(palette_track(1) && !palette_track(1));             /* (and so does the track: once) */
     cv_begin(3, 1, T_BG); cv_text(0, 0, &probe, "A", T_THEME);
     assert(swap16(cv_px[1]) != night);
-    /* fonts (docs/design): Rubik X 9 px, S 11 px, M 15 px, L 30 px; tabular digits; the ellipsis; L capitals only */
+    /* fonts (docs/design): Chakra Petch X 10 px, S 12 px, M 15 px, L 30 px in Rubik's line boxes; tabular
+     * digits; the ellipsis; L capitals only */
     assert(AF_X.h == 12 && AF_X.asc == 9 && AF_S.h == 14 && AF_S.asc == 11 && AF_M.h == 19 && AF_M.asc == 15 &&
            AF_L.h == 37 && AF_L.asc == 29);
     assert(text_w(&AF_X, "0000") == text_w(&AF_X, "1111"));

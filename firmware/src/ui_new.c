@@ -16,9 +16,10 @@ static struct {
     int16_t bpm;
 } nw;
 static int new_on(void) { return nw.on != 0; }
-static void new_close(void) { if (nw.on) { nw.on = 0; ui.force = 1; } }
+static void new_close(void) { if (nw.on) { nw.on = 0; ui.new_active=0; ui.force = 1; } }
 static void new_open(void)
 {
+    ui.new_active=1;
     uint32_t r = (uint32_t)TSEL->p[P_ROOT], s = (uint32_t)TSEL->p[P_SCALE];
     int32_t b = song.g[G_BPM];
     template_key(&r, &s, &b);                       /* (the template's, when there is one) */
@@ -83,7 +84,7 @@ static void new_create(void)
     scale_share(TSEL);
     song.g[G_BPM] = nw.bpm;
     undo_clear();
-    nw.on = 0;
+    nw.on = 0; ui.new_active = 0;
     go_home();
     sync_reload = 1;
     ui_message("NEW SONG");
@@ -141,19 +142,20 @@ static void new_words(char *d, const char *s, uint32_t n)
         i = d[e] ? e : e - 1u;
     }
 }
-/* the keys under NEW SONG (mock/r6_pages NEW SONG): OCT- back on the left, OCT+ on the right in the track's colour */
-static void new_keys(int create)
+/* the keys under NEW SONG (mock/r6_pages NEW SONG): OCT- back on the left, OCT+ on the right in the track's colour
+ * (go, its icon); the sound designer's START too */
+static void new_keys_row(const char *go, uint32_t icon)
 {
-    const char *go = create ? "Create" : "Roles";
     int32_t gw = text_w(&AF_S, go) + 30;
     cv_begin(240, 24, T_BG);
     cv_rrect(6, 2, 40, 20, 5, T_SURF, T_BG);
     cv_icon_mid(20, 12, 12, ICON_X_UNDO, T_MID, T_SURF);
     cv_rrect(234 - gw, 2, gw, 20, 5, T_THEME, T_BG);
-    cv_icon_mid(234 - gw + 8, 12, 12, create ? ICON_X_CHECK : ICON_X_RIGHT, T_INK, T_THEME);
+    cv_icon_mid(234 - gw + 8, 12, 12, icon, T_INK, T_THEME);
     cv_text_on(234 - gw + 22, 4, &AF_S, go, T_INK, T_THEME);
     cv_blit(0, 212);
 }
+static void new_keys(int create) { new_keys_row(create ? "Create" : "Roles", create ? ICON_X_CHECK : ICON_X_RIGHT); }
 /* a role's column: the track's colour bar, "Track 1", the role in its colour, the sound it gets (two lines), its
  * engine; KEEP: the template's sound, dim; the knob turning: outlined */
 static void new_role_col(uint32_t k)

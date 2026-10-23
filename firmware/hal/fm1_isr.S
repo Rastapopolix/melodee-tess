@@ -17,4 +17,27 @@
 	.endm
 
 	FM1_ISR isr_timer5, fm1_timer5_irq
-	FM1_ISR isr_alnk0, fm1_alnk0_irq
+/* Envelope around the C prologue/body/epilogue, including nested TIMER5.
+ * Register save/restore and the short timestamp footer remain outside this
+ * span; diagnostics add a conservative wrapper/nesting allowance. */
+	.section .audio_text,"ax",@progbits
+	.globl isr_alnk0
+isr_alnk0:
+	[--sp] = {psr, rets, reti}
+	[--sp] = {r3-r0}
+	r0 = 0x10804
+	r0 = [r0]
+	r1 = fm1_audio_irq_start_ticks
+	[r1] = r0
+	call fm1_alnk0_irq
+	r0 = 0x10804
+	r0 = [r0]
+	r1 = fm1_audio_irq_start_ticks
+	r1 = [r1]
+	r0 -= r1
+	r1 = fm1_audio_irq_elapsed_ticks
+	[r1] = r0
+	{r3-r0} = [sp++]
+	{psr, rets, reti} = [sp++]
+	csync
+	rti

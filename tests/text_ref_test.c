@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* The firmware's text (src/gfx.c cv_text) against the reference text path of the UI-redesign prototype that
  * drew the UI design screens (its aa_text / aa_blit4 / ramp_make,
- * restated below): pen in 1/16 px accumulated over the string, pair kerning by binary search, no extra tracking,
+ * restated below): pen in 1/16 px accumulated over the string, pair kerning (now class tables), no extra tracking,
  * the 16-entry ramp with the light / dark coverage curve. Glyph placement has since moved on from the prototype's
  * (the glyph at the rounded pen) to horizontal phases (tools/aa_raster.py): of the two phase positions around
  * the pen, the one whose offset is nearer the previous glyph's, plus that phase's ink offset; a glyph with one
@@ -70,15 +70,11 @@ static uint32_t ref_gi(const aafont_t *f, uint32_t ch)      /* the glyph's numbe
     if (k < 0) k = ref_at(f, '?');
     return k < 0 ? 0u : (uint32_t)k;                        /* a sparse face (L) without '?': its first glyph */
 }
-static int32_t ref_kern(const aafont_t *f, uint32_t a, uint32_t b)
+static int32_t ref_kern(const aafont_t *f, uint32_t a, uint32_t b)   /* the class matrix, glyph by glyph */
 {
-    uint32_t key = (a << 8) | b, lo = 0, hi = f->nk;
-    while (lo < hi) {
-        uint32_t m = (lo + hi) / 2u;
-        if (f->kkey[m] == key) return f->kd[m];
-        if (f->kkey[m] < key) lo = m + 1u; else hi = m;
-    }
-    return 0;
+    int32_t i = ref_at(f, a), j = ref_at(f, b);
+    if (!f->nkr || i < 0 || j < 0 || !f->kl[i] || !f->kr[j]) return 0;
+    return f->km[(f->kl[i] - 1u) * f->nkr + f->kr[j] - 1u];
 }
 /* a glyph's alpha values: 2 px per byte, or (f->hc) the Huffman bit stream of tools/gen_aa_font.py, decoded
  * here by matching each (length, code) against the canonical code table built from hc's length counts */

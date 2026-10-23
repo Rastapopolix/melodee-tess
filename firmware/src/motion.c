@@ -4,7 +4,12 @@
  * interrupt guard as parameter batches. The ISR only scans 64 fixed records.
  * p[] is the sounding value; motion_base_value() is the patch's saved value. */
 static motion_store_t motion;
+/* Main-loop sound design temporarily auditions the base tone. The saved motion
+ * enable bits and event pool remain unchanged. */
+static uint8_t motion_design_pause;
 static int recording_copy(track_t *t, uint32_t source, uint32_t dest, int apply);
+static int recording_double(track_t *t, uint32_t bank, uint32_t len, int apply);
+static void recording_reindex(void);
 static int16_t motion_base[NTRK][P_COUNT];
 static uint32_t motion_active[NTRK][(P_COUNT + 31u) / 32u];
 static uint8_t motion_base_valid, motion_full;
@@ -15,7 +20,12 @@ static uint8_t motion_base_valid, motion_full;
 #define MO_NATIVE 112u
 #define MO_NATIVE_N 144u                                /* (FM6: the voice up to TRANSPOSE; the CZ-1: 128; P5: 88) */
 enum { MO_TAG_NONE, MO_TAG_P5, MO_TAG_CZ, MO_TAG_FM6 };
-_Static_assert(P_COUNT <= MO_NATIVE && MO_NATIVE + MO_NATIVE_N <= 256u, "motion: the native ids after the track's");
+/* Native payloads carry an engine tag >= 256; ordinary parameters fit -64..127.
+ * Keep the historical native wire IDs even as ordinary engine IDs reach 112. */
+static int motion_native_event(uint32_t id,int32_t value){return id>=MO_NATIVE && value>=256;}
+static uint32_t motion_token(const motion_event_t *e){return e->param|(motion_native_event(e->param,e->value)?256u:0u);}
+
+_Static_assert(P_COUNT < 128u && MO_NATIVE + MO_NATIVE_N <= 256u, "motion: the native ids after the track's");
 static uint8_t motion_nbase[NTRK][MO_NATIVE_N] __attribute__((section(".pool")));   /* (read only under its bit) */
 static uint32_t motion_nactive[NTRK][(MO_NATIVE_N + 31u) / 32u];
 static uint32_t motion_guard(void)
@@ -39,21 +49,14 @@ static void motion_unguard(uint32_t f)
 static uint32_t motion_native_tag(const track_t *t)
 {
     uint32_t e = t->eng_req;
-    return e == ENGI_PROPHET ? MO_TAG_P5 : e == ENGI_CZ ? MO_TAG_CZ : e == ENGI_FM6 ? MO_TAG_FM6 : MO_TAG_NONE;
+    return e == ENGI_FM6 ? MO_TAG_FM6 : MO_TAG_NONE;   /* (MO_TAG_P5, MO_TAG_CZ: the retired Prophet's, CZ-1's) */
 }
-/* byte i of the patch of the track's engine, 0: none motion moves (the Prophet's voice assignment, the CZ-1's line
- * select, FM6's TRANSPOSE and name: what changes the voices themselves) */
+/* byte i of the patch of the track's engine, 0: none motion moves (FM6's TRANSPOSE and name: what changes the voices
+ * themselves) */
 static uint8_t *motion_native_at(track_t *t, uint32_t i)
 {
     uint32_t k = trk_index(t);
     switch (motion_native_tag(t)) {
-#if MELODEE_PROPHET
-    case MO_TAG_P5:
-        return i < NELEM(P5_PANEL) && P5_PANEL[i].label && i != P5_UNISON && i != P5_UNISON_COUNT &&
-               i != P5_UNISON_DETUNE && i != P5_RETRIGGER ? &p5_patch_of(t)->raw[i] : 0;
-#endif
-    case MO_TAG_CZ:
-        return i && i < 128u ? &cz_patch[k].raw[i] : 0;
     case MO_TAG_FM6:
         return i < FP_TRNSP ? &fm6_patch[k][i] : 0;
     default:
@@ -64,26 +67,6 @@ static int motion_native_ok(uint32_t id, int32_t value)    /* (a store's event: 
 {
     uint32_t i = id - MO_NATIVE, tag = (uint32_t)value >> 8, v = (uint32_t)value & 255u;
     if (id < MO_NATIVE || id >= MO_NATIVE + MO_NATIVE_N || value < 0) return 0;
-    if (tag == MO_TAG_P5) {
-#if MELODEE_PROPHET
-        return i < NELEM(P5_PANEL) && P5_PANEL[i].label && i != P5_UNISON && i != P5_UNISON_COUNT &&
-            i != P5_UNISON_DETUNE && i != P5_RETRIGGER && v >= (uint32_t)P5_PANEL[i].min && v <= (uint32_t)P5_PANEL[i].max;
-#else
-        return 0;
-#endif
-    }
-    if (tag == MO_TAG_CZ) {
-        if (!i || i >= 128u) return 0;
-        if (i == 1u) return v <= 1u;
-        if (i == 2u) return !(v & 3u);
-        if (i == 3u) return v <= 47u;
-        if (i == 16u || i == 73u) return (v & 15u) <= 9u && (v >> 4) <= 14u;
-        if (i == 18u || i == 75u) return v <= 9u;
-        for (uint32_t l = 0; l < 2u; l++)
-            for (uint32_t e = 0; e < 3u; e++)
-                if (i == CZ_ENV_END[l][e]) return !(v & 8u);
-        return 1;
-    }
     if (tag == MO_TAG_FM6) {
         static const uint8_t opmax[FP_OP] = {99,99,99,99,99,99,99,99,99,99,99,3,3,7,3,7,99,1,31,99,14};
         static const uint8_t globalmax[FP_TRNSP - FP_PR1] = {99,99,99,99,99,99,99,99,31,7,1,99,99,99,99,1,5,7};
@@ -137,9 +120,9 @@ static void motion_native_snapshot(const track_t *t, uint8_t *raw, uint32_t tag,
 static int motion_param(uint32_t id)
 {
     /* Sound only: transport, routing, voice allocation and discrete engine
-     * changes never become automation. FX sends and continuous mix are safe. */
+     * changes never become automation. Continuous mix parameters are safe. */
     return id != P_RECQ && id < P_COUNT && (id <= P_REL || (id >= P_ED_FLT && id <= P_LD_AMP) ||
-        (id >= P_DIST && id <= P_REV) || id == P_GLIDE || id == P_PAN ||
+        id == P_GLIDE || id == P_PAN ||
         id == P_DETUNE || id == P_SPRD || (id >= P_LN0 && id <= P_LN7) || (id >= P_FM1_ATK && id <= P_FM4_LEVEL) || id >= P_E0);   /* (not the chord keys) */
 }
 static int motion_valid(const motion_store_t *m)
@@ -148,10 +131,10 @@ static int motion_valid(const motion_store_t *m)
     if (m->rsv[0] > 1u || m->count > MOTION_MAX || (m->on & ~((1u << NTRK) - 1u))) return 0;
     for (i = 0; i < m->count; i++) {
         const motion_event_t *e = &m->event[i];
-        if (e->param >= MO_NATIVE ? !motion_native_ok(e->param, e->value) :
-            (!motion_param(e->param) && e->param != P_RECQ) || e->value < -64 || e->value > 127) return 0;
+        if (motion_native_event(e->param,e->value) ? !motion_native_ok(e->param, e->value) :
+            (!motion_param(e->param) && !param_reserved(e->param) && e->param != P_RECQ) || e->value < -64 || e->value > 127) return 0;
         if (!m->rsv[0]) for (j = 0; j < i; j++)
-            if (m->event[j].place == e->place && m->event[j].param == e->param) return 0;
+            if (m->event[j].place == e->place && motion_token(&m->event[j]) == motion_token(e)) return 0;
     }
     return 1;
 }
@@ -168,7 +151,7 @@ static int motion_has_lanes(const track_t *t)
     for (uint32_t i = 0; i < motion.count; i++) {
         const motion_event_t *e = &motion.event[i];
         if ((e->place >> 6) == k && motion_pattern[i] == t->pattern && e->param != P_RECQ &&
-            (e->param < MO_NATIVE || (uint32_t)e->value >> 8 == tag)) return 1;
+            (!motion_native_event(e->param,e->value) || (uint32_t)e->value >> 8 == tag)) return 1;
     }
     return 0;
 }
@@ -238,7 +221,7 @@ static int motion_set_event(track_t *t, uint32_t step, uint32_t id, int16_t valu
     uint32_t k = trk_index(t), i, f;
     const param_desc_t *d;
     if (k >= NTRK || step >= NSTEP) return 1;
-    if (id >= MO_NATIVE) {
+    if (motion_native_event(id,value)) {
         if (!motion_native_ok(id, value)) return 1;
     } else {
         if (!motion_param(id)) return 1;
@@ -247,7 +230,7 @@ static int motion_set_event(track_t *t, uint32_t step, uint32_t id, int16_t valu
     }
     f = motion_guard();
     for (i = 0; i < motion.count; i++)
-        if (motion_pattern[i] == t->pattern && motion.event[i].place == (k << 6 | step) && motion.event[i].param == id) break;
+        if (motion_pattern[i] == t->pattern && motion.event[i].place == (k << 6 | step) && motion.event[i].param == id && motion_native_event(id,motion.event[i].value)==motion_native_event(id,value)) break;
     if (i == MOTION_MAX) { motion_full = 1; motion_unguard(f); return 2; }
     if (t->pattern) motion.rsv[0] = 1;
     motion_pattern[i] = t->pattern;
@@ -265,7 +248,7 @@ static void motion_delete_event(track_t *t, uint32_t step, uint32_t id)
     uint32_t f = motion_guard(), place = trk_index(t) << 6 | step, i, n = 0;
     motion_restore(t);
     for (i = 0; i < motion.count; i++)
-        if (motion_pattern[i] != t->pattern || motion.event[i].place != place || motion.event[i].param != id) {
+        if (motion_pattern[i] != t->pattern || motion.event[i].place != place || (id&512u ? motion.event[i].param!=(id&255u) : motion_token(&motion.event[i])!=id)) {
             motion_pattern[n] = motion_pattern[i]; motion.event[n++] = motion.event[i];
         }
     memset(motion.event + n, 0, (MOTION_MAX - n) * sizeof motion.event[0]);
@@ -278,7 +261,7 @@ static void motion_clear_param(track_t *t, uint32_t id)
     uint32_t f = motion_guard(), k = trk_index(t), i, n = 0, remaining = 0;
     motion_restore(t);
     for (i = 0; i < motion.count; i++)
-        if (motion_pattern[i] != t->pattern || (motion.event[i].place >> 6) != k || motion.event[i].param != id) {
+        if (motion_pattern[i] != t->pattern || (motion.event[i].place >> 6) != k || (id&512u ? motion.event[i].param!=(id&255u) : motion_token(&motion.event[i])!=id)) {
             motion_pattern[n] = motion_pattern[i]; motion.event[n++] = motion.event[i];
         }
     memset(motion.event + n, 0, (MOTION_MAX - n) * sizeof motion.event[0]);
@@ -339,7 +322,7 @@ static uint32_t motion_native_edited(track_t *t, const uint8_t *old)
             if (!b || *b == old[i]) continue;
             uint32_t j;
             for (j = 0; j < motion.count; j++)
-                if (motion_pattern[j] == t->pattern && motion.event[j].place == (k << 6 | idx) && motion.event[j].param == MO_NATIVE + i) break;
+                if (motion_pattern[j] == t->pattern && motion.event[j].place == (k << 6 | idx) && motion.event[j].param == MO_NATIVE + i && motion_native_event(motion.event[j].param,motion.event[j].value)) break;
             extra += j == motion.count;
         }
         /* A multi-byte CZ edit must never record only half its patch change. */
@@ -365,6 +348,7 @@ static uint32_t motion_native_edited(track_t *t, const uint8_t *old)
 static __attribute__((noinline)) void motion_step(track_t *t, uint32_t step, const motion_store_t *m)
 {
     uint32_t k = trk_index(t), i;
+    if((motion_design_pause>>k)&1u)return;
     if (!((m->on >> k) & 1u)) return;
     if (!((motion_base_valid >> k) & 1u)) {
         memcpy(motion_base[k], t->p, sizeof t->p);
@@ -374,8 +358,8 @@ static __attribute__((noinline)) void motion_step(track_t *t, uint32_t step, con
     for (i = 0; i < m->count; i++) {
         const motion_event_t *e = &m->event[i];
         if (motion_pattern[i] != t->pattern || e->place != (k << 6 | step)) continue;
-        if (e->param == P_RECQ) continue; /* old inert FX automation stays inert */
-        if (e->param >= MO_NATIVE) {      /* the engine's own patch: its engine's events only */
+        if (e->param == P_RECQ || param_reserved(e->param)) continue; /* old inert FX automation stays inert */
+        if (motion_native_event(e->param,e->value)) {      /* the engine's own patch: its engine's events only */
             if ((uint32_t)e->value >> 8 == motion_native_tag(t)) motion_native_set(t, e->param - MO_NATIVE, (uint32_t)e->value & 255u);
             continue;
         }
@@ -445,6 +429,65 @@ static int pattern_copy(track_t *t, uint32_t source, uint32_t dest)
         motion.event[motion.count] = motion.event[i]; motion_pattern[motion.count++] = (uint8_t)dest;
     }
     if (dest == t->pattern) pattern_apply(t, dest);
+    motion_unguard(f);
+    return 0;
+}
+/* track t's pattern bank twice as long: its LEN steps, their recorded notes and motion copied after themselves (what
+ * lay hidden there, past LEN, goes). The one playing goes on into the copy. apply 0: only asks. 1 = refused (a song
+ * running), 2 = no room, 3 = 64 steps at most */
+static int pattern_double(track_t *t, uint32_t bank, int apply)
+{
+    uint32_t k = trk_index(t), len, i, j, n = 0, add = 0, drop = 0, f;
+    step_t *s;
+    int16_t *lp;
+    if (bank >= NPAT) return 1;
+    s = bank == t->pattern ? t->step : pattern_at(k, bank)->step;
+    lp = bank == t->pattern ? &t->p[P_SLEN] : &pattern_at(k, bank)->timing[0];
+    f = motion_guard();
+    if (chain.running || chain.armed) { motion_unguard(f); return 1; }
+    len = (uint32_t)clamp(*lp, 1, NSTEP);
+    if (2u * len > NSTEP) { motion_unguard(f); return 3; }
+    for (i = 0; i < motion.count; i++) if ((motion.event[i].place >> 6) == k && motion_pattern[i] == bank) {
+        j = motion.event[i].place & 63u;
+        if (j < len) add++;
+        else if (j < 2u * len) drop++;
+    }
+    if (motion.count - drop + add > MOTION_MAX || recording_double(t, bank, len, 0)) { motion_unguard(f); return 2; }
+    if (!apply) { motion_unguard(f); return 0; }
+    recording_double(t, bank, len, 1);
+    for (i = 0; i < len; i++) s[len + i] = s[i];
+    for (i = 0; i < motion.count; i++) {
+        j = motion.event[i].place & 63u;
+        if ((motion.event[i].place >> 6) != k || motion_pattern[i] != bank || j < len || j >= 2u * len) {
+            motion_pattern[n] = motion_pattern[i]; motion.event[n++] = motion.event[i];
+        }
+    }
+    motion.count = (uint8_t)n;
+    for (i = 0; i < n; i++)
+        if ((motion.event[i].place >> 6) == k && motion_pattern[i] == bank && (motion.event[i].place & 63u) < len) {
+            motion.event[motion.count] = motion.event[i];
+            motion.event[motion.count].place = (uint8_t)(motion.event[i].place + len);
+            motion_pattern[motion.count++] = (uint8_t)bank;
+        }
+    motion.rsv[0] = 1;
+    *lp = (int16_t)(2u * len);
+    recording_reindex();
+    motion_unguard(f);
+    return 0;
+}
+/* .. half as long (an odd LEN keeps its middle step): what is past it stays, hidden, as LEN turned down leaves it.
+ * apply 0: only asks. 1 = refused (a song running), 3 = one step already */
+static int pattern_half(track_t *t, uint32_t bank, int apply)
+{
+    uint32_t len, f;
+    int16_t *lp;
+    if (bank >= NPAT) return 1;
+    lp = bank == t->pattern ? &t->p[P_SLEN] : &pattern_at(trk_index(t), bank)->timing[0];
+    f = motion_guard();
+    if (chain.running || chain.armed) { motion_unguard(f); return 1; }
+    len = (uint32_t)clamp(*lp, 1, NSTEP);
+    if (len < 2u) { motion_unguard(f); return 3; }
+    if (apply) *lp = (int16_t)((len + 1u) / 2u);
     motion_unguard(f);
     return 0;
 }

@@ -1,0 +1,1365 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 Theo Dainis (melodee-tess) */
+/* Unit test of the note generators (firmware/src/gen.c) on their own: no sequencer, no tracks, no Melodee; only
+ * gen.h, gen.c and a random stream of its own, as tessera.c hands each track's. That it builds this way is part of the test: the
+ * generators know nothing of the firmware (phase 1, tessera-notes/docs/analysis/phase1-plan.md step 9).
+ *   build/host/gen_test
+ * Checks, per generator and across its settings: the same seed gives the same steps; notes and velocities stay
+ * inside the generator's range; a rest leaves out's {note 60, vel 100} (LOCK records it); the random draws per
+ * step are exactly those tests/tessera_baseline.txt depends on; mutation keeps the settings in range. Also Euclid's
+ * hits per cycle (= PULSES) and Turing at PROB 0 repeating every LENGTH steps. Prints the host cost per step. */
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#include "gen.h"
+#include "gen.c"
+
+static uint32_t rng_state = 1u;                      /* the stream handed to every generator (a track's, in tessera.c) */
+static uint32_t draws_since(uint32_t before)         /* draws taken from rng_state since it was `before` (up to 16) */
+{
+    uint32_t n = 0, x = before;
+    while (x != rng_state && n < 17u) { gen_next(&x); n++; }
+    return n;
+}
+
+static int bad;
+static void check(const char *what, int ok)
+{
+    printf("gen: %-90s %s\n", what, ok ? "ok" : "FAIL");
+    bad += !ok;
+}
+
+static const gen_clock_t CLK0 = {0, 16, 0};
+static gen_out_t step_out(void) { gen_out_t o = {0, 60, 100, 0, 0, 0, {0, 0}, 0}; return o; }   /* as tessera.c starts each step */
+/* field by field: gen_out_t has a padding byte (before cv), which memcmp would compare too */
+static int out_eq(const gen_out_t *a, const gen_out_t *b, uint32_t n)
+{
+    for (uint32_t i = 0; i < n; i++)
+        if (a[i].gate != b[i].gate || a[i].note != b[i].note || a[i].vel != b[i].vel || a[i].cv != b[i].cv ||
+            a[i].parts != b[i].parts || a[i].accent != b[i].accent || a[i].more_n != b[i].more_n ||
+            (a[i].more_n && memcmp(a[i].more, b[i].more, a[i].more_n))) return 0;
+    return 1;
+}
+
+/* ------------------------------------------------------------------ Turing --- */
+static void turing_tests(void)
+{
+    int range = 1, draws = 1, same = 1, loop = 1;
+    for (uint32_t len = 2; len <= 16; len++)
+        for (uint32_t span = 1; span <= 3; span++)
+            for (uint32_t prob = 0; prob <= 100; prob += 25) {
+                gen_turing_t g = {0xACE1u, (uint8_t)len, (uint8_t)prob, 0, 0, (uint8_t)span};
+                for (uint32_t i = 0; i < 64; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state;
+                    gen_turing_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == (prob ? 1u : 0u);
+                    range &= o.note >= 36 && o.note <= 36 + 12 * (span - 1) + 10 && o.vel >= 90 && o.vel <= 121;
+                    range &= o.gate <= 1 && o.cv >= 0;   /* (the CV: Q15, 0..32767) */
+                }
+            }
+    {   /* PROB 0: the register only rotates, so every LENGTH steps it plays the same again */
+        for (uint32_t len = 2; len <= 16; len++) {
+            gen_turing_t g = {0xB5A3u, (uint8_t)len, 0, 0, 0, 3};
+            gen_out_t seen[48];
+            for (uint32_t i = 0; i < 48; i++) {
+                seen[i] = step_out();
+                gen_turing_tick(&g, &CLK0, &rng_state, &seen[i]);
+                if (i >= len) loop &= out_eq(&seen[i], &seen[i - len], 1);
+            }
+        }
+    }
+    {   /* the same seed: the same steps */
+        gen_out_t a[200], b[200];
+        for (int run = 0; run < 2; run++) {
+            gen_turing_t g = {0xACE1u, 16, 30, 0, 0, 2};
+            rng_state = 12345u;
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_out_t *o = run ? &b[i] : &a[i];
+                *o = step_out();
+                gen_turing_tick(&g, &CLK0, &rng_state, o);
+            }
+        }
+        same = out_eq(a, b, sizeof a / sizeof a[0]);
+    }
+    {   /* a fresh register: never 0 (the defaults' "not picked yet"), low two bits never both 0, and spread */
+        static uint8_t seen[65536 / 8];
+        uint32_t distinct = 0;
+        int ok = 1;
+        memset(seen, 0, sizeof seen);
+        for (uint32_t e = 0; e < 4096; e++) {
+            uint16_t r = gen_turing_pick(e * 7919u + 13u);
+            ok &= r != 0 && (r & 3u) != 0;
+            if (!(seen[r >> 3] & (1u << (r & 7u)))) { seen[r >> 3] |= (uint8_t)(1u << (r & 7u)); distinct++; }
+        }
+        check("turing: a picked register is never 0, its low two bits never both 0", ok);
+        check("turing: 4096 entropy values pick at least 3900 different registers", distinct >= 3900u);
+    }
+    check("turing: notes 36..36+12*(SPAN-1)+10, velocity 90..121, gate 0/1, cv 0..32767 (every LEN, SPAN, PROB)", range);
+    check("turing: one draw a step when PROB > 0, none at PROB 0", draws);
+    check("turing: PROB 0 repeats every LENGTH steps", loop);
+    check("turing: the same seed gives the same steps", same);
+    {
+        int ok = 1;
+        for (uint32_t amt = 0; amt <= 100; amt += 10) {
+            gen_turing_t g = {0xACE1u, 8, 0, 0, 0, 2};
+            gen_turing_mutate(&g, amt, &rng_state);
+            ok &= g.len == 8 && g.prob == 0 && g.oct_span == 2 && g.step_idx == 0;
+            if (!amt) ok &= g.reg == 0xACE1u;
+        }
+        check("turing: mutation changes only the register (AMOUNT 0: nothing)", ok);
+    }
+    {   /* from all active bits 0 or all 1, and over a long run: never all alike after a mutation */
+        int ok = 1;
+        for (uint32_t len = 2; len <= 16; len++) {
+            uint16_t m = len >= 16u ? 0xFFFFu : (uint16_t)((1u << len) - 1u);
+            for (uint32_t amt = 10; amt <= 100; amt += 10)
+                for (uint32_t start = 0; start < 2u; start++) {
+                    gen_turing_t g = {start ? m : 0u, (uint8_t)len, 0, 0, 0, 2};
+                    for (uint32_t n = 0; n < 200; n++) {
+                        gen_turing_mutate(&g, amt, &rng_state);
+                        ok &= (g.reg & m) != 0u && (g.reg & m) != m;
+                    }
+                }
+        }
+        check("turing: after a mutation the active bits are never all 0 (silence) nor all 1 (LEN 2..16)", ok);
+    }
+}
+
+/* ------------------------------------------------------------------ Euclid --- */
+static void euclid_tests(void)
+{
+    int range = 1, draws = 1, rest = 1, hits_ok = 1, same = 1, mut = 1;
+    for (uint32_t steps = 1; steps <= 32; steps++)
+        for (uint32_t pulses = 0; pulses <= steps; pulses++)
+            for (uint32_t rot = 0; rot < steps; rot += 3) {
+                gen_euclid_t g = {(uint8_t)steps, (uint8_t)pulses, (uint8_t)rot, 0, 0, (uint8_t)(rot * 37u)};
+                uint32_t hits = 0;
+                for (uint32_t i = 0; i < steps; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state;
+                    gen_euclid_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == 0u;
+                    if (o.gate) {
+                        hits++;
+                        range &= o.note >= 48 && o.note <= 59 && o.vel == 110;
+                    } else {
+                        rest &= o.note == 60 && o.vel == 100;
+                    }
+                }
+                hits_ok &= hits == pulses && g.step_idx == 0;
+            }
+    {
+        gen_out_t a[64], b[64];
+        for (int run = 0; run < 2; run++) {
+            gen_euclid_t g = {13, 5, 3, 0, 0, 77};
+            for (uint32_t i = 0; i < 64; i++) {
+                gen_out_t *o = run ? &b[i] : &a[i];
+                *o = step_out();
+                gen_euclid_tick(&g, &CLK0, &rng_state, o);
+            }
+        }
+        same = out_eq(a, b, sizeof a / sizeof a[0]);
+    }
+    for (uint32_t steps = 1; steps <= 32; steps++)
+        for (uint32_t amt = 0; amt <= 100; amt += 20) {
+            gen_euclid_t g = {(uint8_t)steps, (uint8_t)(steps / 2u), 0, 0, 0, 5};
+            for (uint32_t n = 0; n < 50; n++) gen_euclid_mutate(&g, amt, &rng_state);
+            mut &= g.steps == steps && g.pulses <= steps && g.rot < steps && g.pitch_seed != 0;
+        }
+    check("euclid: a hit plays 48..59 at velocity 110; a rest keeps note 60, velocity 100", range && rest);
+    check("euclid: PULSES hits in every cycle of STEPS, the playhead back on step 1 (STEPS 1..32, every PULSES)", hits_ok);
+    check("euclid: no random draw on a step (its pitches are a hash of the seed)", draws);
+    check("euclid: the same settings give the same steps", same);
+    check("euclid: mutation keeps PULSES <= STEPS, ROT < STEPS, a seed other than 0", mut);
+    {   /* PULSES 1..STEPS-1 once a mutation moved them, from 0 and from STEPS too (STEPS 1: 1) */
+        int ok = 1;
+        for (uint32_t steps = 1; steps <= 32; steps++)
+            for (uint32_t start = 0; start < 3u; start++) {
+                uint32_t hi = steps > 1u ? steps - 1u : 1u, moved = 0;
+                gen_euclid_t g = {(uint8_t)steps, (uint8_t)(start == 0 ? 0u : start == 1 ? steps : steps / 2u), 0, 0, 0, 5};
+                for (uint32_t n = 0; n < 300; n++) {
+                    uint8_t was = g.pulses;
+                    gen_euclid_mutate(&g, 100, &rng_state);
+                    moved |= g.pulses != was;
+                    if (moved) ok &= g.pulses >= 1u && g.pulses <= hi;
+                }
+                ok &= moved || (g.pulses >= 1u && g.pulses <= hi);
+            }
+        check("euclid: mutation keeps PULSES 1..STEPS-1 (never silent, never every step), from 0 and from STEPS", ok);
+    }
+    {
+        int ok = 1;
+        for (uint32_t s = 0; s < 256; s++) {
+            uint8_t n = gen_new_seed((uint8_t)s, &rng_state);
+            ok &= n != 0 && n != s;
+        }
+        check("euclid: a new seed is never 0 nor the one it replaces", ok);
+    }
+}
+
+/* ------------------------------------------------------------------ Markov --- */
+static void markov_tests(void)
+{
+    int range = 1, draws = 1, same = 1, mut = 1;
+    for (uint32_t root = 0; root < 12; root++)
+        for (uint32_t oct = 1; oct <= 3; oct++)
+            for (uint32_t tens = 0; tens <= 100; tens += 20)
+                for (uint32_t dens = 0; dens <= 100; dens += 25) {
+                    gen_markov_t g = {0, 0, (uint8_t)tens, (uint8_t)dens, (uint8_t)oct};
+                    gen_clock_t clk = {0, 16, (uint8_t)root};
+                    for (uint32_t i = 0; i < 64; i++) {
+                        gen_out_t o = step_out();
+                        uint32_t c = rng_state;
+                        gen_markov_tick(&g, &clk, &rng_state, &o);
+                        draws &= draws_since(c) == 4u;
+                        range &= g.cur_state < 8 && o.vel >= 95 && o.vel <= 114 && o.gate <= 1;
+                        range &= o.note >= 36 + root && o.note <= 36 + root + 14 + 12 * (oct - 1);
+                    }
+                }
+    {
+        gen_out_t a[200], b[200];
+        for (int run = 0; run < 2; run++) {
+            gen_markov_t g = {0, 0, 40, 70, 2};
+            gen_clock_t clk = {0, 16, 5};
+            rng_state = 777u;
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_out_t *o = run ? &b[i] : &a[i];
+                *o = step_out();
+                gen_markov_tick(&g, &clk, &rng_state, o);
+            }
+        }
+        same = out_eq(a, b, sizeof a / sizeof a[0]);
+    }
+    {
+        uint8_t row[8];
+        int rows = 1;
+        for (uint32_t tens = 0; tens <= 100; tens++)
+            for (uint32_t s = 0; s < 8; s++) {
+                gen_markov_row((uint8_t)tens, s, row);
+                for (uint32_t d = 1; d < 8; d++) rows &= row[d] >= row[d - 1];
+                rows &= row[7] == 100;
+            }
+        check("markov: every transition row rises to 100 (TENSION 0..100, every state)", rows);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 10)
+        for (uint32_t t0 = 0; t0 <= 100; t0 += 50) {
+            gen_markov_t g = {3, 0, (uint8_t)t0, 80, 2};
+            for (uint32_t n = 0; n < 50; n++) gen_markov_mutate(&g, amt, &rng_state);
+            mut &= g.tension <= 100 && g.density == 80 && g.oct_span == 2 && g.cur_state == 3;
+        }
+    check("markov: notes root+36 .. root+50+12*(SPAN-1), velocity 95..114, a state 0..7 (every ROOT, SPAN, TENSION, DENSITY)", range);
+    check("markov: four draws a step, in the order degree, octave, velocity, density", draws);
+    check("markov: the same seed gives the same steps", same);
+    check("markov: mutation keeps TENSION 0..100 and changes nothing else", mut);
+    {   /* turning back at 0 and 100: at AMOUNT 100, 4000 mutations rest on a bound only about 2 % of the time */
+        gen_markov_t g = {3, 0, 100, 80, 2};
+        uint32_t at = 0;
+        for (uint32_t n = 0; n < 4000; n++) {
+            gen_markov_mutate(&g, 100, &rng_state);
+            at += g.tension == 0 || g.tension == 100;
+        }
+        check("markov: mutation turns TENSION back at 0 and 100, never sitting there (AMOUNT 100: under 5 % of 4000)",
+              at < 200u);
+    }
+}
+
+/* ------------------------------------------------------------------ Morph --- */
+static void morph_tests(void)
+{
+    int range = 1, draws = 1, rest = 1, same = 1, mut = 1, ends = 1;
+    for (uint32_t pos = 0; pos <= 127; pos += 9)
+        for (uint32_t pa = 0; pa < 8; pa++) {
+            gen_morph_t g = {(uint8_t)pos, GEN_MORPH_PRESETS[pa], GEN_MORPH_PRESETS[7 - pa], 0x0F, 2};
+            for (uint32_t i = 0; i < 48; i++) {
+                gen_out_t o = step_out();
+                uint32_t c = rng_state;
+                gen_morph_tick(&g, &CLK0, &rng_state, &o);
+                draws &= draws_since(c) == 1u;
+                if (o.gate) range &= o.note >= 48 && o.note <= 60 && (o.vel == 100 || o.vel == 115);
+                else rest &= o.note == 60 && o.vel == 100;
+                range &= (g.step_idx & 0xF0u) == 0;
+            }
+        }
+    {   /* POS 0 plays snapshot A exactly */
+        gen_morph_t g = {0, 0x8924u, 0xFFFFu, 0x0F, 2};
+        for (uint32_t i = 0; i < 32; i++) {
+            gen_out_t o = step_out();
+            gen_morph_tick(&g, &CLK0, &rng_state, &o);
+            ends &= o.gate == ((0x8924u >> (i & 15u)) & 1u);
+        }
+    }
+    {
+        gen_out_t a[100], b[100];
+        for (int run = 0; run < 2; run++) {
+            gen_morph_t g = {64, 0x8888u, 0xA5A5u, 0x0F, 2};
+            rng_state = 4242u;
+            for (uint32_t i = 0; i < 100; i++) {
+                gen_out_t *o = run ? &b[i] : &a[i];
+                *o = step_out();
+                gen_morph_tick(&g, &CLK0, &rng_state, o);
+            }
+        }
+        same = out_eq(a, b, sizeof a / sizeof a[0]);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 10) {
+        gen_morph_t g = {120, 0x8888u, 0xA5A5u, 0x0F, 2};
+        for (uint32_t n = 0; n < 50; n++) gen_morph_mutate(&g, amt, &rng_state);
+        mut &= g.morph_pos <= 127 && g.snap_b == 0xA5A5u && g.oct_span == 2;
+    }
+    check("morph: a hit plays 48..60 at velocity 100 or 115; a rest keeps note 60, velocity 100", range && rest);
+    check("morph: one draw a step", draws);
+    check("morph: POS 0 plays snapshot A step for step", ends);
+    check("morph: the same seed gives the same steps", same);
+    check("morph: mutation keeps POS 0..127 and leaves snapshot B", mut);
+}
+
+/* ------------------------------------------------------------------ Grids --- */
+static void grids_tests(void)
+{
+    /* the map read against Grids itself: values from its resources.cc and ReadDrumMap (U8Mix), off the nodes too */
+    static const uint8_t REF[][5] = {{0, 0, 0, 0, 143}, {4, 1, 255, 255, 0}, {8, 2, 48, 228, 187}, {12, 0, 100, 30, 130},
+                                     {30, 1, 200, 77, 114}, {16, 2, 128, 128, 74}, {2, 0, 63, 191, 0}};
+    int ref = 1, range = 1, rest = 1, draws = 1, silent = 1, full = 1, len = 1, same = 1, mut = 1;
+    for (uint32_t i = 0; i < sizeof REF / sizeof REF[0]; i++)
+        ref &= gen_grids_level(REF[i][0], REF[i][1], REF[i][2], REF[i][3]) == REF[i][4];
+    for (uint32_t x = 0; x <= 255; x += 51)
+        for (uint32_t y = 0; y <= 255; y += 85)
+            for (uint32_t dens = 0; dens <= 100; dens += 25)
+                for (uint32_t chaos = 0; chaos <= 100; chaos += 50) {
+                    gen_grids_t g = {(uint8_t)x, (uint8_t)y, (uint8_t)dens, (uint8_t)chaos, 0, {0, 0, 0}};
+                    for (uint32_t i = 0; i < 48; i++) {
+                        gen_out_t o = step_out();
+                        uint32_t c = rng_state, st = g.step_idx;
+                        gen_grids_tick(&g, &CLK0, &rng_state, &o);
+                        draws &= draws_since(c) == (st == 0u && chaos ? 3u : 0u);
+                        range &= o.parts <= 7u && (o.accent & ~o.parts) == 0u && o.gate == (o.parts != 0u) && o.cv >= 0;
+                        range &= g.perturb[0] <= 63u && g.perturb[1] <= 63u && g.perturb[2] <= 63u;
+                        if (o.gate) range &= (o.note == 36 || o.note == 38 || o.note == 42) && (o.vel == 96 || o.vel == 127);
+                        else rest &= o.note == 60 && o.vel == 100;
+                        if (!dens) silent &= !o.gate;
+                        if (dens == 100u && !chaos)          /* every step the map gives a chance plays */
+                            for (uint32_t p = 0; p < 3u; p++)
+                                full &= ((o.parts >> p) & 1u) == (gen_grids_level(st * 2u, p, x, y) > 0u);
+                    }
+                }
+    {   /* 16 steps a bar at 16ths (the map's even 32nds), 32 at 32nds */
+        gen_grids_t g = {128, 128, 50, 0, 0, {0, 0, 0}};
+        const gen_clock_t c32 = {0, 32, 0};
+        for (uint32_t i = 0; i < 40; i++) { gen_out_t o = step_out(); gen_grids_tick(&g, &CLK0, &rng_state, &o); }
+        len &= g.step_idx == 40u % 16u;
+        g.step_idx = 0;
+        for (uint32_t i = 0; i < 40; i++) { gen_out_t o = step_out(); gen_grids_tick(&g, &c32, &rng_state, &o); }
+        len &= g.step_idx == 40u % 32u;
+    }
+    {
+        gen_out_t a[64], b[64];
+        for (int run = 0; run < 2; run++) {
+            gen_grids_t g = {77, 190, 70, 60, 0, {0, 0, 0}};
+            rng_state = 0xC0FFEEu;
+            for (uint32_t i = 0; i < 64; i++) {
+                gen_out_t *o = run ? &b[i] : &a[i];
+                *o = step_out();
+                gen_grids_tick(&g, &CLK0, &rng_state, o);
+            }
+        }
+        same = out_eq(a, b, 64);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 10) {
+        gen_grids_t g = {3, 250, 40, 20, 5, {0, 0, 0}};
+        for (uint32_t n = 0; n < 200; n++) gen_grids_mutate(&g, amt, &rng_state);
+        mut &= g.dens == 40 && g.chaos == 20 && g.step_idx == 5 && (amt || (g.x == 3 && g.y == 250));
+    }
+    {   /* KICK, SNR, HAT (thin: turned round): 0 % a part silent; 50 % at DENS 100 the part as at DENS 50. TOMS: never with
+         * the kick or the snare, never at TOMS 0 or DENS 0, only where one of them is offered a hit under its line;
+         * some at TOMS 100, more than at 30; GM 45 at 96 */
+        int share = 1, toms = 1;
+        uint32_t n30 = 0, n100 = 0;
+        for (uint32_t x = 0; x <= 255; x += 51)
+            for (uint32_t y = 0; y <= 255; y += 85) {
+                for (uint32_t p = 0; p < 3u; p++) {
+                    gen_grids_t g = {(uint8_t)x, (uint8_t)y, 100, 0, 0, {0, 0, 0}, {0, 0, 0}, 0};
+                    gen_grids_t h = {(uint8_t)x, (uint8_t)y, 50, 0, 0, {0, 0, 0}, {0, 0, 0}, 0};
+                    g.thin[p] = 50;
+                    for (uint32_t i = 0; i < 16; i++) {
+                        gen_out_t a = step_out(), b = step_out();
+                        gen_grids_tick(&g, &CLK0, &rng_state, &a);
+                        gen_grids_tick(&h, &CLK0, &rng_state, &b);
+                        share &= ((a.parts ^ b.parts) >> p & 1u) == 0u;
+                    }
+                    g.thin[p] = 100;
+                    for (uint32_t i = 0; i < 16; i++) {
+                        gen_out_t a = step_out();
+                        gen_grids_tick(&g, &CLK0, &rng_state, &a);
+                        share &= !((a.parts >> p) & 1u);
+                    }
+                }
+                for (uint32_t dens = 0; dens <= 100; dens += 25)
+                    for (uint32_t t = 0; t <= 100; t += 10) {
+                        gen_grids_t g = {(uint8_t)x, (uint8_t)y, (uint8_t)dens, 40, 0, {0, 0, 0}, {0, 0, 0}, (uint8_t)t};
+                        for (uint32_t i = 0; i < 32; i++) {
+                            gen_out_t o = step_out();
+                            uint32_t st = g.step_idx, tom;
+                            gen_grids_tick(&g, &CLK0, &rng_state, &o);
+                            tom = (o.parts >> GEN_GRIDS_TOM) & 1u;
+                            toms &= o.parts < 16u && !((o.accent >> GEN_GRIDS_TOM) & 1u);
+                            if (!tom) continue;
+                            toms &= t && dens && !(o.parts & 3u) &&
+                                    (gen_grids_level(st * 2u, 0u, x, y) || gen_grids_level(st * 2u, 1u, x, y));
+                            if (o.parts == 1u << GEN_GRIDS_TOM) toms &= o.note == 45 && o.vel == 96;
+                            if (dens == 50u) n30 += t == 30u, n100 += t == 100u;
+                        }
+                    }
+            }
+        toms &= n100 > n30 && n30 > 0u;
+        check("grids: KICK, SNR, HAT: 0 % silences the part, 50 % at DENS 100 plays it as DENS 50", share);
+        check("grids: TOMS plays 45 where the kick and snare just miss, never with them; none at 0, more as it rises", toms);
+    }
+    check("grids: the map reads as Grids' ReadDrumMap, on and between its patterns", ref);
+    check("grids: hits play 36/38/42 at velocity 96 or 127 (accent); a rest keeps note 60, vel 100", range && rest);
+    check("grids: CHAOS draws three a bar (on its first step), none at 0", draws);
+    check("grids: DENSITY 0 is silent; 100 plays every step the map gives a chance", silent && full);
+    check("grids: a bar of 16 steps at 16ths, 32 at 32nds", len);
+    check("grids: the same seed gives the same steps", same);
+    check("grids: mutation moves only X and Y, inside the map (AMOUNT 0: not at all)", mut);
+}
+
+/* ------------------------------------------------------------------ Bounce --- */
+static gen_bounce_t bounce_at(uint32_t speed, uint32_t angle, uint32_t balls, uint32_t seed)
+{
+    gen_bounce_t g;
+    memset(&g, 0, sizeof g);
+    g.speed = (uint8_t)speed, g.angle = (uint8_t)angle, g.balls = (uint8_t)balls;
+    gen_bounce_serve(&g, seed);
+    return g;
+}
+static void bounce_tests(void)
+{
+    int range = 1, draws = 1, walls = 1, loop = 1, mut = 1, same = 1, order = 1, apart = 1, one = 1;
+    uint32_t chords = 0;
+    for (uint32_t sp = 1; sp <= 64; sp += 9)
+        for (uint32_t an = 0; an <= 90; an += 15)
+            for (uint32_t nb = 1; nb <= 4; nb++) {
+                gen_bounce_t g = bounce_at(sp, an, nb, sp * 7u + an);
+                for (uint32_t i = 0; i < 400; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state, k;
+                    gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == 0u;
+                    range &= o.gate ? o.note >= 48 && o.note <= 70 && (o.vel == 100 || o.vel == 115) :
+                                      o.note == 60 && o.vel == 100 && !o.more_n;
+                    range &= o.cv >= 0 && o.more_n <= 2u && o.gate == (g.hit != 0) && (nb > 1u || !o.more_n);
+                    for (k = 0; k < o.more_n; k++) range &= o.more[k] >= 48 && o.more[k] <= 70 && o.more[k] != o.note;
+                    chords += o.more_n != 0;
+                }
+            }
+    {   /* straight up (90 degrees), 64 a step: floor and top in turn, every 4 steps a hit (0 128 255 127 0 ...) */
+        gen_bounce_t g = bounce_at(64, 90, 1, 0);
+        uint32_t hits = 0, top = 0;
+        for (uint32_t i = 0; i < 16; i++) {
+            gen_out_t o = step_out();
+            gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+            hits += o.gate;
+            top += o.gate && o.vel == 115;
+            walls &= g.x[0] == 128u;
+        }
+        walls &= hits == 4u && top == 2u;
+    }
+    {   /* at 45 degrees and 43 a step (30 each way: 510 / 30 = 17) ball 1's path comes back to its start every 17 steps */
+        gen_bounce_t g = bounce_at(43, 45, 1, 5);
+        gen_out_t a[17], b[17];
+        for (uint32_t i = 0; i < 17; i++) { a[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 17; i++) { b[i] = step_out(); gen_bounce_tick(&g, &CLK0, &rng_state, &b[i]); }
+        loop &= out_eq(a, b, 17) && g.x[0] == 128u && g.y[0] == 0u;
+    }
+    {   /* the same settings and seed give the same steps */
+        gen_bounce_t g1 = bounce_at(37, 61, 3, 9), g2 = bounce_at(37, 61, 3, 9);
+        gen_out_t a[100], b[100];
+        for (uint32_t i = 0; i < 100; i++) { a[i] = step_out(); gen_bounce_tick(&g1, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 100; i++) { b[i] = step_out(); gen_bounce_tick(&g2, &CLK0, &rng_state, &b[i]); }
+        same &= out_eq(a, b, 100);
+    }
+    for (uint32_t sd = 0; sd < 200; sd++) {             /* the balls start apart, at angles of their own */
+        gen_bounce_t g = bounce_at(20, 40, 4, sd);
+        for (uint32_t k = 1; k < 4u; k++) {
+            int32_t o = g.off[k] < 0 ? -g.off[k] : g.off[k];
+            apart &= o >= 8 && o <= 30 && (g.x[k] != g.x[0] || g.y[k] != g.y[0]);
+        }
+        apart &= !g.off[0] && g.x[0] == 128u && !g.y[0];
+    }
+    {   /* ball 1 alone plays as it would with the others there: they add notes, they take none of its */
+        gen_bounce_t g1 = bounce_at(29, 52, 1, 3), g4 = bounce_at(29, 52, 4, 3);
+        for (uint32_t i = 0; i < 300; i++) {
+            gen_out_t a = step_out(), b = step_out();
+            gen_bounce_tick(&g1, &CLK0, &rng_state, &a);
+            gen_bounce_tick(&g4, &CLK0, &rng_state, &b);
+            one &= g1.x[0] == g4.x[0] && g1.y[0] == g4.y[0];
+            if (a.gate) {
+                uint32_t k, in = b.note == a.note;
+                for (k = 0; k < b.more_n; k++) in |= b.more[k] == a.note;
+                one &= b.gate && (in || b.more_n == 2u);
+            }
+        }
+    }
+    {   /* hits on one step: the lowest wall's note first (a ball on the floor and one on the top, the same step) */
+        gen_bounce_t g = bounce_at(64, 90, 2, 0);
+        gen_out_t o = step_out();
+        g.off[1] = 0, g.x[1] = 40, g.y[1] = 250, g.dir &= (uint8_t)~0xCu;   /* ball 2 going up, ball 1 coming down */
+        g.y[0] = 6, g.dir |= 2u;
+        gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+        order &= o.gate && o.more_n == 1u && g.hit == 9u && o.note < o.more[0] && o.vel == 100;
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_bounce_t g = bounce_at(20, 3, 2, 1);
+        for (uint32_t n = 0; n < 200; n++) {
+            gen_bounce_mutate(&g, amt, &rng_state);
+            mut &= g.angle <= 90u && g.speed == 20u && g.balls == 2u;
+        }
+    }
+    check("bounce: a wall hit plays 48..70 at 100 (the top 115), up to 3 notes; else a rest keeps note 60, vel 100", range);
+    check("bounce: several balls hit on one step now and then (chords)", chords > 0u);
+    check("bounce: no random draw a step", draws);
+    check("bounce: straight up at 64 a step hits the floor and the top in turn, every 4 steps", walls);
+    check("bounce: at 45 degrees the path loops (17 steps); the same settings give the same steps", loop && same);
+    check("bounce: the other balls start apart, 8..30 degrees off ANGLE; ball 1 plays as alone", apart && one);
+    check("bounce: hits on one step sound the lowest wall's note first", order);
+    check("bounce: mutation moves only the angle, inside 0..90", mut);
+}
+
+/* ------------------------------------------------------------------- FALL --- */
+static void fall_tests(void)
+{
+    int range = 1, same = 1, rest = 1, calm = 1, windy = 1, balls = 1, lean = 1, gust = 1;
+    uint32_t notes = 0, bass = 0, chords = 0;
+    for (uint32_t sp = 4; sp <= 64; sp += 12)
+        for (uint32_t sd = 1; sd < 40u; sd += 13) {
+            gen_bounce_t g = bounce_at(sp, 45, GEN_BOUNCE_FALL, sd);
+            uint32_t landed[GEN_FALL_LEAVES] = {0};
+            for (uint32_t i = 0; i < 400; i++) {
+                gen_out_t o = step_out();
+                uint8_t before[GEN_FALL_LEAVES];
+                for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) before[k] = g.lt[k];
+                gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+                if (o.gate) {
+                    notes++;
+                    chords += o.more_n > 0u;
+                    range &= o.note >= 36u && o.note <= 71u && o.vel >= 82u && o.vel <= 127u && o.more_n <= 2u && g.hit == 1u;
+                    for (uint32_t m = 0; m < o.more_n; m++) range &= o.more[m] > o.note && o.more[m] <= 71u;
+                    bass += o.note < 48u;
+                } else
+                    range &= o.note == 60u && o.vel == 100u && !g.hit;
+                for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) {
+                    if (!before[k] && g.lt[k]) { landed[k]++; rest &= g.ly[k] == 0u && g.lt[k] >= 2u && g.lt[k] <= 8u; }
+                    if (before[k] == 1u) rest &= !g.lt[k] && g.ly[k] == 255u;   /* (rested: from the top again) */
+                }
+            }
+            for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) range &= landed[k] > 0u;   /* (every leaf lands) */
+        }
+    {                                                  /* the same seed and stream: the same steps */
+        gen_bounce_t g1 = bounce_at(24, 30, GEN_BOUNCE_FALL, 7), g2 = bounce_at(24, 30, GEN_BOUNCE_FALL, 7);
+        uint32_t r1 = 99, r2 = 99;
+        for (uint32_t i = 0; i < 200; i++) {
+            gen_out_t a = step_out(), b = step_out();
+            gen_bounce_tick(&g1, &CLK0, &r1, &a);
+            gen_bounce_tick(&g2, &CLK0, &r2, &b);
+            same &= !memcmp(&a, &b, sizeof a);
+        }
+    }
+    {                                                  /* WIND: calm leaves only sway (each stays near its column); a wind
+                                                        * from the left carries them right, round the box */
+        gen_bounce_t g = bounce_at(8, 45, GEN_BOUNCE_FALL, 3), w = bounce_at(8, 90, GEN_BOUNCE_FALL, 3);
+        uint32_t r1 = 5, r2 = 5;
+        int32_t moved = 0;
+        for (uint32_t i = 0; i < 6; i++) {
+            gen_out_t a = step_out(), b = step_out();
+            uint8_t x0[GEN_FALL_LEAVES];
+            for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) x0[k] = w.lx[k];
+            gen_bounce_tick(&g, &CLK0, &r1, &a);
+            gen_bounce_tick(&w, &CLK0, &r2, &b);
+            for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) if (!w.lt[k]) moved += (int32_t)(uint8_t)(w.lx[k] - x0[k]) < 128 ? 1 : -1;
+        }
+        for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++) {
+            gen_bounce_t f = bounce_at(8, 45, GEN_BOUNCE_FALL, 3);
+            int32_t d = (int32_t)g.lx[k] - (int32_t)f.lx[k];
+            if (d > 128) d -= 256;
+            if (d < -128) d += 256;
+            calm &= g.lt[k] || (d >= -24 && d <= 24);
+        }
+        windy = moved > 0;
+    }
+    {                                                  /* WIND: the landings lean to the side it blows to; gusts only
+                                                        * in a wind, landing more leaves a step */
+        int32_t sum[3] = {0, 0, 0}, cnt[3] = {0, 0, 0};
+        uint32_t gusts[3] = {0, 0, 0}, in_gust = 0, gust_steps = 0, out_gust = 0, calm_steps = 0;
+        static const uint8_t ANG[3] = {0, 45, 90};
+        for (uint32_t a = 0; a < 3u; a++)
+            for (uint32_t sd = 1; sd < 30u; sd += 7) {
+                gen_bounce_t g = bounce_at(24, ANG[a], GEN_BOUNCE_FALL, sd);
+                for (uint32_t i = 0; i < 300; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t n;
+                    gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+                    n = o.gate ? 1u + o.more_n : 0u;
+                    gusts[a] += g.gust != 0u;
+                    for (uint32_t k = 0; k < GEN_FALL_LEAVES; k++)
+                        if (g.lt[k] && !g.ly[k] && o.gate) { sum[a] += g.lx[k], cnt[a]++; }
+                    if (a != 1u) {
+                        if (g.gust) in_gust += n, gust_steps++;
+                        else out_gust += n, calm_steps++;
+                    }
+                }
+            }
+        lean = cnt[0] && cnt[1] && cnt[2] && sum[0] / cnt[0] + 40 < sum[1] / cnt[1] && sum[1] / cnt[1] + 40 < sum[2] / cnt[2];
+        gust = !gusts[1] && gusts[0] > 100u && gusts[2] > 100u && gust_steps && calm_steps &&
+               in_gust * calm_steps > out_gust * gust_steps * 3u / 2u;
+    }
+    {                                                  /* FALL leaves the balls alone */
+        gen_bounce_t g = bounce_at(30, 50, GEN_BOUNCE_FALL, 11), f = g;
+        gen_out_t o = step_out();
+        gen_bounce_tick(&g, &CLK0, &rng_state, &o);
+        balls = !memcmp(g.x, f.x, sizeof g.x) && !memcmp(g.y, f.y, sizeof g.y) && g.dir == f.dir;
+    }
+    check("fall: a landing plays 36..71, louder when faster, up to 3 notes, the lowest first; else a rest", range && notes > 100u);
+    check("fall: leaves land together now and then (chords); about one in seven an octave down", chords > 0u && bass > 0u &&
+          bass < notes / 3u);
+    check("fall: a landed leaf rests 2..8 steps, then falls from the top", rest);
+    check("fall: the same seed and stream give the same steps", same);
+    check("fall: calm, the leaves sway in place; the wind carries them", calm && windy);
+    check("fall: the landings lean to the side the wind blows to (low left, high right)", lean);
+    check("fall: a wind blows in gusts (none when calm), more leaves landing a step in one", gust);
+    check("fall: the balls stay as they were", balls);
+}
+
+/* ---------------------------------------------------------- Series --- */
+static void series_tests(void)
+{
+    static const int8_t SER[16] = {0, 1, -1, 2, 1, 0, -2, 3, -1, 2, 0, 1, 2, -1, -3, 4};
+    int val = 1, range = 1, loop = 1, intv = 1, mut = 1, sec = 1;
+    for (uint32_t i = 0; i < 16u; i++) val &= gen_sr_value(i) == SER[i];
+    for (uint32_t i = 0; i < 4096u; i++) val &= gen_sr_value(2u * i) == -gen_sr_value(i) && gen_sr_value(2u * i + 1u) == gen_sr_value(i) + 1;
+    for (uint32_t st = 0; st < 128u; st += 9)
+        for (uint32_t iv = 1; iv <= 7u; iv++)
+            for (uint32_t lp = 0; lp <= GEN_SR_LOOP; lp += 5) {
+                gen_series_t g = {(uint8_t)st, (uint8_t)iv, (uint8_t)lp, 0, 0};
+                uint8_t first[16];
+                for (uint32_t i = 0; i < 64u; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t d = gen_sr_degree(&g, 0);
+                    gen_series_tick(&g, &o);
+                    range &= o.gate && o.note >= 48u && o.note <= 72u && o.vel >= 70u && o.vel <= 126u && d <= 14u;
+                    if (lp && i < lp && i < 16u) first[i] = o.note;
+                    if (lp && i >= lp && i % lp < 16u) loop &= o.note == first[i % lp];
+                }
+            }
+    {                                                  /* INTV 1: the series round the middle, a degree a unit */
+        gen_series_t g = {0, 1, 0, 0, 0};
+        for (uint32_t i = 0; i < 16u; i++) {
+            int32_t d = 7 + SER[i];
+            intv &= gen_sr_degree(&g, 0) == (uint32_t)d;
+            g.n++;
+        }
+    }
+    {
+        gen_series_t g = {40, 3, 8, 0, 0}, f = g, h = {0, 1, 0, 0, 0};
+        gen_sec_t s = {0, 0, 0};
+        gen_series_mutate(&g, 0, &rng_state);
+        mut &= g.start == f.start;
+        for (uint32_t i = 0; i < 20u && g.start == f.start; i++) gen_series_mutate(&g, 100, &rng_state);
+        mut &= g.start != f.start && g.start < 128u;
+        gen_series_save(&f, &s);
+        gen_series_load(&h, &s);
+        sec &= h.start == 40u && h.intv == 3u && h.loop == 8u;
+        f.loop = GEN_SR_LOOP, f.intv = 7;
+        gen_series_save(&f, &s);
+        gen_series_load(&h, &s);
+        sec &= h.loop == GEN_SR_LOOP && h.intv == 7u;
+    }
+    check("series: Norgard's infinity series (0 1 -1 2 1 0 -2 3 ...; s(2n) = -s(n), s(2n+1) = s(n) + 1)", val);
+    check("series: a note every step, 48..72 at 70..126, folded into two octaves", range);
+    check("series: INTV 1 plays the series a degree a unit round the middle; LOOP repeats its steps", intv && loop);
+    check("series: EVOLVE picks a new START (AMOUNT 0: none); a section keeps START, INTV and LOOP", mut && sec);
+}
+
+/* ---------------------------------------------------------- Chord --- */
+static void chord_tests(void)
+{
+    static const uint8_t POP[4] = {0, 4, 5, 3};
+    int prog = 1, hits = 1, bars = 1, walk = 1, mut = 1, sec = 1;
+    gen_clock_t clk = {0, 16, 0};
+    {                                                  /* POP, a bar a chord, HOLD: a strike a bar, held 16 steps */
+        gen_chord_t g;
+        memset(&g, 0, sizeof g);
+        g.bars = 1;
+        for (uint32_t i = 0; i < 64u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            prog &= o.note == POP[(i / 16u) % 4u] && g.idx == (i / 16u) % 4u;
+            hits &= o.gate == !(i % 16u) && g.hold == 16u && o.vel == (i % 16u ? 84u : 104u);
+        }
+    }
+    {                                                  /* BEAT: every 4 steps, held to the beat; STEP: every step */
+        gen_chord_t g;
+        memset(&g, 0, sizeof g);
+        g.bars = 1, g.hit = GEN_CH_BEAT;
+        for (uint32_t i = 0; i < 32u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            hits &= o.gate == !(i % 4u) && (!o.gate || g.hold == 4u);
+        }
+        memset(&g, 0, sizeof g);
+        g.bars = 1, g.hit = GEN_CH_STEP;
+        for (uint32_t i = 0; i < 16u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            hits &= o.gate && !g.hold;
+        }
+    }
+    for (uint32_t b = 0; b < GEN_CH_BARS; b++) {      /* BARS: 1/2, 1, 2, 4 bars (8, 16, 32, 64 steps at 1/16) */
+        gen_chord_t g;
+        uint32_t n = 0, len = b ? 16u << (b - 1u) : 8u;
+        memset(&g, 0, sizeof g);
+        g.bars = (uint8_t)b, g.prog = GEN_CH_TWO;
+        for (uint32_t i = 0; i < 128u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            n += o.gate;
+            bars &= o.note == ((i / len) % 2u ? 3u : 0u);
+        }
+        bars &= n == 128u / len;
+    }
+    for (uint32_t sd = 1; sd <= 128u; sd++) {         /* WALK: from the tonic, a fourth, fifth or third at a time */
+        gen_chord_t g;
+        memset(&g, 0, sizeof g);
+        gen_chord_fill(&g, sd);
+        walk &= !g.walk[0];
+        for (uint32_t i = 1; i < GEN_CH_WALK_N; i++) {
+            uint32_t d = (g.walk[i] + 7u - g.walk[i - 1u]) % 7u;
+            walk &= g.walk[i] < 7u && (d == 2u || d == 3u || d == 4u || d == 5u);
+        }
+    }
+    {
+        gen_chord_t g, f, h;
+        gen_sec_t s = {0, 0, 0};
+        memset(&g, 0, sizeof g);
+        gen_chord_fill(&g, 7u);
+        f = g;
+        gen_chord_mutate(&g, 0, &rng_state);
+        mut &= !memcmp(&g, &f, sizeof g);
+        gen_chord_mutate(&g, 100, &rng_state);
+        mut &= g.rot == 1u;                            /* (POP: a turn) */
+        g.prog = GEN_CH_WALK;
+        for (uint32_t i = 0; i < 40u; i++) gen_chord_mutate(&g, 100, &rng_state);
+        mut &= !g.walk[0] && memcmp(g.walk, f.walk, GEN_CH_WALK_N);
+        g.bars = 3, g.hit = GEN_CH_BEAT, g.rot = 5;
+        memset(&h, 0, sizeof h);
+        gen_chord_save(&g, &s);
+        gen_chord_load(&h, &s);
+        sec &= h.prog == GEN_CH_WALK && h.bars == 3u && h.hit == GEN_CH_BEAT && h.rot == 5u &&
+               !memcmp(h.walk, g.walk, GEN_CH_WALK_N);
+    }
+    {   /* USER: the keys' degrees in order, its own length (0: one, the tonic), eight at most, a new one from the first */
+        gen_chord_t g;
+        const gen_clock_t clk = {0, 16, 0};
+        int ok = 1;
+        memset(&g, 0, sizeof g);
+        g.prog = GEN_CH_USER, g.bars = 1, g.rot = 3;
+        ok &= gen_chord_len(&g) == 1u && gen_chord_degree(&g, 0) == 0u;
+        ok &= gen_chord_user_add(&g, 2, 1) && gen_chord_user_add(&g, 9, 0) && gen_chord_user_add(&g, 4, 0);
+        ok &= g.ulen == 3u && g.rot == 0u && gen_chord_len(&g) == 3u && gen_chord_degree(&g, 1) == 2u &&
+              gen_chord_degree(&g, 5) == 4u;          /* (9: 2; and round again) */
+        for (uint32_t i = 0; i < 64u; i++) {
+            gen_out_t o = step_out();
+            gen_chord_tick(&g, &clk, &o);
+            if (!(i % 16u)) ok &= o.gate && o.note == g.user[i / 16u % 3u];   /* (a chord a bar: 2 2 4) */
+        }
+        for (uint32_t i = 0; i < 5u; i++) ok &= gen_chord_user_add(&g, 1, 0);
+        ok &= !gen_chord_user_add(&g, 1, 0) && g.ulen == GEN_CH_USER_N;
+        ok &= gen_chord_user_add(&g, 6, 1) && g.ulen == 1u && gen_chord_degree(&g, 5) == 6u;
+        check("chord: USER plays the keys' chords in order, up to eight, a new progression from the first key", ok);
+    }
+    check("chord: POP plays I V vi IV, a chord a bar, its degree as the note, the first strike louder", prog);
+    check("chord: HIT HOLD strikes once a chord, BEAT every beat, STEP every step, each held as long", hits);
+    check("chord: BARS 1/2, 1, 2 and 4 bars a chord", bars);
+    check("chord: WALK starts on the tonic, each chord a third, fourth or fifth from the last", walk);
+    check("chord: EVOLVE turns a progression or changes a WALK chord (AMOUNT 0: none); a section keeps them", mut && sec);
+}
+
+/* ---------------------------------------------------------- Constellation --- */
+static gen_constel_t constel_at(uint32_t y, uint32_t dens, uint32_t size, uint32_t autop, uint32_t seed)
+{
+    gen_constel_t g;
+    memset(&g, 0, sizeof g);
+    g.y = (uint8_t)y, g.dens = (uint8_t)dens, g.size = (uint8_t)size, g.autop = (uint8_t)autop;
+    gen_constel_fill(&g, seed);
+    gen_constel_start(&g);
+    return g;
+}
+static gen_clock_t cs_clk(uint32_t pos) { gen_clock_t c = {(uint8_t)pos, 16, 0}; return c; }
+static void constel_tests(void)
+{
+    int range = 1, window = 1, manual = 1, frozen = 1, loops = 1, same = 1, wander = 1, seek = 1, mut = 1, sec = 1, empty = 1;
+    int heard = 1, mixed = 1, lenw = 1, arp = 1;
+    uint32_t caught = 0, draws = 1, held = 0, live = 0, fills = 0;
+    for (uint32_t sd = 1; sd < 60u; sd += 11)
+        for (uint32_t size = 0; size <= 7u; size += 3)
+            for (uint32_t dens = 0; dens <= 100u; dens += 25) {
+                gen_constel_t g = constel_at(sd % 15u, dens, size, 0, sd);
+                for (uint32_t i = 0; i < 200; i++) {
+                    gen_clock_t c = cs_clk(i);
+                    gen_out_t o = step_out();
+                    uint32_t r = rng_state, st;
+                    gen_constel_tick(&g, &c, &rng_state, &o);
+                    draws &= rng_state == r;                      /* (no draw: AUTO OFF, LOCK 0) */
+                    manual &= g.ship >> 8 == g.y;
+                    st = gen_cs_star(g.sky, g.col, 0, g.dens);
+                    if (g.caught) {
+                        int32_t d = (int32_t)(st & 15u) - 1 - (int32_t)g.y;
+                        caught++;
+                        window &= st && d >= -(int32_t)size && d <= (int32_t)size && g.loop[i & 15u] == st;
+                    } else if (st) {
+                        int32_t d = (int32_t)(st & 15u) - 1 - (int32_t)g.y;
+                        window &= d < -(int32_t)size || d > (int32_t)size;
+                    }
+                    heard &= o.gate == (g.caught != 0u) && (g.trail & 1u) == o.gate && !g.held;   /* (LOCK 0: the sky) */
+                    if (o.gate) range &= o.note >= 48u && o.note <= 72u && o.vel >= 70u && o.vel <= 127u &&
+                                         (g.loop[i & 15u] & 15u) != 0u && o.len == 2u + ((st >> 6) & 3u) * 2u;
+                    else range &= o.note == 60u && o.vel == 100u && !(g.loop[i & 15u] & 15u);
+                    if (!dens) empty &= !o.gate && !g.caught;
+                }
+            }
+    {   /* LOCK 100: nothing more caught; the loop plays round as it is */
+        gen_constel_t g = constel_at(7, 80, 7, 0, 5);
+        uint8_t was[16];
+        gen_out_t a[16];
+        for (uint32_t i = 0; i < 64; i++) { gen_clock_t c = cs_clk(i); gen_out_t o = step_out(); gen_constel_tick(&g, &c, &rng_state, &o); }
+        memcpy(was, g.loop, 16);
+        g.keep = 100;
+        for (uint32_t i = 0; i < 48; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t o = step_out();
+            gen_constel_tick(&g, &c, &rng_state, &o);
+            frozen &= !g.caught;
+            if (i < 16u) a[i] = o;
+            else loops &= o.gate == a[i % 16u].gate && o.note == a[i % 16u].note;
+        }
+        frozen &= !memcmp(was, g.loop, 16);
+    }
+    {   /* LOCK 50: about half the steps play their slot as it was (the sky unheard), the others the sky */
+        gen_constel_t g = constel_at(7, 70, 4, 0, 8);
+        for (uint32_t i = 0; i < 400; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t o = step_out();
+            uint8_t was = g.loop[i & 15u];
+            uint32_t st;
+            g.keep = 50;
+            gen_constel_tick(&g, &c, &rng_state, &o);
+            st = gen_cs_star(g.sky, g.col, 0, g.dens);
+            if (g.held) {
+                held++;
+                mixed &= g.held == (i & 15u) + 1u && g.loop[i & 15u] == was && !g.caught && !(g.trail & 1u) &&
+                         o.gate == ((was & 15u) != 0u);
+            } else {
+                int32_t d = (int32_t)(st & 15u) - 1 - 7;
+                live++;
+                mixed &= g.loop[i & 15u] == (st && d >= -4 && d <= 4 ? st : 0u);
+            }
+        }
+        mixed &= held > 150u && live > 150u;
+    }
+    {   /* the same seed and stream: the same steps */
+        gen_constel_t g1 = constel_at(3, 60, 2, 4, 9), g2 = constel_at(3, 60, 2, 4, 9);
+        uint32_t r1 = 77, r2 = 77;
+        for (uint32_t i = 0; i < 300; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t a = step_out(), b = step_out();
+            gen_constel_tick(&g1, &c, &r1, &a);
+            gen_constel_tick(&g2, &c, &r2, &b);
+            same &= !memcmp(&a, &b, sizeof a) && g1.ship == g2.ship;
+        }
+    }
+    {   /* AUTO 1..9: the ship wanders over the sky, faster further up; SEEK: on the star's row when it crosses */
+        uint32_t span[2] = {0, 0};
+        for (uint32_t k = 0; k < 2u; k++) {
+            gen_constel_t g = constel_at(7, 50, 2, k ? 9u : 1u, 3);
+            uint32_t lo = 255, hi = 0, moved = 0, last = g.ship;
+            for (uint32_t i = 0; i < 400; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out();
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                wander &= g.ship >= 128u && g.ship <= 14u * 256u + 128u;
+                lo = g.ship >> 8 < lo ? g.ship >> 8 : lo;
+                hi = g.ship >> 8 > hi ? g.ship >> 8 : hi;
+                moved += g.ship > last ? g.ship - last : last - g.ship;
+                last = g.ship;
+            }
+            span[k] = moved;
+            wander &= hi > lo;
+        }
+        wander &= span[1] > span[0];
+        {
+            gen_constel_t g = constel_at(0, 40, 0, GEN_CS_SEEK, 21), h = constel_at(0, 40, 0, 0, 21);
+            uint32_t ns = 0, nm = 0;
+            for (uint32_t i = 0; i < 400; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out(), p = step_out();
+                uint32_t r = rng_state;
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                seek &= rng_state == r;                           /* (SEEK draws nothing) */
+                gen_constel_tick(&h, &c, &rng_state, &p);
+                ns += g.caught != 0u;
+                nm += h.caught != 0u;
+            }
+            seek &= ns > nm * 2u;
+        }
+    }
+    {   /* EVOLVE lets go of the loop's stars at AMOUNT % (0: none); a section keeps the sky, Y, SIZE and DENS */
+        gen_constel_t g = constel_at(7, 90, 7, 0, 13), f;
+        for (uint32_t i = 0; i < 64; i++) { gen_clock_t c = cs_clk(i); gen_out_t o = step_out(); gen_constel_tick(&g, &c, &rng_state, &o); }
+        f = g;
+        gen_constel_mutate(&g, 0, &rng_state);
+        mut &= !memcmp(f.loop, g.loop, 16);
+        gen_constel_mutate(&g, 100, &rng_state);
+        for (uint32_t i = 0; i < 16u; i++) mut &= !g.loop[i];
+        {
+            gen_sec_t s;
+            gen_constel_t a = constel_at(11, 37, 5, 3, 2), b = constel_at(0, 0, 0, 0, 99);
+            gen_constel_save(&a, &s);
+            gen_constel_load(&b, &s);
+            sec = b.sky == a.sky && b.y == 11u && b.size == 5u && b.dens == 37u;
+        }
+    }
+    {   /* LEN 5: the loop's slot is the step's place in 5 */
+        gen_constel_t g = constel_at(7, 80, 7, 0, 5);
+        g.len = 5;
+        for (uint32_t i = 0; i < 40; i++) {
+            gen_clock_t c = cs_clk(i);
+            gen_out_t o = step_out();
+            gen_constel_tick(&g, &c, &rng_state, &o);
+            if (g.caught) lenw &= g.caught == (i % 5u) + 1u;
+        }
+        g.keep = 100;
+        {
+            gen_out_t a[5];
+            for (uint32_t i = 0; i < 30; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out();
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                lenw &= g.held == (i % 5u) + 1u;
+                if (i < 5u) a[i] = o;
+                else lenw &= o.gate == a[i % 5u].gate && o.note == a[i % 5u].note;
+            }
+        }
+    }
+    {   /* FILL ARP: an empty step plays the last four stars heard, low to high in turn, at 60; FILL OFF rests */
+        for (uint32_t sd = 1; sd < 40u; sd += 7) {
+            gen_constel_t g = constel_at(7, 30, 7, 0, sd), h;
+            uint8_t up[GEN_CS_ARP];
+            uint32_t n = 0, j = 0;
+            g.fill = GEN_CS_FILL_ARP;
+            h = g;
+            h.fill = GEN_CS_FILL_OFF;
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_clock_t c = cs_clk(i);
+                gen_out_t o = step_out(), p = step_out();
+                uint32_t r1 = rng_state;
+                gen_constel_tick(&g, &c, &rng_state, &o);
+                rng_state = r1;
+                gen_constel_tick(&h, &c, &rng_state, &p);
+                arp &= g.loop[i & 15u] == h.loop[i & 15u];    /* (FILL leaves the loop as it is) */
+                if (g.caught) {
+                    arp &= o.gate && !g.filled;
+                    n = 0;
+                    for (uint32_t k = 0; k < g.arp_n; k++) {      /* (the list, low to high, for the next fills) */
+                        uint32_t q = 0;
+                        for (uint32_t m = 0; m < g.arp_n; m++)
+                            if ((g.arp[m] & 15u) < (g.arp[k] & 15u) || ((g.arp[m] & 15u) == (g.arp[k] & 15u) && m < k)) q++;
+                        up[q] = (uint8_t)(g.arp[k] & 15u);
+                    }
+                    n = g.arp_n;
+                    j = g.arp_i;
+                } else if (n) {
+                    uint32_t v = up[j++ % n];
+                    fills++;
+                    arp &= o.gate && g.filled == v && o.vel == 60u &&
+                           o.note == 48u + 12u * ((v - 1u) / 7u) + GEN_SCALE_MIN[(v - 1u) % 7u] && !p.gate;
+                }
+            }
+        }
+    }
+    check("constellation: LEN 5 catches into slots 1..5, and LOCK 100 plays those 5 round", lenw);
+    check("constellation: FILL ARP plays the stars heard, low to high, between them (soft); the loop as without it",
+          arp && fills > 100u);
+    check("constellation: a star crossing the crosshair within SIZE rows is caught into the step's slot, others not",
+          window && caught > 100u);
+    check("constellation: LOCK 0 plays a star as it crosses and only then (the picture's trail), its size the length",
+          heard);
+    check("constellation: LOCK 50 plays the loop's slot on about half the steps, the sky (into the slot) on the rest", mixed);
+    check("constellation: the loop plays: 48..72 at 70..127 (brightness); an empty slot rests; DENS 0 an empty sky", range && empty);
+    check("constellation: AUTO OFF keeps the ship at Y and draws nothing", manual && draws);
+    check("constellation: LOCK 100 lets the sky by, the loop plays round as it is", frozen && loops);
+    check("constellation: the same seed and stream give the same steps", same);
+    check("constellation: AUTO wanders inside the sky, faster further up; SEEK catches more, with no draw", wander && seek);
+    check("constellation: EVOLVE lets go of the loop's stars (AMOUNT 0: none); a section keeps sky, Y, SIZE, DENS", mut && sec);
+}
+
+/* ------------------------------------------------------------------ Awake --- */
+static gen_awake_t awake_at(uint32_t la, uint32_t lb, uint32_t prob, uint32_t seed)
+{
+    gen_awake_t g;
+    memset(&g, 0, sizeof g);
+    g.len_a = (uint8_t)la, g.len_b = (uint8_t)lb, g.prob = (uint8_t)prob;
+    gen_awake_fill(&g, seed);
+    return g;
+}
+static void awake_tests(void)
+{
+    int range = 1, draws = 1, loop = 1, silent = 1, fill = 1, mut = 1, same = 1;
+    for (uint32_t sd = 1; sd <= 128; sd += 7)
+        for (uint32_t la = 1; la <= 16; la += 5)
+            for (uint32_t prob = 0; prob <= 100; prob += 50) {
+                gen_awake_t g = awake_at(la, 17u - la, prob, sd);
+                for (uint32_t i = 0; i < 64; i++) {
+                    gen_out_t o = step_out();
+                    uint32_t c = rng_state, a = gen_awake_a(&g, g.pos_a);
+                    gen_awake_tick(&g, &CLK0, &rng_state, &o);
+                    draws &= draws_since(c) == (a && prob < 100u ? 1u : 0u);
+                    range &= o.gate ? o.note >= 48 && o.note <= 72 && o.vel == 100 : o.note == 60 && o.vel == 100;
+                    silent &= prob || !o.gate;
+                    range &= g.pos_a < la && g.pos_b < 17u - la && o.cv >= 0;
+                }
+            }
+    for (uint32_t sd = 0; sd < 200; sd++) {                 /* the values in their ranges, A with rests and notes */
+        gen_awake_t g = awake_at(16, 16, 100, sd);
+        uint32_t rests = 0;
+        for (uint32_t i = 0; i < 16; i++) {
+            fill &= gen_awake_a(&g, i) <= 8u && gen_awake_b(&g, i) <= 7u;
+            rests += !gen_awake_a(&g, i);
+        }
+        fill &= rests < 16u;
+    }
+    {   /* lengths 4 and 3 at PROB 100: the steps repeat every 12 */
+        gen_awake_t g = awake_at(4, 3, 100, 5);
+        gen_out_t a[12], b[12];
+        for (uint32_t i = 0; i < 12; i++) { a[i] = step_out(); gen_awake_tick(&g, &CLK0, &rng_state, &a[i]); }
+        for (uint32_t i = 0; i < 12; i++) { b[i] = step_out(); gen_awake_tick(&g, &CLK0, &rng_state, &b[i]); }
+        loop &= out_eq(a, b, 12);
+    }
+    {
+        gen_awake_t g1 = awake_at(9, 5, 60, 77), g2 = awake_at(9, 5, 60, 77);
+        uint32_t r1 = 9, r2 = 9;
+        gen_out_t a[60], b[60];
+        for (uint32_t i = 0; i < 60; i++) { a[i] = step_out(); gen_awake_tick(&g1, &CLK0, &r1, &a[i]); }
+        for (uint32_t i = 0; i < 60; i++) { b[i] = step_out(); gen_awake_tick(&g2, &CLK0, &r2, &b[i]); }
+        same &= out_eq(a, b, 60);
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_awake_t g = awake_at(6, 11, 80, 3), g0 = g;
+        for (uint32_t n = 0; n < 200; n++) {
+            gen_awake_mutate(&g, amt, &rng_state);
+            for (uint32_t i = 0; i < 16; i++) mut &= gen_awake_a(&g, i) <= 8u && gen_awake_b(&g, i) <= 7u;
+            for (uint32_t i = 6; i < 16; i++) mut &= gen_awake_a(&g, i) == gen_awake_a(&g0, i);   /* (past LEN A: kept) */
+            mut &= g.len_a == 6u && g.len_b == 11u && g.prob == 80u;
+        }
+        if (!amt) mut &= !memcmp(g.a, g0.a, 8) && !memcmp(g.b, g0.b, 8);
+    }
+    check("awake: notes 48..72 at 100 (A's degree plus B's); a rest keeps note 60, vel 100; PROB 0 silent", range && silent);
+    check("awake: a draw a step only for one of A's notes below PROB 100", draws);
+    check("awake: the seed's values in range (A 0..8 with notes, B 0..7)", fill);
+    check("awake: lengths 4 and 3 repeat every 12 steps; the same seed and stream, the same steps", loop && same);
+    check("awake: mutation changes values inside A's and B's loops only (AMOUNT 0: none)", mut);
+}
+
+/* ------------------------------------------------------------------ Poly --- */
+static gen_poly_t poly_at(uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t span, uint32_t seed)
+{
+    gen_poly_t g;
+    memset(&g, 0, sizeof g);
+    g.div[0] = (uint8_t)d0, g.div[1] = (uint8_t)d1, g.div[2] = (uint8_t)d2, g.div[3] = (uint8_t)d3, g.span = (uint8_t)span;
+    g.pos = 3;
+    gen_poly_fill(&g, seed);
+    return g;
+}
+static void poly_tests(void)
+{
+    int range = 1, draws = 1, hits = 1, fill = 1, mut = 1, loud = 1, off = 1, wrap = 1;
+    for (uint32_t d = 0; d <= 16; d++)
+        for (uint32_t span = 1; span <= 3; span++) {
+            gen_poly_t g = poly_at(d, 16u - d, d / 2u, 7, span, d * 7u + 1u);
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_out_t o = step_out();
+                uint32_t c = rng_state;
+                gen_poly_tick(&g, &CLK0, &rng_state, &o);
+                draws &= draws_since(c) == 0u;
+                range &= o.gate ? o.note >= 48 && o.note <= 82 && o.vel >= 88 && o.vel <= 127 : o.note == 60 && o.vel == 100;
+                range &= g.pos < 4u && o.cv >= 0;
+            }
+        }
+    {   /* 4 against 3: a note on steps 0 3 4 6 8 9 (twelve a cycle: 6 notes), step 0 louder (both land) */
+        gen_poly_t g = poly_at(4, 3, 0, 0, 1, 1);
+        static const uint8_t WANT[12] = {1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0};
+        for (uint32_t i = 0; i < 24; i++) {
+            gen_out_t o = step_out();
+            gen_poly_tick(&g, &CLK0, &rng_state, &o);
+            hits &= o.gate == WANT[i % 12u];
+            if (i % 12u == 0u) loud &= o.vel == 101u;
+            else if (o.gate) loud &= o.vel == 88u;
+        }
+    }
+    {   /* every rhythm OFF: silent */
+        gen_poly_t g = poly_at(0, 0, 0, 0, 2, 3);
+        for (uint32_t i = 0; i < 64; i++) { gen_out_t o = step_out(); gen_poly_tick(&g, &CLK0, &rng_state, &o); off &= !o.gate; }
+    }
+    {   /* the count wraps where every divider lands: no step lost or doubled across it */
+        gen_poly_t g = poly_at(7, 11, 13, 16, 1, 9);
+        uint32_t n = 0;
+        g.tick = GEN_POLY_WRAP - 2u;
+        for (uint32_t i = 0; i < 4; i++) { gen_out_t o = step_out(); gen_poly_tick(&g, &CLK0, &rng_state, &o); n += o.gate; }
+        wrap &= n == 1u && g.tick == 2u;
+    }
+    for (uint32_t sd = 0; sd < 300; sd++)
+        for (uint32_t span = 1; span <= 3; span++) {
+            gen_poly_t g = poly_at(4, 3, 0, 0, span, sd);
+            for (uint32_t i = 0; i < 4; i++) fill &= g.pitch[i] < 7u * span;
+        }
+    for (uint32_t amt = 0; amt <= 100; amt += 25)
+        for (uint32_t span = 1; span <= 3; span++) {
+            gen_poly_t g = poly_at(5, 2, 9, 0, span, 4), g0 = g;
+            for (uint32_t n = 0; n < 200; n++) {
+                gen_poly_mutate(&g, amt, &rng_state);
+                for (uint32_t i = 0; i < 4; i++) mut &= g.pitch[i] < 7u * span && g.div[i] == g0.div[i];
+            }
+            if (!amt) mut &= !memcmp(g.pitch, g0.pitch, 4);
+        }
+    check("poly: notes 48..82, louder (88 + 13 a rhythm more) where rhythms land together; else a rest as ever", range);
+    check("poly: no random draw a step", draws);
+    check("poly: 4 against 3 plays steps 0 3 4 6 8 9 of every 12, step 0 louder; all OFF silent", hits && loud && off);
+    check("poly: its count wraps at 720720 with no step lost or doubled", wrap);
+    {   /* a FORM section keeps pitches above 15 (their fifth bits beside SPAN) */
+        gen_poly_t g = poly_at(4, 3, 0, 0, 3, 1), h;
+        gen_sec_t s;
+        g.pitch[0] = 20, g.pitch[1] = 16, g.pitch[2] = 5, g.pitch[3] = 15;
+        gen_poly_save(&g, &s);
+        memset(&h, 0, sizeof h);
+        gen_poly_load(&h, &s);
+        mut &= h.span == 3u && !memcmp(h.pitch, g.pitch, 4);
+    }
+    check("poly: the seed's pitches and mutation's stay inside SPAN (1..3); a section keeps them; the rhythms stay", fill && mut);
+}
+
+/* ------------------------------------------------------------------ Quad --- */
+static gen_quad_t quad_at(uint32_t dir, uint32_t prob, uint32_t seed)
+{
+    gen_quad_t g;
+    memset(&g, 0, sizeof g);
+    g.dir = (uint8_t)dir, g.prob = (uint8_t)prob, g.pos = 4;
+    gen_quad_fill(&g, seed);
+    return g;
+}
+static void quad_tests(void)
+{
+    int range = 1, draws = 1, fill = 1, mut = 1, order = 1, hold = 1, sec = 1, same = 1;
+    for (uint32_t dir = 0; dir < GEN_QD_COUNT; dir++)
+        for (uint32_t prob = 0; prob <= 100; prob += 25) {
+            gen_quad_t g = quad_at(dir, prob, dir * 31u + prob + 1u);
+            for (uint32_t i = 0; i < 200; i++) {
+                gen_out_t o = step_out();
+                uint32_t c = rng_state, v, want;
+                gen_quad_tick(&g, &CLK0, &rng_state, &o);
+                v = g.pos < 4u ? g.cell[g.pos] : 0u;
+                want = dir == GEN_QD_HOLD ? 0u : (dir == GEN_QD_RAND) + (v && prob < 100u);
+                draws &= draws_since(c) == want;
+                range &= o.gate ? o.note >= 48 && o.note <= 84 && (o.vel == 112 || o.vel == 96) && v : o.note == 60 && o.vel == 100;
+                range &= (dir == GEN_QD_HOLD ? g.pos == 4u : g.pos < 4u) && o.cv >= 0;
+                if (prob == 0u) range &= !o.gate;
+                if (prob == 100u && dir != GEN_QD_HOLD) range &= o.gate == (v != 0u);
+            }
+        }
+    {   /* the order of the cells: forward, back, back and forth; a LINK's step moves a held row forward */
+        static const uint8_t WANT[3][8] = {{0, 1, 2, 3, 0, 1, 2, 3}, {3, 2, 1, 0, 3, 2, 1, 0}, {0, 1, 2, 3, 2, 1, 0, 1}};
+        for (uint32_t dir = 0; dir < 3u; dir++) {
+            gen_quad_t g = quad_at(dir, 100, 5);
+            for (uint32_t i = 0; i < 8u; i++) {
+                gen_out_t o = step_out();
+                gen_quad_tick(&g, &CLK0, &rng_state, &o);
+                order &= g.pos == WANT[dir][i];
+            }
+        }
+        {
+            gen_quad_t g = quad_at(GEN_QD_HOLD, 100, 5);
+            for (uint32_t i = 0; i < 8u; i++) {
+                gen_out_t o = step_out();
+                gen_quad_tick(&g, &CLK0, &rng_state, &o);
+                hold &= !o.gate && g.pos == 4u;
+            }
+            for (uint32_t i = 0; i < 8u; i++) {
+                gen_out_t o = step_out();
+                gen_quad_step(&g, &rng_state, &o);
+                hold &= g.pos == i % 4u && o.gate == (g.cell[g.pos] != 0u);
+            }
+        }
+    }
+    {   /* the same seed and stream, the same steps (RANDOM, PROB 60) */
+        gen_quad_t a = quad_at(GEN_QD_RAND, 60, 77), b = a;
+        uint32_t ra = 12345u, rb = 12345u;
+        for (uint32_t i = 0; i < 100; i++) {
+            gen_out_t oa = step_out(), ob = step_out();
+            gen_quad_tick(&a, &CLK0, &ra, &oa);
+            gen_quad_tick(&b, &CLK0, &rb, &ob);
+            same &= oa.gate == ob.gate && oa.note == ob.note && a.pos == b.pos;
+        }
+    }
+    for (uint32_t sd = 0; sd < 300; sd++) {
+        gen_quad_t g = quad_at(0, 100, sd);
+        for (uint32_t i = 0; i < 4; i++) fill &= g.cell[i] <= 14u;
+    }
+    for (uint32_t amt = 0; amt <= 100; amt += 25) {
+        gen_quad_t g = quad_at(1, 80, 4), g0 = g;
+        for (uint32_t n = 0; n < 300; n++) {
+            gen_quad_mutate(&g, amt, &rng_state);
+            for (uint32_t i = 0; i < 4; i++) mut &= g.cell[i] <= 21u;
+            mut &= g.dir == g0.dir && g.prob == g0.prob && g.link == g0.link;
+        }
+        if (!amt) mut &= !memcmp(g.cell, g0.cell, 4);
+    }
+    {   /* a FORM section keeps the row (cells up to 21) */
+        static const uint8_t ROW[4] = {21, 0, 17, 9};
+        gen_quad_t g = quad_at(0, 100, 1), h;
+        gen_sec_t s;
+        memcpy(g.cell, ROW, 4);
+        gen_quad_save(&g, &s);
+        memset(&h, 0, sizeof h);
+        gen_quad_load(&h, &s);
+        sec &= !memcmp(h.cell, ROW, 4);
+    }
+    check("quad: notes 48..84 (a degree of three octaves), 112 on the first cell, 96 the others; a rest as ever", range);
+    check("quad: draws a step: RANDOM's cell, PROB's below 100 on a note; HOLD none, and silent", draws);
+    check("quad: FWD, BACK, PEND in their order; HOLD stays, a LINK's step moves it forward and plays", order && hold);
+    check("quad: the same seed and stream, the same steps", same);
+    check("quad: the seed's cells in two octaves; mutation's in three, the settings kept (AMOUNT 0: none); a section keeps the row",
+          fill && mut && sec);
+}
+
+/* ------------------------------------------------------------------ sections --- */
+static void section_tests(void)
+{
+    int ok = 1;
+    gen_sec_t s = {0x1234u, 7, 9};
+    gen_turing_t tu = {0xBEEFu, 16, 0, 0, 0, 2};
+    gen_euclid_t eu = {16, 5, 3, 0, 0, 42};
+    gen_markov_t mk = {0, 0, 61, 100, 2};
+    gen_morph_t mo = {99, 0x2222u, 0xAAAAu, 0x0F, 2};
+    gen_grids_t gr = {40, 200, 50, 10, 3, {0, 0, 0}};
+    gen_turing_save(&tu, &s); ok &= s.reg == 0xBEEFu && s.p0 == 7 && s.p1 == 9;    /* only its own fields */
+    gen_markov_save(&mk, &s); ok &= s.reg == 0xBEEFu && s.p0 == 61 && s.p1 == 9;
+    gen_euclid_save(&eu, &s); ok &= s.reg == 42 && s.p0 == 5 && s.p1 == 3;
+    gen_morph_save(&mo, &s);  ok &= s.reg == 0x2222u && s.p0 == 99 && s.p1 == 3;
+    gen_grids_save(&gr, &s);  ok &= s.reg == (40u | 200u << 8) && s.p0 == 99 && s.p1 == 3;
+    {
+        gen_bounce_t bo = bounce_at(33, 61, 3, 1);
+        gen_sec_t b2 = {2, 80, 5};
+        gen_bounce_save(&bo, &s); ok &= s.reg == 3u && s.p0 == 61 && s.p1 == 33;
+        gen_bounce_load(&bo, &b2); ok &= bo.balls == 2u && bo.angle == 80u && bo.speed == 5u;
+    }
+    {
+        gen_awake_t aw = awake_at(9, 4, 50, 1);
+        gen_sec_t a2 = {0x5555u, 3, 12};
+        gen_awake_save(&aw, &s); ok &= s.reg == 3u && s.p0 == 9 && s.p1 == 4;
+        gen_awake_load(&aw, &a2); ok &= aw.len_a == 3u && aw.len_b == 12u && aw.prob == 50u;
+    }
+    {
+        gen_poly_t po = poly_at(4, 3, 0, 0, 2, 1);
+        gen_sec_t p2 = {0xD210u, 1, 77};
+        po.pitch[0] = 1, po.pitch[1] = 2, po.pitch[2] = 3, po.pitch[3] = 13;
+        gen_poly_save(&po, &s); ok &= s.reg == 0xD321u && s.p0 == 2 && s.p1 == 4;
+        gen_poly_load(&po, &p2); ok &= po.pitch[0] == 0 && po.pitch[1] == 1 && po.pitch[2] == 2 && po.pitch[3] == 13 &&
+                                       po.span == 1 && po.div[0] == 4;
+    }
+    {
+        gen_sec_t e = {42, 6, 2}, m = {0x8888u, 10, 0}, k = {0, 33, 0}, t = {0xACE1u, 0, 0};
+        gen_euclid_load(&eu, &e); ok &= eu.pulses == 6 && eu.rot == 2 && eu.pitch_seed == 42 && eu.steps == 16;
+        gen_morph_load(&mo, &m);  ok &= mo.snap_a == 0x8888u && mo.morph_pos == 10 && mo.snap_b == 0xAAAAu;
+        gen_markov_load(&mk, &k); ok &= mk.tension == 33 && mk.density == 100;
+        gen_turing_load(&tu, &t); ok &= tu.reg == 0xACE1u && tu.len == 16;
+        gen_grids_load(&gr, &t);  ok &= gr.x == 0xE1u && gr.y == 0xACu && gr.dens == 50 && gr.chaos == 10;
+    }
+    check("sections: each generator saves and loads only its own fields", ok);
+}
+
+/* ------------------------------------------------------------------ cost --- */
+static double ns_per_step(int kind)
+{
+    gen_turing_t tu = {0xACE1u, 16, 20, 0, 0, 2};
+    gen_euclid_t eu = {16, 5, 0, 0, 0, 9};
+    gen_markov_t mk = {0, 0, 40, 80, 2};
+    gen_morph_t mo = {64, 0x8888u, 0xA5A5u, 0x0F, 2};
+    gen_grids_t gr = {77, 190, 70, 60, 0, {0, 0, 0}};
+    gen_bounce_t bo = bounce_at(37, 61, 3, 4);
+    gen_awake_t aw = awake_at(9, 5, 70, 3);
+    gen_poly_t po = poly_at(4, 3, 5, 0, 2, 3);
+    gen_quad_t qu = quad_at(GEN_QD_PEND, 70, 3);
+    const uint32_t N = 2000000u;
+    volatile uint32_t sink = 0;
+    struct timespec a, b;
+    clock_gettime(CLOCK_MONOTONIC, &a);
+    for (uint32_t i = 0; i < N; i++) {
+        gen_out_t o = step_out();
+        if (kind == 0) gen_turing_tick(&tu, &CLK0, &rng_state, &o);
+        else if (kind == 1) gen_euclid_tick(&eu, &CLK0, &rng_state, &o);
+        else if (kind == 2) gen_markov_tick(&mk, &CLK0, &rng_state, &o);
+        else if (kind == 3) gen_morph_tick(&mo, &CLK0, &rng_state, &o);
+        else if (kind == 4) gen_grids_tick(&gr, &CLK0, &rng_state, &o);
+        else if (kind == 5) gen_bounce_tick(&bo, &CLK0, &rng_state, &o);
+        else if (kind == 6) gen_awake_tick(&aw, &CLK0, &rng_state, &o);
+        else if (kind == 7) gen_poly_tick(&po, &CLK0, &rng_state, &o);
+        else gen_quad_tick(&qu, &CLK0, &rng_state, &o);
+        sink += o.note + o.gate;
+    }
+    clock_gettime(CLOCK_MONOTONIC, &b);
+    (void)sink;
+    return ((double)(b.tv_sec - a.tv_sec) * 1e9 + (double)(b.tv_nsec - a.tv_nsec)) / N;
+}
+
+static void stream_tests(void)
+{
+    static uint8_t seen[65536 / 8];
+    uint32_t distinct = 0;
+    int ok = 1;
+    memset(seen, 0, sizeof seen);
+    for (uint32_t sd = 0; sd <= 9999u; sd++) {
+        uint32_t x = gen_stream(sd), h = (x ^ (x >> 16)) & 0xFFFFu;
+        ok &= x != 0;
+        if (!(seen[h >> 3] & (1u << (h & 7u)))) { seen[h >> 3] |= (uint8_t)(1u << (h & 7u)); distinct++; }
+    }
+    check("streams: every seed 0..9999 starts a stream other than 0 (xorshift's dead state)", ok);
+    check("streams: the 10,000 seeds start at least 9,000 different streams (16-bit fold)", distinct >= 9000u);
+    {   /* a stream left at 0 (xorshift's dead state) draws on, rather than 0 for ever (Euclid's new seed would hang) */
+        uint32_t z = 0, a = gen_rnd(&z, 1000u), b = gen_rnd(&z, 1000u), c = gen_rnd(&z, 1000u);
+        check("streams: a stream at 0 recovers (no endless draw of 0)", z != 0 && !(a == b && b == c));
+    }
+}
+
+int main(void)
+{
+    stream_tests();
+    turing_tests();
+    euclid_tests();
+    markov_tests();
+    morph_tests();
+    grids_tests();
+    bounce_tests();
+    fall_tests();
+    constel_tests();
+    series_tests();
+    chord_tests();
+    awake_tests();
+    poly_tests();
+    quad_tests();
+    section_tests();
+    printf("gen: host cost per step: Turing %.1f ns, Euclid %.1f ns, Markov %.1f ns, Morph %.1f ns, Grids %.1f ns, "
+           "Bounce %.1f ns, Awake %.1f ns, Poly %.1f ns, Quad %.1f ns\n", ns_per_step(0), ns_per_step(1), ns_per_step(2),
+           ns_per_step(3), ns_per_step(4), ns_per_step(5), ns_per_step(6), ns_per_step(7), ns_per_step(8));
+    printf(bad ? "gen: %d FAILED\n" : "gen: all passed\n", bad);
+    return bad != 0;
+}

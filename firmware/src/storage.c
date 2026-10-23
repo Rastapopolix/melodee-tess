@@ -2,9 +2,9 @@
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Persistent storage on the SPI NOR.
  *
- * Every object has an A/B pair (five base plus two extension sectors per bank project; one otherwise). A save goes to the copy that is not
- * the current one: erase the sector, program the payload pages (from offset
- * 256), then the 32-byte header at offset 0 LAST. The header is the commit
+ * Every object has an A/B pair (ten sectors a copy for a project, one otherwise). A save goes to the copy that is not
+ * the current one: erase its sectors, program the payload pages, then the 32-byte header at offset 0 of its first
+ * sector LAST. The header is the commit
  * record (magic, seq, length, payload CRC, header CRC); on load the valid
  * copy with the newest seq wins (including wrap), so a write torn at any point leaves the
  * previous copy in charge.
@@ -16,24 +16,36 @@
 #define ST_SECTOR 4096u
 #define ST_PAYLOAD_OFF 256u
 #define ST_PAYLOAD_MAX (ST_SECTOR - ST_PAYLOAD_OFF)
-#define ST_BANK_BASE_MAX (5u * ST_SECTOR - ST_PAYLOAD_OFF)
-#define ST_BANK_EXT_LO 0xEA000u
-#define ST_BANK_EXT_MAX (2u * ST_PAYLOAD_MAX)
+#define ST_TAIL 256u                           /* a sector's last bytes, kept erased (see the flash map) */
+#define ST_PROJ_SECTORS 10u                    /* a project copy (Tessera's own format, docs/design/PROJECT_FORMAT.md) */
+#define ST_PROJ_MAX ((ST_SECTOR - ST_TAIL - 32u) + (ST_PROJ_SECTORS - 1u) * (ST_SECTOR - ST_TAIL))   /* 38,368 B */
 
-/* The Prophet user banks: 0x93000..0x9CFFF (the loader moved them from 0x89000 when the app area grew to 0x93000,
- * ldr_core.c), in the legacy single-pattern projects' place: those objects are retired (2026-10-10, Kerem: not
- * wanted), their numbers kept, nothing loads or saves them; 0x9D000..0x9EFFF is free.
- * Bank projects occupy 0xA0000..0xC7FFF, two five-sector copies per slot.
- * Expanded project copies each use two more sectors at 0xEA000..0xF9FFF (unused USR area).
- * User samples are disabled: this area must never accept sample uploads.
- * Flash map: app area 0x4000..0x92FFF; Prophet banks 0x93000..0x9CFFF; free 0x9D000..0x9EFFF; FM6 patch bank
- * copy A 0x9F000 (B 0xFE000); bank projects 0xA0000..0xC7FFF; CZ banks 0xC8000..0xD7FFF; native FM6 0xD8000..;
- * user preset banks 0xDC000..0xDFFFF (upreset.c); OTA staging 0xE0000..0xE4FFF; extensions 0xE5000..0xFAFFF;
- * settings 0xFC000 (FL_DATA 0x97000..0xDFFFF, FL_GLOB 0xFC000..) */
-/* Object numbers 0..19 stay fixed. U33..U64 use E5000..E8FFF;
- * owned FM6 U01..U32 reuse the old bank pair, U33..U64 use E9000/FA000.
- * E0000..E4FFF remains reserved for OTA loader staging. */
-enum { OBJ_SETTINGS, OBJ_PROJECT0, OBJ_UPRESET0 = OBJ_PROJECT0 + 4, OBJ_FM6BANK = OBJ_UPRESET0 + 2, OBJ_BANK0, OBJ_CZBANK0 = OBJ_BANK0 + 4, OBJ_UPRESET_EXT0 = OBJ_CZBANK0 + 8, OBJ_UPFM6_EXT = OBJ_UPRESET_EXT0 + 2, OBJ_NATIVEFM0, OBJ_P5BANK0 = OBJ_NATIVEFM0 + 2, OBJ_TESSERA = OBJ_P5BANK0 + 5, OBJ_COUNT = OBJ_TESSERA + 1 };
+/* Flash map (Tessera, 2026-10-22: docs/design/PROJECT_FORMAT.md in tessera-notes): app area 0x4000..0x92FFF; project
+ * copies (OBJ_PROJ0..3, ten sectors each, ST_PROJ_RUN) in 0x93000..0x9CFFF, 0xA0000..0xD7FFF and 0xEA000..0xF7FFF;
+ * the Tessera object 0x9D000..0x9EFFF; FM6 patch bank copy A 0x9F000 (B 0xFE000); native FM6 0xD8000..0xDBFFF;
+ * user preset banks 0xDC000..0xDFFFF (upreset.c); OTA staging 0xE0000..0xE4FFF (0xE4000 the update-record sector);
+ * preset extensions 0xE5000..0xE8FFF, 0xE9000, 0xFA000; 0xF8000..0xF9FFF and 0xFB000 free; settings 0xFC000..0xFDFFF;
+ * 0xFF000 the device's key and MAC (never written).
+ * The update loader (loader/ldr_core.c) reads the last 256 bytes of every sector from 0x93000 to 0xFC000 after an
+ * update and erases a sector whose tail looks like an update record: a project sector keeps its tail (ST_TAIL) erased,
+ * so music can never look like one.
+ * Retired, their numbers kept and never loaded, saved or erased: the legacy single-pattern projects (OBJ_PROJECT0..3),
+ * Melodee's bank projects (OBJ_BANK0..3: five base sectors at 0xA0000.. and two at 0xEA000..), the CZ-1 banks
+ * (OBJ_CZBANK0..7, 0xC8000..) and the Prophet banks (OBJ_P5BANK0..4, 0x93000..): their sectors are the projects' now.
+ * The projects have object numbers no firmware used before, so an old commit record left in one of their sectors
+ * never validates as a project (st_head checks the type).
+ * User samples are disabled: this area must never accept sample uploads. U33..U64 use E5000..E8FFF; owned FM6
+ * U01..U32 reuse the old bank pair, U33..U64 use E9000/FA000. E0000..E4FFF remains reserved for OTA loader staging. */
+enum { OBJ_SETTINGS, OBJ_PROJECT0, OBJ_UPRESET0 = OBJ_PROJECT0 + 4, OBJ_FM6BANK = OBJ_UPRESET0 + 2, OBJ_BANK0, OBJ_CZBANK0 = OBJ_BANK0 + 4, OBJ_UPRESET_EXT0 = OBJ_CZBANK0 + 8, OBJ_UPFM6_EXT = OBJ_UPRESET_EXT0 + 2, OBJ_NATIVEFM0, OBJ_P5BANK0 = OBJ_NATIVEFM0 + 2, OBJ_TESSERA = OBJ_P5BANK0 + 5, OBJ_PROJ0, OBJ_COUNT = OBJ_PROJ0 + 4 };
+#define OBJ_SLOT(slot) (OBJ_PROJ0 + ((slot) & 3u))   /* a project slot's object */
+/* Each project copy (slot * 2 + copy): its ten sectors as up to two runs of consecutive sectors */
+static const struct { uint32_t at; uint8_t n; } ST_PROJ_RUN[8][2] = {
+    {{0xA0000u, 10}, {0, 0}}, {{0xAA000u, 10}, {0, 0}},   /* slot A: Melodee's bank projects' base sectors */
+    {{0xB4000u, 10}, {0, 0}}, {{0xBE000u, 10}, {0, 0}},   /* slot B */
+    {{0xC8000u, 10}, {0, 0}}, {{0xEA000u, 10}, {0, 0}},   /* slot C: the CZ-1 banks', the old extensions */
+    {{0x93000u, 10}, {0, 0}},                             /* slot D, A copy: the Prophet banks' */
+    {{0xD2000u, 6}, {0xF4000u, 4}},                       /* slot D, B copy: the CZ-1 banks' rest, the extensions' */
+};
 
 typedef struct {
     uint32_t magic;
@@ -62,11 +74,18 @@ static uint32_t st_crc32(const void *p, uint32_t n)   /* zlib CRC-32, 4 bits per
     return ~c;
 }
 
-static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy A (0) / B (1) */
+static int st_proj(uint32_t obj) { return obj >= OBJ_PROJ0 && obj < OBJ_PROJ0 + 4u; }
+/* sector i (0..ST_PROJ_SECTORS - 1) of a project copy */
+static uint32_t st_proj_sector(uint32_t obj, uint32_t copy, uint32_t i)
 {
+    uint32_t c = (obj - OBJ_PROJ0) * 2u + copy;
+    return i < ST_PROJ_RUN[c][0].n ? ST_PROJ_RUN[c][0].at + i * ST_SECTOR : ST_PROJ_RUN[c][1].at + (i - ST_PROJ_RUN[c][0].n) * ST_SECTOR;
+}
+static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy A (0) / B (1): its first sector */
+{
+    if (st_proj(obj)) return st_proj_sector(obj, copy, 0);
     if (obj == OBJ_TESSERA) return 0x9D000u + copy * ST_SECTOR;     /* the free pair below the FM6 patch bank */
-    if (obj >= OBJ_P5BANK0) return 0x93000u+(obj-OBJ_P5BANK0)*2u*ST_SECTOR+copy*ST_SECTOR;   /* (0x89000 before the app area
-                                                                                                * grew: the loader moved them) */
+    if (obj >= OBJ_P5BANK0) return 0x93000u+(obj-OBJ_P5BANK0)*2u*ST_SECTOR+copy*ST_SECTOR;
     if (obj >= OBJ_NATIVEFM0) return 0xD8000u + (obj - OBJ_NATIVEFM0) * 2u * ST_SECTOR + copy * ST_SECTOR;
     if (obj == OBJ_UPFM6_EXT) return copy ? 0xFA000u : 0xE9000u;
     if (obj >= OBJ_UPRESET_EXT0) return 0xE5000u + (obj - OBJ_UPRESET_EXT0) * 2u * ST_SECTOR + copy * ST_SECTOR;
@@ -83,28 +102,27 @@ static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy 
     return 0x97000u + (obj - OBJ_PROJECT0) * 2u * ST_SECTOR + copy * ST_SECTOR;
 }
 
-static int st_banked(uint32_t obj) { return obj >= OBJ_BANK0 && obj < OBJ_CZBANK0; }
-/* New preset objects start directly after the commit header, leaving the last
+/* New objects (presets' extensions, Tessera, the projects) start directly after the commit header, leaving the last
  * 256 bytes erased so the SPL/update loader cannot interpret musical data as OTA. */
 static uint32_t st_payload_off(uint32_t obj) { return obj >= OBJ_UPRESET_EXT0 ? sizeof(st_hdr_t) : ST_PAYLOAD_OFF; }
-static uint32_t st_capacity(uint32_t obj) { return st_banked(obj) ? ST_BANK_BASE_MAX + ST_BANK_EXT_MAX : obj >= OBJ_UPRESET_EXT0 ? ST_SECTOR - 256u - sizeof(st_hdr_t) : ST_PAYLOAD_MAX; }
-static uint32_t st_extension(uint32_t obj, uint32_t copy)
-{
-    return ST_BANK_EXT_LO + ((obj - OBJ_BANK0) * 2u + copy) * 2u * ST_SECTOR;
-}
-/* Keep existing five-sector copies in place. Each copy has its own two-sector
- * extension in unused flash, so migration never overwrites the current copy.
- * The last 256 bytes of extension sectors stay erased: the SPL scans those
- * tails for update records, and musical data must never look like one. */
+static uint32_t st_capacity(uint32_t obj) { return st_proj(obj) ? ST_PROJ_MAX : obj >= OBJ_UPRESET_EXT0 ? ST_SECTOR - ST_TAIL - sizeof(st_hdr_t) : ST_PAYLOAD_MAX; }
+static uint32_t st_sectors(uint32_t obj) { return st_proj(obj) ? ST_PROJ_SECTORS : 1u; }
+/* payload byte off of a copy: its flash offset, *span the bytes from there to the end of that sector's payload. A
+ * project's payload runs through its ten sectors, each but its tail; the first after the commit record */
 static uint32_t st_address(uint32_t obj, uint32_t copy, uint32_t off, uint32_t *span)
 {
-    if (!st_banked(obj) || off < ST_BANK_BASE_MAX) {
-        *span = (st_banked(obj) ? ST_BANK_BASE_MAX : st_capacity(obj)) - off;
-        return st_sector(obj, copy) + st_payload_off(obj) + off;
+    if (st_proj(obj)) {
+        const uint32_t first = ST_SECTOR - ST_TAIL - sizeof(st_hdr_t), each = ST_SECTOR - ST_TAIL;
+        if (off < first) {
+            *span = first - off;
+            return st_sector(obj, copy) + sizeof(st_hdr_t) + off;
+        }
+        off -= first;
+        *span = each - off % each;
+        return st_proj_sector(obj, copy, 1u + off / each) + off % each;
     }
-    off -= ST_BANK_BASE_MAX;
-    *span = ST_PAYLOAD_MAX - off % ST_PAYLOAD_MAX;
-    return st_extension(obj, copy) + off / ST_PAYLOAD_MAX * ST_SECTOR + off % ST_PAYLOAD_MAX;
+    *span = st_capacity(obj) - off;
+    return st_sector(obj, copy) + st_payload_off(obj) + off;
 }
 static int st_read_range(uint32_t obj, uint32_t copy, uint32_t off, void *dst, uint32_t n)
 {
@@ -120,8 +138,13 @@ static int st_read_range(uint32_t obj, uint32_t copy, uint32_t off, void *dst, u
 
 static uint8_t st_buf[256] __attribute__((aligned(4)));
 
-/* the legacy single-pattern projects (OBJ_PROJECT0..+3): retired, their numbers reserved */
-static int st_retired(uint32_t obj) { return obj >= OBJ_PROJECT0 && obj < OBJ_PROJECT0 + 4u; }
+/* retired, their numbers reserved, never loaded, saved or erased: the legacy single-pattern projects, Melodee's bank
+ * projects, the CZ-1 and Prophet banks (their sectors are the projects' now: the flash map, above) */
+static int st_retired(uint32_t obj)
+{
+    return (obj >= OBJ_PROJECT0 && obj < OBJ_PROJECT0 + 4u) || (obj >= OBJ_BANK0 && obj < OBJ_CZBANK0 + 8u) ||
+           (obj >= OBJ_P5BANK0 && obj < OBJ_P5BANK0 + 5u);
+}
 
 static int st_head(uint32_t obj, uint32_t copy, st_hdr_t *h)   /* commit record valid: 0 */
 {
@@ -185,6 +208,13 @@ static int st_load(uint32_t obj, void *dst, uint32_t max)
     return (int)h.len;
 }
 
+/* a committed record is there, whatever it holds (st_load: -1 for one too big for its buffer too) */
+static int st_exists(uint32_t obj)
+{
+    st_hdr_t h;
+    return obj < OBJ_COUNT && !st_retired(obj) && st_current(obj, &h) >= 0 && h.len != 0;
+}
+
 static int st_save(uint32_t obj, const void *src, uint32_t len)
 {
     uint32_t seq, base, off;
@@ -196,16 +226,16 @@ static int st_save(uint32_t obj, const void *src, uint32_t len)
     seq = cur < 0 ? 0u : h.seq;
     base = st_sector(obj, cur == 0 ? 1u : 0u);       /* write the other copy */
     uint32_t crc = st_crc32(src, len);
-    uint32_t extent = obj >= OBJ_BANK0 && obj < OBJ_CZBANK0 ? 5u * ST_SECTOR : ST_SECTOR;
-    for (off = 0; off < extent; off += ST_SECTOR)
-        if ((rc = st_erase(base + off)) != 0) return rc;
-    if (st_banked(obj)) for (off = 0; off < 2u * ST_SECTOR; off += ST_SECTOR)
-        if ((rc = st_erase(st_extension(obj, cur == 0 ? 1u : 0u) + off)) != 0) return rc;
-    for (off = 0; off < len; off += sizeof st_buf) {
-        uint32_t n = len - off > sizeof st_buf ? sizeof st_buf : len - off;
-        memcpy(st_buf, (const uint8_t *)src + off, n);
+    for (off = 0; off < st_sectors(obj); off++)         /* the copy's sectors, its first (the commit record's) first */
+        if ((rc = st_erase(st_proj(obj) ? st_proj_sector(obj, cur == 0 ? 1u : 0u, off) : base)) != 0) return rc;
+    for (off = 0; off < len;) {                         /* (a piece never runs past its sector's payload, span, or a page) */
         uint32_t span, addr = st_address(obj, cur == 0 ? 1u : 0u, off, &span);
+        uint32_t n = len - off > sizeof st_buf ? sizeof st_buf : len - off;
+        if (n > span) n = span;
+        if (n > 256u - (addr & 0xFFu)) n = 256u - (addr & 0xFFu);
+        memcpy(st_buf, (const uint8_t *)src + off, n);
         if ((rc = st_prog(addr, st_buf, n)) != 0) return rc;
+        off += n;
     }
     h.magic = ST_MAGIC;
     h.type = (uint16_t)obj;

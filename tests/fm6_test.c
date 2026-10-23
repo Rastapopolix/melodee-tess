@@ -74,7 +74,7 @@ static void setup(const uint8_t *v, const int16_t *e)
         T->p[P_E0 + i] = e ? e[i] : 0;
     fm6_put_patch(0, v, 1);
     T->p[P_VOICE] = V_POLY;
-    T->p[P_CHOR] = T->p[P_DLY] = T->p[P_REV] = 0;
+    T->p[P_RESERVED34] = T->p[P_RESERVED35] = T->p[P_RESERVED36] = 0;
     memcpy(ED, fm6_patch[0], sizeof ED);
 }
 

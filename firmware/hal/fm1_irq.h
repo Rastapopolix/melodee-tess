@@ -100,7 +100,8 @@ static void fm1_irq_enable_all(void)
  * CPU0 resumes. CPU1 can also take the exception itself: an idle unit's
  * report, pc 00000002 on a garbled red screen, was CPU1 calling a null job and
  * drawing the crash screen while CPU0 went on drawing the UI; its fm1_reboot
- * then held CPU1 before the reset. Now CPU1 records it and holds itself. */
+ * then held CPU1 before the reset. Now CPU1 records it and parks until CPU0
+ * holds it. Only CPU0 can finish restoring the debug guards after a hold. */
 static struct { volatile uint32_t count; uint32_t echoes, cpu, dbg, emu, pc, rets; } fm1_core1_fault;
 
 static int fm1_core1_fault_c(const uint32_t *f)   /* 1: handled, CPU0 resumes */
@@ -135,7 +136,7 @@ static int fm1_core1_fault_c(const uint32_t *f)   /* 1: handled, CPU0 resumes */
     if (!was)
         FM1_DBG_WR_EN = 0xE7u;
     if (cpu) {
-        fm1_core1_stop();
+        __asm__ volatile("csync" ::: "memory");     /* publish the fault; CPU0 joins and holds us */
         for (;;)
             ;
     }

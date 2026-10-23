@@ -6,10 +6,10 @@
 
 static void midi_test_reset(void)
 {
-    ui_power_on();
-    memset(midi_ch, 0, sizeof midi_ch); memset(midi_notes, 0, sizeof midi_notes);
+    ui_power_on(); set_engine_of(&trk[0], HOST_SYNTH);   /* (the generic bend: the Prophet has its own range) */
+    memset(midi_ch, 0, sizeof midi_ch); memset(midi_sel_on, 0, sizeof midi_sel_on);
     memset(midi_owners, 0, sizeof midi_owners); memset(midi_bend_q8, 0, sizeof midi_bend_q8);
-    memset(midi_bend_target, 0, sizeof midi_bend_target); memset(&midi_clock, 0, sizeof midi_clock);
+    memset(midi_bend_target, 0, sizeof midi_bend_target); memset(&midi_clock, 0, sizeof midi_clock);midi_sync_active=0;
     memset(&um, 0, sizeof um); memset(midi_in_source, 0, sizeof midi_in_source);
     mi_r = mi_w = 0; midi_in_overflow = 0; midi_beat_samples = 0;
     fm1_in.notes = kb_prev = 0; fm1_ms = 0; song.sel = 0;
@@ -56,17 +56,17 @@ static int sustain_test(void)
 {
     int bad = 0; midi_test_reset(); track_t *t = &trk[0];
     queued(0x90, 60, 100, 1); queued(0xB0, 64, 127, 1); queued(0x80, 60, 0, 1);
-    bad += check("pedal holds a released synth note and its owner", gate_note(t, 60) && midi_notes[0][60] == (1u | MIDI_PEDAL_NOTE));
+    bad += check("pedal holds a released synth note and its owner", gate_note(t, 60) && mn_get(0, 60) == (1u | MIDI_PEDAL_NOTE));
     queued(0xB0, 64, 0, 1);
-    bad += check("pedal release releases its held note", !gate_note(t, 60) && !midi_notes[0][60] && !midi_owners[0]);
+    bad += check("pedal release releases its held note", !gate_note(t, 60) && !mn_get(0, 60) && !midi_owners[0]);
     queued(0x90, 62, 100, 1); queued(0xB0, 64, 127, 1); queued(0xB0, 123, 0, 1);
-    bad += check("All Notes Off honours sustain rather than hard-killing", gate_note(t, 62) && (midi_notes[0][62] & MIDI_PEDAL_NOTE));
+    bad += check("All Notes Off honours sustain rather than hard-killing", gate_note(t, 62) && (mn_get(0, 62) & MIDI_PEDAL_NOTE));
     queued(0xB0, 121, 0, 1);
-    bad += check("Reset Controllers releases pedal-held notes", !gate_note(t, 62) && !midi_notes[0][62]);
+    bad += check("Reset Controllers releases pedal-held notes", !gate_note(t, 62) && !mn_get(0, 62));
     queued(0x93, 36, 100, 1); queued(0xB3, 64, 127, 1); queued(0x83, 36, 0, 1);
-    bad += check("drum note-offs do not accumulate pedal-held owners", !midi_notes[3][36] && !midi_owners[3]);
+    bad += check("drum note-offs do not accumulate pedal-held owners", !mn_get(3, 36) && !midi_owners[3]);
     queued(0x90, 67, 100, 1); queued(0xB0, 64, 127, 1); queued(0x80, 67, 0, 1); queued(0xB0, 120, 0, 1);
-    bad += check("All Sound Off ignores pedal and discards all track ownership", !midi_notes[0][67] && !midi_owners[0] && !t->nheld && !gate_note(t, 67));
+    bad += check("All Sound Off ignores pedal and discards all track ownership", !mn_get(0, 67) && !midi_owners[0] && !t->nheld && !gate_note(t, 67));
     return bad;
 }
 static int ownership_test(void)
@@ -84,11 +84,11 @@ static int ownership_test(void)
     fm1_in.notes = 0; events_block(CTL);
     bad += check("local release after MIDI release ends the shared note", !gate_note(t, local));
     queued(0x94, 65, 100, 1); song.sel = 1; queued(0x84, 65, 0, 1);
-    bad += check("note-off follows its note-on across selected-track changes", !gate_note(&trk[0], 65) && !midi_notes[4][65]);
+    bad += check("note-off follows its note-on across selected-track changes", !gate_note(&trk[0], 65) && !mn_get(4, 65));
     song.sel = 0; queued(0x94, 67, 100, 1); queued(0xB4, 64, 127, 1); queued(0x84, 67, 0, 1);
     panic_req |= 1u; events_block(CTL);
     queued(0x90, 67, 100, 1); queued(0xB4, 64, 0, 1);
-    bad += check("preset panic forgets old pedal owners so later pedal-up preserves new notes", !midi_notes[4][67] && gate_note(&trk[0], 67));
+    bad += check("preset panic forgets old pedal owners so later pedal-up preserves new notes", !mn_get(4, 67) && gate_note(&trk[0], 67));
     for (uint32_t i = 0; i <= MQ; i++) midi_enqueue(0x09u | 0x90u << 8 | 70u << 16 | 100u << 24, 1);
     events_block(CTL);
     bad += check("queue overflow recovers ownership and releases stuck notes", !midi_in_overflow && mi_r == mi_w && !midi_owners[0] && !gate_note(&trk[0], 67));
@@ -131,11 +131,11 @@ static int clock_test(uint32_t source)
     clock_packet(source, 0xFA, 700); clock_to(source, 700, 7);
     bad += check("Start after timeout restarts cleanly at the master's phase", song.playing && trk[0].seq_idx == 1u);
     /* Original base values remain after MIDI Stop even while motion sounds. */
-    trk[0].p[P_REV] = 23; motion_clear(&trk[0]); motion_set_event(&trk[0], 0, P_REV, 100);
+    trk[0].p[P_LEVEL] = 23; motion_clear(&trk[0]); motion_set_event(&trk[0], 0, P_LEVEL, 100);
     clock_packet(source, 0xFA, 1000); clock_packet(source, 0xF8, 1000);
-    bad += check("external-clock playback applies recorded motion", trk[0].p[P_REV] == 100);
+    bad += check("external-clock playback applies recorded motion", trk[0].p[P_LEVEL] == 100);
     clock_packet(source, 0xFC, 1010);
-    bad += check("external Stop restores the musical parameter base", trk[0].p[P_REV] == 23);
+    bad += check("external Stop restores the musical parameter base", trk[0].p[P_LEVEL] == 23);
     return bad;
 }
 static int clock_arp_and_boundaries(void)
@@ -153,8 +153,21 @@ static int clock_arp_and_boundaries(void)
     clock_setup(1); clock_packet(1, 0xFA, 0xFFFFFFF0u); clock_packet(1, 0xF8, 0xFFFFFFF0u);
     clock_packet(1, 0xF8, 5u); fm1_ms = 10; events_block(CTL);
     bad += check("external clock timestamps survive uint32 millisecond wrap", song.playing && midi_clock.last_ms == 5u);
-    clock_setup(1); transport_req = 1; events_block(CTL); fm1_ms = 501; events_block(CTL);
-    bad += check("local PLAY waiting for missing external clock also times out", !song.playing);
+    clock_setup(1);transport_req=1;events_block(CTL);uint32_t local=trk[0].seq_pos;
+    clock_packet(1,0xF8,10);clock_packet(2,0xFA,20);
+    bad+=check("clock pulses and wrong-source transport cannot take over local PLAY",song.playing&&!midi_sync_active&&trk[0].seq_pos>local&&!midi_beat_samples);
+    fm1_ms=501;events_block(CTL);
+    bad += check("local PLAY runs internally before MIDI transport is received",song.playing&&!midi_sync_active);
+    clock_packet(1,0xFC,502);
+    bad+=check("selected-source Stop arms sync and stops locally started playback",!song.playing&&midi_sync_active==1u);
+    transport_req=1;events_block(CTL);fm1_ms=1003;events_block(CTL);
+    bad+=check("local PLAY after a master Stop runs internally while the master clock is silent",song.playing&&!midi_sync_active);
+    clock_packet(1,0xFA,1010);clock_to(1,1010,7);
+    bad+=check("the master's next Start claims sync again",song.playing&&midi_sync_active==1u&&trk[0].seq_idx==1u);
+    clock_packet(1,0xFC,1200);clock_to(1,1200,3);transport_req=1;events_block(CTL);
+    bad+=check("local PLAY follows a master clock that is still running",song.playing&&midi_sync_active==1u);
+    fm1_ms=1800;events_block(CTL);
+    bad+=check("a followed master clock that stops still times out",!song.playing);
     return bad;
 }
 /* ARP HOLD latched on an external clock: a Stop, a lost clock or a tap while stopped must not leave the arp note
@@ -203,6 +216,60 @@ static int arp_ext_stop_test(void)
     bad += check("internal clock: the ARP keeps stepping after STOP", trk[0].arp_note && trk[0].arp_note != 72 && trk[0].nheld == 1u);
     return bad;
 }
+
+/* A stopped sync master must not turn a live arpeggiator into a single-note
+ * latch. Exercise both clock choices, real key/USB/UART input and every voice
+ * mode before transport, after Stop and after a lost clock. */
+static void arp_live_key(uint32_t source, uint32_t key, uint32_t on)
+{
+    if (!source) {
+        if (on) fm1_in.notes |= 1u << key;
+        else fm1_in.notes &= ~(1u << key);
+        events_block(CTL);
+    } else if (source == 1u) queued(on ? 0x90 : 0x80, 53u + key, on ? 100 : 0, source);
+    else {
+        um_byte(on ? 0x90 : 0x80); um_byte((uint8_t)(53u + key)); um_byte(on ? 100 : 0);
+        events_block(CTL);
+    }
+}
+static int arp_idle_live_test(void)
+{
+    int bad = 0;
+    for (uint32_t clock = 1; clock <= 2; clock++)
+        for (uint32_t source = 0; source < 3; source++)
+            for (uint32_t mode = V_POLY; mode <= V_UNISON; mode++)
+                for (uint32_t state = 0; state < 3; state++) {
+                    clock_setup(clock); track_t *t = &trk[0];
+                    t->p[P_VOICE] = (int16_t)mode; t->p[P_PRIO] = 0;
+                    t->p[P_AMODE] = 3; t->p[P_AHOLD] = 0; t->p[P_AOCT] = 1;
+                    t->p[P_ARATE] = 2; t->p[P_APROB] = 127; t->p[P_AGATE] = 100;
+                    if (state == 1) clock_packet(clock, 0xFC, 10);
+                    else if (state == 2) {
+                        clock_packet(clock, 0xFA, 10); clock_packet(clock, 0xF8, 10);
+                        fm1_ms = 600; events_block(CTL);
+                    }
+                    arp_live_key(source, 7, 1); arp_live_key(source, 11, 1);
+                    uint32_t heard = 0;
+                    for (uint32_t i = 0; i < 1000; i++) {
+                        events_block(CTL);
+                        if (gate_note(t, 60)) heard |= 1u;
+                        if (gate_note(t, 64)) heard |= 2u;
+                    }
+                    char label[100];
+                    snprintf(label, sizeof label, "idle ARP plays both held notes: clock %u input %u voice %u state %u", clock, source, mode, state);
+                    bad += check(label, !song.playing && t->nheld == 2u && heard == 3u && t->arp_idx > 1u);
+                    clock_packet(clock, 0xFA, 1000);
+                    uint32_t before = t->arp_idx;
+                    clock_to(clock, 1000, 7);
+                    bad += check("live ARP hands timing back to the running master", song.playing && midi_sync_active == clock && t->arp_idx > before);
+                    clock_packet(clock, 0xFC, 1150); before = t->arp_idx;
+                    for (uint32_t i = 0; i < 1000; i++) events_block(CTL);
+                    bad += check("master Stop restores local ARP timing for keys still held", !song.playing && t->arp_idx > before + 1u);
+                    arp_live_key(source, 7, 0); arp_live_key(source, 11, 0);
+                    bad += check("idle live ARP releases both keys without hanging ownership", !t->nheld && !t->arp_phys && !t->arp_note && !midi_owners[0]);
+                }
+    return bad;
+}
 /* USB-MIDI back-pressure: full 64-byte bulk packets (16 events) faster than the audio ISR drains the ring are
  * left in the endpoint (NAK) instead of overflowing it, which would panic every sounding note */
 static int usb_burst_test(void)
@@ -231,37 +298,118 @@ static int usb_burst_test(void)
     events_block(CTL);
     return bad;
 }
-/* GLO > SYSTEM DRUM: channel 10 plays the first DRUM track whatever ROUT says, its note-off there too; no DRUM track:
- * the selected one; OFF: as every other channel; another channel (2) wins over CH1-4 */
+/* Exercise the physical-byte parser and USB receiver before the shared event queue. */
+static void route_input(uint32_t source, uint32_t st, uint32_t d1, uint32_t d2)
+{
+    if (source == 2u) {
+        um_byte(st); um_byte(d1);
+        if ((st & 0xE0u) != 0xC0u) um_byte(d2);
+    } else
+        midi_in_event((st >> 4) | st << 8 | d1 << 16 | d2 << 24);
+    events_block(CTL);
+}
+
+static int routing_range_test(void)
+{
+    int bad = 0;
+    static const uint8_t routes[] = {0, 2, 3, 4};
+    for (uint32_t source = 1; source <= 2; source++) {
+        uint32_t ok = 1;
+        for (uint32_t r = 0; r < 4; r++) {
+            for (uint32_t ch = 0; ch < 16; ch++) {
+                midi_test_reset(); settings_drumch = 0;
+                for (uint32_t t = 0; t < NPART; t++) set_engine_of(&trk[t], HOST_SYNTH);
+                song.sel = 2; song.g[G_ROUTE] = routes[r];
+                route_input(source, 0x90u | ch, 60, 100);
+                int target = ch >= r * 4u && ch < r * 4u + 4u ? (int)(ch - r * 4u) : -1;
+                ok &= mn_get(ch, 60) == (uint32_t)(target + 1);
+                for (uint32_t t = 0; t < NPART; t++) ok &= gate_note(&trk[t], 60) == ((int)t == target);
+                if (target < 0) {
+                    int32_t level = trk[2].p[P_LEVEL];
+                    uint32_t mw = trk[2].mw, at = trk[2].at;
+                    route_input(source, 0xB0u | ch, 7, 0);
+                    route_input(source, 0xB0u | ch, 1, 100);
+                    route_input(source, 0xD0u | ch, 100, 0);
+                    route_input(source, 0xE0u | ch, 127, 127);
+                    route_input(source, 0xB0u | ch, 120, 0);
+                    ok &= trk[2].p[P_LEVEL] == level && trk[2].mw == mw && trk[2].at == at && !midi_bend_target[2];
+                }
+                /* Velocity-zero note-ons are releases too. */
+                route_input(source, 0x90u | ch, 60, 0);
+                ok &= !mn_get(ch, 60);
+                for (uint32_t t = 0; t < NPART; t++) ok &= !gate_note(&trk[t], 60);
+            }
+        }
+        bad += check(source == 1 ? "USB: every channel in all four ranges maps or is filtered, including controllers" :
+                                  "TRS: every channel in all four ranges maps or is filtered, including controllers", ok);
+        midi_test_reset(); settings_drumch = 0; song.g[G_ROUTE] = 1;
+        ok = 1;
+        for (uint32_t ch = 0; ch < 16; ch++) {
+            route_input(source, 0x90u | ch, 60, 100);
+            ok &= mn_get(ch, 60) == 1u && gate_note(&trk[0], 60);
+            route_input(source, 0x80u | ch, 60, 0);
+        }
+        bad += check("SEL still accepts every channel", ok && !gate_note(&trk[0], 60));
+
+        midi_test_reset(); settings_drumch = 0;
+        route_input(source, 0x90, 62, 100);
+        song.g[G_ROUTE] = 2; song.sel = 1;
+        route_input(source, 0x80, 62, 0);
+        bad += check("note-off follows its owner after switching to a range excluding its channel",
+                     !mn_get(0, 62) && !gate_note(&trk[0], 62));
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0x90, 64, 100); route_input(source, 0xB0, 64, 127); route_input(source, 0x80, 64, 0);
+        song.g[G_ROUTE] = 4;
+        route_input(source, 0x90, 65, 100); route_input(source, 0xB0, 64, 0);
+        bad += check("excluded channel cannot start new notes while pedal-up still releases its original note",
+                     !mn_get(0, 64) && !mn_get(0, 65) && !gate_note(&trk[0], 64));
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0x90, 67, 100); song.g[G_ROUTE] = 2;
+        route_input(source, 0xB0, 120, 0);
+        bad += check("excluded channel panic clears its original owner", !midi_owners[0] && !gate_note(&trk[0], 67));
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0xB0, 64, 127);
+        song.g[G_ROUTE] = 2; route_input(source, 0xB0, 64, 0);
+        song.g[G_ROUTE] = 0;
+        route_input(source, 0x90, 69, 100); route_input(source, 0x80, 69, 0);
+        bad += check("pedal-up while excluded and without owners prevents stale sustain on re-entry",
+                     !mn_get(0, 69) && !gate_note(&trk[0], 69));
+        song.g[G_ROUTE] = 0; song.rec = 1u << 1;
+        route_input(source, 0x9D, 70, 100); route_input(source, 0x8D, 70, 0);
+        bad += check("channel 14 cannot start an armed take in CH1-4", !song.playing && !mn_get(13, 70) && !trk[1].step[0].n);
+    }
+    return bad;
+}
+
+/* DRUM overrides destinations only inside the selected range. Without a kit, normal routing applies. */
 static int drum_channel_test(void)
 {
     int bad = 0;
     midi_test_reset();
     settings_drumch = 10;
-    set_engine_of(&trk[3], 0);                           /* (power-on: track 4 is a DRUM kit) */
+    set_engine_of(&trk[3], HOST_SYNTH);
     set_engine_of(&trk[2], ENGI_DRUM);
     song.g[G_ROUTE] = 0;
     queued(0x99, 36, 100, 1);
-    bad += check("DRUM 10: channel 10 plays the DRUM track (track 3), not the selected one",
-                 trk[2].v[0].active && !gate_note(&trk[0], 36));
-    song.sel = 1;
+    bad += check("DRUM 10 cannot bypass CH1-4", !midi_owners[2] && !midi_track(9));
+    song.g[G_ROUTE] = 3;
+    queued(0x99, 36, 100, 1);
+    bad += check("DRUM 10 within CH9-12 plays the first DRUM track", trk[2].v[0].active && mn_get(9, 36) == 3u);
+    song.sel = 1; song.g[G_ROUTE] = 0;
     queued(0x89, 36, 0, 1);
-    bad += check("  its note-off goes there too, the track selected meanwhile", !midi_owners[2]);
+    bad += check("DRUM note-off follows its owner after changing range", !midi_owners[2]);
     song.g[G_ROUTE] = 1;
-    queued(0x99, 38, 100, 1);
-    queued(0x89, 38, 0, 1);
-    bad += check("  ROUT SEL: channel 10 still the DRUM track", midi_track(9) == &trk[2] && midi_track(4) == &trk[1]);
-    set_engine_of(&trk[2], 0);
-    bad += check("  no DRUM track: the selected one", midi_track(9) == &trk[1]);
+    bad += check("ROUT SEL: channel 10 still the DRUM track", midi_track(9) == &trk[2] && midi_track(4) == &trk[1]);
+    set_engine_of(&trk[2], HOST_SYNTH);
+    bad += check("SEL without a DRUM track uses selection", midi_track(9) == &trk[1]);
+    song.g[G_ROUTE] = 3;
+    bad += check("range without a DRUM track uses its normal channel offset", midi_track(9) == &trk[1]);
     set_engine_of(&trk[3], ENGI_DRUM);
-    settings_drumch = 2;
-    song.g[G_ROUTE] = 0;
-    bad += check("DRUM 2: channel 2 the DRUM track (over CH1-4), channel 10 the selected", midi_track(1) == &trk[3] &&
-                 midi_track(9) == &trk[1] && midi_track(0) == &trk[0]);
+    settings_drumch = 2; song.g[G_ROUTE] = 0;
+    bad += check("DRUM 2 overrides track 2 inside CH1-4, channel 10 stays filtered",
+                 midi_track(1) == &trk[3] && !midi_track(9) && midi_track(0) == &trk[0]);
     settings_drumch = 0;
     bad += check("DRUM OFF: channel 2 track 2 again", midi_track(1) == &trk[1]);
-    settings_drumch = 10;
-    set_engine_of(&trk[3], 0);
     return bad;
 }
 
@@ -269,7 +417,7 @@ static int drum_channel_test(void)
 int main(void)
 {
     int bad = controls_test() + sustain_test() + ownership_test() + clock_test(1) + clock_test(2) + clock_arp_and_boundaries() +
-              arp_ext_stop_test() + usb_burst_test() + drum_channel_test();
+              arp_ext_stop_test() + arp_idle_live_test() + usb_burst_test() + routing_range_test() + drum_channel_test();
     printf("%s\n", bad ? "MIDI CONTROL/CLOCK TEST FAILED" : "MIDI control/clock integration tests passed"); return bad != 0;
 }
 #endif

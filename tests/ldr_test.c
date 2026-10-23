@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Host test of the Melodee update loader (firmware/loader/ldr_core.c): a fake
  * host serves a package over the SysEx protocol, the "device" flash starts as
  * another package's flash.bin (as if that firmware were installed).
@@ -16,6 +17,7 @@ static uint8_t nor[0x100000], *logical;
 static size_t logical_len;
 static uint8_t rx[1024];
 static uint32_t rx_len, rx_full, now_ms, requests, erases, bad_range, record_cleared, f0_asked;
+static int marker_erase_stuck;
 
 static uint32_t pack7(const uint8_t *in, uint32_t n, uint8_t *out)
 {
@@ -83,6 +85,7 @@ static int ldr_erase(uint32_t off)
     if (off < 0x4000u || off >= 0xFC000u || (off & 0xFFFu)) bad_range++;
     if (off < 0x4000u) { printf("ERASE IN THE HEAD %#x\n", off); exit(1); }
     erases++;
+    if (marker_erase_stuck && off == 0x91000u) return 0;
     memset(nor + off, 0xFF, 0x1000);
     return 0;
 }
@@ -92,8 +95,8 @@ static int ldr_prog(uint32_t off, const void *p, uint32_t n)
     const uint8_t *s = p;
     uint32_t i;
     if (prog_fail_after && !--prog_fail_after) return -1;
-    /* the app area, the Prophet banks' new place above it */
-    if (off < 0x4000u || off + n > 0x9D000u || ((off & 0xFFu) + n) > 256u) bad_range++;
+    /* Programming is restricted to the application. */
+    if (off < 0x4000u || off + n > 0x93000u || ((off & 0xFFu) + n) > 256u) bad_range++;
     for (i = 0; i < n; i++) nor[off + i] &= s[i];
     return 0;
 }
@@ -170,15 +173,20 @@ int main(int argc, char **argv)
         ota_wr32(s+28,~c);
     }
     memcpy(nor+0x89000,prophet_banks,sizeof prophet_banks);
-    memset(nor+0x93000,0x5A,0x8000);                   /* (the legacy projects' place they take: not erased) */
-    prog_fail_after = 2u * 16u + 5u;                   /* the power gone while the third sector is copied */
+    static uint8_t current_banks[0xA000];
+    memset(current_banks,0x5A,sizeof current_banks);
+    for(uint32_t i=3840u;i<sizeof current_banks;i+=4096u)memset(current_banks+i,0xFF,256u);
+    memcpy(nor+0x93000,current_banks,sizeof current_banks);
+    prog_fail_after = 2u * 16u + 5u;                   /* power gone while programming the application */
     rc = ldr_session();
-    bad += check("a copy cut short: the session fails, the old banks intact", rc == -10 &&
-                 !memcmp(nor+0x89000,prophet_banks,sizeof prophet_banks));
+    bad += check("interrupted app write leaves bootloader and current banks intact", rc == -10 &&
+                 !memcmp(nor,head,sizeof head) && !memcmp(nor+0x93000,current_banks,sizeof current_banks));
+    bad += check("interrupted update retains the flash resume record", nor[0xE4F06]==0x41u);
     prog_fail_after = 0;
     rc = ldr_session();
-    bad += check("Prophet native banks moved above the app area (0x93000) on installation",
-                 !memcmp(nor+0x93000,prophet_banks,sizeof prophet_banks));
+    bad += check("legacy Prophet banks are ignored; current bank area is untouched",
+                 !memcmp(nor+0x93000,current_banks,sizeof current_banks) &&
+                 memcmp(nor+0x89000,prophet_banks,sizeof prophet_banks));
     bad += check("project extensions survive firmware installation",!memcmp(nor+0xEA000u,extensions,sizeof extensions));
     printf("  rc %d, %u requests, %u sector erases\n", rc, requests, erases);
     bad += check("install completes", rc == 0);
@@ -201,13 +209,50 @@ int main(int argc, char **argv)
         bad += check("foreign key / damaged app head refused, nothing erased", rc == -6 && erases == 0);
         logical[nfo + 0x4000 + 5] = save;
     }
-    {   /* A valid UFW entry with an older, smaller flash partition (0x89000). */
+    {   /* A stub package with damaged/invalid metadata must never fall back
+         * to the legacy write order. Keep the rest of the package untouched. */
+        uint32_t key;
+        uint8_t saved[32], plain[32];
+        ldr_chip_key(&key);
+        memcpy(saved, logical+nfo+LDR_MARK_OFF, sizeof saved);
+        for (uint32_t k=0;k<5u;k++) {
+            memcpy(plain,saved,sizeof plain);
+            ldr_sfc(plain,32,LDR_MARK_OFF-LDR_APP_LO,key);
+            if (!k) plain[0]^=1u;
+            else if (k==1u) plain[16]^=1u;
+            else {
+                ota_wr32(plain+8,k==2u?0u:k==3u?3u:0x8C004u);
+                ota_wr32(plain+16,ldr_crc32(plain,16));
+            }
+            ldr_sfc(plain,32,LDR_MARK_OFF-LDR_APP_LO,key);
+            memcpy(logical+nfo+LDR_MARK_OFF,plain,32);
+            erases=0;
+            rc=ldr_session();
+            bad += check("invalid stub marker refused before any erase",rc==-15 && !erases);
+        }
+        memcpy(logical+nfo+LDR_MARK_OFF,saved,sizeof saved);
+        static uint8_t before[0x8F000];
+        memcpy(nor+LDR_APP_LO,logical+nfo+LDR_APP_LO,sizeof before);
+        nor[0x5000]^=1u;
+        memcpy(before,nor+LDR_APP_LO,sizeof before);
+        marker_erase_stuck=1;
+        rc=ldr_session();
+        bad += check("marker must erase before changing any body byte",rc==-12 && !memcmp(before,nor+LDR_APP_LO,sizeof before));
+        marker_erase_stuck=0;
+    }
+    {   /* A valid UFW entry with an older, smaller flash partition (0x89000), or another board's (an SMK-37's
+         * 0x9D000, Felucca 1.6.1): refused before erasing anything. */
+        static const uint32_t SZ[2] = {0x89000u, 0x9D000u};
         uint8_t saved[0x400];memcpy(saved,logical,sizeof saved);uint8_t *h=logical;
-        uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
-        for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,0x89000u);ota_jl_enc(e,0x50);}
-        ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
-        erases=0;rc=ldr_session();bad+=check("older smaller partition refused before erasing anything",rc==-3&&!erases&&!memcmp(nor+0x93000,prophet_banks,sizeof prophet_banks));
-        memcpy(logical,saved,sizeof saved);
+        for (uint32_t z = 0; z < 2u; z++) {
+            uint8_t header[64];memcpy(header,h,64);ota_jl_enc(header,64);uint32_t count=ota_rd16(header+8);
+            for(uint32_t k=0;k<count;k++){uint8_t *e=h+0x40+k*0x50u;ota_jl_enc(e,0x50);if(ota_rd16(e)==0)ota_wr32(e+12,SZ[z]);ota_jl_enc(e,0x50);}
+            ota_wr16(header+2,ota_crc16(h+0x40,count*0x50u,0));ota_wr16(header,ota_crc16(header+2,62,0));ota_jl_enc(header,64);memcpy(h,header,64);
+            erases=0;rc=ldr_session();bad+=check(z ? "another board's partition (0x9D000) refused before erasing anything" :
+                                                     "older smaller partition refused before erasing anything",
+                                                 rc==-3&&!erases&&!memcmp(nor+0x93000,current_banks,sizeof current_banks));
+            memcpy(logical,saved,sizeof saved);
+        }
     }
     printf("%s\n", bad ? "LOADER TEST FAILED" : "loader test passed");
     return bad != 0;

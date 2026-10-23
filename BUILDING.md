@@ -1,4 +1,4 @@
-# Building Melodee
+# Building Tessera
 
 The build makes three files in `build/`:
 
@@ -40,6 +40,35 @@ On Linux x86-64 the toolchain runs natively and Docker is not needed.
 ./build.sh
 ```
 
+`MELODEE_RAM_AUDIO=1 ./build.sh` builds the resident audio performance profile.
+All builds retain a bit-identical dry bypass and support the bounded per-track FX inserts described in README.md.
+The optimized audio ISR, all enabled engine callbacks and their reachable helpers
+execute from ordinary SRAM; `tools/audio_ram.py` preserves existing low-SRAM DSP
+sections and uses volatile indirect calls across the XIP/SRAM boundary. Startup
+copies the additional `.audio_text` section before audio or CPU1 starts. Build
+checks verify every linked audio function's address and reject direct XIP calls
+from that graph. Engine callbacks invoked through function pointers are explicit
+roots, including mono-note handling and key mapping; a new engine callback must
+be classified before the build passes. The hardware PC guard includes both SRAM
+code banks, using the linker-derived `_guard_ram_end`.
+`MELODEE_SIZE=0` cannot be combined with this profile.
+
+The profile retains at least a 64 KiB contiguous resource arena for four engine
+states and off-record note history. Additional SRAM tails remain available.
+Factory banks and cold assets remain in flash; loaded patches and active engine
+state are in SRAM. Old effect values remain readable as inert format padding; the new FX use separate parameter IDs.
+Run the host suite with `MELODEE_RAM_AUDIO=1` when checking this target variant.
+Both target profiles reject the retired effect processors. Host sound regressions
+validate dry output against the original engines with all effect sends off.
+`tools/usb_audio_stats.py --parts` identifies cuts on each of the four tracks.
+The resident profile raises the shared voice budget from sixteen to eighteen
+units while CPU1 is online. An offline replay of the captured Prophet / two-FM6 /
+808 song needs this increase to avoid allocation cuts; the eighteen-unit replay
+recorded no allocation cuts for three minutes without growing memory or recorded event data.
+Normal builds and a retired or unavailable CPU1 retain sixteen units. Per-engine
+caps and overload shedding remain active. Target CPU headroom for the higher
+budget still requires a device measurement; host playback cannot establish it.
+
 `JIELI_TOOLCHAIN` and `AC79_SDK` override the default locations
 (`~/.jieli/toolchain`, `~/fw-AC79_AIoT_SDK`).
 
@@ -50,19 +79,18 @@ release ships: the package, the app (`melodee-0.11.1-app.bin`), `SHA256SUMS`, `L
 `LICENSES/` (the package contains Apache-2.0 SDK files, so the licence texts travel with it).
 For example, `--release 1.0.0` uses the distinct identity `FM-1_91000`.
 
-Build options (environment, `0` or `1`; defaults in `firmware/src/build_options.h`, `melodee.c`, `core.h` and `icons.c`):
+Build options (environment; most use `0` or `1`; defaults in `firmware/src/build_options.h`, `melodee.c`, `core.h` and `icons.c`):
 
 | Flag | Default | |
 | --- | --- | --- |
 | `MELODEE_FLASH` | 1 | settings, presets and projects in flash |
 | `MELODEE_OTA` | 1 | update entry (needs `MELODEE_FLASH`) |
-| `MELODEE_USB_AUDIO` | 1 | USB audio: "Melodee Out" plays the computer through the FM-1, "Melodee In" records the four tracks (16 / 24 bit, 44.1 kHz) |
+| `MELODEE_USB_AUDIO` | 1 | USB audio: "Tessera Out" plays the computer through the FM-1, "Tessera In" records the four tracks (16 / 24 bit, 44.1 kHz) |
 | `MELODEE_CDC` | 0 (1 without USB audio) | USB serial console; it shares EP2 / EP3 with USB audio, so `MELODEE_USB_AUDIO=0` |
 | `MELODEE_UART` | 1 | TRS MIDI IN |
-| `MELODEE_DUAL_CORE` | 1 | paired FM6/Prophet rendering on CPU1; `0` builds serial-only firmware |
+| `MELODEE_DUAL_CORE` | 1 | paired FM6 rendering on CPU1; `0` builds serial-only firmware |
 | `MELODEE_SLICE` | 1 | the SLICE engine |
 | `MELODEE_ICONS` | 1 | parameter icons on the knob cards |
-| `MELODEE_FM4` | 0 | the retired DIGITAL engine (4-operator FM) instead of its FM6 conversion |
 
 ## Samples
 
@@ -76,20 +104,17 @@ SAMPLE engine has only the generated drum kit.
 Audio working memory is allocated on demand from the unused part of POOL and
 linker-derived gaps after RAM code, ordinary data and retained state. Allocations
 stay within a single bank and preserve boot records and stack guards. Each
-track reserves only its current engine state; STUT reserves 8 KiB per enabled
-track, while GATE needs no recording buffer. Performance loops reuse the same
-32 KiB capacity as the four stutters. Chorus and reverb retain their tails before
-releasing their delay lines; silent buses skip the delay processing.
+track reserves only its current engine state. The off-record note history uses
+one bounded allocation; no effect processor allocates audio buffers.
 
-Preset browsing keeps names and slot indexes in RAM, with one bank cache for
-general presets, one for FM6 and one shared with the CZ bank reader. Retired FM6
-bank and owned-voice caches are replaced by temporary migration workspace,
-released after conversion. Existing flash and backup formats remain readable.
+Preset browsing keeps names and slot indexes in RAM, with one bank cache shared by
+the general presets and the native FM6, CZ-1 and Prophet banks (the last bank asked for). Melodee 2.0
+reads only the formats written since 1.0; 1.2 rewrote older records at boot.
 
 The build reports both permanent POOL usage and the available working arena,
-and requires at least 152 KiB for simultaneous maximum engine state, recording,
-effects and legacy conversion workspace. The resource tests cover eviction,
-engine transitions, effect tails and resumption, and allocation failure.
+and requires at least 139 KiB for simultaneous maximum engine state, recording
+and note history in normal builds (64 KiB in the resident profile). The resource
+tests cover eviction, engine transitions, and allocation failure.
 
 USB stem buffers are written only for an active capture stream. Derived tuning
 and mixer gains are cached by their effective parameter values, including
@@ -109,7 +134,7 @@ user presets, projects of every format, backup, the keys and knobs, MIDI (USB, T
 control), USB audio, the update entry and loader, the command-line installer, the UI (the real
 drawing code against stubs: every screen in every palette is rendered and checked for clipped or
 overlapping text; PNGs land in `build/ui_new/`), every engine (DRUM, NOISE, PHYS, FM6, SLICE, the
-DIGITAL conversion), the chord keys, the modulation matrix, the FX layer, the reverbs, the SLICER
+DIGITAL conversion), the chord keys, the modulation matrix, retired effect compatibility
 and swing. With `DAISYSP` pointing at a DaisySP checkout, the PHYS models are also compared with
 their floating-point originals; without it that test is skipped.
 
@@ -118,6 +143,12 @@ hash of each render with `tests/golden.txt`; it also checks levels, voices and t
 cost (`tests/cpu_baseline.txt`, `tests/target_budget.txt`). After an intended change of
 the sound, `GOLDEN_UPDATE=1 sh tests/run_tests.sh` rewrites the hashes; `BUDGET_UPDATE=1`
 does the same for the cost files.
+
+The tests run in parallel, one job per test, as many at once as the CPU has cores
+(`PARALLEL=n` sets the count, `PARALLEL=1` runs them one by one); each job's output is printed
+in order as it ends and the failures are listed again at the end. `SOUND=0` leaves out the
+sound tests (the regression suite, TRACKS and the tests of every engine's and effect's rendered
+signal), `SOUND=only` runs them alone.
 
 ## Install
 
@@ -135,25 +166,126 @@ Or, to install your own build from the web installer, make a local copy of the s
 (Web MIDI needs a secure context):
 
 ```
-# Build both variants from the same source; release outputs are kept separately.
-./build.sh --release 1.1.0
-MELODEE_DUAL_CORE=0 ./build.sh --release 1.1.0
-python3 web/make_site.py build/release-1.1.0/melodee-1.1.0.fwsc \
-  build/release-1.1.0-1core/melodee-1.1.0-1core.fwsc 1.1.0 /tmp/melodee-site
-cd /tmp/melodee-site && python3 -m http.server 8000
-# open http://localhost:8000/webapp/installer/
+# Build both variants from the same source (copy the first away: the second build starts afresh).
+./build.sh --release 2.0 && cp build/tessera-2.0.fwsc /tmp/
+MELODEE_DUAL_CORE=0 ./build.sh --release 2.0 && cp build/tessera-2.0-1core.fwsc /tmp/
+web/sim/build.sh                                 # optional: the simulator (Emscripten)
+python3 web/make_site.py /tmp/tessera-2.0.fwsc /tmp/tessera-2.0-1core.fwsc 2.0 /tmp/tessera-site build/sim
+cd /tmp/tessera-site && python3 -m http.server 8000
+# open http://localhost:8000/ (the project page) or http://localhost:8000/webapp/installer/
 ```
 
 Installing firmware is at your own risk. If an install fails and the FM-1 no longer
-starts, recovery needs [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter).
+starts, identify its recovery mode using the steps below.
+
+### Releasing
+
+A tag `vX.Y[.Z]` on `main` runs `.github/workflows/release.yml`: both variants built, the full host suite, the two
+packages checked as the site checks them, and a GitHub release with both packages, `SHA256SUMS` and the notes in
+`docs/RELEASE_X.Y.md` (which must exist; a tag with a suffix, `v2.0-rc1`, makes a prerelease). Run by hand from the
+Actions tab with a version, it builds and checks without publishing.
+
+The site is GitHub Pages from `main`'s `docs/`: publish a release there with the `make_site.py` line above into
+`docs/` (the test pages go into `docs/test/VERSION/` the same way), in a pull request.
+
+### Recover a black-screen FM-1
+
+Builds with the boot stub can recover an interrupted application write after power loss.
+Switch on again, or hold **OCT− alone** while switching on: three short key-light flashes
+mean the USB MIDI update loader is starting. Reconnect USB and install the same package
+again; already verified sectors are skipped. Both octave buttons at power-on still enter
+calibration. One long flash means ROM UBOOT; use the recovery steps below.
+
+The first install of the stub, an intentional stub change, and installing firmware without
+the stub still have an unprotected window. Keep the FM-1 charged and the computer awake.
+See [boot protection design and validation](docs/BOOT-SAFETY.md).
+
+If the device appears as **Melodee Update**, it is in the MIDI update loader:
+`python3 tools/fm1_install.py /path/to/working-firmware.fwsc --yes` resumes installation.
+
+If it appears as USB **4c4a:8057**, with inquiry identity **WL82 / UBOOT1.00**, it is
+already in mask-ROM UBOOT. `tools/fm1_recover.py` can recover it over a normal USB data
+cable, without an RP2040. It does not force a running device into UBOOT.
+
+The [1.3.5 release downloads](https://github.com/keremimo/melodee/releases/tag/v1.3.5)
+include standalone recovery archives for Windows x64, Linux x64, macOS Intel/x64
+and Apple Silicon/arm64. Extract the matching archive and follow its `RECOVERY.md`,
+also available [here](docs/RECOVERY.md). Python, libusb and the RAM helper are bundled.
+Windows still needs the ROM device's WinUSB driver; macOS/Linux may need USB permissions.
+
+To run the Python source instead, install Python 3.10 or later, PyUSB
+(`python3 -m pip install pyusb`) and libusb:
+
+- macOS: `brew install libusb`. If USB access is denied, run the recovery command
+  with `sudo` and the same Python interpreter that has PyUSB installed.
+- Linux: install your distribution's libusb 1.0 package (for example,
+  `sudo apt install libusb-1.0-0`). USB access may need a udev rule or `sudo`.
+- Windows: install a libusb-compatible driver such as WinUSB for **4c4a:8057 only**
+  using Zadig, and supply `--libusb C:\path\to\libusb-1.0.dll` if discovery fails.
+  Do not replace the driver for the normal Tessera MIDI/audio device.
+
+The tool uses the unmodified `cpu/wl82/tools/wl82loader.bin` from the
+[JieLi AC79 SDK](https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK/tree/AC79NN_SDK_V1.2.1_2023-12-13/cpu/wl82/tools).
+It is included under `assets/recovery/` and loaded into RAM. The supported file is
+30,720 bytes with SHA-256
+`d9de9f1c81a3bb52998e5bced678f0ca851223014a7d43965b03f0719a44eb55`.
+The tool uses the included file by default. `--loader` or `AC79_SDK` can override it.
+
+Choose a firmware package whose boot has been verified. For investigating 1.3 startup
+failures, use a previously working release rather than reinstalling the suspected build.
+Download the `.fwsc` and its `SHA256SUMS` from the corresponding release.
+
+The corrected recovery tool also accepts the unmodified official M-VAVE V15
+`FM-1.fwsc` (`FM-1_015`), with whole-file SHA-256
+`db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`.
+The recovery archives on the 1.3.1 release were corrected on 2026-10-13 to accept
+V15's metadata; download again if an older executable rejects it. Keep the backup:
+stock firmware may overwrite Tessera
+data after boot even though the recovery operation preserves it.
+
+```sh
+# Identify ROM UBOOT; no loader or package needed.
+python3 tools/fm1_recover.py --info
+
+# Validate the package and RAM loader offline; no USB access.
+python3 tools/fm1_recover.py working.fwsc --check
+
+# Default: load the RAM helper and save a full backup, with NO flash writes.
+python3 tools/fm1_recover.py working.fwsc
+
+# Back up again, restore the application, and verify the entire flash.
+python3 tools/fm1_recover.py working.fwsc --write
+```
+
+Each connected recovery creates a unique session directory under `fm1-recovery-backups/`
+(`--backup-dir PATH` changes the parent). Keep `full-flash-before.bin`, `backup.json` and
+`retained-ram.bin`. The full backup and its manifest are flushed to disk before any erase.
+The tool checks the package's checksums, chip key, ROM identity and expected flash chip;
+writes only changed 4 KiB sectors in **0x4000–0x93000**; and verifies each sector and then
+the entire flash. The bootloader below 0x4000 and saved data above 0x93000 are retained.
+Legacy Prophet banks at 0x89000 are ignored and replaced by application code. They remain
+available in the full pre-recovery backup, but are not moved or loaded by current firmware.
+
+Success creates `recovery-result.json` and prints **RESTORE VERIFIED**. Power-cycle the
+FM-1 afterward, including after a backup-only session. Verification proves the flash
+contents, not that the selected firmware boots or its audio and controls work.
+If USB disconnects during writing, keep the original backup, reconnect the device in
+UBOOT, and retry; matching sectors are skipped. No success report is produced for a
+failed write or verification. Connect one FM-1 at a time, or select it with `--bus` and
+`--address`. `--wait` controls detection time, up to 60 seconds.
+
+The protocol and previous direct-USB recoveries were verified on macOS. The portable
+tool has simulated USB/NOR tests, including interrupted writes; its Linux and Windows
+hardware paths still need validation. If ROM USB never appears, use
+[FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter) and its RP2040 setup.
 
 ## Experimental cache RAM
 
 Builds reclaim seven 4 KiB data-cache ways at `0x01F28000..0x01F2F000`
-(`MELODEE_CACHE_RAM=1`, the default while it is being validated on the device; `MELODEE_CACHE_RAM=0 ./build.sh`
+(`MELODEE_CACHE_RAM=1`, opt-in; normal builds retain all data-cache ways; `MELODEE_CACHE_RAM=0 ./build.sh`
 turns it off), following the AC79 SDK's flash-execution configuration. All instruction-cache ways remain available.
 The first 14 KiB are the UI's (eight undo levels); the rest join the audio allocator, whose worst case still fits
-the SRAM banks alone. Without a passed self-test the UI keeps one undo level. Keep USB audio enabled during
+the SRAM banks alone. Normal builds keep eight undo levels in ordinary SRAM, within the existing arena reserve. Keep USB audio enabled during
 validation.
 
 The boot routine runs wholly in SRAM with interrupts off and CPU1 held. It
@@ -172,6 +304,9 @@ Verify boot, sustained audio/MIDI/USB activity, persistence and update entry
 before enabling this option by default.
 
 ## Second-core FM6/Prophet rendering
+
+(Tessera retired the CZ-1, Prophet and PHASE engines on 2026-10-22: CPU1 now pairs FM6 voices only. The Prophet notes
+below are the history of how the paired rendering was proven; their stores stay until the new project format.)
 
 The first experimental hardware install bootlooped with `DBG_MSG=0x400`
 (`c1_pc_limit_err_r`) during CPU1's ready handshake. This identifies a CPU1
@@ -227,6 +362,17 @@ An isolated voice stays on CPU0. Other engines, effects, MIDI, USB and the scree
 retain their existing execution paths. This is a targeted synth optimization;
 it does not double all firmware throughput.
 
+The FM6, Prophet and synthesized 808 sample loops stay resident in internal
+DSP RAM, shared by all four tracks; two FM6 tracks share code while retaining
+separate voice state and loaded patches. Startup copies the code and saturation
+tables once. Loaded patches and active engine state also live in RAM.
+FM6 output mixing and its DC filter, ordinary track mixing and the master output
+also run from DSP RAM.
+FM6 per-voice control and envelopes are resident too. Other block-rate helpers
+and factory-library browsing may still use flash. The build
+checks kernel/table placement and retains the existing worst-case audio arena
+reserve; neither voices nor recording capacity are reduced to make room.
+
 With an online CPU1, Prophet's polyphony cap is eight and each voice
 costs two of the existing sixteen shared budget units. Eight Prophet voices fill
 that budget; notes on other tracks still steal voices. CPU1 startup failure keeps
@@ -265,19 +411,77 @@ sides of it:
   `0x03801494` (it looks like a packed stereo sample) while `rets` still held the
   right one. No software check can catch that.
 
-What the FM-1 runs, measured (editor command 79 in a test build, below): the AC79
+Earlier Melodee builds measured (editor command 79 in a test build, below): the AC79
 at 360 MHz (M-VAVE's `isd_config` SYS_CLK; our package carries no clock key, and
 the SDK SPL runs it as fast: 329 dependent adds a microsecond), above the SDK's
 320 MHz table, on the SPL's core
-rail: SYSVDD 11 (1.26 V), VDC14 3 (1.40 V) on its LDO. The stock firmware is
-single-core: its system library says `modified #define CPU_CORE_NUM 1` (the SDK
-default is 2), so no FM-1 was validated with both cores. JieLi's own profile
+rail: SYSVDD 11 (1.26 V), VDC14 3 (1.40 V) on its LDO. This was not the stock
+application's operating supply: V15 raises both rails and enables DCDC after the SPL (below).
+The stock firmware is single-core: its system library says
+`modified #define CPU_CORE_NUM 1` (the SDK default is 2), so stock behavior
+alone does not validate dual-core operation. JieLi's own profile
 above 320 MHz (`isd_config_rule.c`, `CONFIG_OVERCLOCKING_ENABLE`, 396 MHz) sets
 DVDD 14 (1.35 V) and DCDC14 4 (1.45 V), and its notes say to raise them on chips
 that run low. One healthy unit ran both cores under an eight-voice Prophet chord
 without a misread down to SYSVDD 6 (1.11 V): the margin varies from chip to chip.
-Melodee does not change a supply rail: what an FM-1 board and its regulators take
-at other levels is unknown, so the rails stay where the boot loader sets them.
+Tessera now applies the stock supply setup in both core variants. The earlier
+CPU1 measurements do not establish behavior at that setup; hardware validation
+must check cold/soft boots, CPU1 shared-memory errors and loaded audio separately.
+
+### The stock supply setup
+
+`hal/fm1_power.h` applies the supply portion of stock V15's constant-folded
+`power_init` / `__hw_power_init` before cache setup, peripherals and CPU1, with
+interrupts off and CPU1 held. It uses Melodee's bounded P33 driver. No SDK power
+manager, sleep timers or RTOS services are linked in, and the PLL is not changed.
+
+The reference is the unmodified `FM-1_015` package with SHA-256
+`db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`.
+Its decoded boot config contains `SYS_CLK=360000000`, `HSB_DIV=1`, `LSB_DIV=2`
+and no `DVDD`, `DCDC14` or `VDDIO`. Its SPL's default branches at
+`0x01C03E7C..0x01C03EAC` select SYSVDD 11 / VDC14 3. The application task
+`app_core` (entry `0x02004CF2`) then executes the supply sequence at
+`0x02004F90..0x0200509A`:
+
+- Enable LDO13, wait, enable DCDC13, wait, disable LDO13, wait. Each wait is
+  stock's 1,000-iteration `nop` / increment / branch loop, **not** 1,000 us.
+- Write P33 analog registers 1, 5, 6, 7, 8 with `20`, `40`, `0C`, `A5`, `96`
+  (hex), then set register 9 bit 4.
+- Select VDDIOM 4 (3.2 V), VDC14 7 (1.60 V), VDDIOW 3 (3.2 V). Retain the
+  stock reads of registers 6, 5, 5 in that order.
+- Set register 0 bit 7, clear register `16` bits 0..5, set register 2 bit 6,
+  clear register `17` bit 5 (register addresses in hex).
+- Select SYSVDD 15 (1.38 V) last. Stock calls its field helper at `0x01C0108C`
+  with `(6,0,3,7)` at `0x0200503A` and `(9,0,4,15)` at `0x0200509A`.
+
+The initializer stops on a P33 timeout, never writes a field from a failed read,
+and verifies the DCDC/LDO mode and voltage fields afterward. CPU1 starts only
+if those checks succeed; existing boot guards and worker retirement remain.
+`tests/power_test.c` checks the stock transaction trace from cold and warm states,
+every transfer timeout, and wrong final read-backs. Target disassembly checks
+the settling loops. These checks establish software behavior, not measured
+voltages or a guarantee that all instability is resolved.
+
+### The boot clock
+
+Tessera runs at the clock the boot loader sets, 360 MHz, and never writes the PLL
+(`hal/fm1_clock.h` only reads it). PR #27 by [johnskiller](https://github.com/johnskiller),
+with [charlesvestal](https://github.com/charlesvestal)'s register reads, found the SYS
+multiplier in PLL2_CON1 (0x119AC): the SPL's 268 means 24 MHz / 12 x 270 = 540 MHz, and
+CLK_CON2 selects 2/3, so SYS 360 / HSB 180 / LSB 60 / SFC 90 MHz.
+
+1.3.0 to 1.3.3 offered a boot-time retune to 320 MHz (OVERCLOCK; the default in
+1.3.0 and 1.3.1). On some FM-1s, the ones whose CPU1 also misbehaves, the retune failed
+before the LCD and USB came up: the watchdog reset, the next start retuned and failed
+again, and the boot guard entered UBOOT behind a black screen (a retained-RAM capture of
+a bricked 1.3.0 unit showed every start stopping between the clock code and the
+splash). 1.3.2 and 1.3.3 made 360 MHz the default and guarded the option; 1.3.4 removes
+it. Its setting bits in `favorites.factory[15][30]` (2..4) are left as saved and never
+read. A soft reset keeps the PLL, so after an update from a session at 320 MHz the
+FM-1 runs at 320 until its next power-off; `main.c` `clock_boot` reads the multiplier
+for the voice budget.
+With CPU1 the shared voice budget follows the clock (16 or 18 units in the
+resident profile); one core keeps 16.
 
 So the second core stays on, and a unit that shows the fault falls back to one:
 
@@ -329,3 +533,82 @@ build. Verify controls, MIDI timing, audio, patch changes, persistence and updat
 entry on hardware before enabling this in a release. The eight-voice Prophet cap
 is enabled only in this experimental build; validate worst-case patches and
 release tails before adopting it in a release.
+
+## Nightly builds from `nightly`
+
+The web installer keeps the released standard and single-core packages and
+adds two development builds from `nightly`: dual core and single core, both with
+`MELODEE_RAM_AUDIO=1`. Both run at the boot loader's clock (above).
+Save a complete backup in the editor before trying a nightly. Selecting
+Standard in the installer returns to the released firmware.
+
+`./build.sh --nightly` stamps the current Git commit into the firmware version
+(`next-<commit>`) and uses development identity `FM-1_900`. Build both variants
+from the same commit; `MELODEE_DUAL_CORE=0 ./build.sh --nightly` produces
+`build/melodee-nightly-1core.fwsc`, while the dual-core package is
+`build/melodee-nightly.fwsc`. The installer shows the source commit and UTC
+build time, verifies the selected channel's identity, and locks all choices
+while installing.
+
+The Nightly builds workflow runs on pushes to `nightly`, manually, and daily at
+02:00 UTC. Its scheduled definition must also exist on GitHub's default branch.
+It checks out `nightly`, builds both variants, runs the host/web suite,
+and publishes only after successful checks. Packages, checksums and source
+metadata are available as an Actions artifact and in `gh-pages/firmware`.
+`web/publish_nightly.py` updates the existing Pages checkout while keeping its
+published release packages and editor.
+
+## Synth-only firmware
+
+The `synth-only` branch is a one-track sound module for playing and recording into a computer: every
+synth with its sound pages, ARP, CHORD and SCALES, the effects (drive, chorus, delay, reverb), and
+stereo master capture on the USB audio input. It has no sequencer, songs or project saving; PLAY holds
+the ARP, and the last sound comes back at power-on. It keeps the main firmware's flash layout, so the
+projects and presets saved on the FM-1 stay and return with Standard. The branch is never merged into
+`next`.
+
+The installer offers it as an option (Synth only, dual or single core) when the site carries it, with
+its own editor at `webapp/synth-editor/`. Build both variants on `synth-only` from one commit
+(`--nightly` stamps `synth-<commit>` with identity `FM-1_900`), then add them to a Pages checkout from
+this branch's `web/`:
+
+```
+# on synth-only
+MELODEE_RAM_AUDIO=1 ./build.sh --nightly
+MELODEE_RAM_AUDIO=1 MELODEE_DUAL_CORE=0 ./build.sh --nightly
+# from next's web/: the packages, the source commit, the synth-only checkout's web/ (its editor)
+python3 web/publish_synth.py <pages checkout> --dual <synth>/build/melodee-synth-nightly.fwsc \
+  --single <synth>/build/melodee-synth-nightly-1core.fwsc --version synth-<commit> \
+  --commit <full commit> --built-at <UTC time> --web <synth>/web
+```
+
+`web/make_site.py` and the nightly workflow keep the synth-only packages, `firmware/synth.json` and
+its editor when they regenerate the site.
+
+## EQ accelerator experiment
+
+`MELODEE_HW_EQ=1` enables the AC79 hardware EQ backend. It is **off by default**
+until physical arithmetic, DMA completion time and sustained FM-1 load are
+measured. An impulse through four nontrivial all-pass sections is checked
+against the CPU reference before the first active filter effect. A failed
+probe, timeout or invalid output permanently selects the CPU path until reboot.
+The wait is bounded to 8192 register polls; audio never waits on an SDK mutex
+or semaphore. There are four logical biquads per stereo side per slot (96 track sections plus 24 shared send sections), time-shared through a single mono hardware lane. This is a logical
+budget, not evidence that the chip provides 32 independent physical filters.
+Tape uses a fused stereo software path: three cascaded one-pole pairs per
+channel, with shared coefficients and polarity smoothed over about 15 ms.
+Coefficient targets are calculated only when JITTER or the random target
+changes. It avoids the six separate filter passes and hardware EQ waits, and
+needs no delay allocation. The other filter effects retain the optional EQ path.
+Filter effects, Echo and Room run at FS/4 (11.025 kHz). Reverb runs at FS/8 (5.5125 kHz), with a 4 KiB allocation per slot. Two modular running sums provide a triangular CIC input filter; cached block-local converter state avoids repeated SRAM accesses. The seven-tap quarter-rate response and fifteen-tap eighth-rate response reject aliases, with a low-pass pole and upper-mid compensation for Reverb. Wet interpolation and wet/dry mixing are fused in the sample kernels; bounded power-of-two divisions use exact shifts, without a hardware divide.
+
+The eight-line fixed-point Reverb tank uses an orthogonal Householder reflection, input/output diffusers, length-normalised decay and a bounded wet return. SIZE/DEPTH coefficients are cached; drift targets update once per control block. DEPTH retains bass/body and increases return level and tail duration. Synths and the dry mixer retain FS = 44.1 kHz. OFF / MIX 0 releases the slot's delay memory; memory exhaustion bypasses only the failing slot.
+
+Track SEND is post-level/pan/mute/solo and feeds one three-slot stereo auxiliary chain. Shared MIX defaults 127, RETURN defaults 100, SEND and TYPE default 0. CPU0 prepares control values and all allocations, then snapshots the final pointers after compaction. CPU1 owns the shared workspace while CPU0 computes dry master gain, and CPU0 joins before return summing, DC rejection, limiting or any events/flash access. Existing FM6/Prophet voice pairing remains in place. There is no additional block of audio latency. Offline CPU1 runs the same callback serially; a failed in-flight callback is discarded, never rerun with partly advanced histories. Individual USB stems exclude the shared return. The parallel return ramps to silence when the final active slot is bypassed or changes type; RETURN edits are smoothed over about 6 ms.
+
+Opt-in `MELODEE_FX_PROFILE=1 MELODEE_BENCH_SILENT=1` packages allow `tools/fx_performance_device.py` to inject repeatable input and override DSP settings without changing song data. `--bus` measures the shared return. These packages mute physical output and must be replaced by a normal package after measurement. Host `tests/fx_performance.c full` covers all 1,024 ordered extreme/default three-effect combinations. Device deadline/shedding/fault counters remain the performance authority; host instruction counts are not device CPU percentages.
+
+The row/stride/control layout follows the locally installed AC79 V1.2.1 SDK's
+`eq.c` and `asm/eq.h`, also described by
+[JieLi's EQ documentation](https://doc.zh-jieli.com/AC79/zh-cn/master/module_example/audio/EQ.html).
+Host register-model tests cannot establish physical audio quality or CPU savings.

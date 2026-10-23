@@ -1,0 +1,126 @@
+name: Nightly builds
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  push:
+    branches: [nightly]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: melodee-nightly-pages
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      JIELI_TOOLCHAIN: ${{ github.workspace }}/.nightly-deps/jieli/toolchain
+      AC79_SDK: ${{ github.workspace }}/.nightly-deps/sdk
+      PARALLEL: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: nightly
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libharfbuzz-dev libfribidi-dev libraqm-dev
+          python -m pip install Pillow fonttools
+      - uses: actions/cache@v4
+        with:
+          path: .nightly-deps
+          key: jieli-linux-sdk-d179b448-v1
+      - name: Fetch pinned SDK and toolchain
+        run: |
+          if [ ! -x "$JIELI_TOOLCHAIN/pi32v2/bin/clang" ]; then
+            tools/get_toolchain.sh "$GITHUB_WORKSPACE/.nightly-deps/jieli"
+          fi
+          if [ ! -d "$AC79_SDK/.git" ]; then
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git "$AC79_SDK"
+          fi
+          test "$(git -C "$AC79_SDK" rev-parse HEAD)" = d179b4484759423312073f5fbb232501aa491047
+      - name: Build dual core and run host/web checks
+        env:
+          MELODEE_DUAL_CORE: '1'
+          MELODEE_RAM_AUDIO: '1'
+        run: |
+          ./build.sh --nightly
+          cp build/melodee-nightly.fwsc build/melodee.fwsc
+          tests/run_tests.sh
+      - name: Build single core
+        env:
+          MELODEE_DUAL_CORE: '0'
+          MELODEE_RAM_AUDIO: '1'
+        run: ./build.sh --nightly
+      - name: Save build provenance and checksums
+        run: |
+          git rev-parse HEAD > build/nightly-commit.txt
+          date -u +%Y-%m-%dT%H:%M:%SZ > build/nightly-built-at.txt
+          cd build
+          sha256sum melodee-nightly.fwsc melodee-nightly-1core.fwsc > SHA256SUMS-nightly
+      - uses: actions/upload-artifact@v4
+        with:
+          name: melodee-nightly-${{ github.run_number }}
+          path: |
+            build/melodee-nightly*.fwsc
+            build/nightly-*.txt
+            build/SHA256SUMS-nightly
+            LICENSE
+            LICENSING.md
+            LICENSES
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: .nightly-pages
+          fetch-depth: 0
+      - name: Publish installer and nightly packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python web/import_releases.py .nightly-pages --repo "$GITHUB_REPOSITORY"
+          commit=$(cat build/nightly-commit.txt)
+          python web/publish_nightly.py .nightly-pages \
+            --dual build/melodee-nightly.fwsc --single build/melodee-nightly-1core.fwsc \
+            --version "next-${commit:0:7}" --commit "$commit" --built-at "$(cat build/nightly-built-at.txt)"
+          cp build/SHA256SUMS-nightly .nightly-pages/firmware/SHA256SUMS-nightly
+          cd .nightly-pages
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add webapp firmware
+          if ! git diff --cached --quiet; then
+            git commit -m 'build: publish nightly variants'
+            git push origin HEAD:gh-pages
+          fi
+      - name: Request and verify Pages publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds"
+          expected=$(git -C .nightly-pages rev-parse HEAD)
+          published=false
+          for attempt in $(seq 1 60); do
+            result=$(gh api "repos/$GITHUB_REPOSITORY/pages/builds/latest")
+            status=$(echo "$result" | jq -r .status)
+            revision=$(echo "$result" | jq -r .commit)
+            if [ "$revision" = "$expected" ] && [ "$status" = built ]; then
+              published=true
+              break
+            fi
+            if [ "$revision" = "$expected" ] && [ "$status" = errored ]; then
+              echo "$result"
+              exit 1
+            fi
+            sleep 10
+          done
+          test "$published" = true
+          site=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .html_url)
+          python web/verify_nightly.py "$site" build

@@ -1,7 +1,19 @@
 build/
-firmware/src/*.preram
-firmware/src/*.presave
-firmware/src/*.preflourish
-firmware/src/*.prerename
-tools/*.prerename
 __pycache__/
+# hand-made backups of edited sources
+firmware/src/*.bak*
+firmware/src/*.pre*
+tools/*.pre*
+fm1-recovery-backups/
+*.fwsc
+
+.nightly-deps/
+.nightly-pages/
+# melodee-tess: planning notes live in the private repo tessera-notes (~/src/tessera-notes)
+/ROADMAP.md
+/docs/analysis/
+/docs/design/GENERATOR_COMPARISON.md
+/docs/design/MODULE_GENERATORS.md
+/docs/design/NORNS_GENERATORS.md
+/docs/design/phase2/
+/docs/design/phase4/

@@ -1,0 +1,223 @@
+# The central parameter ids (firmware/src/pid.c): id, name, scope, range, default. FROZEN: an id
+# never changes meaning. Rewrite (PID_UPDATE=1) only to append ids or for an intended range change.
+0x000 LEVEL                    track 0..127 def 104
+0x001 ENV ATTACK               track 0..127 def 10
+0x002 ENV DECAY                track 0..127 def 70
+0x003 ENV SUSTAIN              track 0..127 def 90
+0x004 ENV RELEASE              track 0..127 def 60
+0x005 ENV TO FILTER            track -64..63 def 0
+0x006 ENV TO PITCH             track -64..63 def 0
+0x007 ENV TO SHAPE             track -64..63 def 0
+0x008 RECORD QUANTIZE          track 0..10 def 0
+0x009 LFO RATE                 track 0..127 def 60
+0x00a LFO WAVE                 track 0..4 def 0
+0x00b LFO PHASE                track 0..127 def 0
+0x00c LFO FADE                 track 0..127 def 0
+0x00d LFO TO PITCH             track -64..63 def 0
+0x00e LFO TO FILTER            track -64..63 def 0
+0x00f LFO TO SHAPE             track -64..63 def 0
+0x010 LFO TO LEVEL             track 0..127 def 0
+0x011 ARP MODE                 track 0..6 def 0
+0x012 ARP RATE                 track 0..9 def 2
+0x013 ARP OCTAVES              track 1..4 def 1
+0x014 ARP GATE                 track 1..127 def 64
+0x015 ARP SWING                track 0..100 def 0
+0x016 ARP PROBABILITY          track 0..127 def 127
+0x017 ARP HOLD                 track 0..1 def 0
+0x018 ARP ORDER                track 0..1 def 0
+0x019 ROOT                     track 0..11 def 0
+0x01a SCALE                    track 0..76 def 0
+0x01b QUANTIZE                 track 0..5 def 0
+0x01c TRANSPOSE                track -24..24 def 0
+0x01d PATTERN LENGTH           track 1..64 def 16
+0x01e PATTERN DIVISION         track 0..9 def 2
+0x01f PATTERN SWING            track 0..100 def 0
+0x020 PATTERN GATE             track 1..127 def 64
+0x025 VOICE MODE               track 0..3 def 0
+0x026 GLIDE                    track 0..127 def 0
+0x027 PAN                      track -64..63 def 0
+0x028 MUTE                     track 0..1 def 0
+0x029 GLIDE MODE               track 0..1 def 0
+0x02a NOTE PRIORITY            track 0..2 def 0
+0x02b VOICE ALLOCATION         track 0..1 def 0
+0x02c UNISON DETUNE            track 0..127 def 40
+0x031 MOD 1 SOURCE             track 0..10 def 0
+0x032 MOD 1 DESTINATION        track 0..20 def 0
+0x033 MOD 1 AMOUNT             track -64..63 def 0
+0x034 MOD 2 SOURCE             track 0..10 def 0
+0x035 MOD 2 DESTINATION        track 0..20 def 0
+0x036 MOD 2 AMOUNT             track -64..63 def 0
+0x037 MOD 3 SOURCE             track 0..10 def 0
+0x038 MOD 3 DESTINATION        track 0..20 def 0
+0x039 MOD 3 AMOUNT             track -64..63 def 0
+0x03a MOD 4 SOURCE             track 0..10 def 0
+0x03b MOD 4 DESTINATION        track 0..20 def 0
+0x03c MOD 4 AMOUNT             track -64..63 def 0
+0x051 CHORD                    track 0..9 def 0
+0x052 CHORD VOICING            track 0..4 def 0
+0x053 MPC DEGREE               track 1..12 def 1
+0x054 DRUM KICK                track 0..127 def 127
+0x055 DRUM SNARE               track 0..127 def 127
+0x056 DRUM CLAP                track 0..127 def 127
+0x057 DRUM CLOSED HAT          track 0..127 def 127
+0x058 DRUM OPEN HAT            track 0..127 def 127
+0x059 DRUM TOM                 track 0..127 def 127
+0x05a DRUM RIM                 track 0..127 def 127
+0x05b DRUM BELL                track 0..127 def 127
+0x05c LFO SYNC                 track 0..10 def 0
+0x05d LFO TRIGGER              track 0..1 def 0
+0x05e LFO POLARITY             track 0..1 def 0
+0x05f STEREO SPREAD            track 0..127 def 0
+0x060 FX 1 TYPE                track 0..9 def 0
+0x061 FX 1 MIX                 track 0..127 def 0
+0x062 FX 1 RATE                track 0..127 def 60
+0x063 FX 1 CHARACTER           track 0..127 def 64
+0x064 FX 2 TYPE                track 0..9 def 0
+0x065 FX 2 MIX                 track 0..127 def 0
+0x066 FX 2 RATE                track 0..127 def 60
+0x067 FX 2 CHARACTER           track 0..127 def 64
+0x068 FX 3 TYPE                track 0..9 def 0
+0x069 FX 3 MIX                 track 0..127 def 0
+0x06a FX 3 RATE                track 0..127 def 60
+0x06b FX 3 CHARACTER           track 0..127 def 64
+0x06c FX SEND                  track 0..127 def 0
+0x06d FX SEND 2                track 0..127 def 0
+0x06e FX SEND 3                track 0..127 def 0
+0x06f ENGINE 1                 track 0..0 def 0
+0x070 ENGINE 2                 track 0..0 def 0
+0x071 ENGINE 3                 track 0..0 def 0
+0x072 ENGINE 4                 track 0..0 def 0
+0x073 ENGINE 5                 track 0..0 def 0
+0x074 ENGINE 6                 track 0..0 def 0
+0x075 ENGINE 7                 track 0..0 def 0
+0x076 ENGINE 8                 track 0..0 def 0
+0x100 TEMPO                    global 40..240 def 120
+0x101 SWING                    global 0..100 def 0
+0x102 CLOCK SOURCE             global 0..2 def 0
+0x103 TUNE                     global -50..50 def 0
+0x10c MIDI INPUT               global 0..1 def 0
+0x10d DRUM MIDI CHANNEL        global device 0..16 def 10
+0x10e MIDI ROUTING             global 0..4 def 0
+0x110 PROJECT SLOT             global action 1..5 def 1
+0x111 BOOT PROJECT             global device 0..4 def 0
+0x112 PROJECT LOAD             global action 0..1 def 0
+0x113 PROJECT SAVE             global action 0..1 def 0
+0x114 ENGINE                   global action 0..21 def 0
+0x115 A4 TUNING                global device 400..480 def 440
+0x116 CLEAR SEQUENCE           global action 0..1 def 0
+0x117 INIT SOUND               global action 0..1 def 0
+0x11b SEND FX 1 TYPE           global 0..9 def 0
+0x11c SEND FX 1 MIX            global 0..127 def 127
+0x11d SEND FX 1 RATE           global 0..127 def 60
+0x11e SEND FX 1 CHARACTER      global 0..127 def 64
+0x11f SEND FX 2 TYPE           global 0..9 def 0
+0x120 SEND FX 2 MIX            global 0..127 def 127
+0x121 SEND FX 2 RATE           global 0..127 def 60
+0x122 SEND FX 2 CHARACTER      global 0..127 def 64
+0x123 SEND FX 3 TYPE           global 0..9 def 0
+0x124 SEND FX 3 MIX            global 0..127 def 127
+0x125 SEND FX 3 RATE           global 0..127 def 60
+0x126 SEND FX 3 CHARACTER      global 0..127 def 64
+0x127 FX RETURN                global 0..127 def 100
+0x128 FX MODE                  global 0..1 def 0
+0x129 VOICE BUDGET             global device 8..32 def 16
+0x200 GENERATOR MODE           track 0..13 def 0
+0x201 TURING LENGTH            track 2..16 def 16
+0x202 TURING PROB              track 0..100 def 0
+0x203 TURING SPAN              track 1..3 def 2
+0x204 EUCLID STEPS             track 1..32 def 16
+0x205 EUCLID PULSES            track 0..32 def 4
+0x206 EUCLID ROTATION          track 0..31 def 0
+0x207 MARKOV LEAP              track 0..100 def 25
+0x208 MARKOV DENSITY           track 5..100 def 70
+0x209 MARKOV SPAN              track 1..3 def 2
+0x20a MORPH POSITION           track 0..127 def 64
+0x20b MORPH RHYTHM A           track 0..7 def 0
+0x20c MORPH RHYTHM B           track 0..7 def 2
+0x20d EVOLVE LOCK              track 0..100 def 0
+0x20e EVOLVE EVERY             track 0..5 def 0
+0x20f EVOLVE AMOUNT            track 0..100 def 30
+0x210 EVOLVE ROLL              track 1..128 def 1
+0x211 FORM                     track 0..6 def 0
+0x212 FORM CONTRAST            track 0..100 def 60
+0x213 FORM FLOURISH            track -12..12 def 0
+0x214 TWEAK SHIFT              track -24..24 def 0
+0x215 TWEAK DROP               track 0..100 def 0
+0x216 TWEAK HUMAN              track 0..100 def 0
+0x217 TWEAK FOLLOW             track 0..4 def 0
+0x218 ATLAS X                  track 0..255 def 128
+0x219 ATLAS Y                  track 0..255 def 128
+0x21a ATLAS DENSITY            track 0..100 def 50
+0x21b BOUNCE SPEED             track 1..64 def 24
+0x21c BOUNCE ANGLE             track 0..90 def 37
+0x21d BOUNCE BALLS             track 1..5 def 1
+0x21e AWAKE LENGTH A           track 1..16 def 8
+0x21f AWAKE LENGTH B           track 1..16 def 7
+0x220 AWAKE PROB               track 0..100 def 100
+0x221 POLY RHYTHM 1            track 0..16 def 4
+0x222 POLY RHYTHM 2            track 0..16 def 3
+0x223 POLY RHYTHM 3            track 0..16 def 0
+0x224 POLY RHYTHM 4            track 0..16 def 0
+0x225 POLY SPAN                track 1..3 def 1
+0x226 TWEAK BRANCH             track 0..100 def 0
+0x227 TWEAK BRANCH TO          track 0..4 def 0
+0x228 TWEAK BRANCH MODE        track 0..2 def 0
+0x229 TWEAK LOGIC              track 0..4 def 0
+0x22a TWEAK LOGIC WITH         track 0..4 def 0
+0x22b TWEAK COND               track 0..10 def 0
+0x22c TIDE SPEED               track 0..100 def 50
+0x22d SWARM RATE               track 0..100 def 50
+0x22e QUAD DIRECTION           track 0..4 def 0
+0x22f QUAD PROB                track 0..100 def 100
+0x230 QUAD LINK                track 0..15 def 0
+0x231 NOTE LENGTH              track 0..2 def 0
+0x232 NOTE LENGTH LEN          track 0..5 def 2
+0x233 NOTE LENGTH KEYS         track 1..4 def 4
+0x234 CONSTELLATION Y          track 0..14 def 7
+0x235 CONSTELLATION DENS       track 0..100 def 50
+0x236 CONSTELLATION SIZE       track 0..7 def 2
+0x237 CONSTELLATION AUTO       track 0..10 def 0
+0x238 SERIES START             track 0..127 def 0
+0x239 SERIES INTV              track 1..7 def 1
+0x23a SERIES LOOP              track 0..16 def 0
+0x23e QUAD RANGE               track 0..3 def 0
+0x23f QUAD MOVE 1              track 0..3 def 0
+0x240 QUAD MOVE 2              track 0..3 def 0
+0x241 QUAD MOVE 3              track 0..3 def 0
+0x242 QUAD MOVE 4              track 0..3 def 0
+0x243 QUAD EVERY 1             track 0..6 def 3
+0x244 QUAD EVERY 2             track 0..6 def 3
+0x245 QUAD EVERY 3             track 0..6 def 3
+0x246 QUAD EVERY 4             track 0..6 def 3
+0x247 CONSTELLATION LEN        track 1..16 def 16
+0x248 CONSTELLATION FILL       track 0..1 def 0
+0x249 CHORD PROG               track 0..7 def 0
+0x24a CHORD BARS               track 0..3 def 1
+0x24b CHORD HIT                track 0..2 def 0
+0x24c CHORD OCT                track -2..2 def 0
+0x24d ATLAS KICK               track 0..100 def 100
+0x24e ATLAS SNARE              track 0..100 def 100
+0x24f ATLAS HAT                track 0..100 def 100
+0x250 ATLAS TOMS               track 0..100 def 0
+0x251 CHORD USER LEN           track 1..8 def 4
+0x252 STEP EVOLVE LOCK         track 0..100 def 50
+0x253 STEP EVOLVE EVERY        track 0..5 def 1
+0x254 STEP EVOLVE AMOUNT       track 0..100 def 0
+0x255 ATLAS PART4              track 0..4 def 0
+0x256 TIMING RATCH             track 0..7 def 0
+0x257 TIMING CHANCE            track 0..100 def 100
+0x258 CHORD BREATH             track 0..100 def 0
+0x259 ENERGY ARC               global 0..100 def 0
+0x25a ENERGY RESTS             global 0..100 def 0
+0x25b ANSWER VARY              track 0..100 def 30
+0x25c ANSWER ECHO              track 0..100 def 20
+0x25d ANSWER FADE              track 0..100 def 33
+0x25e ANSWER ORDER             track 0..2 def 0
+0x25f ANSWER SHIFT             track 0..7 def 2
+0x260 ANSWER SPACE             track 0..100 def 25
+0x261 ANSWER LEN               track 0..2 def 1
+0x262 TIMING SHAPE             track 0..2 def 0
+0x263 MIDI OUT CHANNEL         track 0..17 def 0
+0x264 KEY LINK                 global 0..1 def 1
+0x265 SOURCE                   track 0..4 def 0
+0x266 KEEP                     track 0..2 def 0

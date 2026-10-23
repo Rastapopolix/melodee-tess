@@ -12,21 +12,21 @@ static int16_t mo_cell;                                 /* (the sheet's lane: it
 
 static int motion_page(void) { return !ui.home && !ui.menu && !ui.layer && cur_page()->graph == GR_MOTION; }
 /* the parameters with events on the selected track's pattern, by id; their number */
-static uint32_t mo_lanes(uint8_t *ids)
+static uint32_t mo_lanes(uint16_t *ids)
 {
     uint32_t i, j, n = 0, k = song.sel % NTRK;
     for (i = 0; i < motion.count; i++) {
         const motion_event_t *e = &motion.event[i];
         if ((e->place >> 6) != k || motion_pattern[i] != TSEL->pattern || e->param == P_RECQ ||
-            (e->param >= MO_NATIVE && (uint32_t)e->value >> 8 != motion_native_tag(TSEL)))   /* (another engine's) */
+            (motion_native_event(e->param,e->value) && (uint32_t)e->value >> 8 != motion_native_tag(TSEL)))   /* (another engine's) */
             continue;
-        for (j = 0; j < n && ids[j] != e->param; j++)
+        for (j = 0; j < n && ids[j] != motion_token(e); j++)
             ;
         if (j < n || n >= MO_MAX)
             continue;
-        for (j = n++; j > 0 && ids[j - 1] > e->param; j--)
+        for (j = n++; j > 0 && ids[j - 1] > motion_token(e); j--)
             ids[j] = ids[j - 1];
-        ids[j] = e->param;
+        ids[j] = (uint16_t)motion_token(e);
     }
     return n;
 }
@@ -34,61 +34,35 @@ static uint32_t mo_events(uint32_t id)                  /* the lane's events */
 {
     uint32_t i, n = 0, k = song.sel % NTRK;
     for (i = 0; i < motion.count; i++)
-        n += (motion.event[i].place >> 6) == k && motion_pattern[i] == TSEL->pattern && motion.event[i].param == id;
+        n += (motion.event[i].place >> 6) == k && motion_pattern[i] == TSEL->pattern && motion_token(&motion.event[i]) == id;
     return n;
 }
 static int mo_value(uint32_t id, uint32_t step, int16_t *v)   /* the event at step, 1 if there is one */
 {
     uint32_t i, place = (song.sel % NTRK) << 6 | step;
     for (i = 0; i < motion.count; i++)
-        if (motion_pattern[i] == TSEL->pattern && motion.event[i].place == place && motion.event[i].param == id) {
-            *v = (int16_t)(id >= MO_NATIVE ? motion.event[i].value & 255 : motion.event[i].value);
+        if (motion_pattern[i] == TSEL->pattern && motion.event[i].place == place && motion_token(&motion.event[i]) == id) {
+            *v = (int16_t)((id&256u) ? motion.event[i].value & 255 : motion.event[i].value);
             return 1;
         }
     return 0;
 }
-/* a lane of the engine's own patch (motion.c MO_NATIVE + i): the Prophet's and FM6's values by their pages' names
- * (FM6's operators "OP3 OUT"), the CZ-1's tone bytes by what they belong to ("DCW 1 env") */
-static const param_desc_t MO_CZ_BYTE = {"TONE", F_INT, 0, 255, 0, 0, 0};
+/* a lane of the engine's own patch (motion.c MO_NATIVE + i): FM6's values by their pages' names (its operators
+ * "OP3 OUT") */
+static const param_desc_t MO_BYTE = {"TONE", F_INT, 0, 255, 0, 0, 0};
 static const param_desc_t *mo_desc(uint32_t id)         /* its range (and name) */
 {
-    uint32_t i = id - MO_NATIVE;
-    if (id < MO_NATIVE)
+    uint32_t i = (id&255u) - MO_NATIVE;
+    if (!(id&256u))
         return param_desc_of(eng_idx(TSEL->eng_req), id);
-#if MELODEE_PROPHET
-    if (motion_native_tag(TSEL) == MO_TAG_P5 && i < NELEM(P5_PANEL) && P5_PANEL[i].label)
-        return &P5_PANEL[i];
-#endif
     if (motion_native_tag(TSEL) == MO_TAG_FM6)
-        return i < FP_PR1 ? &FM6_OPD[i % FP_OP] : i < FP_NAME ? &FM6_GD[i - FP_PR1] : &MO_CZ_BYTE;
-    return &MO_CZ_BYTE;
-}
-static void mo_cz_name(uint32_t i, char *b, uint32_t n, int brief)
-{
-    static const char *const PART[6] = {"Wave", "DCA key", "DCW key", "DCA", "DCW", "Pitch"};
-    static const uint8_t END[6] = {2, 4, 6, 23, 40, 57};   /* (a line's 57 bytes: its parts' ends) */
-    uint32_t line = i >= 71u, o = i - (line ? 71u : 14u), p;
-    char d[2] = {(char)('1' + line), 0};
-    if (i < 14u) {
-        str_cpy(b, i < 4u ? "Detune" : "Vibrato", n);
-        return;
-    }
-    for (p = 0; p < 5u && o >= END[p]; p++)
-        ;
-    str_cpy(b, PART[p], n);
-    str_cpy(b + str_len(b), brief ? "" : " ", n - str_len(b));
-    str_cpy(b + str_len(b), d, n - str_len(b));
-    if (p >= 3u && !brief)
-        str_cpy(b + str_len(b), " env", n - str_len(b));
+        return i < FP_PR1 ? &FM6_OPD[i % FP_OP] : i < FP_NAME ? &FM6_GD[i - FP_PR1] : &MO_BYTE;
+    return &MO_BYTE;
 }
 static void mo_name(uint32_t id, char *b, uint32_t n)   /* "Cutoff" */
 {
-    uint32_t i = id - MO_NATIVE;
-    if (id >= MO_NATIVE && motion_native_tag(TSEL) == MO_TAG_CZ) {
-        mo_cz_name(i, b, n, 0);
-        return;
-    }
-    if (id >= MO_NATIVE && motion_native_tag(TSEL) == MO_TAG_FM6 && i < FP_PR1) {   /* "OP3 OUT" */
+    uint32_t i = (id&255u) - MO_NATIVE;
+    if ((id&256u) && motion_native_tag(TSEL) == MO_TAG_FM6 && i < FP_PR1) {   /* "OP3 OUT" */
         str_cpy(b, "OP1 ", n);
         b[2] = (char)('6' - i / FP_OP);
         str_cpy(b + 4, mo_desc(id)->label, n - 4u);
@@ -98,9 +72,9 @@ static void mo_name(uint32_t id, char *b, uint32_t n)   /* "Cutoff" */
 }
 static int16_t mo_base(uint32_t id)                     /* the value the patch itself has */
 {
-    uint32_t i = id - MO_NATIVE, k = song.sel % NTRK;
+    uint32_t i = (id&255u) - MO_NATIVE, k = song.sel % NTRK;
     const uint8_t *b;
-    if (id < MO_NATIVE)
+    if (!(id&256u))
         return motion_base_value(TSEL, id);
     b = motion_native_at(TSEL, i);
     return (int16_t)(motion_nbit(k, i) ? motion_nbase[k][i] : b ? *b : 0);
@@ -136,7 +110,7 @@ static const sheet_row_t SHEET_MOTION[] = {{"Play", mo_play_v, 0, mo_play, 0}, {
 
 static void motion_enter(void)                          /* OCT+ on a lane: its sheet */
 {
-    uint8_t ids[MO_MAX];
+    uint16_t ids[MO_MAX];
     uint32_t n = mo_lanes(ids);
     char t[20], sub[16];
     if (!n)
@@ -153,7 +127,7 @@ static void motion_enter(void)                          /* OCT+ on a lane: its s
 }
 static void motion_knob(uint32_t k, int32_t s)          /* KNOB 2 the lane, KNOB 1 Play */
 {
-    uint8_t ids[MO_MAX];
+    uint16_t ids[MO_MAX];
     uint32_t n = mo_lanes(ids);
     if (k == 1u && n)
         mo.lane = (uint8_t)clamp((int32_t)mo.lane + (s > 0 ? 1 : -1), 0, (int32_t)n - 1);
@@ -172,17 +146,11 @@ static void mo_label(uint32_t id, char *b)              /* "CUTOFF" (too wide: t
         if (b[i] >= 'a' && b[i] <= 'z') b[i] = (char)(b[i] - 32);
     if (text_w(&AF_X, b) <= 40)
         return;
-    if (id >= MO_NATIVE && motion_native_tag(TSEL) == MO_TAG_CZ) {   /* "DCW1" */
-        mo_cz_name(id - MO_NATIVE, b, 16, 1);
-        for (i = 0; b[i]; i++)
-            if (b[i] >= 'a' && b[i] <= 'z') b[i] = (char)(b[i] - 32);
-    } else {
-        str_cpy(b, mo_desc(id)->label, 16);
-    }
+    str_cpy(b, mo_desc(id)->label, 16);
 }
 static void motion_draw(void)
 {
-    uint8_t ids[MO_MAX];
+    uint16_t ids[MO_MAX];
     uint32_t n = mo_lanes(ids), len = (uint32_t)clamp(TSEL->p[P_SLEN], 1, NSTEP), r, s, sig, on = motion_enabled(TSEL);
     uint32_t ph = song.playing ? TSEL->seq_idx % len : 0xFFu;
     if (ui.force)

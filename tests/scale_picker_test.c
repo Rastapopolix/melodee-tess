@@ -6,8 +6,8 @@
 static void mark(int on)
 {
     press(B_SCL); frames(400); assert(scale_settings_page(cur_page()));
-    turn(EN_K2, 4); frame();                       /* (SCL is a list: Favourite its 5th row, KNOB 1 its value) */
-    turn(EN_K1, on ? 1 : -1); frame();
+    turn(EN_K1, 5); frame();                       /* (SCL is a list: Favourite its 6th row, KNOB 2 its value) */
+    turn(EN_K2, on ? 1 : -1); frame();
     turn(EN_SELECT, -1); frame(); assert(cur_page()->graph == GR_SCALE_PICKER);
 }
 
@@ -17,11 +17,17 @@ int main(void)
     assert(cur_page()->graph == GR_SCALE_PICKER && ui.scale_family == 1);
     assert(cur_page()->id[1] == P_SCALE && cur_page()->id[2] == P_ROOT);
     uint32_t visited = 0;
+    tessera.key_link = 0;                          /* (KEY LINK OWN: ROOT the track's) */
     turn(EN_K3, 5); frame();
     assert(TSEL->p[P_ROOT] == 5 && !scale_favorite(TSEL->p[P_SCALE]));
     for (uint32_t k = 1; k < NPART; k++) assert(trk[k].p[P_ROOT] == 0);
     edit_param(2, 100); assert(TSEL->p[P_ROOT] == 11);
     edit_param(2, -100); assert(TSEL->p[P_ROOT] == 0);
+    tessera.key_link = 1;                          /* (LINKED: the picker's ROOT on every melodic track) */
+    edit_param(2, 3);
+    for (uint32_t k = 0; k < NPART; k++) assert(drum_track(&trk[k]) || trk[k].p[P_ROOT] == 3);
+    edit_param(2, -3);
+    for (uint32_t k = 0; k < NPART; k++) assert(drum_track(&trk[k]) || trk[k].p[P_ROOT] == 0);
     for (uint32_t family = 1; family <= SCALE_FAMILIES; family++) {
         edit_param(0, (int32_t)family - ui.scale_family);
         uint32_t total = scale_picker_count();

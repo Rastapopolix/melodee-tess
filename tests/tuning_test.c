@@ -37,10 +37,7 @@ static uint32_t oscillator_step(uint32_t eng, uint32_t hz, uint32_t osc)
     set_engine_of(t, eng); apply_preset_to(t, 0); t->engine = t->eng_req;
     t->p[P_LD_PIT] = t->p[P_ED_PIT] = 0;
     t->p[P_SUS] = 127; t->p[P_VOICE] = V_POLY;
-    if (eng == 0) t->p[P_E1] = 12; /* exercise ANALOG's rebuilt detuned oscillator */
-    if (eng == 2) t->p[P_E4] = 1;  /* enable PHASE's second line */
     if (eng == 6) { t->p[P_E0] = 0; t->p[P_E1] = 7; t->p[P_E2] = -12; } /* three pitches */
-    if (eng == 15) cz_patch[0].raw[0] = (cz_patch[0].raw[0] & ~3u) | 2u; /* LINE 1 + 1' */
     trk_note_on(t, 69, 100);
     voice_t *v = 0;
     for (uint32_t i = 0; i < NVOICE; i++) if (t->v[i].gate) { v = &t->v[i]; break; }
@@ -52,7 +49,7 @@ static uint32_t oscillator_step(uint32_t eng, uint32_t hz, uint32_t osc)
 
 static void engines(void)
 {
-    const uint32_t eng[] = {0, 2, 3, 6, 15}, oscillators[] = {2, 2, 1, 3, 2};
+    const uint32_t eng[] = {3, 6}, oscillators[] = {1, 3};   /* SID, TRIO (PHASE and the CZ-1: retired) */
     for (uint32_t k = 0; k < NELEM(eng); k++) {
         int ok = 1;
         for (uint32_t osc = 0; osc < oscillators[k]; osc++) {
@@ -93,8 +90,12 @@ static void controls(void)
     verify("A4 card shows 432 Hz", str_eq(value, "432") && str_eq(unit, "Hz"));
     stop_transport(); project_save(0); tuning_a4 = 444;
     project_load(0); verify("Loading a project keeps the device's chosen A4", tuning_a4 == 444);
+    int16_t previous_budget=settings_budget;settings_budget=32;
+    project_load(0);verify("Loading a project keeps the shared workload allowance",settings_budget==32);
     template_save(); tuning_a4 = 432;
     template_load(); verify("Loading a template keeps the device's chosen A4", tuning_a4 == 432);
+    settings_budget=24;template_load();verify("Loading a template keeps the device workload allowance",settings_budget==24);
+    settings_budget=previous_budget;
     song.g[G_TUNE] = 7; go_title("GLOBAL"); turn(EN_K4, 1);
     verify("TUNE remains an independent cents adjustment", song.g[G_TUNE] == 8 && tuning_a4 == 432);
     tuning_a4 = 440; turn(EN_K1, -1000);

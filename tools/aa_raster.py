@@ -156,8 +156,8 @@ def raster_font(spec, px, chars, tracking=0.0, gamma=1.0, tabular=True, kern_min
         for b in chars:
             if a == " " or b == " ":
                 continue
-            if a.isdigit() and b.isdigit():
-                continue                       # tabular figures never kern
+            if (a.isdigit() or a in ".,:") and (b.isdigit() or b in ".,:"):
+                continue                       # tabular figures never kern (nor with their points: 1.25 = 8.75)
             d = (font_hi.getlength(a + b, features=feats) - lens[a] - lens[b]) / SS
             d16 = int(round(d * 16))
             if abs(d16) >= kern_min:

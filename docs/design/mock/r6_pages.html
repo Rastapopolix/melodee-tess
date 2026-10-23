@@ -21,7 +21,7 @@ h3{font:500 15px system-ui;color:#ccc;margin:18px 0 0}
 <h3>Rings over a picture</h3>
 <div class="mg">
 <div class="mc"><svg viewBox="0 0 240 240" id="q_arp"></svg><div class="cap">ARP: the notes it plays, climbing</div></div>
-<div class="mc"><svg viewBox="0 0 240 240" id="q_scl"></svg><div class="cap">SCL: its settings as a list (KNOB 2 the row, KNOB 1 the value, OCT+ the scales list); the octave under it</div></div>
+<div class="mc"><svg viewBox="0 0 240 240" id="q_scl"></svg><div class="cap">SCL: its settings as a list (KNOB 1 the row, KNOB 2 the value, OCT+ the scales list); the octave under it</div></div>
 <div class="mc"><svg viewBox="0 0 240 240" id="q_chord"></svg><div class="cap">CHORD: its name, its notes on two octaves</div></div>
 <div class="mc"><svg viewBox="0 0 240 240" id="q_pattern"></svg><div class="cap">PATTERN: the 64 steps as four bars of dots</div></div>
 <div class="mc"><svg viewBox="0 0 240 240" id="q_slicer"></svg><div class="cap">SLICER: the gate it cuts, at its depth</div></div>
@@ -83,7 +83,7 @@ const put=(id,s)=>document.getElementById(id).innerHTML=r(0,0,240,240,BG,0)+s;
 {let s=head('ARP',c,1,2,0)+rings([['MODE','Up','',.25],['RATE','1/16','',.4],['OCTAVES','2','',.33],['GATE','50','%',.5]],c,0)+panel(108,112);
  const N=[0,1,2,3,4,5,6,7];N.forEach((k)=>{const x=14+k*27,row=k%4+(k>=4?4:0);s+=r(x,198-row*8-8,13,7,k<4?c:mix(c,PN,.6),3)});
  s+=t(14,126,'C3 E3 G3 · 2 oct',9,MD)+path('M12 204 L228 204',LN,1)+sound('PROPHET','Pickle Pincher',c);put('q_arp',s)}
-/* SCL: a list of its settings (KNOB 2 the row, KNOB 1 its value, OCT+ its list), the octave under it */
+/* SCL: a list of its settings (KNOB 1 the row, KNOB 2 its value, OCT+ its list), the octave under it */
 {let s=head('SCALE',c,1,3,1);const L=[['Root','D#',0],['Scale','Minor',1],['Quantise','On',0],['Transpose','0 st',0],['Favourite','★',0]];
  L.forEach((q,i)=>{const y=26+i*22,on=i==1;if(on)s+=r(0,y,240,20,RS,0)+r(0,y,3,20,c,0);s+=t(12,y+14,q[0],11,on?TX:SC,0,on)+t(on?216:228,y+14,q[1],11,on?c:MD,'end',on)+(q[2]?t(228,y+14,'›',12,on?c:MD,'end',1):'')});
  s+=r(4,142,232,78,PN,6);const W=[0,2,4,5,7,9,11],inS=[3,5,6,8,10,11,1],root=3;
@@ -127,7 +127,7 @@ const put=(id,s)=>document.getElementById(id).innerHTML=r(0,0,240,240,BG,0)+s;
  for(let i=0;i<4;i++)s+=r(4+i*58,22,54,44,SF,6)+t(10+i*58,34,'LEVEL',8.5,C[i],0,1)+t(10+i*58,52,['-11','-4','-4','-4'][i]+'<tspan font-size="9" fill="'+MD+'"> dB</tspan>',15,TX,0,1);
  s+=`<rect x="0" y="70" width="240" height="170" fill="${BG}" opacity=".7"/>`+r(4,80,232,156,SF,10,LN)+t(14,96,'Keys',9,MD,0,1);
  [[0,'Mute','1',0],[1,'Mute','2',1],[3,'Mute','3',0],[4,'Mute','4',0],[5,'','',0]].forEach(([i,a,b,on])=>{const x=10+i*28+14;if(a)s+=r(x,104,26,40,on?mix(REC,SF,.55):PN,4,on?null:LN)+t(x+13,120,a,7.5,on?TX:SC,'middle',1)+t(x+13,134,b,9,on?TX:MD,'middle',1)});
- const K=[['Solo','1'],['Solo','2'],['Solo','3'],['Solo','4'],['Mute','all'],['',''],['',''],['Tap','tempo']];
+ const K=[['Solo','1'],['Solo','2'],['Solo','3'],['Solo','4'],['Mute','all'],['',''],['',''],['Tap','bpm']];
  K.forEach((k,i)=>{const x=10+i*28,on=i==2;s+=r(x,152,26,76,on?c:k[0]?PN:QT,4,k[0]&&!on?LN:null)+t(x+13,206,k[0],7.5,on?BG:SC,'middle',1)+t(x+13,220,k[1],9,on?BG:TX,'middle',1)});
  put('q_layer',s)}
 /* NAME */

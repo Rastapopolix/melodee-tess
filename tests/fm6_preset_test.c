@@ -1,16 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Independent native preset pools, migration and failure recovery on simulated NOR. */
+/* Independent native preset pools and failure recovery on simulated NOR. */
 #define PERSISTENCE_TEST_NO_MAIN
 #include "persistence_test.c"
 
 static void reboot_presets(void)
 {
-    up_cache_reset();native_cache_reset();upf_empty();cz_bank_boot();up_boot();
+    up_cache_reset();native_cache_reset();up_boot();
 }
 static int bank_import(void)
 {
     int bad=0;static uint8_t bank[4096],old[4096];uint32_t saved;
-    reset();upf_empty();fm6_init();cz_init();up_boot();
+    reset();fm6_init();up_boot();
     for(uint32_t k=0;k<32;k++)fm6_factory(k%FM6_NFAC,bank+k*128u);
     uint32_t writes=erases;
     bad+=check("32-voice import commits two storage objects, not 32 saves",native_fm_import32(32,bank,&saved)==0 && saved==32 && erases==writes+2);
@@ -31,60 +31,59 @@ static int bank_import(void)
 }
 int main(void)
 {
-    int bad=0;uint8_t fm[FM6_PACKED],cz[CZ_BYTES],got[FM6_PACKED];
-    reset();upf_empty();fm6_init();cz_init();up_boot();
-    fm6_factory(3,fm);memcpy(fm+118,"MY VOICE  ",10);cz_patch_init(cz);memcpy(cz+128,"MY CZ TONE      ",16);cz[20]=0x37;
-    bad+=check("64 FM6 and 128 CZ slots are independent from 64 general slots",native_limit(ENGI_FM6)==64 && native_limit(ENGI_CZ)==128 && UP_SLOTS==64 && !native_count(ENGI_FM6) && !native_count(ENGI_CZ));
+    int bad=0;uint8_t fm[FM6_PACKED],cz[144u],got[FM6_PACKED];
+    reset();fm6_init();up_boot();
+    fm6_factory(3,fm);memcpy(fm+118,"MY VOICE  ",10);memset(cz,0,sizeof cz);memcpy(cz+128,"MY CZ TONE      ",16);cz[20]=0x37;
+    bad+=check("64 FM6 slots, independent from 64 general slots; no CZ-1 or Prophet pool",native_limit(ENGI_FM6)==64 && !native_limit(ENGI_CZ) && !native_limit(ENGI_PROPHET) && UP_SLOTS==64 && !native_count(ENGI_FM6));
     bad+=check("F064 stores original 128-byte DX7 VMEM",native_put(ENGI_FM6,63,fm)==0 && !memcmp(native_raw(ENGI_FM6,63),fm,128));
-    bad+=check("Z128 stores all original 144 CZ-1 bytes",native_put(ENGI_CZ,127,cz)==0 && !memcmp(native_raw(ENGI_CZ,127),cz,144));
-    bad+=check("one engine's native slot cannot occupy the other engine or a general slot",!up_used(63) && native_count(ENGI_FM6)==1 && native_count(ENGI_CZ)==1);
-    TSEL->p[P_DIST]=47;TSEL->p[P_LD_PIT]=12;TSEL->step[0]=(step_t){.time=ST_NOTE,.n=1,.note={60}};
+    bad+=check("a CZ-1 tone is refused (its store retired with the engine)",native_put(ENGI_CZ,127,cz)==1 && !native_used(ENGI_CZ,127));
+    bad+=check("a native slot cannot occupy a general slot",!up_used(63) && native_count(ENGI_FM6)==1 && !native_count(ENGI_CZ));
+    TSEL->p[P_RESERVED33]=47;TSEL->p[P_LD_PIT]=12;TSEL->step[0]=(step_t){.time=ST_NOTE,.n=1,.note={60}};
     native_load(ENGI_FM6,63,0);fm6_pack(fm6_patch[0],got);
-    bad+=check("native FM6 load keeps effects, modulation and pattern",!memcmp(got,fm,128) && TSEL->p[P_DIST]==47 && TSEL->p[P_LD_PIT]==12 && TSEL->step[0].note[0]==60);
-    native_load(ENGI_CZ,127,0);
-    bad+=check("native CZ load keeps effects, modulation and pattern",!memcmp(cz_patch[0].raw,cz,144) && TSEL->p[P_DIST]==47 && TSEL->p[P_LD_PIT]==12 && TSEL->step[0].note[0]==60);
-    uint32_t total,cur=eng_list_pos(&total);
-    bad+=check("Z128 occupies the next ordinary preset position after CZ factory tones",total==66 && cur==65 && user_of(TSEL)==127);
-    eng_list_step(1);bad+=check("ordinary engine preset scrolling wraps from Z128 to INIT",TSEL->eng_req==ENGI_CZ && TSEL->preset==0 && !TSEL->user);
-    eng_list_step(-1);bad+=check("ordinary engine preset scrolling returns to Z128",TSEL->user==128 && !memcmp(cz_patch[0].raw,cz,144));
+    bad+=check("native FM6 load keeps effects, modulation and pattern",!memcmp(got,fm,128) && TSEL->p[P_RESERVED33]==47 && TSEL->p[P_LD_PIT]==12 && TSEL->step[0].note[0]==60);
+    bad+=check("a native CZ load is refused (the engine and its store retired)",native_load(ENGI_CZ,127,0)!=0 && TSEL->eng_req==ENGI_FM6);
+    uint32_t total,cur=eng_list_pos(&total),fac=total-1u;
+    bad+=check("F064 occupies the next ordinary preset position after FM6 factory voices",cur==fac && user_of(TSEL)==63);
+    eng_list_step(1);bad+=check("ordinary engine preset scrolling wraps from F064 to the first voice",TSEL->eng_req==ENGI_FM6 && TSEL->preset==0 && !TSEL->user);
+    eng_list_step(-1);fm6_pack(fm6_patch[0],got);bad+=check("ordinary engine preset scrolling returns to F064",TSEL->user==64 && !memcmp(got,fm,128));
     cur=preset_all_pos(&total);uint32_t k,e=preset_all_at(cur,&k);
-    bad+=check("global preset browser identifies native slots as user sounds",e==USER_NATIVE_CZ && k==127);
+    bad+=check("global preset browser identifies native slots as user sounds",e==USER_NATIVE_FM && k==63);
     favorite_set(USER_NATIVE_FM,63,1);favorite_set(USER_NATIVE_CZ,127,1);favorites.filter=1;
-    bad+=check("native presets participate in the regular favorites filter",preset_pos(&total)<2 && total==2);
+    bad+=check("native presets participate in the regular favorites filter (a CZ favorite no longer lists)",preset_pos(&total)<1 && total==1);
     preset_go(0);bad+=check("filtered global scrolling loads F064 directly",TSEL->eng_req==ENGI_FM6 && TSEL->user==64);
     settings_save();memset(&favorites,0,sizeof favorites);persist_t persisted;int n=st_load(OBJ_SETTINGS,&persisted,sizeof persisted);settings_import(&persisted,n);
-    bad+=check("native favorites persist without changing the settings layout",favorite_has(USER_NATIVE_FM,63) && favorite_has(USER_NATIVE_CZ,127));favorites.filter=0;
+    bad+=check("native favorites persist without changing the settings layout",favorite_has(USER_NATIVE_FM,63) && !favorite_has(USER_NATIVE_CZ,127));favorites.filter=0;
+    {char zn[11];__typeof__(favorites) keep=favorites;memset(&favorites,0,sizeof favorites);
+     favorite_set(ENGI_FM6,25,1);favorite_set(USER_NATIVE_FM,1,1);favorite_set(USER_NATIVE_FM,1,0);
+     bad+=check("ZEN-1's FM6 presets (after INIT VOICE) keep their favorites apart from the native slots",favorite_has(ENGI_FM6,25) && !favorite_has(ENGI_FM6,26) && !favorite_has(USER_NATIVE_FM,1));
+     favorites=keep;engine_load_of(TSEL,ENGI_FM6,25);fm6_name(zn,fm6_patch[0]);
+     bad+=check("FM6 preset 25 loads ZEN-1's SOFT PAD, INIT VOICE stays at 24",!strcmp(zn,"SOFT PAD") && preset_init(ENGI_FM6)==24u);}
     reboot_presets();
-    bad+=check("both native pools survive reboot byte for byte",native_used(ENGI_FM6,63) && native_used(ENGI_CZ,127) && !memcmp(native_raw(ENGI_FM6,63),fm,128) && !memcmp(native_raw(ENGI_CZ,127),cz,144));
+    bad+=check("the native FM6 pool survives reboot byte for byte",native_used(ENGI_FM6,63) && !memcmp(native_raw(ENGI_FM6,63),fm,128));
     uint8_t newer[128];memcpy(newer,fm,128);newer[118]='N';fail_after=2;
     bad+=check("torn native save reports failure and rolls RAM back",native_put(ENGI_FM6,63,newer)==2 && !memcmp(native_raw(ENGI_FM6,63),fm,128));fail_after=-1;reboot_presets();
     bad+=check("torn native save keeps the last flash commit",!memcmp(native_raw(ENGI_FM6,63),fm,128));
-    song.playing=1;uint32_t writes=erases;bad+=check("native writes refuse playback without flash erase",native_put(ENGI_CZ,0,cz)==2 && erases==writes);song.playing=0;
-    native_put(ENGI_CZ,127,0);native_put(ENGI_FM6,63,0);reboot_presets();
-    bad+=check("erased native presets stay erased across boot",!native_used(ENGI_CZ,127) && !native_used(ENGI_FM6,63));
+    song.playing=1;uint32_t writes=erases;bad+=check("native writes refuse playback without flash erase",native_put(ENGI_FM6,0,fm)==2 && erases==writes);song.playing=0;
+    native_put(ENGI_FM6,63,0);reboot_presets();
+    bad+=check("erased native presets stay erased across boot",!native_used(ENGI_FM6,63));
 
-    /* Simulate the preceding shared-preset firmware, including both UPF6 objects. */
-    reset();upf_empty();fm6_init();set_engine_of(TSEL,ENGI_FM6);
+    /* An FM6 general preset keeps its voice in the native slot of the same number. */
+    reset();fm6_init();set_engine_of(TSEL,ENGI_FM6);
     uint8_t voice[FP_SIZE+1];fm6_unpack(fm,voice);fm6_set_patch(0,voice);
-    up_store(0,"OLD FIRST");up_store(47,"OLD MIDDLE");up_store(63,"OLD LAST");
-    /* A historical CZ bank and one ordinary native CZ record must both survive. */
-    cz_bank_t oldcz;cz_bank_empty(&oldcz,7);oldcz.used=0x8000u;memcpy(oldcz.tone[15].raw,cz,144);st_save(OBJ_CZBANK0+7,&oldcz,sizeof oldcz);
-    set_engine_of(TSEL,ENGI_CZ);memcpy(cz_patch[0].raw,cz,144);cz_patch[0].raw[128]='S';up_store(4,"SHARED CZ");
-    fail_after=30;reboot_presets();fail_after=-1;
-    bad+=check("interrupted pool migration retains committed native data and old sources",native_used(ENGI_FM6,0) && native_used(ENGI_FM6,47));
-    reboot_presets();
-    bad+=check("shared FM6 voices migrate even after a reused-object interruption",native_used(ENGI_FM6,0) && native_used(ENGI_FM6,47) && native_used(ENGI_FM6,63) && !memcmp(native_raw(ENGI_FM6,63),fm,128));
-    bad+=check("old CZ slot 128 stays in place; shared tone uses a free CZ slot",native_used(ENGI_CZ,127) && native_used(ENGI_CZ,0) && native_raw(ENGI_CZ,0)[128]=='S' && !memcmp(native_raw(ENGI_CZ,127),cz,144));
-    native_put(ENGI_FM6,63,0);native_put(ENGI_CZ,0,0);reboot_presets();
-    bad+=check("migration markers prevent erased legacy sounds from reappearing",!native_used(ENGI_FM6,63) && !native_used(ENGI_CZ,0));
+    up_store(47,"MIDDLE");reboot_presets();
+    bad+=check("an FM6 user preset's voice survives reboot in its native slot",up_used(47) && native_used(ENGI_FM6,47) && !memcmp(native_raw(ENGI_FM6,47),fm,128));
     int layout=1;
     /* (the legacy projects are retired: the Prophet banks took their place when the app area grew) */
     #define RETIRED(o) st_retired(o)
+    static int16_t owner[0x100000/ST_SECTOR];   /* (each sector of each live copy: one owner; a project copy has ten) */
+    for(uint32_t i=0;i<sizeof owner/sizeof owner[0];i++)owner[i]=-1;
     for(uint32_t a=0;a<OBJ_COUNT;a++)for(uint32_t ac=0;ac<2;ac++){
-        uint32_t lo=st_sector(a,ac),len=st_banked(a)?5u*ST_SECTOR:ST_SECTOR;
         if(RETIRED(a))continue;
-        layout &= !(lo<0xE5000u && lo+len>0xE0000u) && lo>=0x93000u;   /* (above the app area) */
-        for(uint32_t b=a+1;b<OBJ_COUNT;b++)for(uint32_t bc=0;bc<2;bc++){uint32_t blo=st_sector(b,bc),blen=st_banked(b)?5u*ST_SECTOR:ST_SECTOR;if(RETIRED(b))continue;layout &=lo+len<=blo || blo+blen<=lo;}
+        for(uint32_t i=0;i<st_sectors(a);i++){
+            uint32_t lo=st_proj(a)?st_proj_sector(a,ac,i):st_sector(a,ac);
+            layout &= !(lo<0xE5000u && lo+ST_SECTOR>0xE0000u) && lo>=0x93000u;   /* (above the app area) */
+            layout &= owner[lo/ST_SECTOR]<0; owner[lo/ST_SECTOR]=(int16_t)a;
+        }
     }
     bad+=check("native storage stays separate from projects, general presets and OTA",layout);
     bad+=bank_import();

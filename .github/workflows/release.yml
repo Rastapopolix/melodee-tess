@@ -1,0 +1,112 @@
+name: Release Tessera
+
+# A tag vX.Y[.Z][-suffix] on main: builds both firmware variants (dual core and MELODEE_DUAL_CORE=0), runs the full host
+# suite, checks the two packages as the site does (web/make_site.py: one identity, two distinct builds, Tessera's own
+# loader) and publishes a GitHub release with both packages, SHA256SUMS and the notes in docs/RELEASE_X.Y.md (a
+# suffix, as 2.0-rc1, is a prerelease). Run by hand (workflow_dispatch) it does all of that but the release: a dry run.
+# The site is not touched: GitHub Pages serves main's docs/, updated by a pull request (web/make_site.py into docs/,
+# with the simulator from web/sim/build.sh), as the test pages are.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, X.Y[.Z][-suffix] (a dry run: nothing is published)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      JIELI_TOOLCHAIN: ${{ github.workspace }}/.nightly-deps/jieli/toolchain
+      AC79_SDK: ${{ github.workspace }}/.nightly-deps/sdk
+      PARALLEL: '2'
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libharfbuzz-dev libfribidi-dev libraqm-dev
+          python -m pip install Pillow fonttools
+      - uses: actions/cache@v4
+        with:
+          path: .nightly-deps
+          key: jieli-linux-sdk-d179b448-v1
+      - name: Fetch pinned SDK and toolchain
+        run: |
+          if [ ! -x "$JIELI_TOOLCHAIN/pi32v2/bin/clang" ]; then
+            tools/get_toolchain.sh "$GITHUB_WORKSPACE/.nightly-deps/jieli"
+          fi
+          if [ ! -d "$AC79_SDK/.git" ]; then
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git "$AC79_SDK"
+          fi
+          test "$(git -C "$AC79_SDK" rev-parse HEAD)" = d179b4484759423312073f5fbb232501aa491047
+      - name: Version and release notes
+        run: |
+          v="${VERSION#v}"
+          echo "V=$v" >> "$GITHUB_ENV"
+          base="${v%%-*}"
+          test -f "docs/RELEASE_$base.md" || { echo "docs/RELEASE_$base.md is missing"; exit 1; }
+          echo "NOTES=docs/RELEASE_$base.md" >> "$GITHUB_ENV"
+      - name: Full host suite (on a development build)
+        run: |
+          ./build.sh
+          tests/run_tests.sh
+      - name: Build both release variants
+        run: |
+          mkdir -p build/release-assets
+          ./build.sh --release "$V" 2>&1 | tee dual.log
+          cp "build/tessera-$V.fwsc" build/release-assets/
+          MELODEE_DUAL_CORE=0 ./build.sh --release "$V" 2>&1 | tee single.log
+          cp "build/tessera-$V-1core.fwsc" build/release-assets/
+      - name: Check the packages as the site does, checksums
+        run: |
+          python web/make_site.py "build/release-assets/tessera-$V.fwsc" \
+            "build/release-assets/tessera-$V-1core.fwsc" "$V" build/site-check
+          (cd build/release-assets && sha256sum *.fwsc > SHA256SUMS && cat SHA256SUMS)
+          {
+            echo "### Tessera $V"
+            echo '```'
+            grep -h -E "audio working arena|^app |^package " dual.log single.log
+            cat build/release-assets/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tessera-${{ env.V }}
+          path: build/release-assets/*
+
+  publish:
+    needs: firmware
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: build/release-assets
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          base="${v%%-*}"
+          pre=""
+          case "$v" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" build/release-assets/* --verify-tag $pre \
+            --title "Tessera $v" --notes-file "docs/RELEASE_$base.md"

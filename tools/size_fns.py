@@ -15,10 +15,20 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 SRC = _ROOT / "firmware" / "src" if (_ROOT / "firmware" / "src").is_dir() else _ROOT / "src"   # either layout
 # the UI, the stores, the editor and the console: main loop only, never called by sound code
-SIZE_FILES = ["ui.c", "favorites.c", "icons.c", "ui_graph.c", "ui_draw.c", "ui_menu.c", "ui_input.c",
+SIZE_FILES = ["ui.c", "gfx.c", "favorites.c", "icons.c", "ui_graph.c", "ui_draw.c", "ui_menu.c", "ui_input.c",
+              "editor_native.c", "scale_picker.c", "seq_edit.c", "seq_notes.c", "seq_undo.c", "native_presets.c", "note_tools.c", "seq_tools.c", "sysex_library.c", "fm6_store.c", "ui_browser.c", "ui_designer.c", "ui_designer_input.c", "ui_layer.c", "ui_list.c", "ui_motion.c", "ui_name.c",
+              "ui_new.c", "ui_pages.c", "ui_patterns.c", "ui_popup.c", "ui_scales.c", "ui_sections.c", "ui_slots.c", "ui_stage.c",
               "storage.c", "upreset.c", "project.c", "settings_persist.c",
-              "editor.c", "editor_cz.c", "cz_bank.c", "cz_patch.h", "pattern_store.c", "editor_fm6.c", "fm6_bank.c", "editor_preferences.c", "editor_backup.c", "console.c"]
+              "editor.c", "project_tsp.c", "editor_fm6.c", "editor_preferences.c", "editor_backup.c", "console.c",
+              # main-loop only too: the boot and the main loop (main.c, not its ISR), parameters and their text, the
+              # browser, the screen saver, calibration, the update entry
+              "main.c", "params.c", "browse.c", "screen.c", "panel.c", "ota.c", "favorites.c"]
 DEF = re.compile(r"^(?:static|void|int|uint\w*|int\w*|const)\b[^;=(]*?\b([A-Za-z_]\w*)\s*\(", re.M)
+# Stopped note transforms are infrequent main-loop work.
+# Keep their callers' common input/render paths compact as well as the helpers.
+COLD_NAMES = {"note_convert", "note_transform", "ui_confirm_accept"}
+# Share event copies and keep confirmed writes out of the input dispatcher.
+NOINLINE_NAMES = {"ui_confirm_accept", "note_assign"}
 IR_DEF = re.compile(r"^(define [^\n]*?@\"?([\w.]+)\"?\([^\n]*\)(?: unnamed_addr| local_unnamed_addr)?)( #\d+[^\n]*\{)$",
                     re.M)
 
@@ -41,9 +51,13 @@ def definitions(text):
 
 
 def size_names():
-    names = set()
+    # These recording helpers only restore, copy or reindex editor/persistence data.
+    # Playback, live capture and erase functions retain the normal optimization.
+    names = {"recording_restore_note", "recording_copy", "recording_reindex",
+             "drum909_init", "drum909_set", "drum_note_on", "voice_start",
+             "audio_batch_push", "mix_prepare_batch", "fm6_sync"}
     for f in SIZE_FILES:
-        names.update(definitions((SRC / f).read_text()))
+        names.update(n for n in definitions((SRC / f).read_text()) if not n.endswith("_irq"))   # (ISRs stay as they are)
     return names
 
 
@@ -54,7 +68,7 @@ def main(src, dst):
         if m.group(2) not in names:
             return m.group(0)
         hit.add(m.group(2))
-        return m.group(1) + " minsize" + m.group(3)
+        return m.group(1) + " minsize" + (" cold" if m.group(2) in COLD_NAMES else "") + (" noinline" if m.group(2) in NOINLINE_NAMES else "") + m.group(3)
     ir = IR_DEF.sub(mark, Path(src).read_text())
     attrs = {int(n): a for n,a in re.findall(r"^attributes #(\d+) = (.*)$",ir,re.M)}
     nextattr = max(attrs)+1
