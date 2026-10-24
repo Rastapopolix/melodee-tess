@@ -609,6 +609,13 @@ layers, ENERGY, and the cords. Tessera 2.0 has a project format of its own: proj
 by Melodee show **OLD FORMAT** in their slot and do not load (there is no converter), and the first save writes over
 them. Melodee's own preset banks are not carried over.
 
+**A new project** (stopped): tap **SAVE** to the **PROJECT** page and turn **KNOB 1** past the slots and TMPL to
+**NEW**, then press **OCT+**. The NEW SONG screen asks for the key (**KNOB 1** root, **2** scale, **3** tempo), then,
+after **OCT+**, a role per track (**KNOB 1** to **4**): **KEEP** its sound, or **DRUMS**, **BASS**, **CHORDS**,
+**LEAD** or **PAD** for the first sound of that kind. **OCT+** creates it with every pattern empty; **OCT-** goes back
+or cancels. It starts from the template when one is saved in TMPL, else from the power-on sounds, and has no slot
+until you save it.
+
 The web editor's **Complete backup** saves and restores the music, slots A to D, the sound banks and the settings.
 To try the [demo projects](demos/README.md), `tools/demo_backup.py` puts them into slots of your own backup.
 
